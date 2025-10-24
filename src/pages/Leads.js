@@ -15,14 +15,8 @@ import {
 import { db, auth } from "../firebase";
 import "./Leads.css";
 
-/*
-  Features:
-  - createdAt set only on create
-  - updatedAt/updatedBy/updatedByName set on updates and status changes
-  - history array stores client timestamps (ISO), changedBy, changedByName, type, field, oldValue, newValue, note
-  - Next Status requires note
-  - Details drawer uses className="cp-form details" and renders history with .history-item and .change-pill
-*/
+// Requirement form integration (place RequirementForm.js in src/data)
+import RequirementForm from "../data/RequirementForm";
 
 const defaultForm = {
   id: null,
@@ -75,6 +69,12 @@ export default function Leads() {
   });
 
   const [detailsLead, setDetailsLead] = useState(null);
+
+  // separate state for the lead used by RequirementForm
+  const [reqLead, setReqLead] = useState(null);
+
+  // requirement drawer state
+  const [openReq, setOpenReq] = useState(false);
 
   // Real-time leads listener
   useEffect(() => {
@@ -334,10 +334,10 @@ export default function Leads() {
 
   // lock body scroll when drawer/modal open
   useEffect(() => {
-    if (showForm || detailsLead || statusModal.open) document.body.classList.add("coupons-drawer-open");
+    if (showForm || detailsLead || statusModal.open || openReq) document.body.classList.add("coupons-drawer-open");
     else document.body.classList.remove("coupons-drawer-open");
     return () => document.body.classList.remove("coupons-drawer-open");
-  }, [showForm, detailsLead, statusModal.open]);
+  }, [showForm, detailsLead, statusModal.open, openReq]);
 
   // esc to close
   useEffect(() => {
@@ -346,11 +346,12 @@ export default function Leads() {
         if (statusModal.open) closeStatusModal();
         else if (detailsLead) closeDetails();
         else if (showForm && !closing) closeDrawer();
+        else if (openReq) setOpenReq(false);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [statusModal, detailsLead, showForm, closing]);
+  }, [statusModal, detailsLead, showForm, closing, openReq]);
 
   if (loading) {
     return (
@@ -371,6 +372,17 @@ export default function Leads() {
         </div>
         <div className="coupons-actions">
           <button className="cp-btn" onClick={() => openDrawer(defaultForm)}>+ New Lead</button>
+          <button
+            className="cp-btn primary"
+            onClick={() => {
+              // open requirement form without opening details drawer
+              setDetailsLead(null);
+              setReqLead(null);
+              setOpenReq(true);
+            }}
+          >
+            + Create Requirement
+          </button>
         </div>
       </header>
 
@@ -405,11 +417,34 @@ export default function Leads() {
                   <td className="muted">{l.createdByName || l.createdBy || "—"}</td>
                   <td className="muted">{l.updatedAt ? fmtDate(l.updatedAt) : (l.createdAt ? fmtDate(l.createdAt) : "—")} {l.updatedByName ? `· ${l.updatedByName}` : ""}</td>
                   <td>
-                    <div className="row-actions">
-                      <button className="cp-link" onClick={() => editLead(l)}>Edit</button>
-                      <button className="cp-link" onClick={() => openStatusModal(l)}>Next Status</button>
+                    <div className="row-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      {/* small edit icon */}
+                      <button title="Edit lead" className="row-action-icon" onClick={() => editLead(l)} style={{ padding: 6, borderRadius: 6, border: "1px solid rgba(0,0,0,0.04)", background: "#fff" }}>
+                        ✎
+                      </button>
+
+                      {/* Create Requirement per-row (ONLY for qualified leads) */}
+                      { (l.status || "").toLowerCase() === "qualified" ? (
+                        <button
+                          title="Create Requirement"
+                          className="cp-link"
+                          onClick={() => { setReqLead(l); setDetailsLead(null); setOpenReq(true); }}
+                          style={{ padding: "6px 8px", borderRadius: 6, background: "#f3f4f6", border: "none", fontWeight: 700 }}
+                        >
+                          + Req
+                        </button>
+                      ) : null }
+
+                      {/* view details */}
                       <button className="cp-link" onClick={() => openDetails(l)}>View Details</button>
-                      <button className="cp-link danger" onClick={() => setConfirmDelete(l)}>Delete</button>
+
+                      {/* next stage */}
+                      <button className="cp-link next-stage" onClick={() => openStatusModal(l)}>Next Stage →</button>
+
+                      {/* small delete icon */}
+                      <button title="Delete lead" className="row-action-icon" onClick={() => setConfirmDelete(l)} style={{ padding: 6, borderRadius: 6, border: "1px solid rgba(0,0,0,0.04)", background: "#fff", color: "#b91c1c" }}>
+                        🗑
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -477,6 +512,7 @@ export default function Leads() {
                   <option value="qualified">qualified</option>
                   <option value="lost">lost</option>
                   <option value="converted">converted</option>
+                  <option value="req shared">req shared</option>
                 </select>
               </div>
 
@@ -640,11 +676,50 @@ export default function Leads() {
               </div>
             </div>
 
-            <div className="details-footer" style={{ marginTop: 12, display: "flex", justifyContent: "flex-end" }}>
-              <button className="cp-btn ghost" onClick={closeDetails}>Close</button>
+            <div className="details-footer" style={{ marginTop: 12, display: "flex", justifyContent: "space-between", gap: 8 }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                {/* Open requirement form for this lead ONLY if it's qualified */}
+                { (detailsLead.status || "").toLowerCase() === "qualified" ? (
+                  <button className="cp-btn" onClick={() => { setReqLead(detailsLead); setOpenReq(true); }}>Create Requirement</button>
+                ) : null }
+              </div>
+              <div>
+                <button className="cp-btn ghost" onClick={closeDetails}>Close</button>
+              </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Requirement drawer (opens when Create Requirement clicked) */}
+      {openReq && (
+        <RequirementForm
+          lead={reqLead || detailsLead || { id: "", customerName: "", contactPerson: "", phone: "", address: "" }}
+          onCancel={() => { setOpenReq(false); setReqLead(null); }}
+          onSaved={() => {
+            // Close requirement drawer, then update the lead's status to "req shared" (if we have a lead)
+            setOpenReq(false);
+            const leadToUse = reqLead || detailsLead;
+            setReqLead(null);
+            if (leadToUse && leadToUse.id) {
+              const user = auth.currentUser || {};
+              const entry = makeHistoryEntry({
+                type: "status",
+                field: "status",
+                oldValue: leadToUse.status,
+                newValue: "req shared",
+                note: "Requirement created and shared",
+              });
+              updateDoc(doc(db, "leads", leadToUse.id), {
+                status: "req shared",
+                updatedAt: serverTimestamp(),
+                updatedBy: user.uid || "",
+                updatedByName: user.displayName || user.email || "",
+                history: arrayUnion(entry),
+              }).catch((e) => console.error("set req shared status error", e));
+            }
+          }}
+        />
       )}
 
       {/* Delete confirm */}
