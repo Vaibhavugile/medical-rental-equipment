@@ -1,0 +1,91 @@
+/* OrderCreate.css — styles for OrderCreate drawer/modal
+   Place in src/pages/OrderCreate.css and import in OrderCreate.jsx: import "./OrderCreate.css"
+*/
+
+.cp-drawer {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 18, 26, 0.5);
+  display: flex;
+  justify-content: center; /* center modal horizontally */
+  align-items: flex-start; /* align modal from top */
+  padding-top: 36px;
+  z-index: 1000;
+}
+
+.cp-form.details {
+  width: min(1100px, 96%);
+  max-height: calc(100vh - 72px);
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(2,6,23,0.12);
+  padding: 18px;
+  border: 1px solid #eef2f7;
+}
+
+.cp-form-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.cp-form-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.label.muted {
+  color: #6b7280;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.muted { color: #6b7280; }
+
+.cp-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e6edf3;
+  font-size: 14px;
+}
+
+.cp-btn {
+  background: #0b69ff;
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.cp-btn.ghost {
+  background: transparent;
+  color: #0b69ff;
+  border: 1px solid #e6edf3;
+}
+
+.meta-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.meta-row .label { color:#6b7280; font-size:13px; }
+.meta-row .value { font-weight:600; }
+.value.strong { font-size:16px; }
+
+.chip {
+  background: #f8fafc;
+  border: 1px solid #eef2f7;
+  padding: 6px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.cp-modal { position: fixed; inset: 0; display:flex; justify-content:center; align-items:center; background: rgba(2,6,23,0.45); z-index:1200; }
+.cp-modal-card { background: #fff; border-radius: 10px; padding: 14px; width: 90%; max-width: 900px; box-shadow: 0 8px 30px rgba(2,6,23,0.12); border:1px solid #eef2f7; }
+
+/* responsive */
+@media (max-width: 900px) {
+  .cp-form.details { width: 96%; padding: 12px; }
+  .cp-modal-card { width: 95%; }
+}

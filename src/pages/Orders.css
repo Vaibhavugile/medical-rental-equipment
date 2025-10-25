@@ -1,0 +1,146 @@
+/* Orders.css — Styles for Orders page and drawer
+   Save as src/pages/Orders.css and import in Orders.jsx: import "./Orders.css"
+*/
+
+.orders-wrap {
+  max-width: 1180px;
+  margin: 24px auto;
+  padding: 0 16px;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  color: #0f172a;
+}
+
+.orders-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.orders-header h1 {
+  font-size: 20px;
+  margin: 0;
+}
+
+.orders-card, .orders-error { padding: 12px; background: #fff; border-radius: 10px; border: 1px solid #eef2f7; }
+
+.orders-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border: 1px solid #eef2f7;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.orders-table thead th {
+  text-align: left;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #6b7280;
+  background: #fbfdff;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.orders-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f3f6f9;
+  font-size: 14px;
+}
+
+.orders-table tbody tr:last-child td { border-bottom: none; }
+
+.strong { font-weight: 700; }
+.orders-empty { padding: 20px; color: #6b7280; text-align: center; }
+
+.cp-link {
+  background: transparent;
+  border: none;
+  color: #0b69ff;
+  cursor: pointer;
+  padding: 6px 8px;
+  font-weight: 600;
+}
+
+/* Drawer / modal shared styles (reused from OrderCreate.css) */
+.cp-drawer {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 18, 26, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 28px;
+  z-index: 1000;
+}
+
+.cp-form.details {
+  width: min(1100px, 96%);
+  max-height: calc(100vh - 56px);
+  overflow-y: auto;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(2,6,23,0.12);
+  padding: 18px;
+  border: 1px solid #eef2f7;
+}
+
+.cp-form-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.cp-form-head h2 { margin: 0; font-size: 18px; }
+
+.label { color: #6b7280; font-size: 13px; }
+.muted { color: #6b7280; }
+
+.cp-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e6edf3;
+  font-size: 14px;
+}
+
+.cp-btn {
+  background: #0b69ff;
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.cp-btn.ghost {
+  background: transparent;
+  color: #0b69ff;
+  border: 1px solid #e6edf3;
+}
+
+.details-right { background: #fbfdff; padding: 12px; border-radius: 8px; border: 1px solid #eef2f7; }
+
+.asset-card { background: #fff; border: 1px solid #eef2f7; padding: 8px; border-radius: 8px; display:flex; align-items:center; gap:8px; }
+
+/* meta row */
+.meta-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.meta-row .label { color:#6b7280; font-size:13px; }
+.meta-row .value { font-weight:600; }
+.value.strong { font-size:16px; }
+
+/* asset picker modal */
+.cp-modal { position: fixed; inset: 0; display:flex; justify-content:center; align-items:center; background: rgba(2,6,23,0.45); z-index:1200; }
+.cp-modal-card { background: #fff; border-radius: 10px; padding: 14px; width: 90%; max-width: 900px; box-shadow: 0 8px 30px rgba(2,6,23,0.12); border:1px solid #eef2f7; }
+
+.asset-list-row { display:flex; align-items:center; gap:12px; padding:8px; border-bottom:1px solid #f3f6f9; }
+.asset-list-row .asset-id { font-weight:700; }
+.asset-list-row .asset-meta { color:#6b7280; font-size:12px; }
+
+/* responsive tweaks */
+@media (max-width: 900px) {
+  .cp-form.details { width: 96%; padding: 12px; }
+  .cp-modal-card { width: 95%; }
+  .orders-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+}

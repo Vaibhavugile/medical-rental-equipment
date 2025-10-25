@@ -1,0 +1,56 @@
+/* src/pages/Products.css */
+
+/* Reuse Leads UI system/styles */
+@import './Leads.css';
+
+/* Product-specific overrides */
+.cp-table tbody tr.active-row td { background: #fbfdff; border-left: 3px solid #e6f0ff; }
+
+.assets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.asset-card {
+  background: linear-gradient(180deg, #fff, #fbfdff);
+  border-radius: 10px;
+  padding: 12px;
+  border: 1px solid #eef2f7;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  box-shadow: 0 8px 24px rgba(15,23,42,0.03);
+}
+.asset-top {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+}
+.asset-meta { font-size: 13px; color: #475569; }
+.asset-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+.status { font-weight:700; padding:6px 8px; border-radius:999px; font-size:12px; display:inline-block; }
+
+/* small chips */
+.chip {
+  background: #f1f5f9;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+/* modal form inputs */
+.modal-form input, .modal-form textarea, select {
+  width:100%;
+  padding:8px 10px;
+  border-radius:8px;
+  border:1px solid #e6eef8;
+}
+
+/* responsive */
+@media (max-width: 900px) {
+  .cp-form.details { width: 100%; max-width: 100%; border-radius: 0; }
+  .assets-grid { grid-template-columns: 1fr 1fr; }
+}

@@ -1,0 +1,114 @@
+/* Branches.css — restyled to match Quotations.css look & feel */
+
+.branches-wrap {
+  max-width: 1180px;
+  margin: 28px auto;
+  padding: 16px;
+  font-family: "Inter", sans-serif;
+  color: #0f172a;
+}
+
+.branches-wrap h1 {
+  margin: 0 0 6px 0;
+  color: #0b5cff;
+  font-size: 1.4rem;
+}
+.branches-wrap p {
+  color: #6b7280;
+  margin-bottom: 12px;
+}
+
+/* Card style consistent with quotations */
+.card, .branch-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px;
+  border: 1px solid #eef2f7;
+  box-shadow: 0 8px 30px rgba(2,6,23,0.04);
+}
+
+/* Branch list cards */
+.branch-card {
+  transition: transform .12s ease, box-shadow .12s ease;
+}
+.branch-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 40px rgba(2,6,23,0.06);
+}
+
+.branch-title {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 1rem;
+}
+.muted {
+  color: #6b7280;
+  font-size: 0.9rem;
+}
+
+/* Buttons — align with qp styles */
+.btn {
+  background-color: #2563eb;
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  transition: background .15s ease, transform .08s ease;
+}
+.btn:hover { background-color: #1d4ed8; transform: translateY(-1px); }
+
+.btn.ghost {
+  background: #fbfbff;
+  color: #0b5cff;
+  border: 1px solid #e6eef8;
+}
+.btn.ghost:hover { background: #f3f6ff; }
+
+.btn.danger {
+  background: #ef4444;
+}
+.btn.danger:hover { background: #dc2626; }
+
+/* Form inputs match qp input style */
+input, textarea, select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #e6eef8;
+  font-size: 14px;
+  outline: none;
+  background: #fff;
+  transition: border-color .12s, box-shadow .12s;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: #0b5cff;
+  box-shadow: 0 0 0 4px rgba(11,92,255,0.06);
+}
+
+/* Form card on the right */
+.card form { display: flex; flex-direction: column; gap: 8px; }
+
+.label {
+  color: #6b7280;
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+/* List container */
+.branches-list { display: grid; gap: 12px; margin-top: 8px; }
+
+/* Action row on card */
+.branch-actions { display:flex; gap:8px; margin-top:10px; }
+
+/* Error state */
+.error {
+  color: #b91c1c;
+  background: #fff5f5;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+  margin-bottom: 12px;
+  box-shadow: none;
+}

@@ -13,8 +13,12 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
+import { useNavigate } from "react-router-dom";
 import "./Quotations.css";
 import { makeHistoryEntry, propagateToLead } from "../utils/status"; // <--- shared helpers
+
+// NEW: OrderCreate drawer component
+import OrderCreate from "./OrderCreate";
 
 // currency formatter
 const fmtCurrency = (v) => {
@@ -70,6 +74,11 @@ export default function Quotations() {
   const [viewingVersion, setViewingVersion] = useState(null);
   const [saving, setSaving] = useState(false);
   const [shareReady, setShareReady] = useState(false); // flag after a successful save so user can share/mark sent
+
+  // NEW: holds quotation object for which the OrderCreate drawer is open
+  const [orderModalQuote, setOrderModalQuote] = useState(null);
+
+  const navigate = useNavigate();
 
   useEffect(() => {
     setLoading(true);
@@ -455,51 +464,11 @@ export default function Quotations() {
     }
   };
 
-  const convertToOrder = async (quote) => {
+  /* ---------- convertToOrder now opens the OrderCreate drawer ---------- */
+  const convertToOrder = (quote) => {
     setError("");
-    try {
-      const user = auth.currentUser || {};
-      if ((quote.status || "").toLowerCase() !== "accepted") {
-        setError("Only accepted quotations can be converted to orders. Mark as 'accepted' first.");
-        return;
-      }
-      const orderPayload = {
-        quotationId: quote.id,
-        requirementId: quote.requirementId || "",
-        orderNo: `O-${Math.floor(Date.now() / 1000)}`,
-        items: (quote.items || []).map((it) => ({ name: it.name, qty: Number(it.qty || 0), rate: Number(it.rate || 0), amount: Number(it.amount || 0), notes: it.notes || "", days: it.days || 0, expectedStartDate: it.expectedStartDate || "", expectedEndDate: it.expectedEndDate || "", productId: it.productId || "" })),
-        totals: quote.totals || {},
-        status: "created",
-        createdAt: serverTimestamp(),
-        createdBy: user.uid || "",
-        createdByName: user.displayName || user.email || "",
-      };
-      const ref = await addDoc(collection(db, "orders"), orderPayload);
-      await updateDoc(doc(db, "quotations", quote.id), { orderId: ref.id, updatedAt: serverTimestamp() });
-      if (quote.requirementId) {
-        const reqRef = doc(db, "requirements", quote.requirementId);
-        const entry = makeHistoryEntry(user, {
-          type: "order",
-          field: "status",
-          oldValue: quote.status || "",
-          newValue: "order_created",
-          note: `Order ${orderPayload.orderNo} created from quotation ${quote.quoNo || quote.id}`,
-        });
-        await updateDoc(reqRef, {
-          status: "order_created",
-          updatedAt: serverTimestamp(),
-          updatedBy: user.uid || "",
-          updatedByName: user.displayName || user.email || "",
-          history: arrayUnion(entry),
-        });
-
-        // propagate order creation to lead
-        propagateToLead(quote.requirementId, "order", quote.status || "", "order_created", entry.note);
-      }
-    } catch (err) {
-      console.error("convertToOrder", err);
-      setError(err.message || "Failed to convert quotation to order");
-    }
+    // open the OrderCreate drawer (handled in OrderCreate.jsx)
+    setOrderModalQuote(quote);
   };
 
   // Share the updated quotation and mark it as 'sent'
@@ -538,6 +507,7 @@ export default function Quotations() {
             <option value="sent">Sent</option>
             <option value="accepted">Accepted</option>
             <option value="rejected">Rejected</option>
+            <option value="order_created">Order Created</option>
           </select>
         </div>
       </header>
@@ -569,12 +539,20 @@ export default function Quotations() {
                 <td>
                   <div className="qp-actions">
                     <button className="qp-link" onClick={() => openDetails(q)}>View</button>
+
                     {(q.status || "").toLowerCase() === "draft" && <button className="qp-link" onClick={() => updateQuotationStatus(q, "sent", "Sent to customer")}>Mark Sent</button>}
+
                     {(q.status || "").toLowerCase() === "sent" && <>
                       <button className="qp-link" onClick={() => updateQuotationStatus(q, "accepted", "Accepted by customer")}>Accept</button>
                       <button className="qp-link" onClick={() => updateQuotationStatus(q, "rejected", "Rejected by customer")}>Reject</button>
                     </>}
-                    {(q.status || "").toLowerCase() === "accepted" && <button className="qp-link" onClick={() => convertToOrder(q)}>Convert to Order</button>}
+
+                    {(q.status || "").toLowerCase() === "accepted" && !q.orderId && <button className="qp-link" onClick={() => convertToOrder(q)}>Convert to Order</button>}
+
+                    {/* if an order was created from this quotation, offer quick nav to orders */}
+                    {(q.orderId || (q.status || "").toLowerCase() === "order_created") && (
+                      <button className="qp-link" onClick={() => navigate("/orders")}>View Orders</button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -707,6 +685,7 @@ export default function Quotations() {
                           <option value="sent">sent</option>
                           <option value="accepted">accepted</option>
                           <option value="rejected">rejected</option>
+                          <option value="order_created">order_created</option>
                         </select>
                       ) : <div className="value">{details.status}</div>}
                     </div>
@@ -776,9 +755,12 @@ export default function Quotations() {
                           <button className="cp-btn primary" onClick={() => updateQuotationStatus(details, "accepted", "Accepted by ops")}>Mark Accepted</button>
                           <button className="cp-btn ghost" onClick={() => updateQuotationStatus(details, "rejected", "Rejected by ops")}>Mark Rejected</button>
                         </>}
-                        {(details.status || "").toLowerCase() === "accepted" && <>
+                        {(details.status || "").toLowerCase() === "accepted" && !details.orderId && <>
                           <button className="cp-btn primary" onClick={() => convertToOrder(details)}>Create Order</button>
                         </>}
+                        {(details.orderId || (details.status || "").toLowerCase() === "order_created") && (
+                          <button className="cp-btn ghost" onClick={() => navigate("/orders")}>View Orders</button>
+                        )}
                         <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
                           <button className="cp-btn ghost" onClick={() => { navigator.clipboard && navigator.clipboard.writeText(JSON.stringify(details)); alert("Copied JSON to clipboard"); }}>Copy JSON</button>
 
@@ -823,6 +805,23 @@ export default function Quotations() {
 
           </div>
         </div>
+      )}
+
+      {/* OrderCreate drawer/modal */}
+      {orderModalQuote && (
+        <OrderCreate
+          open={!!orderModalQuote}
+          quotation={orderModalQuote}
+          onClose={() => setOrderModalQuote(null)}
+          onCreated={(orderId) => {
+            // update local details if the same quotation is open
+            if (details && details.id === orderModalQuote.id) {
+              setDetails((d) => ({ ...d, orderId, status: "order_created" }));
+            }
+            setOrderModalQuote(null);
+            // quotations list will be updated automatically by the Firestore snapshot listener
+          }}
+        />
       )}
     </div>
   );

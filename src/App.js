@@ -3,8 +3,12 @@ import React from "react";
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import Leads from "./pages/Leads";
 import Requirements from "./pages/Requirements";
-import "./App.css"; // optional: add global styles if you have them
 import Quotations from "./pages/Quotations";
+import Branches from "./pages/Branches";
+import Products from "./pages/Products";
+import Orders from "./pages/Orders"; // <-- new
+import "./App.css"; // optional: add global styles if you have them
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -13,6 +17,7 @@ export default function App() {
           <div style={{ maxWidth: 1180, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ fontSize: 18, fontWeight: 800, color: "#0b5cff" }}>Your Company</div>
+
               <nav style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <NavLink
                   to="/"
@@ -56,6 +61,48 @@ export default function App() {
                 >
                   Quotations
                 </NavLink>
+
+                <NavLink
+                  to="/orders"
+                  style={({ isActive }) => ({
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    textDecoration: "none",
+                    color: isActive ? "#fff" : "#0b5cff",
+                    background: isActive ? "linear-gradient(90deg,#0b69ff,#00b4d8)" : "transparent",
+                    fontWeight: 700,
+                  })}
+                >
+                  Orders
+                </NavLink>
+
+                <NavLink
+                  to="/branches"
+                  style={({ isActive }) => ({
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    textDecoration: "none",
+                    color: isActive ? "#fff" : "#0b5cff",
+                    background: isActive ? "linear-gradient(90deg,#0b69ff,#00b4d8)" : "transparent",
+                    fontWeight: 700,
+                  })}
+                >
+                  Branches
+                </NavLink>
+
+                <NavLink
+                  to="/products"
+                  style={({ isActive }) => ({
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    textDecoration: "none",
+                    color: isActive ? "#fff" : "#0b5cff",
+                    background: isActive ? "linear-gradient(90deg,#0b69ff,#00b4d8)" : "transparent",
+                    fontWeight: 700,
+                  })}
+                >
+                  Products
+                </NavLink>
               </nav>
             </div>
 
@@ -70,10 +117,10 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Leads />} />
             <Route path="/requirements" element={<Requirements />} />
-            
-
-            {/* Optional placeholder route for quotations if you plan to add a list */}
-            <Route path="/quotations" element={<Quotations/> }/>
+            <Route path="/quotations" element={<Quotations />} />
+            <Route path="/orders" element={<Orders />} /> {/* <-- new route */}
+            <Route path="/branches" element={<Branches />} />
+            <Route path="/products" element={<Products />} />
 
             <Route
               path="*"
