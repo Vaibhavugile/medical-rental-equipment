@@ -40,3 +40,27 @@
 .qp-ops { margin-top:12px; display:flex; flex-direction:column; gap:8px; }
 
 .qp-error { color:#b91c1c; margin-bottom:12px; }
+/* Improve discount type & value input layout */
+.qp-discount-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.qp-discount-row select,
+.qp-discount-row input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.qp-discount-row select:focus,
+.qp-discount-row input:focus {
+  border-color: #0b5cff;
+  box-shadow: 0 0 0 2px rgba(11, 92, 255, 0.15);
+}
