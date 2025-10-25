@@ -1,4 +1,4 @@
-// src/pages/Orders.jsx
+// src/pages/Orders.js
 import React, { useEffect, useMemo, useState } from "react";
 import {
   collection,
@@ -11,6 +11,7 @@ import {
   getDoc,
   getDocs,
   arrayUnion,
+  addDoc,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
@@ -32,8 +33,6 @@ const fmtCurrency = (v) => {
   }
 };
 
-const safeNum = (v) => (typeof v === "number" ? v : Number(v || 0));
-
 export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +46,7 @@ export default function Orders() {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [assetsById, setAssetsById] = useState({}); // assetId -> asset doc data map
+  const [drivers, setDrivers] = useState([]); // driver list for assignment
 
   const navigate = useNavigate();
 
@@ -82,7 +82,7 @@ export default function Orders() {
     })();
   }, []);
 
-  // load products (one-time) so selects show names
+  // load products & drivers (one-time)
   useEffect(() => {
     (async () => {
       try {
@@ -94,6 +94,13 @@ export default function Orders() {
         setProductsList(prods);
       } catch (err) {
         console.error("Failed to load products", err);
+      }
+
+      try {
+        const dsnap = await getDocs(collection(db, "drivers"));
+        setDrivers(dsnap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) })));
+      } catch (err) {
+        console.warn("Failed to load drivers", err);
       }
     })();
   }, []);
@@ -177,40 +184,6 @@ export default function Orders() {
     return arr;
   }, [orders, filterStatus, search]);
 
-  // Update a field on the open order doc (optimistic local update + firestore)
-  const updateOrderField = async (path, value) => {
-    if (!selectedOrder) return;
-    setSaving(true);
-    setError("");
-    try {
-      // update locally
-      setSelectedOrder((s) => {
-        const clone = JSON.parse(JSON.stringify(s || {}));
-        const parts = path.split(".");
-        let cur = clone;
-        for (let i = 0; i < parts.length - 1; i++) {
-          if (!(parts[i] in cur)) cur[parts[i]] = {};
-          cur = cur[parts[i]];
-        }
-        cur[parts[parts.length - 1]] = value;
-        return clone;
-      });
-
-      // persist to firestore
-      await updateDoc(doc(db, "orders", selectedOrder.id), {
-        [path]: value,
-        updatedAt: serverTimestamp(),
-        updatedBy: auth.currentUser?.uid || "",
-        updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
-      });
-    } catch (err) {
-      console.error("updateOrderField", err);
-      setError(err.message || "Failed to update order");
-    } finally {
-      setSaving(false);
-    }
-  };
-
   // Update an order item (qty, rate, dates, branch, productId)
   const updateOrderItem = async (index, patch) => {
     if (!selectedOrder) return;
@@ -231,7 +204,8 @@ export default function Orders() {
       clone.items[index].amount = Number(clone.items[index].qty || 0) * Number(clone.items[index].rate || 0);
 
       // compute totals
-      const totals = computeTotalsFromItems(clone.items, clone.discount, clone.taxes);
+      const subtotal = (clone.items || []).reduce((s, it) => s + Number((it.qty || 0) * (it.rate || 0)), 0);
+      const totals = { subtotal, total: subtotal };
 
       // update in firestore
       await updateDoc(doc(db, "orders", selectedOrder.id), {
@@ -260,20 +234,6 @@ export default function Orders() {
     }
   };
 
-  const computeTotalsFromItems = (items = [], discount = { type: "percent", value: 0 }, taxes = []) => {
-    const subtotal = (items || []).reduce((s, it) => s + Number((it.qty || 0) * (it.rate || 0)), 0);
-    let discountAmount = 0;
-    if (discount) {
-      if ((discount.type || "").toLowerCase() === "percent") discountAmount = subtotal * (Number(discount.value || 0) / 100);
-      else discountAmount = Number(discount.value || 0);
-    }
-    const taxable = Math.max(0, subtotal - discountAmount);
-    const taxBreakdown = (taxes || []).map((t) => ({ ...t, amount: taxable * (Number(t.rate || 0) / 100) }));
-    const totalTax = taxBreakdown.reduce((s, t) => s + (t.amount || 0), 0);
-    const total = Math.max(0, taxable + totalTax);
-    return { subtotal, discountAmount, taxBreakdown, totalTax, total };
-  };
-
   // Asset picker open for a specific item: fetch assets filtered by productId + branchId + in_stock
   const openAssetPickerForItem = async (itemIndex) => {
     setError("");
@@ -296,7 +256,6 @@ export default function Orders() {
     setAssetPicker((p) => ({ ...p, selected: { ...(p.selected || {}), [assetId]: !(p.selected || {})[assetId] } }));
   };
 
-  // Confirm asset assignment from picker: attach asset ids to the order item and optionally checkout assets
   const confirmAssignAssetsFromPicker = async (checkoutImmediately = false) => {
     if (!selectedOrder) return;
     const idx = assetPicker.itemIndex;
@@ -308,13 +267,13 @@ export default function Orders() {
     setSaving(true);
     setError("");
     try {
-      // local update
       const clone = JSON.parse(JSON.stringify(selectedOrder));
       clone.items = clone.items || [];
       clone.items[idx].assignedAssets = [...(clone.items[idx].assignedAssets || []), ...selectedIds];
 
-      // persist
-      const totals = computeTotalsFromItems(clone.items, clone.discount, clone.taxes);
+      const subtotal = (clone.items || []).reduce((s, it) => s + Number((it.qty || 0) * (it.rate || 0)), 0);
+      const totals = { subtotal, total: subtotal };
+
       await updateDoc(doc(db, "orders", selectedOrder.id), {
         items: clone.items,
         totals,
@@ -323,7 +282,6 @@ export default function Orders() {
         updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
       });
 
-      // optionally checkout assets immediately (mark out_for_rental)
       if (checkoutImmediately) {
         for (const aid of selectedIds) {
           try {
@@ -354,7 +312,6 @@ export default function Orders() {
     }
   };
 
-  // Checkout currently assigned assets for an item (no new assignment)
   const checkoutAssignedAssetsForItem = async (itemIndex) => {
     if (!selectedOrder) return;
     const item = selectedOrder.items?.[itemIndex];
@@ -373,14 +330,12 @@ export default function Orders() {
         }
       }
 
-      // refresh assets metadata and update assetsById
       const unique = Array.from(new Set(item.assignedAssets));
       const snaps = await Promise.all(unique.map(aid => getDoc(doc(db, "assets", aid))));
       const map = {};
       snaps.forEach(s => { if (s.exists()) map[s.id] = { id: s.id, ...(s.data() || {}) }; });
       setAssetsById(prev => ({ ...(prev || {}), ...map }));
 
-      // reload order from server to reflect latest statuses
       const snap = await getDoc(doc(db, "orders", selectedOrder.id));
       if (snap.exists()) setSelectedOrder({ id: snap.id, ...(snap.data() || {}) });
     } catch (err) {
@@ -391,7 +346,6 @@ export default function Orders() {
     }
   };
 
-  // Auto-assign N assets for an item
   const autoAssignAssets = async (itemIndex, count = 1, checkoutImmediately = false) => {
     if (!selectedOrder) return;
     const item = selectedOrder.items?.[itemIndex];
@@ -410,8 +364,9 @@ export default function Orders() {
       const clone = JSON.parse(JSON.stringify(selectedOrder));
       clone.items[itemIndex].assignedAssets = [...(clone.items[itemIndex].assignedAssets || []), ...picked];
 
-      // persist
-      const totals = computeTotalsFromItems(clone.items, clone.discount, clone.taxes);
+      const subtotal = (clone.items || []).reduce((s, it) => s + Number((it.qty || 0) * (it.rate || 0)), 0);
+      const totals = { subtotal, total: subtotal };
+
       await updateDoc(doc(db, "orders", selectedOrder.id), {
         items: clone.items,
         totals,
@@ -430,7 +385,6 @@ export default function Orders() {
         }
       }
 
-      // refresh assets metadata for picked ids
       try {
         const snaps = await Promise.all(picked.map(aid => getDoc(doc(db, "assets", aid))));
         const map = {};
@@ -449,7 +403,6 @@ export default function Orders() {
     }
   };
 
-  // Unassign an asset from an item (optionally check it in / mark in_stock)
   const unassignAsset = async (itemIndex, assetId, checkin = false) => {
     if (!selectedOrder) return;
     setSaving(true);
@@ -459,8 +412,9 @@ export default function Orders() {
       clone.items = clone.items || [];
       clone.items[itemIndex].assignedAssets = (clone.items[itemIndex].assignedAssets || []).filter((a) => a !== assetId);
 
-      // persist
-      const totals = computeTotalsFromItems(clone.items, clone.discount, clone.taxes);
+      const subtotal = (clone.items || []).reduce((s, it) => s + Number((it.qty || 0) * (it.rate || 0)), 0);
+      const totals = { subtotal, total: subtotal };
+
       await updateDoc(doc(db, "orders", selectedOrder.id), {
         items: clone.items,
         totals,
@@ -469,7 +423,6 @@ export default function Orders() {
         updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
       });
 
-      // optionally checkin the asset
       if (checkin) {
         try {
           await checkinAsset(assetId, { note: `Unassigned from order ${selectedOrder.orderNo}` });
@@ -478,7 +431,6 @@ export default function Orders() {
         }
       }
 
-      // remove asset meta from map if it's no longer assigned anywhere
       const keepIds = new Set((clone.items || []).flatMap(it => it.assignedAssets || []));
       const remaining = {};
       Object.keys(assetsById).forEach(k => { if (keepIds.has(k)) remaining[k] = assetsById[k]; });
@@ -493,13 +445,11 @@ export default function Orders() {
     }
   };
 
-  // Checkin a single asset (mark returned)
   const checkinAssignedAsset = async (assetId, itemIndex) => {
     setSaving(true);
     setError("");
     try {
       await checkinAsset(assetId, { note: `Returned from order ${selectedOrder.orderNo}` });
-      // remove from assignedAssets array for item
       await unassignAsset(itemIndex, assetId, false);
     } catch (err) {
       console.error("checkinAssignedAsset", err);
@@ -521,7 +471,6 @@ export default function Orders() {
         updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
       });
 
-      // update requirement history if linked
       if (selectedOrder.requirementId) {
         const entry = makeHistoryEntry(auth.currentUser || {}, {
           type: "order",
@@ -530,18 +479,19 @@ export default function Orders() {
           newValue: newStatus,
           note: `Order ${selectedOrder.orderNo} marked ${newStatus}`,
         });
+        entry.at = new Date();
+
         await updateDoc(doc(db, "requirements", selectedOrder.requirementId), {
           status: newStatus,
           updatedAt: serverTimestamp(),
           updatedBy: auth.currentUser?.uid || "",
           updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
-          history: arrayUnion ? arrayUnion(entry) : entry,
+          history: arrayUnion(entry),
         });
 
         propagateToLead(selectedOrder.requirementId, "order", selectedOrder.status || "", newStatus, entry.note);
       }
 
-      // update local
       setSelectedOrder((s) => ({ ...s, status: newStatus }));
     } catch (err) {
       console.error("changeOrderStatus", err);
@@ -551,7 +501,116 @@ export default function Orders() {
     }
   };
 
-  // Render
+  // ----------------
+  // Delivery workflows
+  // ----------------
+
+  const createDeliveryDoc = async (payload) => {
+    const deliveriesCol = collection(db, "deliveries");
+    const ref = await addDoc(deliveriesCol, { ...payload, createdAt: serverTimestamp(), createdBy: auth.currentUser?.uid || "" });
+    return ref.id;
+  };
+
+  const assignDriverToOrder = async (driverId) => {
+    if (!selectedOrder) return setError("No order open");
+    const driver = drivers.find((d) => d.id === driverId);
+    if (!driver) return setError("Choose a valid driver");
+    setSaving(true);
+    try {
+      const payload = {
+        orderId: selectedOrder.id,
+        orderNo: selectedOrder.orderNo,
+        driverId,
+        driverName: driver.name || "",
+        pickupAddress: selectedOrder.pickupAddress || selectedOrder.deliveryAddress || "",
+        dropAddress: selectedOrder.deliveryAddress || "",
+        items: selectedOrder.items || [],
+        status: "assigned",
+      };
+      const deliveryId = await createDeliveryDoc(payload);
+      const deliveryObj = { deliveryId, driverId, driverName: driver.name || "", status: "assigned", createdAt: serverTimestamp() };
+
+      // update order - use client Date inside arrayUnion for history
+      await updateDoc(doc(db, "orders", selectedOrder.id), {
+        delivery: deliveryObj,
+        deliveryStatus: "assigned",
+        deliveryHistory: arrayUnion({ at: new Date(), by: auth.currentUser?.uid || "", stage: "assigned", note: `Driver ${driver.name} assigned` }),
+        updatedAt: serverTimestamp(),
+      });
+
+      // requirement history if linked
+      if (selectedOrder.requirementId) {
+        const entry = makeHistoryEntry(auth.currentUser || {}, {
+          type: "delivery",
+          field: "driverAssigned",
+          oldValue: "",
+          newValue: driverId,
+          note: `Driver ${driver.name} assigned`,
+        });
+        entry.at = new Date();
+        await updateDoc(doc(db, "requirements", selectedOrder.requirementId), { history: arrayUnion(entry), updatedAt: serverTimestamp() });
+        propagateToLead(selectedOrder.requirementId, "delivery", "", "assigned", entry.note);
+      }
+
+      const snap = await getDoc(doc(db, "orders", selectedOrder.id));
+      if (snap.exists()) setSelectedOrder({ id: snap.id, ...(snap.data() || {}) });
+    } catch (err) {
+      console.error("assignDriverToOrder", err);
+      setError(err.message || "Failed to assign driver");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateDeliveryStage = async (newStage, note = "") => {
+    if (!selectedOrder) return setError("No order open");
+    if (!selectedOrder.delivery?.deliveryId) return setError("No delivery linked to this order");
+    setSaving(true);
+    try {
+      await updateDoc(doc(db, "deliveries", selectedOrder.delivery.deliveryId), {
+        status: newStage,
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser?.uid || "",
+        updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
+        history: arrayUnion({ at: new Date(), by: auth.currentUser?.uid || "", stage: newStage, note }),
+      });
+
+      await updateDoc(doc(db, "orders", selectedOrder.id), {
+        deliveryStatus: newStage,
+        deliveryHistory: arrayUnion({ at: new Date(), by: auth.currentUser?.uid || "", stage: newStage, note }),
+        updatedAt: serverTimestamp(),
+      });
+
+      if (selectedOrder.requirementId) {
+        const entry = makeHistoryEntry(auth.currentUser || {}, {
+          type: "delivery",
+          field: "status",
+          oldValue: selectedOrder.delivery?.status || "",
+          newValue: newStage,
+          note: note || `Delivery ${newStage}`,
+        });
+        entry.at = new Date();
+        await updateDoc(doc(db, "requirements", selectedOrder.requirementId), { history: arrayUnion(entry), updatedAt: serverTimestamp() });
+        propagateToLead(selectedOrder.requirementId, "delivery", selectedOrder.delivery?.status || "", newStage, entry.note);
+      }
+
+      const snap = await getDoc(doc(db, "orders", selectedOrder.id));
+      if (snap.exists()) setSelectedOrder({ id: snap.id, ...(snap.data() || {}) });
+    } catch (err) {
+      console.error("updateDeliveryStage", err);
+      setError(err.message || "Failed to update delivery stage");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const driverAcceptDelivery = async () => updateDeliveryStage("accepted", "Driver accepted");
+  const markPickedUp = async () => updateDeliveryStage("picked_up", "Driver picked up items");
+  const markInTransit = async () => updateDeliveryStage("in_transit", "In transit");
+  const markDelivered = async () => updateDeliveryStage("delivered", "Delivered to customer");
+  const confirmDeliveryAccepted = async () => updateDeliveryStage("completed", "Customer accepted delivery");
+
+  // UI render
   if (loading) return <div className="orders-wrap"><div className="orders-card">Loading orders…</div></div>;
 
   return (
@@ -578,6 +637,7 @@ export default function Orders() {
             <th>Order No</th>
             <th>Customer</th>
             <th>Status</th>
+            <th>Delivery</th>
             <th>Created</th>
             <th>Items</th>
             <th>Total</th>
@@ -591,6 +651,7 @@ export default function Orders() {
               <td className="strong">{o.orderNo || o.id}</td>
               <td>{o.customerName || "—"}</td>
               <td style={{ textTransform: "capitalize" }}>{o.status || "created"}</td>
+              <td style={{ textTransform: "capitalize" }}>{o.deliveryStatus || o.delivery?.status || "—"}</td>
               <td>{o.createdAt?.seconds ? new Date(o.createdAt.seconds * 1000).toLocaleString() : "—"}</td>
               <td>{(o.items || []).length}</td>
               <td>{fmtCurrency(o.totals?.total || 0)}</td>
@@ -601,7 +662,7 @@ export default function Orders() {
               </td>
             </tr>
           ))}
-          {filtered.length === 0 && <tr><td colSpan="7" className="orders-empty">No orders found.</td></tr>}
+          {filtered.length === 0 && <tr><td colSpan="8" className="orders-empty">No orders found.</td></tr>}
         </tbody>
       </table>
 
@@ -624,7 +685,7 @@ export default function Orders() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 18 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 18 }}>
               <div>
                 <div style={{ marginBottom: 12 }}>
                   <div className="label">Customer</div>
@@ -657,11 +718,6 @@ export default function Orders() {
                                 <div>
                                   <div className="muted">Rate</div>
                                   <input className="cp-input" style={{ width: 120 }} value={it.rate} onChange={(e) => updateOrderItem(idx, { rate: Number(e.target.value || 0) })} />
-                                </div>
-
-                                <div>
-                                  <div className="muted">Days</div>
-                                  <input className="cp-input" style={{ width: 100 }} value={it.days || 0} onChange={(e) => updateOrderItem(idx, { days: Number(e.target.value || 0) })} />
                                 </div>
 
                                 <div>
@@ -741,11 +797,9 @@ export default function Orders() {
                                           </div>
 
                                           <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                                            {/* If asset meta shows it's out_for_rental, show Check-in */}
                                             {(meta && ((meta.status || "").toLowerCase() === "out_for_rental" || (meta.status || "").toLowerCase() === "checked_out")) ? (
                                               <button className="cp-btn ghost" onClick={() => checkinAssignedAsset(aid, idx)}>Check-in</button>
                                             ) : (
-                                              // If not checked out yet, allow Checkout (single asset) or Check-in won't make sense
                                               <button className="cp-btn ghost" onClick={() => checkoutAssignedAssetsForItem(idx)}>Checkout Assigned</button>
                                             )}
 
@@ -773,22 +827,89 @@ export default function Orders() {
                   <div className="meta-row"><div className="label">Customer</div><div className="value">{selectedOrder.customerName || "—"}</div></div>
 
                   <div style={{ marginTop: 12 }}>
-                    <h4>Totals</h4>
-                    <div className="meta-row"><div className="label">Subtotal</div><div className="value">{fmtCurrency(selectedOrder.totals?.subtotal || 0)}</div></div>
-                    <div className="meta-row"><div className="label">Discount</div><div className="value">{selectedOrder.discount?.type === "percent" ? `${selectedOrder.discount?.value || 0}%` : fmtCurrency(selectedOrder.discount?.value || 0)}</div></div>
-                    <div className="meta-row"><div className="label">Tax</div><div className="value">{fmtCurrency(selectedOrder.totals?.totalTax || 0)}</div></div>
-                    <div className="meta-row"><div className="label strong">Total</div><div className="value strong">{fmtCurrency(selectedOrder.totals?.total || 0)}</div></div>
-                  </div>
+                    <h4>Delivery</h4>
 
-                  <div style={{ marginTop: 16 }}>
-                    <button className="cp-btn" onClick={() => {
-                      (async () => {
+                    <div style={{ marginTop: 8 }}>
+                      <div className="label muted">Driver</div>
+                      <select className="cp-input" value={selectedOrder.delivery?.driverId || ""} onChange={(e) => setSelectedOrder((s) => ({ ...s, delivery: { ...(s.delivery || {}), driverId: e.target.value } }))}>
+                        <option value="">Select driver</option>
+                        {drivers.map((d) => <option key={d.id} value={d.id}>{d.name}{d.phone ? ` · ${d.phone}` : ""}</option>)}
+                      </select>
+
+                      <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
+                        {/* Show Assign button only when no delivery has been created/linked yet */}
+                        {(!selectedOrder.delivery?.deliveryId && (selectedOrder.deliveryStatus !== "assigned")) ? (
+                          <button className="cp-btn" onClick={() => {
+                            const did = selectedOrder.delivery?.driverId;
+                            if (!did) { setError("Choose a driver first"); return; }
+                            assignDriverToOrder(did);
+                          }} disabled={!selectedOrder.delivery?.driverId}>Assign driver</button>
+                        ) : (
+                          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                            <div style={{ padding: "6px 10px", background: "#ecfdf5", borderRadius: 8, color: "#065f46", fontWeight: 700 }}>
+                              Assigned: {selectedOrder.delivery?.driverName || ((drivers.find(d => d.id === selectedOrder.delivery?.driverId) || {}).name || selectedOrder.delivery?.driverId || "—")}
+                            </div>
+                            {/* Reassign button appears only as a control if you want to allow reassignments */}
+                            <button
+                              className="cp-btn ghost"
+                              onClick={() => {
+                                // enable reassign flow by clearing delivery linkage locally (admin action)
+                                // caution: this does not delete deliveries doc created earlier; adjust to your preference
+                                setSelectedOrder((s) => ({ ...s, delivery: { ...(s.delivery || {}), deliveryId: null }, deliveryStatus: null }));
+                                setError("");
+                              }}
+                            >
+                              Reassign
+                            </button>
+                          </div>
+                        )}
+
+                        <button className="cp-btn ghost" onClick={() => navigate("/drivers")}>Manage drivers</button>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: 12 }}>
+                      <div className="label muted">Delivery Status</div>
+                      <div style={{ fontWeight: 700, marginTop: 6, textTransform: "capitalize" }}>{selectedOrder.deliveryStatus || selectedOrder.delivery?.status || "—"}</div>
+
+                      <div style={{ display: "flex", gap: 8, marginTop: 8, flexWrap: "wrap" }}>
+                        <button className="cp-btn ghost" onClick={driverAcceptDelivery} disabled={!selectedOrder.delivery?.deliveryId || (selectedOrder.deliveryStatus === "accepted")}>Driver Accept</button>
+                        <button className="cp-btn ghost" onClick={markPickedUp} disabled={!selectedOrder.delivery?.deliveryId || (selectedOrder.deliveryStatus === "picked_up")}>Picked up</button>
+                        <button className="cp-btn ghost" onClick={markInTransit} disabled={!selectedOrder.delivery?.deliveryId || (selectedOrder.deliveryStatus === "in_transit")}>In transit</button>
+                        <button className="cp-btn ghost" onClick={markDelivered} disabled={!selectedOrder.delivery?.deliveryId || (selectedOrder.deliveryStatus === "delivered")}>Delivered</button>
+                        <button className="cp-btn" onClick={confirmDeliveryAccepted} disabled={!selectedOrder.delivery?.deliveryId || (selectedOrder.deliveryStatus === "completed")}>Accept delivery</button>
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: 12 }}>
+                      <div className="label muted">Delivery history</div>
+                      <div style={{ marginTop: 8 }}>
+                        {(selectedOrder.deliveryHistory || []).slice().reverse().map((h, i) => (
+                          <div key={i} style={{ padding: 8, borderBottom: "1px solid #f3f6f9" }}>
+                            <div style={{ fontSize: 13 }}>{h.stage || h.note}</div>
+                            <div className="muted" style={{ fontSize: 12 }}>{h.by || ""} • {h.at?.seconds ? new Date(h.at.seconds * 1000).toLocaleString() : (h.at ? new Date(h.at).toLocaleString() : "")}</div>
+                          </div>
+                        ))}
+                        {(!selectedOrder.deliveryHistory || selectedOrder.deliveryHistory.length === 0) && <div className="muted">No delivery events yet.</div>}
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: 12 }}>
+                      <h4>Totals</h4>
+                      <div className="meta-row"><div className="label">Subtotal</div><div className="value">{fmtCurrency(selectedOrder.totals?.subtotal || 0)}</div></div>
+                      <div className="meta-row"><div className="label">Discount</div><div className="value">{selectedOrder.discount?.type === "percent" ? `${selectedOrder.discount?.value || 0}%` : fmtCurrency(selectedOrder.discount?.value || 0)}</div></div>
+                      <div className="meta-row"><div className="label">Tax</div><div className="value">{fmtCurrency(selectedOrder.totals?.totalTax || 0)}</div></div>
+                      <div className="meta-row"><div className="label strong">Total</div><div className="value strong">{fmtCurrency(selectedOrder.totals?.total || 0)}</div></div>
+                    </div>
+
+                    <div style={{ marginTop: 16 }}>
+                      <button className="cp-btn" onClick={async () => {
                         setSaving(true);
                         try {
-                          const totals = computeTotalsFromItems(selectedOrder.items || [], selectedOrder.discount, selectedOrder.taxes);
+                          const subtotal = (selectedOrder.items || []).reduce((s, it) => s + Number((it.qty || 0) * (it.rate || 0)), 0);
                           await updateDoc(doc(db, "orders", selectedOrder.id), {
                             items: selectedOrder.items || [],
-                            totals,
+                            totals: { subtotal, total: subtotal },
                             updatedAt: serverTimestamp(),
                             updatedBy: auth.currentUser?.uid || "",
                             updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
@@ -800,15 +921,15 @@ export default function Orders() {
                         } finally {
                           setSaving(false);
                         }
-                      })();
-                    }}>Save Order</button>
+                      }}>Save Order</button>
 
-                    <button className="cp-btn ghost" style={{ marginLeft: 8 }} onClick={() => {
-                      if (selectedOrder.orderNo) {
-                        navigator.clipboard?.writeText(JSON.stringify(selectedOrder, null, 2));
-                        alert("Copied order JSON to clipboard");
-                      }
-                    }}>Copy JSON</button>
+                      <button className="cp-btn ghost" style={{ marginLeft: 8 }} onClick={() => {
+                        if (selectedOrder.orderNo) {
+                          navigator.clipboard?.writeText(JSON.stringify(selectedOrder, null, 2));
+                          alert("Copied order JSON to clipboard");
+                        }
+                      }}>Copy JSON</button>
+                    </div>
                   </div>
                 </div>
               </div>

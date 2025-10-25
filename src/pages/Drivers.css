@@ -1,0 +1,167 @@
+.drivers-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: Inter, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+
+.drivers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.drivers-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+}
+
+.driver-card {
+  background: #fff;
+  border: 1px solid #eef2f7;
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  gap: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  transition: transform 0.1s ease;
+}
+
+.driver-card:hover {
+  transform: translateY(-2px);
+}
+
+.driver-avatar {
+  width: 50px;
+  height: 50px;
+  background: linear-gradient(135deg, #0b69ff, #00b4d8);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.driver-info h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.driver-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.driver-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #fff;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.badge.available {
+  background: #22c55e;
+}
+
+.badge.busy {
+  background: #eab308;
+}
+
+.badge.offline {
+  background: #9ca3af;
+}
+
+.cp-btn {
+  background: #0b69ff;
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.cp-btn.ghost {
+  background: transparent;
+  color: #0b69ff;
+  border: 1px solid #e6edf3;
+}
+
+.cp-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #e6edf3;
+  font-size: 14px;
+}
+
+.driver-form label {
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 8px;
+  display: block;
+}
+
+.driver-form textarea {
+  resize: none;
+  height: 60px;
+}
+
+.form-error {
+  color: #b91c1c;
+  background: #fef2f2;
+  padding: 6px;
+  border-radius: 6px;
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.empty-state {
+  text-align: center;
+  color: #6b7280;
+  padding: 20px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px dashed #dbe3ed;
+}
+
+/* Modal styles */
+.cp-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.cp-modal-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 18px;
+  width: 90%;
+  max-width: 420px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+}

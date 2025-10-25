@@ -6,7 +6,8 @@ import Requirements from "./pages/Requirements";
 import Quotations from "./pages/Quotations";
 import Branches from "./pages/Branches";
 import Products from "./pages/Products";
-import Orders from "./pages/Orders"; // <-- new
+import Orders from "./pages/Orders";
+import Drivers from "./pages/Drivers"; // <-- added
 import "./App.css"; // optional: add global styles if you have them
 
 export default function App() {
@@ -77,6 +78,20 @@ export default function App() {
                 </NavLink>
 
                 <NavLink
+                  to="/drivers"
+                  style={({ isActive }) => ({
+                    padding: "8px 10px",
+                    borderRadius: 8,
+                    textDecoration: "none",
+                    color: isActive ? "#fff" : "#0b5cff",
+                    background: isActive ? "linear-gradient(90deg,#0b69ff,#00b4d8)" : "transparent",
+                    fontWeight: 700,
+                  })}
+                >
+                  Drivers
+                </NavLink>
+
+                <NavLink
                   to="/branches"
                   style={({ isActive }) => ({
                     padding: "8px 10px",
@@ -118,7 +133,8 @@ export default function App() {
             <Route path="/" element={<Leads />} />
             <Route path="/requirements" element={<Requirements />} />
             <Route path="/quotations" element={<Quotations />} />
-            <Route path="/orders" element={<Orders />} /> {/* <-- new route */}
+            <Route path="/orders" element={<Orders />} />
+            <Route path="/drivers" element={<Drivers />} /> {/* <-- new route */}
             <Route path="/branches" element={<Branches />} />
             <Route path="/products" element={<Products />} />
 
