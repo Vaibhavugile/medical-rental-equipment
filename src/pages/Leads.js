@@ -1,4 +1,4 @@
-// src/pages/Leads.js
+// src/pages/Leads.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   addDoc,
@@ -44,7 +44,8 @@ const fmtDate = (ts) => {
   }
 };
 
-const STATUS_FLOW = ["new", "contacted", "qualified", "converted"];
+// Extended status flow to include 'req shared' and 'lost' terminal states
+const STATUS_FLOW = ["new", "contacted", "req shared", "qualified", "converted"];
 
 export default function Leads() {
   const [leads, setLeads] = useState([]);
@@ -413,7 +414,7 @@ export default function Leads() {
                   <td className="muted">{l.contactPerson}{l.email ? ` · ${l.email}` : ""}</td>
                   <td>{l.phone}</td>
                   <td className="muted">{l.leadSource || "—"}</td>
-                  <td><span className={`chip ${l.status[0]?.toUpperCase() + l.status.slice(1)}`}>{l.status}</span></td>
+                  <td><span className={`chip ${(l.status || "").split(" ").map(s => s[0]?.toUpperCase() + s.slice(1)).join("")}`}>{l.status}</span></td>
                   <td className="muted">{l.createdByName || l.createdBy || "—"}</td>
                   <td className="muted">{l.updatedAt ? fmtDate(l.updatedAt) : (l.createdAt ? fmtDate(l.createdAt) : "—")} {l.updatedByName ? `· ${l.updatedByName}` : ""}</td>
                   <td>
@@ -617,7 +618,7 @@ export default function Leads() {
                 <div className="details-meta">
                   <div className="meta-row">
                     <div className="label muted">Status</div>
-                    <div className="value"><span className={`chip ${detailsLead.status[0]?.toUpperCase() + detailsLead.status.slice(1)}`}>{detailsLead.status}</span></div>
+                    <div className="value"><span className={`chip ${(detailsLead.status || "").split(" ").map(s => s[0]?.toUpperCase() + s.slice(1)).join("")}`}>{detailsLead.status}</span></div>
                   </div>
 
                   <div className="meta-row">

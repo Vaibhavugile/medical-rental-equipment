@@ -6,6 +6,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -20,6 +21,8 @@ import "./Requirements.css";
  - item.days = item.expectedDurationDays || item.days || requirement.expectedDurationDays
  - item.expectedStartDate = item.expectedStartDate || requirement.expectedStartDate
  - item.expectedEndDate = item.expectedEndDate || requirement.expectedEndDate
+
+ Also: propagates requirement/quotation status changes to linked Lead documents via propagateToLead().
 */
 
 const defaultQuotation = {
@@ -84,6 +87,56 @@ const parseDateForDisplay = (ts) => {
     return "—";
   } catch {
     return "—";
+  }
+};
+
+// --- Status propagation helper ---
+const STATUS_MAP_TO_LEAD = {
+  "quotation shared": "contacted",
+  "order_created": "converted",
+  "ready_for_quotation": "contacted",
+  "sent": "contacted",
+  "accepted": "converted",
+  "rejected": "lost",
+};
+
+const propagateToLead = async (requirementId, fromType, oldStatus, newStatus, note = "") => {
+  if (!requirementId) return;
+  try {
+    const reqRef = doc(db, "requirements", requirementId);
+    const reqSnap = await getDoc(reqRef);
+    if (!reqSnap.exists()) return;
+    const req = reqSnap.data() || {};
+    const leadId = req.leadId || req.lead || null;
+    if (!leadId) return;
+
+    const leadRef = doc(db, "leads", leadId);
+    const user = auth.currentUser || {};
+
+    const leadEntry = {
+      ts: new Date().toISOString(),
+      changedBy: user.uid || "unknown",
+      changedByName: user.displayName || user.email || "unknown",
+      type: fromType || "propagate",
+      field: "status",
+      oldValue: oldStatus ?? "",
+      newValue: newStatus ?? "",
+      note: note || `Propagated from requirement ${requirementId}`,
+    };
+
+    const mapped = STATUS_MAP_TO_LEAD[newStatus] || STATUS_MAP_TO_LEAD[req.status] || null;
+
+    const updates = {
+      history: arrayUnion(leadEntry),
+      updatedAt: serverTimestamp(),
+      updatedBy: user.uid || "",
+      updatedByName: user.displayName || user.email || "",
+    };
+    if (mapped) updates.status = mapped;
+
+    await updateDoc(leadRef, updates);
+  } catch (err) {
+    console.error("propagateToLead error", err);
   }
 };
 
@@ -258,6 +311,9 @@ export default function Requirements() {
           updatedByName: user.displayName || user.email || "",
           history: arrayUnion(entry),
         });
+
+        // propagate requirement -> lead
+        propagateToLead(quotation.requirementId, "quotation", detailsReq?.status || "", "quotation shared", entry.note);
       }
 
       closeQuotation();
@@ -278,6 +334,9 @@ export default function Requirements() {
         updatedByName: user.displayName || user.email || "",
         history: arrayUnion(entry),
       });
+
+      // propagate requirement status change to lead
+      propagateToLead(req.id, "requirement", req.status || "", newStatus, note || entry.note);
     } catch (err) {
       console.error("changeReqStatus", err);
       setError(err.message || "Failed to change status");

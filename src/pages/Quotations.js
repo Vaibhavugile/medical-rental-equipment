@@ -1,10 +1,11 @@
-// src/pages/Quotations.jsx
+// src/pages/Quotations.js
 import React, { useEffect, useMemo, useState } from "react";
 import {
   addDoc,
   arrayUnion,
   collection,
   doc,
+  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -13,19 +14,6 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import "./Quotations.css";
-
-/**
- * Full-featured Quotations page
- * - list quotations
- * - view details
- * - edit quotation (full fields: items, discount, taxes, notes, quoNo, status)
- * - versioning (snapshot previous state into quotations/{qid}/versions)
- * - revert to versions
- *
- * Key differences from previous file:
- * - Added calcAmounts to re-use same totals logic as Requirements form
- * - Added editing helpers for items, taxes, discount and totals recomputation
- */
 
 // currency formatter
 const fmtCurrency = (v) => {
@@ -78,6 +66,59 @@ const calcAmounts = (items, discount, taxes) => {
   const totalTax = taxBreakdown.reduce((s, t) => s + (t.amount || 0), 0);
   const total = Math.max(0, taxable + totalTax);
   return { subtotal, discountAmount, taxBreakdown, totalTax, total };
+};
+
+// --- Status propagation helper ---
+// when a quotation or requirement status changes we want to also update the linked Lead
+const STATUS_MAP_TO_LEAD = {
+  // requirement status -> lead status mapping
+  "quotation shared": "contacted",
+  "order_created": "converted",
+  "ready_for_quotation": "contacted",
+  // quotation status -> lead status mapping (fallbacks)
+  "sent": "contacted",
+  "accepted": "converted",
+  "rejected": "lost",
+};
+
+const propagateToLead = async (requirementId, fromType, oldStatus, newStatus, note = "") => {
+  if (!requirementId) return;
+  try {
+    const reqRef = doc(db, "requirements", requirementId);
+    const reqSnap = await getDoc(reqRef);
+    if (!reqSnap.exists()) return;
+    const req = reqSnap.data() || {};
+    const leadId = req.leadId || req.lead || null;
+    if (!leadId) return;
+
+    const leadRef = doc(db, "leads", leadId);
+    const user = auth.currentUser || {};
+
+    const leadEntry = {
+      ts: new Date().toISOString(),
+      changedBy: user.uid || "unknown",
+      changedByName: user.displayName || user.email || "unknown",
+      type: fromType || "propagate",
+      field: "status",
+      oldValue: oldStatus ?? "",
+      newValue: newStatus ?? "",
+      note: note || `Propagated from requirement ${requirementId}`,
+    };
+
+    const mapped = STATUS_MAP_TO_LEAD[newStatus] || STATUS_MAP_TO_LEAD[req.status] || null;
+
+    const updates = {
+      history: arrayUnion(leadEntry),
+      updatedAt: serverTimestamp(),
+      updatedBy: user.uid || "",
+      updatedByName: user.displayName || user.email || "",
+    };
+    if (mapped) updates.status = mapped;
+
+    await updateDoc(leadRef, updates);
+  } catch (err) {
+    console.error("propagateToLead error", err);
+  }
 };
 
 export default function Quotations() {
@@ -335,6 +376,9 @@ export default function Quotations() {
           updatedBy: user.uid || "",
           updatedByName: user.displayName || user.email || "",
         });
+
+        // propagate the change to the lead (new helper)
+        propagateToLead(details.requirementId, "quotation", details.status || "", toUpdate.status || "", entry.note);
       }
 
       // Update local state so UI reflects saved data
@@ -414,6 +458,9 @@ export default function Quotations() {
           updatedBy: user.uid || "",
           updatedByName: user.displayName || user.email || "",
         });
+
+        // propagate revert to lead as well
+        propagateToLead(details.requirementId, "quotation", details.status || "", payload.status || "", entry.note);
       }
 
       setDetails((d) => ({ ...d, ...payload }));
@@ -429,7 +476,7 @@ export default function Quotations() {
     }
   };
 
-  /* ---------- Status update & convert to order (unchanged) ---------- */
+  /* ---------- Status update & convert to order (updated to propagate) ---------- */
   const updateQuotationStatus = async (quote, newStatus, note = "") => {
     setError("");
     try {
@@ -458,6 +505,9 @@ export default function Quotations() {
         };
         if (newStatus === "accepted") updates.status = "order_created";
         await updateDoc(reqRef, updates);
+
+        // propagate this status change to the linked lead
+        propagateToLead(quote.requirementId, "quotation", quote.status || "", newStatus, entry.note);
       }
       if (details && details.id === quote.id) {
         setDetails((d) => ({ ...d, status: newStatus }));
@@ -505,6 +555,9 @@ export default function Quotations() {
           updatedByName: user.displayName || user.email || "",
           history: arrayUnion(entry),
         });
+
+        // propagate order creation to lead
+        propagateToLead(quote.requirementId, "order", quote.status || "", "order_created", entry.note);
       }
     } catch (err) {
       console.error("convertToOrder", err);
@@ -645,31 +698,25 @@ export default function Quotations() {
                           </div>
 
                           <div className="extra-details" style={{ marginTop: 8 }}>
-                            Amount: {fmtCurrency(it.amount || (Number(it.qty || 0) * Number(it.rate || 0)))}
+                            Amount: {fmtCurrency(it.amount || 0)}
                           </div>
                         </div>
                       ))}
 
                       <div style={{ marginTop: 8 }}>
-                        <button className="cp-btn" onClick={addEditItem}>+ Add Item</button>
+                        <button className="cp-btn" onClick={addEditItem}>+ Add item</button>
                       </div>
                     </div>
                   ) : (
-                    <table className="qp-items" style={{ marginTop: 8 }}>
-                      <thead>
-                        <tr><th>Item</th><th>Qty</th><th>Rate</th><th>Amount</th></tr>
-                      </thead>
-                      <tbody>
-                        {(details.items || []).map((it, i) => (
-                          <tr key={i}>
-                            <td>{it.name}</td>
-                            <td>{it.qty}</td>
-                            <td>{fmtCurrency(it.rate)}</td>
-                            <td>{fmtCurrency(it.amount)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <div style={{ marginTop: 8 }}>
+                      {(details.items || []).map((it, i) => (
+                        <div key={i} style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                          <div style={{ fontWeight: 700 }}>{it.name || "—"}</div>
+                          <div style={{ fontSize: 13, color: "#6b7280" }}>{it.qty || 0} × {fmtCurrency(it.rate || 0)} = {fmtCurrency(it.amount || 0)}</div>
+                          {it.notes ? <div style={{ marginTop: 6 }}>{it.notes}</div> : null}
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
 
