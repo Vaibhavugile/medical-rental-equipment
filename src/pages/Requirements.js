@@ -15,6 +15,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import "./Requirements.css";
+import { makeHistoryEntry, propagateToLead } from "../utils/status";
 
 /*
  Updated to show per-item dates/duration with fallback to requirement-level fields:
@@ -62,17 +63,6 @@ const calcAmounts = (items, discount, taxes) => {
   return { subtotal, discountAmount, taxBreakdown, totalTax, total };
 };
 
-const makeHistoryEntry = (user, opts = {}) => ({
-  ts: new Date().toISOString(),
-  changedBy: user.uid || "unknown",
-  changedByName: user.displayName || user.email || "unknown",
-  type: opts.type || "update",
-  field: opts.field || null,
-  oldValue: opts.oldValue == null ? null : String(opts.oldValue),
-  newValue: opts.newValue == null ? null : String(opts.newValue),
-  note: opts.note || null,
-});
-
 const parseDateForDisplay = (ts) => {
   try {
     if (!ts) return "—";
@@ -87,56 +77,6 @@ const parseDateForDisplay = (ts) => {
     return "—";
   } catch {
     return "—";
-  }
-};
-
-// --- Status propagation helper ---
-const STATUS_MAP_TO_LEAD = {
-  "quotation shared": "contacted",
-  "order_created": "converted",
-  "ready_for_quotation": "contacted",
-  "sent": "contacted",
-  "accepted": "converted",
-  "rejected": "lost",
-};
-
-const propagateToLead = async (requirementId, fromType, oldStatus, newStatus, note = "") => {
-  if (!requirementId) return;
-  try {
-    const reqRef = doc(db, "requirements", requirementId);
-    const reqSnap = await getDoc(reqRef);
-    if (!reqSnap.exists()) return;
-    const req = reqSnap.data() || {};
-    const leadId = req.leadId || req.lead || null;
-    if (!leadId) return;
-
-    const leadRef = doc(db, "leads", leadId);
-    const user = auth.currentUser || {};
-
-    const leadEntry = {
-      ts: new Date().toISOString(),
-      changedBy: user.uid || "unknown",
-      changedByName: user.displayName || user.email || "unknown",
-      type: fromType || "propagate",
-      field: "status",
-      oldValue: oldStatus ?? "",
-      newValue: newStatus ?? "",
-      note: note || `Propagated from requirement ${requirementId}`,
-    };
-
-    const mapped = STATUS_MAP_TO_LEAD[newStatus] || STATUS_MAP_TO_LEAD[req.status] || null;
-
-    const updates = {
-      history: arrayUnion(leadEntry),
-      updatedAt: serverTimestamp(),
-      updatedBy: user.uid || "",
-      updatedByName: user.displayName || user.email || "",
-    };
-    if (mapped) updates.status = mapped;
-
-    await updateDoc(leadRef, updates);
-  } catch (err) {
-    console.error("propagateToLead error", err);
   }
 };
 
@@ -312,7 +252,7 @@ export default function Requirements() {
           history: arrayUnion(entry),
         });
 
-        // propagate requirement -> lead
+        // propagate requirement -> lead (sets lead.status exactly to "quotation shared")
         propagateToLead(quotation.requirementId, "quotation", detailsReq?.status || "", "quotation shared", entry.note);
       }
 
@@ -335,7 +275,7 @@ export default function Requirements() {
         history: arrayUnion(entry),
       });
 
-      // propagate requirement status change to lead
+      // propagate requirement status change to lead (sets lead.status exactly to newStatus)
       propagateToLead(req.id, "requirement", req.status || "", newStatus, note || entry.note);
     } catch (err) {
       console.error("changeReqStatus", err);

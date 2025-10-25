@@ -18,6 +18,9 @@ import "./Leads.css";
 // Requirement form integration (place RequirementForm.js in src/data)
 import RequirementForm from "../data/RequirementForm";
 
+// IMPORTED shared helpers
+import { makeHistoryEntry, propagateToLead, STATUS_MAP_TO_LEAD } from "../utils/status";
+
 const defaultForm = {
   id: null,
   customerName: "",
@@ -165,21 +168,6 @@ export default function Leads() {
     });
   };
 
-  // Make history entry (client timestamp)
-  const makeHistoryEntry = (opts = {}) => {
-    const user = auth.currentUser || {};
-    return {
-      ts: new Date().toISOString(),
-      changedBy: user.uid || "unknown",
-      changedByName: user.displayName || user.email || user.uid || "unknown",
-      type: opts.type || "update",
-      field: opts.field || null,
-      oldValue: opts.oldValue == null ? null : String(opts.oldValue),
-      newValue: opts.newValue == null ? null : String(opts.newValue),
-      note: opts.note || null,
-    };
-  };
-
   // Create or update lead
   const handleSave = async (e) => {
     e?.preventDefault();
@@ -211,7 +199,8 @@ export default function Leads() {
           const oldV = existing[key] ?? "";
           const newV = payloadFields[key] ?? "";
           if (String(oldV) !== String(newV)) {
-            changes.push(makeHistoryEntry({
+            // pass user explicitly so changedBy/changedByName are set
+            changes.push(makeHistoryEntry(user, {
               type: key === "status" ? "status" : "update",
               field: key,
               oldValue: oldV,
@@ -243,7 +232,8 @@ export default function Leads() {
         }
       } else {
         // CREATE: store createdBy and initial history (no assignedTo input)
-        const createEntry = makeHistoryEntry({
+        const userForCreate = auth.currentUser || {};
+        const createEntry = makeHistoryEntry(userForCreate, {
           type: "create",
           field: null,
           oldValue: null,
@@ -258,11 +248,11 @@ export default function Leads() {
         await addDoc(collection(db, "leads"), {
           ...payloadFields,
           createdAt: serverTimestamp(),
-          createdBy: user.uid || "",
-          createdByName: user.displayName || user.email || user.uid || "",
+          createdBy: userForCreate.uid || "",
+          createdByName: userForCreate.displayName || userForCreate.email || userForCreate.uid || "",
           updatedAt: serverTimestamp(),
-          updatedBy: user.uid || "",
-          updatedByName: user.displayName || user.email || user.uid || "",
+          updatedBy: userForCreate.uid || "",
+          updatedByName: userForCreate.displayName || userForCreate.email || userForCreate.uid || "",
           history: [createEntry],
         });
       }
@@ -270,7 +260,7 @@ export default function Leads() {
       closeDrawer();
     } catch (err) {
       console.error("save lead error", err);
-      setError(err.message || "Failed to save lead.");
+      setError(err.message || "Failed to save leads.");
     } finally {
       setSaving(false);
     }
@@ -295,7 +285,7 @@ export default function Leads() {
     setError("");
     try {
       const user = auth.currentUser || {};
-      const entry = makeHistoryEntry({
+      const entry = makeHistoryEntry(user, {
         type: "status",
         field: "status",
         oldValue: lead.status,
@@ -704,7 +694,7 @@ export default function Leads() {
             setReqLead(null);
             if (leadToUse && leadToUse.id) {
               const user = auth.currentUser || {};
-              const entry = makeHistoryEntry({
+              const entry = makeHistoryEntry(user, {
                 type: "status",
                 field: "status",
                 oldValue: leadToUse.status,

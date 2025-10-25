@@ -14,6 +14,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import "./Quotations.css";
+import { makeHistoryEntry, propagateToLead } from "../utils/status"; // <--- shared helpers
 
 // currency formatter
 const fmtCurrency = (v) => {
@@ -36,17 +37,6 @@ const parseDate = (ts) => {
   return "—";
 };
 
-const makeHistoryEntry = (user, opts = {}) => ({
-  ts: new Date().toISOString(),
-  changedBy: user.uid || "unknown",
-  changedByName: user.displayName || user.email || "unknown",
-  type: opts.type || "update",
-  field: opts.field || null,
-  oldValue: opts.oldValue == null ? null : String(opts.oldValue),
-  newValue: opts.newValue == null ? null : String(opts.newValue),
-  note: opts.note || null,
-});
-
 /**
  * Reused totals calculation from Requirements.jsx
  * returns: { subtotal, discountAmount, taxBreakdown, totalTax, total }
@@ -68,59 +58,6 @@ const calcAmounts = (items, discount, taxes) => {
   return { subtotal, discountAmount, taxBreakdown, totalTax, total };
 };
 
-// --- Status propagation helper ---
-// when a quotation or requirement status changes we want to also update the linked Lead
-const STATUS_MAP_TO_LEAD = {
-  // requirement status -> lead status mapping
-  "quotation shared": "contacted",
-  "order_created": "converted",
-  "ready_for_quotation": "contacted",
-  // quotation status -> lead status mapping (fallbacks)
-  "sent": "contacted",
-  "accepted": "converted",
-  "rejected": "lost",
-};
-
-const propagateToLead = async (requirementId, fromType, oldStatus, newStatus, note = "") => {
-  if (!requirementId) return;
-  try {
-    const reqRef = doc(db, "requirements", requirementId);
-    const reqSnap = await getDoc(reqRef);
-    if (!reqSnap.exists()) return;
-    const req = reqSnap.data() || {};
-    const leadId = req.leadId || req.lead || null;
-    if (!leadId) return;
-
-    const leadRef = doc(db, "leads", leadId);
-    const user = auth.currentUser || {};
-
-    const leadEntry = {
-      ts: new Date().toISOString(),
-      changedBy: user.uid || "unknown",
-      changedByName: user.displayName || user.email || "unknown",
-      type: fromType || "propagate",
-      field: "status",
-      oldValue: oldStatus ?? "",
-      newValue: newStatus ?? "",
-      note: note || `Propagated from requirement ${requirementId}`,
-    };
-
-    const mapped = STATUS_MAP_TO_LEAD[newStatus] || STATUS_MAP_TO_LEAD[req.status] || null;
-
-    const updates = {
-      history: arrayUnion(leadEntry),
-      updatedAt: serverTimestamp(),
-      updatedBy: user.uid || "",
-      updatedByName: user.displayName || user.email || "",
-    };
-    if (mapped) updates.status = mapped;
-
-    await updateDoc(leadRef, updates);
-  } catch (err) {
-    console.error("propagateToLead error", err);
-  }
-};
-
 export default function Quotations() {
   const [quotations, setQuotations] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -132,7 +69,7 @@ export default function Quotations() {
   const [versions, setVersions] = useState([]);
   const [viewingVersion, setViewingVersion] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [shareReady, setShareReady] = useState(false); // NEW: flag after a successful save so user can share/mark sent
+  const [shareReady, setShareReady] = useState(false); // flag after a successful save so user can share/mark sent
 
   useEffect(() => {
     setLoading(true);
@@ -377,7 +314,7 @@ export default function Quotations() {
           updatedByName: user.displayName || user.email || "",
         });
 
-        // propagate the change to the lead (new helper)
+        // propagate the change to the lead via shared helper
         propagateToLead(details.requirementId, "quotation", details.status || "", toUpdate.status || "", entry.note);
       }
 
@@ -386,7 +323,7 @@ export default function Quotations() {
       setIsEditing(false);
       setEditQuotation(null);
 
-      // NEW: allow the user to explicitly share the updated quotation & mark as sent
+      // allow the user to explicitly share the updated quotation & mark as sent
       setShareReady(true);
     } catch (err) {
       console.error("saveEdits", err);
@@ -565,7 +502,7 @@ export default function Quotations() {
     }
   };
 
-  // NEW: Share the updated quotation and mark it as 'sent'
+  // Share the updated quotation and mark it as 'sent'
   const shareUpdated = async () => {
     if (!details) return;
     try {
@@ -845,7 +782,7 @@ export default function Quotations() {
                         <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
                           <button className="cp-btn ghost" onClick={() => { navigator.clipboard && navigator.clipboard.writeText(JSON.stringify(details)); alert("Copied JSON to clipboard"); }}>Copy JSON</button>
 
-                          {/* NEW: show share button only when shareReady is true */}
+                          {/* show share button only when shareReady is true */}
                           {shareReady && (
                             <button className="cp-btn primary" onClick={() => {
                               if (window.confirm("Share the updated quotation and mark it as 'sent'?")) {
