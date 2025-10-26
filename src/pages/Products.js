@@ -280,7 +280,8 @@ export default function Products() {
       if (!assetDocId) return;
       const note = reservedForName ? `Reserved for ${reservedForName}` : `Reserved`;
       // store reservedFor and reservedAt in metadata
-      await changeAssetStatus(assetDocId, "reserved", note, { reservedFor: reservedForName || "unknown", reservedAt: serverTimestamp() });
+      await changeAssetStatus(assetDocId, "reserved", note, { reservedFor: reservedForName || "unknown", reservedAtISO: new Date().toISOString() });
+
       await refreshAssets();
     } catch (err) {
       console.error("reserveAsset", err);
@@ -291,7 +292,7 @@ export default function Products() {
   const releaseReservation = async (assetDocId, note = "Reservation released") => {
     try {
       if (!assetDocId) return;
-      await changeAssetStatus(assetDocId, "in_stock", note, { releasedAt: serverTimestamp() });
+      await changeAssetStatus(assetDocId, "in_stock", note, { releasedAtISO: new Date().toISOString() });
       await refreshAssets();
     } catch (err) {
       console.error("releaseReservation", err);

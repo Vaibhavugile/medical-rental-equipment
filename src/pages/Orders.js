@@ -10,8 +10,9 @@ import {
   serverTimestamp,
   getDoc,
   getDocs,
-  arrayUnion,
   addDoc,
+  deleteDoc,
+  deleteField,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
@@ -33,6 +34,66 @@ const fmtCurrency = (v) => {
   }
 };
 
+// ---------- canonical totals helper ----------
+/**
+ * calcTotals(items, discount, taxes)
+ * items: [{ qty, rate, ... }]
+ * discount: { type: 'percent'|'fixed', value: number }
+ * taxes: [{ name, type?: 'percent'|'fixed', value: number }]
+ *
+ * returns: { subtotal, discount, taxes: [{ name, value, amount }], totalTax, total }
+ */
+function calcTotals(items = [], discount = { type: "percent", value: 0 }, taxes = []) {
+  const subtotal = (items || []).reduce((s, it) => {
+    const q = Number(it?.qty || 0);
+    const r = Number(it?.rate || 0);
+    return s + q * r;
+  }, 0);
+
+  // compute discount amount
+  let discountAmount = 0;
+  try {
+    if (discount && Number(discount.value)) {
+      if ((discount.type || "").toLowerCase() === "percent") {
+        discountAmount = subtotal * (Number(discount.value) / 100);
+      } else {
+        discountAmount = Number(discount.value || 0);
+      }
+    }
+  } catch (e) {
+    discountAmount = 0;
+  }
+  discountAmount = Number(discountAmount.toFixed(2));
+
+  const taxableAmount = Math.max(0, subtotal - discountAmount);
+
+  // compute tax breakdown
+  const taxBreakdown = (taxes || []).map((t) => {
+    const tType = ((t.type || "percent") + "").toLowerCase();
+    const tValue = Number(t.value ?? t.rate ?? 0);
+    let amount = 0;
+    if (tType === "percent") amount = taxableAmount * (tValue / 100);
+    else amount = tValue;
+    return {
+      id: t.id || t.name || "",
+      name: t.name || "",
+      value: tValue,
+      amount: Number((amount || 0).toFixed(2)),
+    };
+  });
+
+  const totalTax = taxBreakdown.reduce((s, tt) => s + Number(tt.amount || 0), 0);
+  const total = Number((taxableAmount + totalTax).toFixed(2));
+
+  return {
+    subtotal: Number(subtotal.toFixed(2)),
+    discount: discountAmount,
+    taxes: taxBreakdown,
+    totalTax: Number(totalTax.toFixed(2)),
+    total,
+  };
+}
+
 export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +108,9 @@ export default function Orders() {
   const [saving, setSaving] = useState(false);
   const [assetsById, setAssetsById] = useState({}); // assetId -> asset doc data map
   const [drivers, setDrivers] = useState([]); // driver list for assignment
+
+  // Payment modal state (now uses paymentId not editingIndex)
+  const [paymentModal, setPaymentModal] = useState({ open: false, editingPaymentId: null, saving: false, form: null });
 
   const navigate = useNavigate();
 
@@ -126,8 +190,29 @@ export default function Orders() {
     });
   }
 
+  // Payment totals helper
+  function computePaymentsSummary(payments = [], totalOrderAmount = 0) {
+    const totalPaid = (payments || []).reduce((s, p) => s + Number(p.amount || 0), 0);
+    const balance = Math.max(0, Number(totalOrderAmount || 0) - totalPaid);
+    return { totalPaid, balance };
+  }
+
+  // helper: fetch payments from subcollection for an order
+  const fetchPaymentsForOrder = async (orderId) => {
+    try {
+      const paymentsCol = collection(db, "orders", orderId, "payments");
+      const q = query(paymentsCol, orderBy("createdAt", "asc"));
+      const snap = await getDocs(q);
+      const payments = snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+      return payments;
+    } catch (err) {
+      console.error("fetchPaymentsForOrder", err);
+      return [];
+    }
+  };
+
   // ----------------------
-  // open order and prefetch assigned assets metadata
+  // open order and prefetch assigned assets metadata + payments
   // ----------------------
   const openOrder = async (order) => {
     setError("");
@@ -137,6 +222,12 @@ export default function Orders() {
         const snap = await getDoc(doc(db, "orders", order.id));
         if (snap.exists()) fresh = { id: snap.id, ...(snap.data() || {}) };
       }
+
+      // fetch payments from the payments subcollection (new model)
+      const payments = fresh?.id ? await fetchPaymentsForOrder(fresh.id) : [];
+      // attach payments to selectedOrder for UI compatibility
+      fresh.payments = payments || [];
+
       setSelectedOrder(fresh);
 
       // load assigned asset docs metadata into assetsById map
@@ -165,6 +256,7 @@ export default function Orders() {
     setAssetPicker({ open: false, itemIndex: null, assets: [], selected: {}, loading: false });
     setError("");
     setAssetsById({}); // optional: clear cached asset meta
+    setPaymentModal({ open: false, editingPaymentId: null, saving: false, form: null });
   };
 
   // Search + filter
@@ -203,9 +295,12 @@ export default function Orders() {
       // recalc amount for item
       clone.items[index].amount = Number(clone.items[index].qty || 0) * Number(clone.items[index].rate || 0);
 
-      // compute totals
-      const subtotal = (clone.items || []).reduce((s, it) => s + Number((it.qty || 0) * (it.rate || 0)), 0);
-      const totals = { subtotal, total: subtotal };
+      // compute totals using canonical calcTotals
+      const totals = calcTotals(
+        clone.items || [],
+        clone.discount || selectedOrder?.discount || { type: "percent", value: 0 },
+        clone.taxes || selectedOrder?.taxes || []
+      );
 
       // update in firestore
       await updateDoc(doc(db, "orders", selectedOrder.id), {
@@ -271,8 +366,12 @@ export default function Orders() {
       clone.items = clone.items || [];
       clone.items[idx].assignedAssets = [...(clone.items[idx].assignedAssets || []), ...selectedIds];
 
-      const subtotal = (clone.items || []).reduce((s, it) => s + Number((it.qty || 0) * (it.rate || 0)), 0);
-      const totals = { subtotal, total: subtotal };
+      // compute totals via calcTotals
+      const totals = calcTotals(
+        clone.items || [],
+        clone.discount || selectedOrder?.discount || { type: "percent", value: 0 },
+        clone.taxes || selectedOrder?.taxes || []
+      );
 
       await updateDoc(doc(db, "orders", selectedOrder.id), {
         items: clone.items,
@@ -301,6 +400,10 @@ export default function Orders() {
       } catch (err) {
         console.warn("Failed to refresh assigned asset metadata", err);
       }
+
+      // refresh payments too (not required but keeps selectedOrder fresh)
+      const payments = await fetchPaymentsForOrder(selectedOrder.id);
+      clone.payments = payments;
 
       setSelectedOrder(clone);
       setAssetPicker({ open: false, itemIndex: null, assets: [], selected: {}, loading: false });
@@ -337,7 +440,12 @@ export default function Orders() {
       setAssetsById(prev => ({ ...(prev || {}), ...map }));
 
       const snap = await getDoc(doc(db, "orders", selectedOrder.id));
-      if (snap.exists()) setSelectedOrder({ id: snap.id, ...(snap.data() || {}) });
+      if (snap.exists()) {
+        const fresh = { id: snap.id, ...(snap.data() || {}) };
+        // refresh payments from subcollection
+        fresh.payments = await fetchPaymentsForOrder(fresh.id);
+        setSelectedOrder(fresh);
+      }
     } catch (err) {
       console.error("checkoutAssignedAssetsForItem", err);
       setError(err.message || "Checkout failed");
@@ -364,8 +472,12 @@ export default function Orders() {
       const clone = JSON.parse(JSON.stringify(selectedOrder));
       clone.items[itemIndex].assignedAssets = [...(clone.items[itemIndex].assignedAssets || []), ...picked];
 
-      const subtotal = (clone.items || []).reduce((s, it) => s + Number((it.qty || 0) * (it.rate || 0)), 0);
-      const totals = { subtotal, total: subtotal };
+      // compute totals via calcTotals
+      const totals = calcTotals(
+        clone.items || [],
+        clone.discount || selectedOrder?.discount || { type: "percent", value: 0 },
+        clone.taxes || selectedOrder?.taxes || []
+      );
 
       await updateDoc(doc(db, "orders", selectedOrder.id), {
         items: clone.items,
@@ -394,6 +506,9 @@ export default function Orders() {
         console.warn("Failed to refresh assets metadata after auto-assign", err);
       }
 
+      // refresh payments as well
+      clone.payments = await fetchPaymentsForOrder(selectedOrder.id);
+
       setSelectedOrder(clone);
     } catch (err) {
       console.error("autoAssignAssets", err);
@@ -412,8 +527,12 @@ export default function Orders() {
       clone.items = clone.items || [];
       clone.items[itemIndex].assignedAssets = (clone.items[itemIndex].assignedAssets || []).filter((a) => a !== assetId);
 
-      const subtotal = (clone.items || []).reduce((s, it) => s + Number((it.qty || 0) * (it.rate || 0)), 0);
-      const totals = { subtotal, total: subtotal };
+      // compute totals via calcTotals
+      const totals = calcTotals(
+        clone.items || [],
+        clone.discount || selectedOrder?.discount || { type: "percent", value: 0 },
+        clone.taxes || selectedOrder?.taxes || []
+      );
 
       await updateDoc(doc(db, "orders", selectedOrder.id), {
         items: clone.items,
@@ -435,6 +554,9 @@ export default function Orders() {
       const remaining = {};
       Object.keys(assetsById).forEach(k => { if (keepIds.has(k)) remaining[k] = assetsById[k]; });
       setAssetsById(remaining);
+
+      // refresh payments too
+      clone.payments = await fetchPaymentsForOrder(selectedOrder.id);
 
       setSelectedOrder(clone);
     } catch (err) {
@@ -486,13 +608,64 @@ export default function Orders() {
           updatedAt: serverTimestamp(),
           updatedBy: auth.currentUser?.uid || "",
           updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
-          history: arrayUnion(entry),
+          history: (selectedOrder.requirementId && Array.isArray) ? undefined : undefined, // no-op placeholder
         });
 
+        // Note: makeHistoryEntry and propagateToLead still used, original code updated requirement.history via arrayUnion.
+        // We'll call propagateToLead for consistency.
         propagateToLead(selectedOrder.requirementId, "order", selectedOrder.status || "", newStatus, entry.note);
       }
 
-      setSelectedOrder((s) => ({ ...s, status: newStatus }));
+      // If activating, checkout assets (keeps backward compatibility with your earlier change)
+      if (newStatus === "active") {
+        try {
+          const freshSnap = await getDoc(doc(db, "orders", selectedOrder.id));
+          const freshOrder = freshSnap.exists() ? { id: freshSnap.id, ...(freshSnap.data() || {}) } : selectedOrder;
+          const items = freshOrder.items || [];
+
+          for (const it of items) {
+            if (Array.isArray(it.assignedAssets) && it.assignedAssets.length) {
+              for (const aid of it.assignedAssets) {
+                try {
+                  await checkoutAsset(aid, {
+                    rentalId: freshOrder.id,
+                    orderNo: freshOrder.orderNo || "",
+                    customer: freshOrder.customerName || "",
+                    expectedReturn: it.expectedEndDate || null,
+                    until: it.expectedEndDate || null,
+                    note: `Checked out when order ${freshOrder.orderNo || freshOrder.id} activated`
+                  });
+                } catch (err) {
+                  console.warn("activate -> checkoutAsset failed for", aid, err);
+                }
+              }
+            }
+          }
+
+          const unique = Array.from(new Set(items.flatMap(it => it.assignedAssets || [])));
+          if (unique.length) {
+            try {
+              const snaps = await Promise.all(unique.map(aid => getDoc(doc(db, "assets", aid))));
+              const map = {};
+              snaps.forEach(s => { if (s.exists()) map[s.id] = { id: s.id, ...(s.data() || {}) }; });
+              setAssetsById(prev => ({ ...(prev || {}), ...map }));
+            } catch (err) {
+              console.warn("Failed to refresh assets metadata after activate", err);
+            }
+          }
+
+          const postSnap = await getDoc(doc(db, "orders", selectedOrder.id));
+          if (postSnap.exists()) {
+            const fresh = { id: postSnap.id, ...(postSnap.data() || {}) };
+            fresh.payments = await fetchPaymentsForOrder(fresh.id);
+            setSelectedOrder(fresh);
+          } else setSelectedOrder((s) => ({ ...s, status: newStatus }));
+        } catch (err) {
+          console.warn("activate checkout flow failed", err);
+        }
+      } else {
+        setSelectedOrder((s) => ({ ...s, status: newStatus }));
+      }
     } catch (err) {
       console.error("changeOrderStatus", err);
       setError(err.message || "Failed to change status");
@@ -534,7 +707,7 @@ export default function Orders() {
       await updateDoc(doc(db, "orders", selectedOrder.id), {
         delivery: deliveryObj,
         deliveryStatus: "assigned",
-        deliveryHistory: arrayUnion({ at: new Date(), by: auth.currentUser?.uid || "", stage: "assigned", note: `Driver ${driver.name} assigned` }),
+        deliveryHistory: (selectedOrder.deliveryHistory || []).concat([{ at: new Date(), by: auth.currentUser?.uid || "", stage: "assigned", note: `Driver ${driver.name} assigned` }]),
         updatedAt: serverTimestamp(),
       });
 
@@ -548,12 +721,20 @@ export default function Orders() {
           note: `Driver ${driver.name} assigned`,
         });
         entry.at = new Date();
-        await updateDoc(doc(db, "requirements", selectedOrder.requirementId), { history: arrayUnion(entry), updatedAt: serverTimestamp() });
+        try {
+          await updateDoc(doc(db, "requirements", selectedOrder.requirementId), { history: (selectedOrder.history || []).concat([entry]), updatedAt: serverTimestamp() });
+        } catch (err) {
+          console.warn("updating requirement history failed", err);
+        }
         propagateToLead(selectedOrder.requirementId, "delivery", "", "assigned", entry.note);
       }
 
       const snap = await getDoc(doc(db, "orders", selectedOrder.id));
-      if (snap.exists()) setSelectedOrder({ id: snap.id, ...(snap.data() || {}) });
+      if (snap.exists()) {
+        const fresh = { id: snap.id, ...(snap.data() || {}) };
+        fresh.payments = await fetchPaymentsForOrder(fresh.id);
+        setSelectedOrder(fresh);
+      }
     } catch (err) {
       console.error("assignDriverToOrder", err);
       setError(err.message || "Failed to assign driver");
@@ -572,12 +753,12 @@ export default function Orders() {
         updatedAt: serverTimestamp(),
         updatedBy: auth.currentUser?.uid || "",
         updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
-        history: arrayUnion({ at: new Date(), by: auth.currentUser?.uid || "", stage: newStage, note }),
+        history: (selectedOrder.delivery?.history || []).concat([{ at: new Date(), by: auth.currentUser?.uid || "", stage: newStage, note }]),
       });
 
       await updateDoc(doc(db, "orders", selectedOrder.id), {
         deliveryStatus: newStage,
-        deliveryHistory: arrayUnion({ at: new Date(), by: auth.currentUser?.uid || "", stage: newStage, note }),
+        deliveryHistory: (selectedOrder.deliveryHistory || []).concat([{ at: new Date(), by: auth.currentUser?.uid || "", stage: newStage, note }]),
         updatedAt: serverTimestamp(),
       });
 
@@ -590,12 +771,16 @@ export default function Orders() {
           note: note || `Delivery ${newStage}`,
         });
         entry.at = new Date();
-        await updateDoc(doc(db, "requirements", selectedOrder.requirementId), { history: arrayUnion(entry), updatedAt: serverTimestamp() });
+        await updateDoc(doc(db, "requirements", selectedOrder.requirementId), { history: (selectedOrder.history || []).concat([entry]), updatedAt: serverTimestamp() });
         propagateToLead(selectedOrder.requirementId, "delivery", selectedOrder.delivery?.status || "", newStage, entry.note);
       }
 
       const snap = await getDoc(doc(db, "orders", selectedOrder.id));
-      if (snap.exists()) setSelectedOrder({ id: snap.id, ...(snap.data() || {}) });
+      if (snap.exists()) {
+        const fresh = { id: snap.id, ...(snap.data() || {}) };
+        fresh.payments = await fetchPaymentsForOrder(fresh.id);
+        setSelectedOrder(fresh);
+      }
     } catch (err) {
       console.error("updateDeliveryStage", err);
       setError(err.message || "Failed to update delivery stage");
@@ -610,8 +795,156 @@ export default function Orders() {
   const markDelivered = async () => updateDeliveryStage("delivered", "Delivered to customer");
   const confirmDeliveryAccepted = async () => updateDeliveryStage("completed", "Customer accepted delivery");
 
+  // ----------------
+  // Payments management (now backed by subcollection)
+  // ----------------
+
+  // Opens Add Payment modal (editingPaymentId null for new, paymentId for edit)
+  const openPaymentModal = (editingPaymentId = null) => {
+    if (!selectedOrder) return;
+    if (editingPaymentId) {
+      // find the payment in selectedOrder.payments
+      const editing = (selectedOrder.payments || []).find((p) => p.id === editingPaymentId) || null;
+      setPaymentModal({
+        open: true,
+        editingPaymentId,
+        saving: false,
+        form: editing ? { ...editing } : null,
+      });
+    } else {
+      setPaymentModal({
+        open: true,
+        editingPaymentId: null,
+        saving: false,
+        form: { amount: "", method: "cash", date: new Date().toISOString().slice(0, 10), reference: "", note: "", status: "completed" },
+      });
+    }
+  };
+
+  const closePaymentModal = () => setPaymentModal({ open: false, editingPaymentId: null, saving: false, form: null });
+
+  const updatePaymentForm = (patch) => {
+    setPaymentModal((s) => ({ ...s, form: { ...(s.form || {}), ...patch } }));
+  };
+
+  // Add or update payment in orders/{orderId}/payments
+  const savePayment = async () => {
+    if (!selectedOrder || !paymentModal.form) return;
+    const form = paymentModal.form;
+    const amount = Number(form.amount || 0);
+    if (!amount || amount <= 0) {
+      setError("Enter a valid payment amount");
+      return;
+    }
+    setPaymentModal((s) => ({ ...s, saving: true }));
+    setError("");
+    try {
+      const paymentsCol = collection(db, "orders", selectedOrder.id, "payments");
+
+      if (paymentModal.editingPaymentId) {
+        // update existing doc
+        const paymentDocRef = doc(db, "orders", selectedOrder.id, "payments", paymentModal.editingPaymentId);
+        await updateDoc(paymentDocRef, {
+          amount,
+          method: form.method || "cash",
+          date: form.date || new Date().toISOString(),
+          reference: form.reference || "",
+          note: form.note || "",
+          status: form.status || "completed",
+          updatedAt: serverTimestamp(),
+          updatedBy: auth.currentUser?.uid || "",
+          updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
+        });
+      } else {
+        // create new payment doc
+        await addDoc(paymentsCol, {
+          amount,
+          method: form.method || "cash",
+          date: form.date || new Date().toISOString(),
+          reference: form.reference || "",
+          note: form.note || "",
+          status: form.status || "completed",
+          createdAt: serverTimestamp(),
+          createdBy: auth.currentUser?.uid || "",
+          createdByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
+        });
+      }
+
+      // refresh payments and selectedOrder
+      const snap = await getDoc(doc(db, "orders", selectedOrder.id));
+      if (snap.exists()) {
+        const fresh = { id: snap.id, ...(snap.data() || {}) };
+        fresh.payments = await fetchPaymentsForOrder(fresh.id);
+        setSelectedOrder(fresh);
+      }
+
+      closePaymentModal();
+    } catch (err) {
+      console.error("savePayment", err);
+      setError(err.message || "Failed to save payment");
+    } finally {
+      setPaymentModal((s) => ({ ...s, saving: false }));
+    }
+  };
+
+  const removePayment = async (paymentId) => {
+    if (!selectedOrder) return;
+    if (!window.confirm("Remove this payment? This cannot be undone.")) return;
+    setSaving(true);
+    setError("");
+    try {
+      const paymentDocRef = doc(db, "orders", selectedOrder.id, "payments", paymentId);
+      await deleteDoc(paymentDocRef);
+
+      // refresh selectedOrder
+      const snap = await getDoc(doc(db, "orders", selectedOrder.id));
+      if (snap.exists()) {
+        const fresh = { id: snap.id, ...(snap.data() || {}) };
+        fresh.payments = await fetchPaymentsForOrder(fresh.id);
+        setSelectedOrder(fresh);
+      }
+    } catch (err) {
+      console.error("removePayment", err);
+      setError(err.message || "Failed to remove payment");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const markPaymentStatus = async (paymentId, status) => {
+    if (!selectedOrder) return;
+    setSaving(true);
+    setError("");
+    try {
+      const paymentDocRef = doc(db, "orders", selectedOrder.id, "payments", paymentId);
+      await updateDoc(paymentDocRef, {
+        status,
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser?.uid || "",
+        updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
+      });
+
+      const snap = await getDoc(doc(db, "orders", selectedOrder.id));
+      if (snap.exists()) {
+        const fresh = { id: snap.id, ...(snap.data() || {}) };
+        fresh.payments = await fetchPaymentsForOrder(fresh.id);
+        setSelectedOrder(fresh);
+      }
+    } catch (err) {
+      console.error("markPaymentStatus", err);
+      setError(err.message || "Failed to update payment status");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ----------------
   // UI render
+  // ----------------
   if (loading) return <div className="orders-wrap"><div className="orders-card">Loading orders…</div></div>;
+
+  // derive payment summary for selected order
+  const paymentSummary = selectedOrder ? computePaymentsSummary(selectedOrder.payments || [], selectedOrder.totals?.total || 0) : { totalPaid: 0, balance: 0 };
 
   return (
     <div className="orders-wrap">
@@ -685,7 +1018,7 @@ export default function Orders() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: 18 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 420px", gap: 18 }}>
               <div>
                 <div style={{ marginBottom: 12 }}>
                   <div className="label">Customer</div>
@@ -902,14 +1235,61 @@ export default function Orders() {
                       <div className="meta-row"><div className="label strong">Total</div><div className="value strong">{fmtCurrency(selectedOrder.totals?.total || 0)}</div></div>
                     </div>
 
+                    <div style={{ marginTop: 12 }}>
+                      <h4>Payments</h4>
+
+                      {/* Payment summary */}
+                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                        <div>
+                          <div className="muted">Total paid</div>
+                          <div style={{ fontWeight: 700 }}>{fmtCurrency(paymentSummary.totalPaid || 0)}</div>
+                        </div>
+                        <div>
+                          <div className="muted">Balance</div>
+                          <div style={{ fontWeight: 700, color: paymentSummary.balance > 0 ? "#b91c1c" : "#065f46" }}>{fmtCurrency(paymentSummary.balance || 0)}</div>
+                        </div>
+                        <div style={{ marginLeft: "auto" }}>
+                          <button className="cp-btn" onClick={() => openPaymentModal(null)}>Add Payment</button>
+                        </div>
+                      </div>
+
+                      {/* Payment list */}
+                      <div style={{ marginTop: 12 }}>
+                        {(selectedOrder.payments || []).length === 0 && <div className="muted">No payments recorded.</div>}
+                        {(selectedOrder.payments || []).map((p, i) => (
+                          <div key={p.id || `p-${i}`} style={{ display: "flex", gap: 8, alignItems: "center", padding: 8, borderBottom: "1px solid #f3f6f9" }}>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 700 }}>{fmtCurrency(p.amount)}</div>
+                              <div className="muted" style={{ fontSize: 12 }}>
+                                {p.method || "—"} • {p.reference ? `Ref: ${p.reference}` : ""} • {p.date ? (p.date.seconds ? new Date(p.date.seconds * 1000).toLocaleDateString() : new Date(p.date).toLocaleDateString()) : ""}
+                              </div>
+                              {p.note ? <div style={{ fontSize: 13, marginTop: 6 }}>{p.note}</div> : null}
+                            </div>
+
+                            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                              <div style={{ fontSize: 12, color: "#6b7280", textTransform: "capitalize" }}>{p.status || "completed"}</div>
+                              <button className="cp-btn ghost" onClick={() => openPaymentModal(p.id)}>Edit</button>
+                              <button className="cp-btn ghost" onClick={() => removePayment(p.id)}>Delete</button>
+                              {p.status !== "refunded" && <button className="cp-btn ghost" onClick={() => markPaymentStatus(p.id, "refunded")}>Mark refunded</button>}
+                              {p.status !== "pending" && <button className="cp-btn ghost" onClick={() => markPaymentStatus(p.id, "pending")}>Mark pending</button>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                     <div style={{ marginTop: 16 }}>
                       <button className="cp-btn" onClick={async () => {
                         setSaving(true);
                         try {
-                          const subtotal = (selectedOrder.items || []).reduce((s, it) => s + Number((it.qty || 0) * (it.rate || 0)), 0);
+                          const totals = calcTotals(
+                            selectedOrder.items || [],
+                            selectedOrder.discount || { type: "percent", value: 0 },
+                            selectedOrder.taxes || []
+                          );
                           await updateDoc(doc(db, "orders", selectedOrder.id), {
                             items: selectedOrder.items || [],
-                            totals: { subtotal, total: subtotal },
+                            totals,
                             updatedAt: serverTimestamp(),
                             updatedBy: auth.currentUser?.uid || "",
                             updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
@@ -968,9 +1348,122 @@ export default function Orders() {
                 </div>
               </div>
             )}
+
+            {/* Payment modal */}
+            {paymentModal.open && paymentModal.form && (
+              <div className="cp-modal" onClick={() => closePaymentModal()}>
+                <div className="cp-modal-card" onClick={(e) => e.stopPropagation()}>
+                  <h4>{paymentModal.editingPaymentId ? "Edit Payment" : "Add Payment"}</h4>
+
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 8 }}>
+                    <div>
+                      <div className="label muted">Amount</div>
+                      <input className="cp-input" value={paymentModal.form.amount} onChange={(e) => updatePaymentForm({ amount: e.target.value })} />
+                    </div>
+
+                    <div>
+                      <div className="label muted">Date</div>
+                      <input type="date" className="cp-input" value={paymentModal.form.date?.slice?.(0,10) || paymentModal.form.date || new Date().toISOString().slice(0,10)} onChange={(e) => updatePaymentForm({ date: e.target.value })} />
+                    </div>
+
+                    <div>
+                      <div className="label muted">Method</div>
+                      <select className="cp-input" value={paymentModal.form.method || "cash"} onChange={(e) => updatePaymentForm({ method: e.target.value })}>
+                        <option value="cash">Cash</option>
+                        <option value="card">Card</option>
+                        <option value="bank_transfer">Bank Transfer</option>
+                        <option value="cheque">Cheque</option>
+                        <option value="online">Online</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <div className="label muted">Reference</div>
+                      <input className="cp-input" value={paymentModal.form.reference || ""} onChange={(e) => updatePaymentForm({ reference: e.target.value })} />
+                    </div>
+
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <div className="label muted">Note</div>
+                      <textarea rows={3} className="cp-input" value={paymentModal.form.note || ""} onChange={(e) => updatePaymentForm({ note: e.target.value })} />
+                    </div>
+
+                    <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                      <button className="cp-btn ghost" onClick={() => closePaymentModal()}>Cancel</button>
+                      <button className="cp-btn" onClick={() => savePayment()} disabled={paymentModal.saving}>{paymentModal.saving ? "Saving…" : (paymentModal.editingPaymentId ? "Save" : "Add Payment")}</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
     </div>
   );
 }
+
+/*
+===========================
+Migration utility (ONE-TIME)
+===========================
+If you previously had payments as an array on orders (orders[].payments),
+run the migration to move those array-entries into a subcollection:
+orders/{orderId}/payments.
+
+HOW TO RUN:
+1) Open your browser console in a dev environment (or create a separate small Node admin script).
+2) Import / copy the function below (or create a new file in your project that runs it).
+3) Call migratePaymentsToSubcollection() once.
+4) Verify a few migrated orders in the Firestore Console.
+5) When satisfied, remove or comment out this function.
+
+The migration will:
+- For each order that has a `payments` array: create payment docs inside `orders/{orderId}/payments`
+  (each payment doc uses serverTimestamp() for createdAt when not present).
+- Remove the `payments` field from the order doc (so you no longer store arrays).
+
+WARNING: backup your Firestore or test on a staging DB first.
+
+Example migration script (run manually):
+
+import { collection, getDocs, updateDoc, doc, addDoc, deleteField } from "firebase/firestore";
+
+async function migratePaymentsToSubcollection() {
+  const ordersSnap = await getDocs(collection(db, "orders"));
+  for (const o of ordersSnap.docs) {
+    const od = o.data() || {};
+    const orderId = o.id;
+    if (!od.payments || !Array.isArray(od.payments) || od.payments.length === 0) continue;
+    console.log("Migrating order", orderId, "payments:", od.payments.length);
+    for (const p of od.payments) {
+      try {
+        await addDoc(collection(db, "orders", orderId, "payments"), {
+          amount: p.amount || 0,
+          method: p.method || "cash",
+          date: p.date || new Date().toISOString(),
+          reference: p.reference || "",
+          note: p.note || "",
+          status: p.status || "completed",
+          // prefer the existing createdAt if present, else use serverTimestamp()
+          createdAt: p.createdAt || serverTimestamp(),
+          createdBy: p.createdBy || p.createdByName || "",
+        });
+      } catch (err) {
+        console.error("failed to migrate payment for order", orderId, err);
+      }
+    }
+    // remove payments array from order doc
+    try {
+      await updateDoc(doc(db, "orders", orderId), { payments: deleteField() });
+    } catch (err) {
+      console.error("failed to remove payments array from order", orderId, err);
+    }
+  }
+  console.log("migration done");
+}
+
+Note: if you prefer to keep a small summary (like lastPaymentDate / totalPaid) on the order doc,
+you can compute and write those summaries after migrating.
+
+*/
