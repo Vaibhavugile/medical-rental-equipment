@@ -1,6 +1,7 @@
+// src/pages/Signup.js
 import React, { useState } from "react";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { setDoc, doc, serverTimestamp } from "firebase/firestore";
+import { setDoc, doc, serverTimestamp, getDocs, query, where, collection } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import "./Signup.css";
 
@@ -15,49 +16,54 @@ function Signup({ onSignup }) {
     e.preventDefault();
     setError("");
 
-    // Basic validation
     if (!name.trim() || !email.trim() || !password) {
-      setError("Name, email and password are required.");
+      setError("Name, email, and password are required.");
       return;
     }
 
     setLoading(true);
     try {
-      // create user in Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email.trim(),
-        password
-      );
+      // Step 1 — check if email exists in 'drivers' collection
+      const driverQ = query(collection(db, "drivers"), where("loginEmail", "==", email.trim().toLowerCase()));
+      const driverSnap = await getDocs(driverQ);
+      const isDriver = driverSnap.docs.length > 0;
+
+      // Step 2 — create user in Firebase Auth
+      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
       const user = userCredential.user;
 
-      // update displayName for auth user (so auth.currentUser.displayName is available)
+      // Step 3 — update display name for the auth profile
       try {
         await updateProfile(user, { displayName: name.trim() });
-      } catch (updErr) {
-        // non-fatal: continue even if updateProfile fails
-        console.warn("updateProfile failed:", updErr);
+      } catch (e) {
+        console.warn("updateProfile failed", e);
       }
 
-      // create user profile doc in Firestore
+      // Step 4 — create /users/{uid} document with auto role
+      const role = isDriver ? "driver" : "sales";
       await setDoc(doc(db, "users", user.uid), {
         name: name.trim(),
-        email: email.trim(),
-        role: "sales", // default role, change as needed
+        email: email.trim().toLowerCase(),
+        role,
         createdAt: serverTimestamp(),
       });
 
-      // Notify parent (App will also detect onAuthStateChanged)
+      // Optional: update the driver doc with authUid if matched
+      if (isDriver) {
+        const driverDocId = driverSnap.docs[0].id;
+        await setDoc(
+          doc(db, "drivers", driverDocId),
+          { authUid: user.uid, updatedAt: serverTimestamp() },
+          { merge: true }
+        );
+      }
+
       if (typeof onSignup === "function") onSignup();
     } catch (err) {
       console.error("signup error", err);
-      const msg = err?.code
-        ? (err.code === "auth/email-already-in-use"
-            ? "Email already in use. Try logging in."
-            : err.code === "auth/weak-password"
-            ? "Password is too weak (min 6 characters)."
-            : err.message)
-        : (err.message || "Signup failed.");
+      let msg = "Signup failed.";
+      if (err.code === "auth/email-already-in-use") msg = "Email already in use. Try logging in.";
+      if (err.code === "auth/weak-password") msg = "Password too weak (min 6 characters).";
       setError(msg);
     } finally {
       setLoading(false);
@@ -67,7 +73,6 @@ function Signup({ onSignup }) {
   return (
     <div className="signup-container">
       <h2>Create Account</h2>
-
       <form onSubmit={handleSignup}>
         <input
           type="text"
@@ -75,7 +80,6 @@ function Signup({ onSignup }) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
-          autoComplete="name"
         />
         <input
           type="email"
@@ -83,7 +87,6 @@ function Signup({ onSignup }) {
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
-          autoComplete="email"
         />
         <input
           type="password"
@@ -91,18 +94,17 @@ function Signup({ onSignup }) {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          autoComplete="new-password"
         />
         <button type="submit" disabled={loading}>
-          {loading ? "Creating account…" : "Sign Up"}
+          {loading ? "Creating..." : "Sign Up"}
         </button>
       </form>
-
       {error && <p className="error">{error}</p>}
-
       <p style={{ marginTop: 12 }}>
         Already have an account?{" "}
-        <a href="/login" style={{ color: "#007bff" }}>Login</a>
+        <a href="/login" style={{ color: "#007bff" }}>
+          Login
+        </a>
       </p>
     </div>
   );

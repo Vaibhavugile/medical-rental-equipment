@@ -12,6 +12,7 @@ import {
   getDocs,
   addDoc,
   deleteDoc,
+  arrayUnion,
   deleteField,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
@@ -608,11 +609,9 @@ export default function Orders() {
           updatedAt: serverTimestamp(),
           updatedBy: auth.currentUser?.uid || "",
           updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
-          history: (selectedOrder.requirementId && Array.isArray) ? undefined : undefined, // no-op placeholder
+          // leave history handling to existing logic or propagateToLead
         });
 
-        // Note: makeHistoryEntry and propagateToLead still used, original code updated requirement.history via arrayUnion.
-        // We'll call propagateToLead for consistency.
         propagateToLead(selectedOrder.requirementId, "order", selectedOrder.status || "", newStatus, entry.note);
       }
 
@@ -685,109 +684,135 @@ export default function Orders() {
   };
 
   const assignDriverToOrder = async (driverId) => {
-    if (!selectedOrder) return setError("No order open");
-    const driver = drivers.find((d) => d.id === driverId);
-    if (!driver) return setError("Choose a valid driver");
-    setSaving(true);
-    try {
-      const payload = {
-        orderId: selectedOrder.id,
-        orderNo: selectedOrder.orderNo,
-        driverId,
-        driverName: driver.name || "",
-        pickupAddress: selectedOrder.pickupAddress || selectedOrder.deliveryAddress || "",
-        dropAddress: selectedOrder.deliveryAddress || "",
-        items: selectedOrder.items || [],
-        status: "assigned",
-      };
-      const deliveryId = await createDeliveryDoc(payload);
-      const deliveryObj = { deliveryId, driverId, driverName: driver.name || "", status: "assigned", createdAt: serverTimestamp() };
+  if (!selectedOrder) return setError("No order open");
+  const driver = drivers.find((d) => d.id === driverId);
+  if (!driver) return setError("Choose a valid driver");
+  setSaving(true);
+  try {
+    const payload = {
+      orderId: selectedOrder.id,
+      orderNo: selectedOrder.orderNo,
+      driverId,
+      driverName: driver.name || "",
+      pickupAddress: selectedOrder.pickupAddress || selectedOrder.deliveryAddress || "",
+      dropAddress: selectedOrder.deliveryAddress || "",
+      items: selectedOrder.items || [],
+      status: "assigned",
+      fetchedBy: auth.currentUser?.uid || "",
+      fetchedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
+      createdAt: serverTimestamp(),
+    };
+    const deliveryId = await createDeliveryDoc(payload);
+    const deliveryObj = { deliveryId, driverId, driverName: driver.name || "", status: "assigned", createdAt: serverTimestamp() };
 
-      // update order - use client Date inside arrayUnion for history
-      await updateDoc(doc(db, "orders", selectedOrder.id), {
-        delivery: deliveryObj,
-        deliveryStatus: "assigned",
-        deliveryHistory: (selectedOrder.deliveryHistory || []).concat([{ at: new Date(), by: auth.currentUser?.uid || "", stage: "assigned", note: `Driver ${driver.name} assigned` }]),
-        updatedAt: serverTimestamp(),
+    // Build a history entry with client timestamp to avoid serverTimestamp() inside arrayUnion
+    const orderHistoryEntry = {
+      at: new Date().toISOString(), // client timestamp here to avoid the SDK restriction
+      by: auth.currentUser?.uid || "",
+      stage: "assigned",
+      note: `Driver ${driver.name} assigned`,
+    };
+
+    // update order - push a delivery history entry using arrayUnion (with client timestamp) and set updatedAt with server timestamp
+    await updateDoc(doc(db, "orders", selectedOrder.id), {
+      delivery: deliveryObj,
+      deliveryStatus: "assigned",
+      deliveryHistory: arrayUnion(orderHistoryEntry),
+      updatedAt: serverTimestamp(),
+    });
+
+    // ... requirement handling unchanged (if any) ...
+    if (selectedOrder.requirementId) {
+      const entry = makeHistoryEntry(auth.currentUser || {}, {
+        type: "delivery",
+        field: "driverAssigned",
+        oldValue: "",
+        newValue: driverId,
+        note: `Driver ${driver.name} assigned`,
       });
-
-      // requirement history if linked
-      if (selectedOrder.requirementId) {
-        const entry = makeHistoryEntry(auth.currentUser || {}, {
-          type: "delivery",
-          field: "driverAssigned",
-          oldValue: "",
-          newValue: driverId,
-          note: `Driver ${driver.name} assigned`,
-        });
-        entry.at = new Date();
-        try {
-          await updateDoc(doc(db, "requirements", selectedOrder.requirementId), { history: (selectedOrder.history || []).concat([entry]), updatedAt: serverTimestamp() });
-        } catch (err) {
-          console.warn("updating requirement history failed", err);
-        }
-        propagateToLead(selectedOrder.requirementId, "delivery", "", "assigned", entry.note);
-      }
-
-      const snap = await getDoc(doc(db, "orders", selectedOrder.id));
-      if (snap.exists()) {
-        const fresh = { id: snap.id, ...(snap.data() || {}) };
-        fresh.payments = await fetchPaymentsForOrder(fresh.id);
-        setSelectedOrder(fresh);
-      }
-    } catch (err) {
-      console.error("assignDriverToOrder", err);
-      setError(err.message || "Failed to assign driver");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const updateDeliveryStage = async (newStage, note = "") => {
-    if (!selectedOrder) return setError("No order open");
-    if (!selectedOrder.delivery?.deliveryId) return setError("No delivery linked to this order");
-    setSaving(true);
-    try {
-      await updateDoc(doc(db, "deliveries", selectedOrder.delivery.deliveryId), {
-        status: newStage,
-        updatedAt: serverTimestamp(),
-        updatedBy: auth.currentUser?.uid || "",
-        updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
-        history: (selectedOrder.delivery?.history || []).concat([{ at: new Date(), by: auth.currentUser?.uid || "", stage: newStage, note }]),
-      });
-
-      await updateDoc(doc(db, "orders", selectedOrder.id), {
-        deliveryStatus: newStage,
-        deliveryHistory: (selectedOrder.deliveryHistory || []).concat([{ at: new Date(), by: auth.currentUser?.uid || "", stage: newStage, note }]),
-        updatedAt: serverTimestamp(),
-      });
-
-      if (selectedOrder.requirementId) {
-        const entry = makeHistoryEntry(auth.currentUser || {}, {
-          type: "delivery",
-          field: "status",
-          oldValue: selectedOrder.delivery?.status || "",
-          newValue: newStage,
-          note: note || `Delivery ${newStage}`,
-        });
-        entry.at = new Date();
+      entry.at = new Date();
+      try {
         await updateDoc(doc(db, "requirements", selectedOrder.requirementId), { history: (selectedOrder.history || []).concat([entry]), updatedAt: serverTimestamp() });
-        propagateToLead(selectedOrder.requirementId, "delivery", selectedOrder.delivery?.status || "", newStage, entry.note);
+      } catch (err) {
+        console.warn("updating requirement history failed", err);
       }
-
-      const snap = await getDoc(doc(db, "orders", selectedOrder.id));
-      if (snap.exists()) {
-        const fresh = { id: snap.id, ...(snap.data() || {}) };
-        fresh.payments = await fetchPaymentsForOrder(fresh.id);
-        setSelectedOrder(fresh);
-      }
-    } catch (err) {
-      console.error("updateDeliveryStage", err);
-      setError(err.message || "Failed to update delivery stage");
-    } finally {
-      setSaving(false);
+      propagateToLead(selectedOrder.requirementId, "delivery", "", "assigned", entry.note);
     }
-  };
+
+    const snap = await getDoc(doc(db, "orders", selectedOrder.id));
+    if (snap.exists()) {
+      const fresh = { id: snap.id, ...(snap.data() || {}) };
+      fresh.payments = await fetchPaymentsForOrder(fresh.id);
+      setSelectedOrder(fresh);
+    }
+  } catch (err) {
+    console.error("assignDriverToOrder", err);
+    setError(err.message || "Failed to assign driver");
+  } finally {
+    setSaving(false);
+  }
+};
+
+
+const updateDeliveryStage = async (newStage, note = "") => {
+  if (!selectedOrder) return setError("No order open");
+  if (!selectedOrder.delivery?.deliveryId) return setError("No delivery linked to this order");
+  setSaving(true);
+  try {
+    const deliveryRef = doc(db, "deliveries", selectedOrder.delivery.deliveryId);
+    const orderRef = doc(db, "orders", selectedOrder.id);
+
+    // build history entry with client timestamp
+    const hist = {
+      at: new Date().toISOString(),
+      by: auth.currentUser?.uid || "",
+      stage: newStage,
+      note,
+    };
+
+    // update deliveries doc: status + push history (client timestamp inside arrayUnion) + updatedAt server timestamp
+    await updateDoc(deliveryRef, {
+      status: newStage,
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser?.uid || "",
+      updatedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
+      history: arrayUnion(hist),
+    });
+
+    // update orders doc: deliveryStatus + push deliveryHistory (client timestamp) + updatedAt server timestamp
+    await updateDoc(orderRef, {
+      deliveryStatus: newStage,
+      deliveryHistory: arrayUnion(hist),
+      updatedAt: serverTimestamp(),
+    });
+
+    if (selectedOrder.requirementId) {
+      const entry = makeHistoryEntry(auth.currentUser || {}, {
+        type: "delivery",
+        field: "status",
+        oldValue: selectedOrder.delivery?.status || "",
+        newValue: newStage,
+        note: note || `Delivery ${newStage}`,
+      });
+      entry.at = new Date();
+      await updateDoc(doc(db, "requirements", selectedOrder.requirementId), { history: (selectedOrder.history || []).concat([entry]), updatedAt: serverTimestamp() });
+      propagateToLead(selectedOrder.requirementId, "delivery", selectedOrder.delivery?.status || "", newStage, entry.note);
+    }
+
+    const snap = await getDoc(orderRef);
+    if (snap.exists()) {
+      const fresh = { id: snap.id, ...(snap.data() || {}) };
+      fresh.payments = await fetchPaymentsForOrder(fresh.id);
+      setSelectedOrder(fresh);
+    }
+  } catch (err) {
+    console.error("updateDeliveryStage", err);
+    setError(err.message || "Failed to update delivery stage");
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   const driverAcceptDelivery = async () => updateDeliveryStage("accepted", "Driver accepted");
   const markPickedUp = async () => updateDeliveryStage("picked_up", "Driver picked up items");
@@ -1371,27 +1396,34 @@ export default function Orders() {
                       <select className="cp-input" value={paymentModal.form.method || "cash"} onChange={(e) => updatePaymentForm({ method: e.target.value })}>
                         <option value="cash">Cash</option>
                         <option value="card">Card</option>
-                        <option value="bank_transfer">Bank Transfer</option>
-                        <option value="cheque">Cheque</option>
-                        <option value="online">Online</option>
-                        <option value="other">Other</option>
+                        <option value="upi">UPI</option>
+                        <option value="bank">Bank</option>
                       </select>
                     </div>
 
                     <div>
+                      <div className="label muted">Status</div>
+                      <select className="cp-input" value={paymentModal.form.status || "completed"} onChange={(e) => updatePaymentForm({ status: e.target.value })}>
+                        <option value="completed">Completed</option>
+                        <option value="pending">Pending</option>
+                        <option value="refunded">Refunded</option>
+                      </select>
+                    </div>
+
+                    <div style={{ gridColumn: "1 / -1" }}>
                       <div className="label muted">Reference</div>
                       <input className="cp-input" value={paymentModal.form.reference || ""} onChange={(e) => updatePaymentForm({ reference: e.target.value })} />
                     </div>
 
                     <div style={{ gridColumn: "1 / -1" }}>
                       <div className="label muted">Note</div>
-                      <textarea rows={3} className="cp-input" value={paymentModal.form.note || ""} onChange={(e) => updatePaymentForm({ note: e.target.value })} />
+                      <textarea className="cp-input" value={paymentModal.form.note || ""} onChange={(e) => updatePaymentForm({ note: e.target.value })} />
                     </div>
+                  </div>
 
-                    <div style={{ gridColumn: "1 / -1", display: "flex", gap: 8, justifyContent: "flex-end" }}>
-                      <button className="cp-btn ghost" onClick={() => closePaymentModal()}>Cancel</button>
-                      <button className="cp-btn" onClick={() => savePayment()} disabled={paymentModal.saving}>{paymentModal.saving ? "Saving…" : (paymentModal.editingPaymentId ? "Save" : "Add Payment")}</button>
-                    </div>
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
+                    <button className="cp-btn ghost" onClick={() => closePaymentModal()}>Cancel</button>
+                    <button className="cp-btn" onClick={() => savePayment()} disabled={paymentModal.saving}>{paymentModal.saving ? "Saving…" : "Save"}</button>
                   </div>
                 </div>
               </div>
@@ -1402,68 +1434,3 @@ export default function Orders() {
     </div>
   );
 }
-
-/*
-===========================
-Migration utility (ONE-TIME)
-===========================
-If you previously had payments as an array on orders (orders[].payments),
-run the migration to move those array-entries into a subcollection:
-orders/{orderId}/payments.
-
-HOW TO RUN:
-1) Open your browser console in a dev environment (or create a separate small Node admin script).
-2) Import / copy the function below (or create a new file in your project that runs it).
-3) Call migratePaymentsToSubcollection() once.
-4) Verify a few migrated orders in the Firestore Console.
-5) When satisfied, remove or comment out this function.
-
-The migration will:
-- For each order that has a `payments` array: create payment docs inside `orders/{orderId}/payments`
-  (each payment doc uses serverTimestamp() for createdAt when not present).
-- Remove the `payments` field from the order doc (so you no longer store arrays).
-
-WARNING: backup your Firestore or test on a staging DB first.
-
-Example migration script (run manually):
-
-import { collection, getDocs, updateDoc, doc, addDoc, deleteField } from "firebase/firestore";
-
-async function migratePaymentsToSubcollection() {
-  const ordersSnap = await getDocs(collection(db, "orders"));
-  for (const o of ordersSnap.docs) {
-    const od = o.data() || {};
-    const orderId = o.id;
-    if (!od.payments || !Array.isArray(od.payments) || od.payments.length === 0) continue;
-    console.log("Migrating order", orderId, "payments:", od.payments.length);
-    for (const p of od.payments) {
-      try {
-        await addDoc(collection(db, "orders", orderId, "payments"), {
-          amount: p.amount || 0,
-          method: p.method || "cash",
-          date: p.date || new Date().toISOString(),
-          reference: p.reference || "",
-          note: p.note || "",
-          status: p.status || "completed",
-          // prefer the existing createdAt if present, else use serverTimestamp()
-          createdAt: p.createdAt || serverTimestamp(),
-          createdBy: p.createdBy || p.createdByName || "",
-        });
-      } catch (err) {
-        console.error("failed to migrate payment for order", orderId, err);
-      }
-    }
-    // remove payments array from order doc
-    try {
-      await updateDoc(doc(db, "orders", orderId), { payments: deleteField() });
-    } catch (err) {
-      console.error("failed to remove payments array from order", orderId, err);
-    }
-  }
-  console.log("migration done");
-}
-
-Note: if you prefer to keep a small summary (like lastPaymentDate / totalPaid) on the order doc,
-you can compute and write those summaries after migrating.
-
-*/
