@@ -1,6 +1,6 @@
 // src/App.js
 import React from "react";
-import { BrowserRouter, Routes, Route, NavLink, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, NavLink, useNavigate, Navigate } from "react-router-dom";
 
 import Leads from "./pages/Leads";
 import Requirements from "./pages/Requirements";
@@ -12,11 +12,13 @@ import Drivers from "./pages/Drivers";
 import DriverApp from "./pages/DriverApp";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import DriverAttendance from "./pages/DriverAttendance";
 
 import useAuth from "./pages/useAuth";
 import { auth } from "./firebase";
 import "./App.css";
 
+/* ---------------- Header for CRM ---------------- */
 function HeaderRight() {
   const { user, userProfile } = useAuth();
   const navigate = useNavigate();
@@ -203,6 +205,39 @@ function CRMApp() {
               >
                 Products
               </NavLink>
+
+              {/* Optional: quick links to driver views for admins/testing */}
+              <NavLink
+                to="/driver-app"
+                style={({ isActive }) => ({
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  textDecoration: "none",
+                  color: isActive ? "#fff" : "#0b5cff",
+                  background: isActive
+                    ? "linear-gradient(90deg,#0b69ff,#00b4d8)"
+                    : "transparent",
+                  fontWeight: 700,
+                })}
+              >
+                Driver App
+              </NavLink>
+
+              <NavLink
+                to="/attendance"
+                style={({ isActive }) => ({
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  textDecoration: "none",
+                  color: isActive ? "#fff" : "#0b5cff",
+                  background: isActive
+                    ? "linear-gradient(90deg,#0b69ff,#00b4d8)"
+                    : "transparent",
+                  fontWeight: 700,
+                })}
+              >
+                Attendance
+              </NavLink>
             </nav>
           </div>
 
@@ -219,33 +254,121 @@ function CRMApp() {
           <Route path="/drivers" element={<Drivers />} />
           <Route path="/branches" element={<Branches />} />
           <Route path="/products" element={<Products />} />
+
+          {/* Driver/testing routes inside CRM */}
+          <Route path="/driver-app" element={<DriverApp />} />
+          <Route path="/attendance" element={<DriverAttendance />} />
         </Routes>
       </main>
     </>
   );
 }
 
+/* -------------- Simple layout for driver role -------------- */
+function DriverLayout() {
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => {
+    try {
+      await auth.signOut();
+      navigate("/login");
+    } catch (err) {
+      console.error("Signout error", err);
+      alert("Signout failed");
+    }
+  };
+
+  return (
+    <>
+      <header
+        style={{
+          borderBottom: "1px solid rgba(15,23,42,0.04)",
+          background: "#fff",
+          padding: "10px 16px",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: 1000,
+            margin: "0 auto",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <nav style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <NavLink
+              to="/driver-app"
+              style={({ isActive }) => ({
+                padding: "8px 10px",
+                borderRadius: 8,
+                textDecoration: "none",
+                color: isActive ? "#fff" : "#0b5cff",
+                background: isActive
+                  ? "linear-gradient(90deg,#0b69ff,#00b4d8)"
+                  : "transparent",
+                fontWeight: 700,
+              })}
+            >
+              Tasks
+            </NavLink>
+
+            <NavLink
+              to="/attendance"
+              style={({ isActive }) => ({
+                padding: "8px 10px",
+                borderRadius: 8,
+                textDecoration: "none",
+                color: isActive ? "#fff" : "#0b5cff",
+                background: isActive
+                  ? "linear-gradient(90deg,#0b69ff,#00b4d8)"
+                  : "transparent",
+                fontWeight: 700,
+              })}
+            >
+              Attendance
+            </NavLink>
+          </nav>
+
+          <button className="cp-btn ghost" onClick={handleSignOut}>
+            Sign Out
+          </button>
+        </div>
+      </header>
+
+      <main>
+        <Routes>
+          <Route path="/driver-app" element={<DriverApp />} />
+          <Route path="/attendance" element={<DriverAttendance />} />
+          {/* Default to attendance for drivers */}
+          <Route path="*" element={<Navigate to="/attendance" replace />} />
+        </Routes>
+      </main>
+    </>
+  );
+}
+
+/* ------------------------------ App root ------------------------------ */
 export default function App() {
   const { user, userProfile, loading } = useAuth();
 
   if (loading) return <div style={{ padding: 40 }}>Loading...</div>;
 
-  // ✅ If logged-in user is a driver → show only DriverApp
-  if (user && userProfile?.role === "driver") {
-    return (
-      <BrowserRouter>
-        <DriverApp />
-      </BrowserRouter>
-    );
-  }
-
-  // Otherwise, show CRM + auth routes
   return (
     <BrowserRouter>
       <Routes>
+        {/* Auth */}
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/*" element={<CRMApp />} />
+
+        {/* Driver-only experience */}
+        {user && userProfile?.role === "driver" ? (
+          <Route path="/*" element={<DriverLayout />} />
+        ) : (
+          // CRM for admins/others
+          <Route path="/*" element={<CRMApp />} />
+        )}
       </Routes>
     </BrowserRouter>
   );

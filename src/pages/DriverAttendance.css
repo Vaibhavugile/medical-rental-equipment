@@ -1,0 +1,67 @@
+/* DriverAttendance.css — driver-facing attendance page */
+
+.att-wrap {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  color: #0f172a;
+}
+
+.att-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; margin-bottom: 16px;
+}
+.att-top h2 { margin: 0; font-size: 22px; color: #0b5cff; }
+.att-controls input[type="date"] {
+  padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px;
+}
+
+.att-card {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+  padding: 16px; box-shadow: 0 3px 10px rgba(15,23,42,.05);
+}
+
+.att-row {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 12px;
+}
+.label { font-size: 12px; color: #64748b; }
+.value { font-size: 16px; font-weight: 600; color: #111827; }
+
+.chip {
+  display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  background: #f1f5f9; color: #334155; text-transform: capitalize;
+}
+.chip.present { background: #e9f8f1; color: #0d6b3c; }
+.chip.absent { background: #fdecec; color: #9f1239; }
+.chip.leave { background: #fff7ed; color: #9a3412; }
+.chip.half_day { background: #eef2ff; color: #3730a3; }
+.chip.late { background: #fff1f2; color: #9f1239; }
+
+.att-actions { display: flex; gap: 10px; margin: 10px 0 6px; }
+.cp-btn {
+  background: linear-gradient(90deg, #0b69ff, #00b4d8);
+  border: none; color: #fff; font-weight: 600; border-radius: 8px;
+  padding: 10px 14px; cursor: pointer; transition: opacity .2s, transform .1s;
+}
+.cp-btn:hover { opacity: .9; }
+.cp-btn:active { transform: scale(.98); }
+.cp-btn.ghost { background: transparent; color: #0b5cff; border: 1px solid rgba(11,92,255,.2); }
+
+.att-status-row { display: flex; align-items: center; gap: 10px; margin: 10px 0; }
+.quick-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-btn {
+  padding: 6px 10px; border-radius: 999px; border: 1px solid #e5e7eb; background: #f8fafc; cursor: pointer; font-weight: 600;
+}
+.chip-btn:hover { background: #eef2ff; border-color: #c7d2fe; color: #3730a3; }
+
+.att-note { display: grid; gap: 6px; margin-top: 10px; }
+.att-note textarea {
+  width: 100%; border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px; font-size: 14px; resize: vertical;
+}
+
+.muted { color: #64748b; font-size: 13px; }
+
+@media (max-width: 720px) {
+  .att-row { grid-template-columns: 1fr 1fr; }
+}

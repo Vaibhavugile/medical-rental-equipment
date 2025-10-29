@@ -1,5 +1,7 @@
-// src/components/DriverApp.js
-import React, { useEffect, useState } from "react";
+// src/pages/DriverApp.js — Scalable v4 (TanStack useVirtualizer, NA-safe, ESLint clean)
+
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import PropTypes from "prop-types";
 import {
   collection,
   query,
@@ -13,473 +15,527 @@ import {
   arrayUnion,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import "./DriverApp.css";
 
-/**
- * Helper to format Firestore Timestamp / ISO string / Date / number
- */
-function formatTimestampToLocale(t) {
-  if (!t) return "";
-  // Firestore Timestamp object
-  if (typeof t === "object" && t !== null && (t.seconds || t.nanoseconds)) {
-    try {
-      return new Date(t.seconds * 1000).toLocaleString();
-    } catch (e) {
-      // fallback
-    }
+/* ------------------------------ helpers ------------------------------ */
+
+const NA = "NA";
+const val = (v) => (v === undefined || v === null || v === "" ? NA : v);
+
+const STAGES = ["assigned", "accepted", "in_transit", "delivered", "completed", "rejected"];
+const isStage = (s) => STAGES.includes(s);
+const LABEL = (s) =>
+  ({
+    assigned: "Assigned",
+    accepted: "Accepted",
+    in_transit: "Pickup / In transit",
+    delivered: "Delivered",
+    completed: "Completed",
+    rejected: "Rejected",
+  }[s] || s || NA);
+
+function formatTS(t) {
+  if (!t) return NA;
+  if (typeof t === "object" && (t.seconds || t.nanoseconds)) {
+    const d = new Date(((t.seconds || 0) * 1000) + Math.floor((t.nanoseconds || 0) / 1e6));
+    return isNaN(d) ? NA : d.toLocaleString();
   }
-  // Firestore may return a Date
-  if (t instanceof Date) return t.toLocaleString();
-  // ISO string
-  if (typeof t === "string") {
-    try {
-      const d = new Date(t);
-      if (!isNaN(d.getTime())) return d.toLocaleString();
-    } catch (e) {}
-  }
-  // number (ms)
-  if (typeof t === "number") {
-    try {
-      return new Date(t).toLocaleString();
-    } catch (e) {}
-  }
-  return String(t);
+  const d = t instanceof Date ? t : new Date(t);
+  return isNaN(d) ? NA : d.toLocaleString();
 }
 
-/**
- * Simple totals calc compatible with Orders.js behaviour
- */
-function calcTotals(items = [], discount = { type: "percent", value: 0 }, taxes = []) {
-  const subtotal = (items || []).reduce((s, it) => {
-    const q = Number(it?.qty || 0);
-    const r = Number(it?.rate || 0);
-    return s + q * r;
-  }, 0);
+/* ------------------------------ hooks ------------------------------ */
 
-  let discountAmount = 0;
-  try {
-    if (discount && Number(discount.value)) {
-      if ((discount.type || "").toLowerCase() === "percent") {
-        discountAmount = subtotal * (Number(discount.value) / 100);
-      } else {
-        discountAmount = Number(discount.value || 0);
-      }
-    }
-  } catch (e) {
-    discountAmount = 0;
-  }
-  discountAmount = Number(discountAmount.toFixed(2));
-  const taxableAmount = Math.max(0, subtotal - discountAmount);
-
-  const taxBreakdown = (taxes || []).map((t) => {
-    const tType = ((t.type || "percent") + "").toLowerCase();
-    const tValue = Number(t.value ?? t.rate ?? 0);
-    let amount = 0;
-    if (tType === "percent") amount = taxableAmount * (tValue / 100);
-    else amount = tValue;
-    return {
-      id: t.id || t.name || "",
-      name: t.name || "",
-      value: tValue,
-      amount: Number((amount || 0).toFixed(2)),
-    };
-  });
-  const totalTax = taxBreakdown.reduce((s, tt) => s + Number(tt.amount || 0), 0);
-  const total = Number((taxableAmount + totalTax).toFixed(2));
-
-  return {
-    subtotal: Number(subtotal.toFixed(2)),
-    discount: discountAmount,
-    taxes: taxBreakdown,
-    totalTax: Number(totalTax.toFixed(2)),
-    total,
-  };
-}
-
-export default function DriverApp() {
+function useAuthUser() {
   const [user, setUser] = useState(auth.currentUser || null);
+  useEffect(() => auth.onAuthStateChanged((u) => setUser(u || null)), []);
+  return user;
+}
+
+function useDriverProfile(user) {
   const [driver, setDriver] = useState(null);
-  const [deliveries, setDeliveries] = useState([]);
-  const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [branchesMap, setBranchesMap] = useState({}); // branchId -> branch doc
-
-  useEffect(() => {
-    const unsub = auth.onAuthStateChanged((u) => setUser(u));
-    return () => unsub();
-  }, []);
-
-  // Load branches map
-  useEffect(() => {
-    (async () => {
-      try {
-        const snap = await getDocs(collection(db, "branches"));
-        const map = {};
-        snap.docs.forEach((d) => {
-          map[d.id] = { id: d.id, ...(d.data() || {}) };
-        });
-        setBranchesMap(map);
-      } catch (err) {
-        console.warn("Failed to load branches:", err);
-      }
-    })();
-  }, []);
-
-  // Fetch driver record by auth uid/email
   useEffect(() => {
     if (!user) return;
     (async () => {
       setLoading(true);
       try {
         const q1 = query(collection(db, "drivers"), where("authUid", "==", user.uid));
-        const snap1 = await getDocs(q1);
-        if (!snap1.empty) {
-          setDriver({ id: snap1.docs[0].id, ...snap1.docs[0].data() });
-          return;
+        const s1 = await getDocs(q1);
+        if (!s1.empty) {
+          setDriver({ id: s1.docs[0].id, ...(s1.docs[0].data() || {}) });
+        } else {
+          const q2 = query(collection(db, "drivers"), where("loginEmail", "==", user.email || ""));
+          const s2 = await getDocs(q2);
+          if (!s2.empty) setDriver({ id: s2.docs[0].id, ...(s2.docs[0].data() || {}) });
         }
-        const q2 = query(collection(db, "drivers"), where("loginEmail", "==", user.email));
-        const snap2 = await getDocs(q2);
-        if (!snap2.empty) {
-          setDriver({ id: snap2.docs[0].id, ...snap2.docs[0].data() });
-        }
-      } catch (err) {
-        console.error(err);
+      } catch (e) {
+        console.error(e);
         setError("Failed to load driver profile.");
       } finally {
         setLoading(false);
       }
     })();
   }, [user]);
+  return { driver, loading, error };
+}
 
-  // Subscribe to deliveries for this driver and enrich with order + payments + stores
+function useBranchesMap() {
+  const [branchesMap, setBranchesMap] = useState({});
   useEffect(() => {
-    if (!driver) return;
+    (async () => {
+      try {
+        const snap = await getDocs(collection(db, "branches"));
+        const map = {};
+        snap.docs.forEach((d) => (map[d.id] = { id: d.id, ...(d.data() || {}) }));
+        setBranchesMap(map);
+      } catch (e) {
+        console.warn("Branches load failed", e);
+      }
+    })();
+  }, []);
+  return branchesMap;
+}
+
+function useDriverDeliveries(driver, branchesMap) {
+  const [deliveries, setDeliveries] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!driver?.id) return;
     setLoading(true);
-    const q = query(collection(db, "deliveries"), where("driverId", "==", driver.id));
+    const qy = query(collection(db, "deliveries"), where("driverId", "==", driver.id));
+
     const unsub = onSnapshot(
-      q,
+      qy,
       async (snap) => {
         try {
           const out = [];
           for (const d of snap.docs) {
             const del = { id: d.id, ...(d.data() || {}) };
 
-            // fetch order doc if linked
+            // Attach order minimal
             if (del.orderId) {
-              const oSnap = await getDoc(doc(db, "orders", del.orderId));
-              if (oSnap.exists()) {
-                const orderData = { id: oSnap.id, ...(oSnap.data() || {}) };
-
-                // fetch payments subcollection (Orders page uses subcollection)
-                try {
-                  const paymentsSnap = await getDocs(collection(db, "orders", orderData.id, "payments"));
-                  const payments = paymentsSnap.docs.map((p) => ({ id: p.id, ...(p.data() || {}) }));
-                  orderData.payments = payments;
-                } catch (err) {
-                  console.warn("Failed to fetch payments for order", orderData.id, err);
-                  orderData.payments = orderData.payments || [];
+              try {
+                const oSnap = await getDoc(doc(db, "orders", del.orderId));
+                if (oSnap.exists()) {
+                  const order = { id: oSnap.id, ...(oSnap.data() || {}) };
+                  const branchIds = Array.from(new Set((order.items || []).map((it) => it?.branchId).filter(Boolean)));
+                  order.stores = branchIds.map((bId) => ({
+                    id: bId,
+                    name: branchesMap?.[bId]?.name || branchesMap?.[bId]?.displayName || bId,
+                  }));
+                  del.order = order;
+                } else {
+                  del.order = { id: del.orderId };
                 }
-
-                // compute totals if not present
-                if (!orderData.totals) {
-                  orderData.totals = calcTotals(orderData.items || [], orderData.discount || { type: "percent", value: 0 }, orderData.taxes || []);
-                }
-
-                // calculate payment summary (totalPaid, balance)
-                const totalPaid = (orderData.payments || []).reduce((s, p) => s + Number(p.amount || 0), 0);
-                const balance = Math.max(0, Number(orderData.totals?.total || 0) - totalPaid);
-
-                orderData.paymentSummary = { totalPaid, balance };
-
-                // determine deposit / depositAmount (if set on order fields)
-                orderData.depositAmount = orderData.depositAmount ?? orderData.deposit ?? 0;
-
-                // determine stores using items' branchId
-                const branchIds = Array.from(
-                  new Set((orderData.items || []).map((it) => it.branchId).filter(Boolean))
-                );
-                orderData.stores = branchIds.map((bId) => {
-                  const branch = branchesMap[bId];
-                  return branch ? { id: bId, name: branch.name || branch.displayName || bId } : { id: bId, name: bId };
-                });
-
-                // attach order onto delivery
-                del.order = orderData;
-              } else {
+              } catch {
                 del.order = { id: del.orderId };
               }
+            } else if (!del.order) {
+              del.order = {};
             }
 
-            // merge delivery-level history if exists (deliveries.history) with order.deliveryHistory so driver sees full timeline
-            // normalize both sources to objects with at, stage, by, note
-            const unifyHistory = (arr) =>
-              (arr || []).map((h) => {
-                const at = h?.at ?? h?.createdAt ?? h?.timestamp ?? null;
-                return {
-                  stage: h?.stage || h?.name || h?.note || "",
-                  at: at,
-                  by: h?.by || h?.byId || h?.createdBy || "",
-                  note: h?.note || "",
-                };
-              });
-
-            const delHist = unifyHistory(del.history || []);
-            const orderHist = unifyHistory(del.order?.deliveryHistory || del.order?.deliveryHistory || []);
-            // combine and sort by timestamp ascending (oldest -> newest)
-            const combined = [...orderHist, ...delHist].filter(Boolean).sort((a, b) => {
-              try {
-                const atA = typeof a.at === "string" ? Date.parse(a.at) : (a.at && a.at.seconds ? a.at.seconds * 1000 : (a.at ? Number(a.at) : 0));
-                const atB = typeof b.at === "string" ? Date.parse(b.at) : (b.at && b.at.seconds ? b.at.seconds * 1000 : (b.at ? Number(b.at) : 0));
-                return (atA || 0) - (atB || 0);
-              } catch {
-                return 0;
-              }
+            // Merge histories safely
+            const canon = (arr) =>
+              (Array.isArray(arr) ? arr : []).map((h) => ({
+                stage: h?.stage || h?.name || h?.note || "",
+                at: h?.at || h?.createdAt || h?.timestamp || null,
+                by: h?.by || h?.byId || h?.createdBy || "",
+                note: h?.note || "",
+              }));
+            const combined = [...canon(del.order?.deliveryHistory), ...canon(del.history)].sort((a, b) => {
+              const A = Date.parse(a.at) || (a.at?.seconds ? a.at.seconds * 1000 : 0) || 0;
+              const B = Date.parse(b.at) || (b.at?.seconds ? b.at.seconds * 1000 : 0) || 0;
+              return A - B;
             });
-
             del.combinedHistory = combined;
 
             out.push(del);
           }
           setDeliveries(out);
           setLoading(false);
-        } catch (err) {
-          console.error("deliveries enrichment failed", err);
+        } catch (e) {
+          console.error(e);
           setError("Failed to load deliveries");
           setDeliveries([]);
           setLoading(false);
         }
       },
-      (err) => {
-        console.error("deliveries onSnapshot error", err);
+      (e) => {
+        console.error(e);
         setError("Failed to subscribe to deliveries.");
         setLoading(false);
       }
     );
 
     return () => unsub();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [driver, branchesMap]);
+  }, [driver?.id, branchesMap]);
 
-  // update delivery stage (driver app) — updates deliveries doc and also the linked orders doc
-  const handleStageUpdate = async (deliveryId, newStage) => {
-    try {
-      const ref = doc(db, "deliveries", deliveryId);
-      // Build history entry using client ISO timestamp (avoid serverTimestamp inside arrayUnion)
-      const historyEntry = {
-        stage: newStage,
-        at: new Date().toISOString(),
-        by: user?.uid || auth.currentUser?.uid || "",
-        note: `Driver ${driver?.name || ""} set ${newStage}`,
-      };
+  return { deliveries, loading, error, setDeliveries };
+}
 
-      // Update delivery doc
-      await updateDoc(ref, {
-        status: newStage,
-        history: arrayUnion(historyEntry),
-        updatedAt: serverTimestamp(),
-        updatedBy: user?.uid || auth.currentUser?.uid || "",
-      });
+/* ------------------------------ UI pieces ------------------------------ */
 
-      // find delivery locally to get orderId
-      const local = deliveries.find((d) => d.id === deliveryId);
-      const orderId = local?.orderId || local?.order?.id;
-      if (orderId) {
-        const orderRef = doc(db, "orders", orderId);
-        const orderHistoryEntry = {
-          stage: newStage,
-          at: new Date().toISOString(),
-          by: user?.uid || auth.currentUser?.uid || "",
-          note: `Driver ${driver?.name || ""} set ${newStage}`,
-        };
-        await updateDoc(orderRef, {
-          deliveryStatus: newStage,
-          deliveryHistory: arrayUnion(orderHistoryEntry),
-          updatedAt: serverTimestamp(),
-          updatedBy: user?.uid || auth.currentUser?.uid || "",
-          updatedByName: user?.displayName || auth.currentUser?.displayName || user?.email || auth.currentUser?.email || "",
-        });
-      }
-    } catch (err) {
-      console.error("Stage update failed:", err);
-      setError("Failed to update stage");
-    }
-  };
+function TopBar({ driver, onSignOut }) {
+  return (
+    <header className="driver-topbar">
+      <div>
+        <h2>🚚 {val(driver?.name)}</h2>
+        <p className="muted">{val(driver?.vehicle)}</p>
+      </div>
+      <button className="signout-btn" onClick={onSignOut}>Sign Out</button>
+    </header>
+  );
+}
+TopBar.propTypes = { driver: PropTypes.object, onSignOut: PropTypes.func };
+
+function Tabs({ active, counts, onChange }) {
+  const c = counts || {};
+  const handleChange = (s) => onChange(isStage(s) ? s : "assigned");
+  return (
+    <div className="tabs">
+      {STAGES.map((s) => (
+        <button key={s} className={`tab ${active === s ? "active" : ""}`} onClick={() => handleChange(s)}>
+          {LABEL(s)} <span className="count-chip">{Number(c?.[s] || 0)}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+Tabs.propTypes = { active: PropTypes.string, counts: PropTypes.object, onChange: PropTypes.func };
+
+function SearchBar({ value, onChange, onRefresh }) {
+  return (
+    <div className="driver-section">
+      <div className="driver-cards" style={{ gridTemplateColumns: "1fr" }}>
+        <div className="driver-card" role="region" aria-label="Filter controls">
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <input
+              type="search"
+              placeholder="Search address, order no, customer…"
+              value={value}
+              onChange={(e) => onChange(e.target.value)}
+              style={{ flex: 1, minWidth: 280 }}
+            />
+            <button className="cp-btn ghost" onClick={onRefresh}>Refresh</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+SearchBar.propTypes = { value: PropTypes.string, onChange: PropTypes.func, onRefresh: PropTypes.func };
+
+function CompactRow({ index, style, data }) {
+  const d = data?.items?.[index];
+  if (!d) return <div style={style} />;
+
+  const open = data?.onOpen || (() => {});
+  const onStage = data?.onStage || (() => {});
+  const o = d?.order || {};
+  const status = (d?.status || o?.deliveryStatus || "assigned").toLowerCase();
+  const address = o?.deliveryAddress || o?.address || o?.dropAddress || d?.address;
+
+  return (
+    <div className="row" style={style}>
+      <div className="row-main" onClick={() => open(d)}>
+        <div className="row-title">{val(o?.customerName)}</div>
+        <div className="row-sub muted">{val(address)}</div>
+        <div className="row-meta">
+          <span>Order: {val(o?.orderNo || d?.orderId || d?.id)}</span>
+          <span>Updated: {formatTS(d?.updatedAt || o?.updatedAt || d?.createdAt)}</span>
+        </div>
+      </div>
+      <div className={`status-pill ${status}`}>{LABEL(status)}</div>
+      <div className="row-actions">
+        {status === "assigned" && (
+          <>
+            <button className="cp-btn" onClick={() => onStage(d.id, "accepted")}>Accept</button>
+            <button className="cp-btn ghost" onClick={() => onStage(d.id, "rejected")}>Reject</button>
+          </>
+        )}
+        {status === "accepted" && (
+          <button className="cp-btn" onClick={() => onStage(d.id, "in_transit")}>Start Pickup</button>
+        )}
+        {status === "in_transit" && (
+          <>
+            <button className="cp-btn" onClick={() => onStage(d.id, "delivered")}>Delivered</button>
+            {address && address !== NA && (
+              <button
+                className="cp-btn ghost"
+                onClick={() =>
+                  window.open(
+                    `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`,
+                    "_blank"
+                  )
+                }
+              >
+                Navigate
+              </button>
+            )}
+          </>
+        )}
+        {status === "delivered" && (
+          <button className="cp-btn" onClick={() => onStage(d.id, "completed")}>Complete</button>
+        )}
+      </div>
+    </div>
+  );
+}
+CompactRow.propTypes = { index: PropTypes.number, style: PropTypes.object, data: PropTypes.object };
+
+function DetailsModal({ delivery, onClose }) {
+  const o = delivery?.order || {};
+  const dialogRef = useRef(null);
+  useEffect(() => { dialogRef.current?.focus(); }, []);
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()} tabIndex={-1} ref={dialogRef}>
+        <header>
+          <h3>Delivery Details</h3>
+          <button onClick={onClose} aria-label="Close">✖</button>
+        </header>
+
+        <div className="modal-section">
+          <h5>Customer</h5>
+          <p>{val(o?.customerName)}</p>
+          <p className="muted">{val(o?.deliveryAddress || o?.address || o?.dropAddress)}</p>
+        </div>
+
+        {Array.isArray(o?.items) && o.items.length > 0 && (
+          <div className="modal-section">
+            <h5>Items</h5>
+            {o.items.map((it, i) => (
+              <div key={i}>
+                {val(it?.name)} × {val(it?.qty)}
+                {it?.branchId ? ` · branch: ${val(it.branchId)}` : ""}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="modal-section">
+          <h5>History</h5>
+          <ul className="timeline">
+            {(Array.isArray(delivery?.combinedHistory) ? delivery.combinedHistory : [])
+              .slice()
+              .reverse()
+              .map((h, i) => (
+                <li key={i}>
+                  <span>{val(h?.stage || h?.note)}</span>
+                  <span className="time">{formatTS(h?.at)}{h?.by ? ` • by ${val(h.by)}` : ""}</span>
+                </li>
+              ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+DetailsModal.propTypes = { delivery: PropTypes.object, onClose: PropTypes.func };
+
+/* ------------------------------ main ------------------------------ */
+
+export default function DriverApp() {
+  const user = useAuthUser();
+  const { driver, loading: profileLoading, error: profileError } = useDriverProfile(user);
+  const branchesMap = useBranchesMap();
+  const { deliveries, loading: deliveriesLoading, error: deliveriesError, setDeliveries } =
+    useDriverDeliveries(driver, branchesMap);
+
+  const [selected, setSelected] = useState(null);
+  const [activeTab, _setActiveTab] = useState("assigned");
+  const [queryText, setQueryText] = useState("");
+  const [search, setSearch] = useState("");
+
+  // ✅ All hooks before any return
+  const parentRef = useRef(null);
+
+  const setActiveTab = (s) => _setActiveTab(isStage(s) ? s : "assigned");
+
+  // debounce search
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(queryText), 250);
+    return () => clearTimeout(t);
+  }, [queryText]);
+
+  const loading = !!(profileLoading || deliveriesLoading);
+  const error = profileError || deliveriesError;
+
+  // Filter (always array)
+  const filtered = useMemo(() => {
+    const q = (search || "").trim().toLowerCase();
+    const src = Array.isArray(deliveries) ? deliveries : [];
+    if (!q) return src;
+    return src.filter((d) => {
+      const text = [
+        d?.order?.customerName,
+        d?.order?.orderNo,
+        d?.order?.deliveryAddress,
+        d?.order?.address,
+        d?.order?.dropAddress,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return text.includes(q);
+    });
+  }, [deliveries, search]);
+
+  // Group (never undefined)
+  const grouped = useMemo(() => {
+    const init = {
+      assigned: [],
+      accepted: [],
+      in_transit: [],
+      delivered: [],
+      completed: [],
+      rejected: [],
+      other: [],
+    };
+    (Array.isArray(filtered) ? filtered : []).forEach((d) => {
+      const s = (d?.status || d?.order?.deliveryStatus || "assigned").toLowerCase();
+      (init[s] ?? init.other).push(d);
+    });
+    return init;
+  }, [filtered]);
+
+  const counts = useMemo(() => {
+    const c = {};
+    for (const s of STAGES) c[s] = Array.isArray(grouped?.[s]) ? grouped[s].length : 0;
+    return c;
+  }, [grouped]);
+
+  const safeTab = isStage(activeTab) ? activeTab : "assigned";
+  const activeItems = Array.isArray(grouped?.[safeTab]) ? grouped[safeTab] : [];
+
+  // ✅ Virtualizer hooks also before any return
+  const rowVirtualizer = useVirtualizer({
+    count: activeItems.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 92,
+    overscan: 8,
+  });
 
   const handleSignOut = async () => {
     await auth.signOut();
     window.location.href = "/login";
   };
 
-  const openMap = (addr) =>
-    window.open(
-      `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(addr)}`,
-      "_blank"
-    );
+  const updateStage = async (deliveryId, newStage) => {
+    const list = Array.isArray(deliveries) ? deliveries : [];
+    const idx = list.findIndex((d) => d?.id === deliveryId);
+    if (idx === -1) return;
+    const before = list[idx];
 
-  const getProgress = (status) => {
-    const steps = ["assigned", "accepted", "in_transit", "delivered", "completed"];
-    const index = steps.indexOf(status);
-    return ((index + 1) / steps.length) * 100;
+    const optimistic = list.slice();
+    optimistic[idx] = {
+      ...before,
+      status: newStage,
+      history: [...(before?.history || []), { stage: newStage, at: new Date().toISOString(), by: user?.uid || "" }],
+    };
+    setDeliveries(optimistic);
+
+    try {
+      const ref = doc(db, "deliveries", deliveryId);
+      const historyEntry = {
+        stage: newStage,
+        at: new Date().toISOString(),
+        by: user?.uid || auth.currentUser?.uid || "",
+        note: `Driver ${driver?.name || ""} set ${newStage}`,
+      };
+      await updateDoc(ref, {
+        status: newStage,
+        history: arrayUnion(historyEntry),
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid || "",
+      });
+
+      const orderId = before?.orderId || before?.order?.id;
+      if (orderId) {
+        const orderRef = doc(db, "orders", orderId);
+        await updateDoc(orderRef, {
+          deliveryStatus: newStage,
+          deliveryHistory: arrayUnion(historyEntry),
+          updatedAt: serverTimestamp(),
+          updatedBy: user?.uid || "",
+        });
+      }
+    } catch (e) {
+      const rolled = list.slice();
+      rolled[idx] = before;
+      setDeliveries(rolled);
+      alert("Failed to update stage. Check your connection and permissions.");
+      console.error("Stage update failed", e);
+    }
   };
 
+  // Early returns AFTER hooks — allowed
   if (loading) return <div className="driver-loading">Loading your dashboard…</div>;
-  if (!driver)
-    return (
-      <div className="driver-empty">
-        No driver profile linked. Please contact admin.
-      </div>
-    );
+  if (!driver) return <div className="driver-empty">No driver profile linked. Please contact admin.</div>;
+
+  const forceRefresh = () => setDeliveries((arr) => (Array.isArray(arr) ? arr.slice() : []));
 
   return (
     <div className="driver-app">
-      <header className="driver-topbar">
-        <div>
-          <h2>🚚 {driver.name}</h2>
-          <p>{driver.vehicle || "No vehicle info"}</p>
-        </div>
-        <button className="signout-btn" onClick={handleSignOut}>
-          Sign Out
-        </button>
-      </header>
+      <TopBar driver={driver} onSignOut={handleSignOut} />
 
-      <section className="driver-section">
-        <h3>Assigned Deliveries</h3>
-        {deliveries.length === 0 && <p>No deliveries assigned yet.</p>}
-        <div className="driver-cards">
-          {deliveries.map((d) => {
-            const o = d.order || {};
-            const payments = o.payments || [];
-            const total = o.totals?.total ?? o.totalAmount ?? 0;
-            const deposit = o.depositAmount ?? 0;
-            const totalPaid = payments.reduce((s, p) => s + Number(p.amount || 0), 0);
-            const paymentStatus = totalPaid >= Number(total || 0) ? "paid" : totalPaid > 0 ? "partial" : "pending";
+      <SearchBar value={queryText} onChange={setQueryText} onRefresh={forceRefresh} />
 
-            return (
-              <div key={d.id} className="driver-card fade-in">
-                <div className="driver-card-header">
-                  <div>
-                    <h4>{o.customerName || "Unknown Customer"}</h4>
-                    <p className="muted">{o.deliveryAddress || o.address || o.dropAddress}</p>
+      <div className="driver-section">
+        <Tabs active={safeTab} counts={counts || {}} onChange={setActiveTab} />
 
-                    {o.stores && o.stores.length > 0 && (
-                      <div style={{ marginTop: 6 }}>
-                        <small className="muted">Stores:</small>{" "}
-                        {o.stores.map((s, i) => (
-                          <span key={s.id} style={{ marginRight: 8 }}>
-                            {s.name}
-                            {i < o.stores.length - 1 ? "," : ""}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
-                    {d.fetchedByName && (
-                      <div style={{ marginTop: 4 }} className="muted">
-                        Fetched by: {d.fetchedByName}
-                      </div>
-                    )}
-                  </div>
-                  <div className={`status-tag ${d.status || (o.deliveryStatus || "")}`}>{d.status || (o.deliveryStatus || "—")}</div>
-                </div>
-
-                <div className="driver-summary">
-                  <div>
-                    <strong>Order No:</strong> {o.orderNo || d.orderId}
-                  </div>
-                  <div>
-                    <strong>Total:</strong> ₹{Number(total || 0).toLocaleString()}
-                  </div>
-                  <div>
-                    <strong>Deposit:</strong> ₹{Number(deposit || 0).toLocaleString()}
-                  </div>
-                  <div>
-                    <strong>Payment:</strong> {paymentStatus} ({Number(totalPaid || 0).toLocaleString()})
-                  </div>
-                </div>
-
-                <div className="progress-bar">
-                  <div className="progress-fill" style={{ width: `${getProgress(d.status || (o.deliveryStatus || "assigned"))}%` }} />
-                </div>
-
-                <div className="driver-actions">
-                  {d.status === "assigned" && (
-                    <>
-                      <button className="cp-btn" onClick={() => handleStageUpdate(d.id, "accepted")}>Accept</button>
-                      <button className="cp-btn ghost" onClick={() => handleStageUpdate(d.id, "rejected")}>Reject</button>
-                    </>
-                  )}
-                  {d.status === "accepted" && <button className="cp-btn" onClick={() => handleStageUpdate(d.id, "in_transit")}>Start Trip</button>}
-                  {d.status === "in_transit" && (
-                    <>
-                      <button className="cp-btn" onClick={() => handleStageUpdate(d.id, "delivered")}>Delivered</button>
-                      <button className="cp-btn ghost" onClick={() => openMap(o.deliveryAddress || o.address || o.dropAddress)}>Navigate</button>
-                    </>
-                  )}
-                  {d.status === "delivered" && <button className="cp-btn" onClick={() => handleStageUpdate(d.id, "completed")}>Complete</button>}
-                </div>
-
-                <button className="details-btn" onClick={() => setSelected(d)}>View Details</button>
-              </div>
-            );
-          })}
-        </div>
-      </section>
-
-      {/* Details Modal */}
-      {selected && (
-        <div className="modal-overlay" onClick={() => setSelected(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <header>
-              <h3>Delivery Details</h3>
-              <button onClick={() => setSelected(null)}>✖</button>
-            </header>
-            <div className="modal-body">
-              <h4>{selected.order?.customerName}</h4>
-              <p>{selected.order?.deliveryAddress || selected.order?.address}</p>
-
-              {selected.order?.stores && selected.order.stores.length > 0 && (
-                <div className="modal-section">
-                  <h5>Stores</h5>
-                  <ul>
-                    {selected.order.stores.map((s) => <li key={s.id}>{s.name} ({s.id})</li>)}
-                  </ul>
-                </div>
-              )}
-
-              <div className="modal-section">
-                <h5>Items</h5>
-                {selected.order?.items?.map((item, i) => (
-                  <div key={i}>
-                    {item.name} × {item.qty} – ₹{item.rate} {item.branchId ? ` · branch: ${branchesMap[item.branchId]?.name || item.branchId}` : ""}
-                  </div>
-                ))}
-              </div>
-
-              <div className="modal-section">
-                <h5>Payment</h5>
-                <p>Total: ₹{selected.order?.totals?.total ?? selected.order?.totalAmount ?? 0}</p>
-                <p>Deposit: ₹{selected.order?.depositAmount ?? 0}</p>
-                <p>Status: {selected.order?.paymentSummary ? `${selected.order.paymentSummary.balance > 0 ? "Due" : "Paid"} (Paid ₹${selected.order.paymentSummary.totalPaid})` : "—"}</p>
-              </div>
-
-              <div className="modal-section">
-                <h5>History</h5>
-                <ul className="timeline">
-                  {(selected.combinedHistory || []).slice().reverse().map((h, i) => (
-                    <li key={i}>
-                      <span>{h.stage || h.note}</span>
-                      <span className="time">{formatTimestampToLocale(h.at)} {h.by ? ` • by ${h.by}` : ""}</span>
-                    </li>
-                  ))}
-                </ul>
+        <div className="list-card">
+          {activeItems.length === 0 ? (
+            <p className="muted">No {LABEL(safeTab).toLowerCase()} tasks.</p>
+          ) : (
+            <div
+              ref={parentRef}
+              className="list-viewport"
+              style={{ height: "60vh", minHeight: 360, overflow: "auto" }}
+            >
+              <div
+                style={{
+                  height: rowVirtualizer.getTotalSize(),
+                  width: "100%",
+                  position: "relative",
+                }}
+              >
+                {rowVirtualizer.getVirtualItems().map((vi) => {
+                  const item = activeItems[vi.index];
+                  return (
+                    <div
+                      key={item?.id ?? vi.key}
+                      style={{
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        height: vi.size,
+                        transform: `translateY(${vi.start}px)`,
+                      }}
+                    >
+                      <CompactRow
+                        index={vi.index}
+                        style={{}}
+                        data={{ items: activeItems, onOpen: setSelected, onStage: updateStage }}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
 
-      {error && <div className="driver-error">{error}</div>}
+      {selected && <DetailsModal delivery={selected} onClose={() => setSelected(null)} />}
+
+      {error && <div className="driver-error" role="alert">{val(error)}</div>}
     </div>
   );
 }

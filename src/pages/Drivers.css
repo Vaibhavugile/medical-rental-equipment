@@ -1,4 +1,8 @@
-/* Drivers.css — Admin Driver Management Styling */
+/* Drivers.css — Admin Driver Management Styling (updated)
+   - Toolbar styling
+   - Collapsible add/edit form
+   - Floating Add (+) Button for mobile
+*/
 
 .drivers-page {
   max-width: 1150px;
@@ -12,8 +16,41 @@
   font-size: 22px;
   font-weight: 700;
   color: #0b5cff;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
+
+/* Toolbar */
+.drivers-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px;
+  margin: 12px 0 16px 0;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+}
+
+.drivers-toolbar input,
+.drivers-toolbar select {
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  outline: none;
+}
+
+.drivers-toolbar input {
+  flex: 1;
+  min-width: 180px;
+}
+
+.add-btn { white-space: nowrap; }
+
+/* Collapsible area for the form */
+.collapsible { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; }
+.collapsible.open { max-height: 1000px; }
 
 .driver-form {
   display: flex;
@@ -24,7 +61,7 @@
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   padding: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
 }
 
@@ -41,9 +78,11 @@
 }
 
 .driver-form input:focus,
-.driver-form select:focus {
-  border-color: #0b5cff;
-}
+.driver-form select:focus { border-color: #0b5cff; }
+
+.field-group { display: flex; gap: 8px; align-items: center; }
+
+.actions-row { display: flex; gap: 8px; }
 
 .cp-btn {
   background: linear-gradient(90deg, #0b69ff, #00b4d8);
@@ -55,83 +94,106 @@
   cursor: pointer;
   transition: opacity 0.2s ease, transform 0.1s ease;
 }
+.cp-btn:hover { opacity: 0.9; }
+.cp-btn:active { transform: scale(0.97); }
+.cp-btn.ghost { background: transparent; color: #0b5cff; border: 1px solid rgba(11, 92, 255, 0.15); }
+.cp-btn.ghost:hover { background: rgba(11, 92, 255, 0.05); }
 
-.cp-btn:hover {
-  opacity: 0.9;
-}
+.error { color: #ef4444; font-size: 14px; margin-top: 8px; }
 
-.cp-btn:active {
-  transform: scale(0.97);
-}
+.drivers-table { overflow-x: auto; background: #fff; border-radius: 12px; box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05); border: 1px solid #e5e7eb; }
+.drivers-table table { width: 100%; border-collapse: collapse; }
+.drivers-table th, .drivers-table td { text-align: left; padding: 10px 14px; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
+.drivers-table th { background: #f9fafb; font-weight: 700; color: #334155; }
+.drivers-table tr:hover td { background: #f8fafc; }
+.drivers-table td button { margin-right: 6px; font-size: 13px; }
 
-.cp-btn.ghost {
-  background: transparent;
-  color: #0b5cff;
-  border: 1px solid rgba(11, 92, 255, 0.15);
-}
-
-.cp-btn.ghost:hover {
-  background: rgba(11, 92, 255, 0.05);
-}
-
-.error {
-  color: #ef4444;
-  font-size: 14px;
-  margin-top: 8px;
-}
-
-.drivers-table {
-  overflow-x: auto;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
-  border: 1px solid #e5e7eb;
-}
-
-.drivers-table table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.drivers-table th,
-.drivers-table td {
-  text-align: left;
-  padding: 10px 14px;
-  font-size: 14px;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.drivers-table th {
-  background: #f9fafb;
-  font-weight: 700;
-  color: #334155;
-}
-
-.drivers-table tr:hover td {
-  background: #f8fafc;
-}
-
-.drivers-table td button {
-  margin-right: 6px;
-  font-size: 13px;
+/* Floating Add Button for mobile */
+.fab-add {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 999px;
+  border: none;
+  background: #0b5cff;
+  color: #fff;
+  font-size: 28px;
+  line-height: 0;
+  display: none; /* hidden on desktop */
+  box-shadow: 0 10px 24px rgba(11, 92, 255, 0.3);
+  cursor: pointer;
 }
 
 /* Responsive */
 @media (max-width: 700px) {
-  .driver-form {
-    flex-direction: column;
-    align-items: stretch;
-  }
+  .driver-form { flex-direction: column; align-items: stretch; }
+  .drivers-table table, .drivers-table th, .drivers-table td { font-size: 13px; padding: 8px; }
+  .cp-btn { width: auto; text-align: center; }
+  .fab-add { display: inline-flex; align-items: center; justify-content: center; }
+}
+/* Overlay behind drawer */
+.drawer-overlay {
+position: fixed;
+inset: 0;
+background: rgba(0, 0, 0, 0.35);
+backdrop-filter: saturate(160%) blur(1px);
+z-index: 49;
+}
 
-  .drivers-table table,
-  .drivers-table th,
-  .drivers-table td {
-    font-size: 13px;
-    padding: 8px;
-  }
 
-  .cp-btn {
-    width: 100%;
-    text-align: center;
-  }
+/* Drawer panel */
+.drawer {
+position: fixed;
+top: 0;
+right: 0;
+height: 100vh;
+width: min(560px, 100%);
+background: #ffffff;
+border-left: 1px solid #e5e7eb;
+box-shadow: -10px 0 30px rgba(15, 23, 42, 0.15);
+transform: translateX(100%);
+transition: transform 0.25s ease;
+z-index: 50;
+display: flex;
+flex-direction: column;
+}
+.drawer.open { transform: translateX(0); }
+
+
+.drawer-header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 14px 16px;
+border-bottom: 1px solid #eef2f7;
+position: sticky;
+top: 0;
+background: #fff;
+z-index: 1;
+}
+.drawer-header h3 { margin: 0; font-size: 18px; font-weight: 700; }
+
+
+/* Make the form scroll inside the drawer */
+.drawer .driver-form {
+box-shadow: none;
+border: none;
+border-radius: 0;
+margin: 0;
+padding: 16px;
+overflow-y: auto;
+}
+
+
+/* Reduce spacing for compact drawer layout */
+.drawer .driver-form input,
+.drawer .driver-form select {
+min-width: 180px;
+}
+
+
+@media (max-width: 700px) {
+.drawer { width: 100%; }
 }
