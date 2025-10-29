@@ -1,0 +1,104 @@
+.orders-sidebar {
+  position: sticky;
+  top: 12px;
+  align-self: start;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.orders-sidebar-head {
+  font-weight: 800;
+  font-size: 14px;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+.orders-side-block { margin-top: 12px; }
+
+.side-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.side-search { width: 100%; }
+
+/* Chip list */
+.side-chips {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.side-chip {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  transition: background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  font-weight: 700;
+  font-size: 12px;
+  color: #111827;
+}
+
+.side-chip:hover { background: #f9fafb; }
+
+.side-chip.is-active {
+  border-color: #111827;
+  box-shadow: 0 0 0 2px #111827 inset;
+}
+
+/* Count pill */
+.chip-count {
+  min-width: 24px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 12px;
+  color: #111827;
+  background: #f3f4f6;
+}
+
+/* Optional: tint the active chips by status */
+.status-created.is-active { background: #6b7280; color: #fff; }
+.status-assets_partial.is-active { background: #2563eb; color: #fff; }
+.status-assets_assigned.is-active { background: #1d4ed8; color: #fff; }
+.status-driver_assigned.is-active { background: #7c3aed; color: #fff; }
+.status-ready_to_dispatch.is-active { background: #4f46e5; color: #fff; }
+.status-starts_today.is-active { background: #0ea5e9; color: #fff; }
+.status-in_transit.is-active { background: #f59e0b; color: #fff; }
+.status-delivered.is-active { background: #10b981; color: #fff; }
+.status-active.is-active { background: #14b8a6; color: #fff; }
+.status-ending_today.is-active { background: #065f46; color: #fff; }
+.status-completed.is-active { background: #047857; color: #fff; }
+.status-cancelled.is-active { background: #b91c1c; color: #fff; }
+
+.side-reset {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #111827;
+  color: #fff;
+  border: none;
+  font-weight: 800;
+  font-size: 12px;
+  cursor: pointer;
+}
+.side-reset:hover { opacity: 0.95; }
