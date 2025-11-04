@@ -509,24 +509,19 @@ export default function OrderDrawer({
 
                 <div style={{ marginTop: 8 }}>
                   <div className="label muted">Driver</div>
-                  <select
-                    className="cp-input"
-                    value={selectedOrder.delivery?.driverId || ""}
-                    onChange={(e) =>
-                      (selectedOrder.delivery = {
-                        ...(selectedOrder.delivery || {}),
-                        driverId: e.target.value,
-                      }) && null /* handled by Assign action */
-                    }
-                  >
-                    <option value="">Select driver</option>
-                    {drivers.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.name}
-                        {d.phone ? ` · ${d.phone}` : ""}
-                      </option>
-                    ))}
-                  </select>
+                 <select
+  className="cp-input"
+  value={selectedOrder.delivery?.driverId || ""}
+  onChange={(e) => assignDriverToOrder(e.target.value)}
+>
+  <option value="">Select driver</option>
+  {drivers.map((d) => (
+    <option key={d.id} value={d.id}>
+      {d.name}{d.phone ? ` · ${d.phone}` : ""}
+    </option>
+  ))}
+</select>
+
 
                   <div
                     style={{
