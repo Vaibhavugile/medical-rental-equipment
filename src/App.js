@@ -13,11 +13,11 @@ import DriverApp from "./pages/DriverApp";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import DriverAttendance from "./pages/DriverAttendance";
-
+import TrackingPage from "./pages/TrackingPage";
 import useAuth from "./pages/useAuth";
 import { auth } from "./firebase";
 import "./App.css";
-
+import AttendanceAdmin from "./pages/AttendanceAdmin";
 /* ---------------- Header for CRM ---------------- */
 function HeaderRight() {
   const { user, userProfile } = useAuth();
@@ -224,7 +224,7 @@ function CRMApp() {
               </NavLink>
 
               <NavLink
-                to="/attendance"
+                to="/tracking"
                 style={({ isActive }) => ({
                   padding: "8px 10px",
                   borderRadius: 8,
@@ -236,7 +236,7 @@ function CRMApp() {
                   fontWeight: 700,
                 })}
               >
-                Attendance
+                Tracking
               </NavLink>
             </nav>
           </div>
@@ -257,7 +257,9 @@ function CRMApp() {
 
           {/* Driver/testing routes inside CRM */}
           <Route path="/driver-app" element={<DriverApp />} />
-          <Route path="/attendance" element={<DriverAttendance />} />
+          <Route path="/tracking" element={<TrackingPage/>} />
+          <Route path="/attendance" element={<AttendanceAdmin />} />
+
         </Routes>
       </main>
     </>

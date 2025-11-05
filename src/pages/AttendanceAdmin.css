@@ -1,0 +1,281 @@
+/* AttendanceAdmin.css — Light theme to match Orders.css */
+
+.attendance-page {
+  max-width: 1180px;
+  margin: 24px auto;
+  padding: 0 16px;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  color: #0f172a;
+}
+
+.attendance-page h2 {
+  font-size: 20px;
+  margin: 0 0 12px;
+}
+
+/* Filters / Toolbar */
+.toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: #fff;
+  padding: 10px;
+  border: 1px solid #eef2f7;
+  border-radius: 10px;
+  margin-bottom: 12px;
+}
+
+.toolbar select,
+.toolbar input[type="date"] {
+  background: #fff;
+  border: 1px solid #e6edf3;
+  color: #0f172a;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.toolbar .spacer {
+  flex: 1;
+}
+
+/* Buttons */
+.cp-btn {
+  background: #0b69ff;
+  color: #fff;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+}
+.cp-btn:hover {
+  filter: brightness(1.05);
+}
+.cp-btn.ghost {
+  background: transparent;
+  color: #0b69ff;
+  border: 1px solid #e6edf3;
+}
+
+/* Summary Cards */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+.summary .card {
+  background: #fff;
+  border: 1px solid #eef2f7;
+  border-radius: 10px;
+  padding: 14px;
+}
+.summary .num {
+  font-size: 22px;
+  font-weight: 700;
+}
+.summary .label {
+  color: #6b7280;
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* Table */
+.table-wrap {
+  margin-top: 8px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #eef2f7;
+}
+
+.attendance-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+.attendance-table thead th {
+  text-align: left;
+  padding: 12px 14px;
+  font-size: 13px;
+  color: #6b7280;
+  background: #fbfdff;
+  border-bottom: 1px solid #eef2f7;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.attendance-table tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #f3f6f9;
+  font-size: 14px;
+  vertical-align: top;
+}
+
+.attendance-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.attendance-table tbody tr:hover {
+  background: #fbfdff;
+}
+
+/* Text styles */
+.dname {
+  font-weight: 700;
+}
+.muted {
+  color: #6b7280;
+  font-size: 12px;
+}
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-size: 12.5px;
+}
+.error {
+  color: #dc2626;
+  margin: 8px 0;
+}
+
+/* Chips / Status Pill */
+.chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #eef2f7;
+  font-size: 12px;
+  border: 1px solid #e6edf3;
+  color: #0f172a;
+}
+
+.chip.warn {
+  background: #fff7ed;
+  color: #b45309;
+  border-color: #fde6c8;
+}
+
+/* Per-driver totals list */
+.totals {
+  margin: 16px 0;
+  display: grid;
+  gap: 8px;
+}
+.total-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: #fff;
+  border: 1px solid #eef2f7;
+  border-radius: 10px;
+  padding: 10px;
+}
+.total-row .name {
+  font-weight: 700;
+}
+.pill {
+  display: inline-block;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eef6ff;
+  border: 1px solid #dbeafe;
+  font-size: 12px;
+  color: #0b69ff;
+}
+
+/* Drawer (Details Panel) */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(12,18,26,0.5);
+  z-index: 1000;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: -520px;
+  width: 520px;
+  max-width: 96vw;
+  height: 100vh;
+  background: #ffffff;
+  border-left: 1px solid #eef2f7;
+  box-shadow: 0 10px 40px rgba(2,6,23,0.12);
+  transition: right 220ms ease-in-out;
+  z-index: 1001;
+}
+.drawer.open {
+  right: 0;
+}
+
+.drawer-inner {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+/* Detail Grid */
+.detail-grid {
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr 1fr;
+}
+@media (max-width: 720px) {
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.info {
+  background: #fbfdff;
+  border: 1px solid #eef2f7;
+  border-radius: 10px;
+  padding: 10px;
+}
+.info-label {
+  color: #6b7280;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.info-value {
+  font-size: 14px;
+}
+
+/* Inputs inside drawer */
+.drawer input,
+.drawer select,
+.drawer textarea {
+  background: #fff;
+  border: 1px solid #e6edf3;
+  color: #0f172a;
+  border-radius: 8px;
+  padding: 8px;
+  width: 100%;
+  font-size: 14px;
+}
+
+/* Empty State */
+.attendance-empty {
+  padding: 20px;
+  color: #6b7280;
+  text-align: center;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .toolbar {
+    flex-wrap: wrap;
+  }
+  .toolbar > * {
+    flex: 1 1 160px;
+  }
+}

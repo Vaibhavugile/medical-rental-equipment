@@ -11,7 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../firebase";
 import "./Drivers.css";
-
+import { useNavigate } from "react-router-dom";
 /**
  * Drivers Management Module (Eqp Rental) — Side Drawer UI
  */
@@ -23,6 +23,7 @@ export default function Drivers() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showForm, setShowForm] = useState(false); // drawer toggle
+  const navigate = useNavigate();
 
   const emptyDriver = {
     name: "",
@@ -343,6 +344,9 @@ export default function Drivers() {
                   <td>
                     <button className="cp-btn ghost" onClick={() => editDriver(d)}>Edit</button>
                     <button className="cp-btn ghost" onClick={() => deleteDriverById(d.id)}>Delete</button>
+                    <button className="cp-btn ghost" onClick={() => navigate(`/attendance?driverId=${d.id}`)}>
+  Attendance
+</button>
                   </td>
                 </tr>
               ))}
