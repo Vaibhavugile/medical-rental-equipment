@@ -1,6 +1,6 @@
 // src/App.js
-import React from "react";
-import { BrowserRouter, Routes, Route, NavLink, useNavigate, Navigate } from "react-router-dom";
+import React, { Suspense, lazy } from "react";
+import { BrowserRouter, Routes, Route, NavLink, useNavigate, Navigate,useLocation } from "react-router-dom";
 
 import Leads from "./pages/Leads";
 import Requirements from "./pages/Requirements";
@@ -13,11 +13,12 @@ import DriverApp from "./pages/DriverApp";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import DriverAttendance from "./pages/DriverAttendance";
-import TrackingPage from "./pages/TrackingPage";
+
 import useAuth from "./pages/useAuth";
 import { auth } from "./firebase";
 import "./App.css";
 import AttendanceAdmin from "./pages/AttendanceAdmin";
+const TrackingPage = lazy(() => import("./pages/TrackingPage"));
 /* ---------------- Header for CRM ---------------- */
 function HeaderRight() {
   const { user, userProfile } = useAuth();
@@ -257,9 +258,8 @@ function CRMApp() {
 
           {/* Driver/testing routes inside CRM */}
           <Route path="/driver-app" element={<DriverApp />} />
-          <Route path="/tracking" element={<TrackingPage/>} />
           <Route path="/attendance" element={<AttendanceAdmin />} />
-
+ <Route path="/tracking" element={<TrackingPageWithParams />} />
         </Routes>
       </main>
     </>
@@ -350,7 +350,12 @@ function DriverLayout() {
     </>
   );
 }
-
+function TrackingPageWithParams() {
+  const params = new URLSearchParams(useLocation().search);
+  const presetDriverId = params.get("driverId") || "";
+  const presetDate = params.get("date") || new Date().toISOString().slice(0,10);
+  return <TrackingPage presetDriverId={presetDriverId} presetDate={presetDate} />;
+}
 /* ------------------------------ App root ------------------------------ */
 export default function App() {
   const { user, userProfile, loading } = useAuth();

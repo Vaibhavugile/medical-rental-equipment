@@ -3,6 +3,8 @@ import { collection, getDocs, getDoc, doc } from "firebase/firestore";
 import { db } from "../firebase";
 import { useSearchParams } from "react-router-dom";
 import "./AttendanceAdmin.css";
+import { useNavigate } from "react-router-dom";
+// inside component:
 
 // --- Debug helpers ---
 const DEBUG = true; // flip to false to silence logs in production
@@ -14,7 +16,8 @@ export default function AttendanceAdmin() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
+// inside component:
+const navigate = useNavigate();
   const [drivers, setDrivers] = useState([]);
   const [records, setRecords] = useState([]);
 
@@ -195,6 +198,7 @@ export default function AttendanceAdmin() {
                 <th>Duration</th>
                 <th>Status</th>
                 <th>Notes</th>
+                <th>Track</th>
                 <th></th>
               </tr>
             </thead>
@@ -212,6 +216,13 @@ export default function AttendanceAdmin() {
                   <td>{r.status || (r.checkOutAt ? "present" : "open")}</td>
                   <td style={{maxWidth:280, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{r.notes || "-"}</td>
                   <td><button className="cp-btn ghost" onClick={() => setOpenRow(r)}>Details</button></td>
+                  <td><button
+  className="cp-btn ghost"
+  onClick={() => navigate(`/tracking?driverId=${r.driverId}&date=${r.dayId}`)}
+>
+  Track
+</button>
+</td>
                 </tr>
               ))}
             </tbody>

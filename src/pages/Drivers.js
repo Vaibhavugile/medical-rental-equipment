@@ -347,6 +347,12 @@ export default function Drivers() {
                     <button className="cp-btn ghost" onClick={() => navigate(`/attendance?driverId=${d.id}`)}>
   Attendance
 </button>
+<button
+  className="cp-btn ghost"
+  onClick={() => navigate(`/tracking?driverId=${d.id}`)}
+>
+  Track
+</button>
                   </td>
                 </tr>
               ))}
