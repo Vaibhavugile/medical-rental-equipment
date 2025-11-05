@@ -15,7 +15,7 @@ import { db, auth } from "../firebase";
 import {
   listBranches,
   listAssets,
-  checkoutAsset,
+  reserveAsset,
 } from "../utils/inventory";
 import { makeHistoryEntry, propagateToLead } from "../utils/status";
 import "./OrderCreate.css";
@@ -368,14 +368,15 @@ export default function OrderCreate({ open, quotation: incomingQuotation, onClos
         if (Array.isArray(it.assignedAssets) && it.assignedAssets.length) {
           for (const assetDocId of it.assignedAssets) {
             try {
-              await checkoutAsset(assetDocId, {
-                rentalId: ref.id,
+               await reserveAsset(assetDocId, {
+                reservationId: ref.id,
+                orderId: ref.id,
                 customer: orderPayload.customerName || "",
-                until: it.expectedEndDate || null,
-                note: `Assigned to order ${orderPayload.orderNo}`,
-              });
+               until: it.expectedEndDate || null,
+               note: `Reserved for order ${orderPayload.orderNo}`,
+             });
             } catch (err) {
-              console.warn("checkoutAsset failed", assetDocId, err);
+              console.warn("reserveAsset failed", assetDocId, err);
             }
           }
         }

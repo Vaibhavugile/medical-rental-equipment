@@ -123,6 +123,45 @@ export async function changeAssetStatus(assetDocId, newStatus, note = "", extra 
   });
 }
 
+export async function reserveAsset(
+  assetDocId,
+  { reservationId = null, orderId = null, customer = null, until = null, note = "Reserved for order" } = {}
+) {
+  if (!assetDocId) throw new Error("assetDocId required");
+  const user = auth.currentUser || {};
+  const assetRef = doc(db, "assets", assetDocId);
+  const entry = makeInventoryHistoryEntry(user, {
+    type: "reserve",
+    note,
+    data: { reservationId, orderId, customer, until },
+  });
+  await updateDoc(assetRef, {
+    status: "reserved",
+    reservation: { reservationId, orderId, customer, until },
+    updatedAt: serverTimestamp(),
+    updatedBy: user.uid || "",
+    updatedByName: user.displayName || user.email || "",
+    history: arrayUnion(entry),
+  });
+}
+
+/**
++ * Clear reservation and return asset to stock.
++ */
+export async function unreserveAsset(assetDocId, { note = "Reservation cleared" } = {}) {
+  if (!assetDocId) throw new Error("assetDocId required");
+  const user = auth.currentUser || {};
+  const assetRef = doc(db, "assets", assetDocId);
+  const entry = makeInventoryHistoryEntry(user, { type: "reserve_clear", note });
+  await updateDoc(assetRef, {
+    status: "in_stock",
+    reservation: null,
+    updatedAt: serverTimestamp(),
+    updatedBy: user.uid || "",
+    updatedByName: user.displayName || user.email || "",
+    history: arrayUnion(entry),
+ });
+}
 /**
  * checkoutAsset(assetDocId, { rentalId = null, customer = null, until = null, note })
  * Marks asset out_for_rental and records rental metadata and history entry.
@@ -227,4 +266,6 @@ export default {
   listBranches,
   listProducts,
   listAssets,
+  reserveAsset,
+  unreserveAsset,
 };
