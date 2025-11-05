@@ -86,12 +86,14 @@ export async function createAssetsForProduct(productId, branchId = null, quantit
   const created = [];
   for (let i = 0; i < Number(quantity || 0); i++) {
     const assetId = makeUniqueAssetId(productId);
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(assetId)}`;
     const payload = {
       assetId,
       productId,
       branchId: branchId || null,
       status: assetStatus,
       metadata: assetMeta || {},
+      qrUrl, 
       createdAt: serverTimestamp(),
       createdBy: user.uid || "",
       createdByName: user.displayName || user.email || "",

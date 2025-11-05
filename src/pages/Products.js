@@ -602,6 +602,12 @@ export default function Products() {
                         <option value="">Move</option>
                         {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                       </select>
+                      <button
+  className="btn ghost"
+  onClick={() => { if (a.qrUrl) window.open(a.qrUrl, "_blank"); }}
+>
+  QR Code
+</button>
                     </div>
                   </div>
                 ))}
@@ -653,6 +659,19 @@ export default function Products() {
               <div className="muted">
                 {assetDetails.metadata && <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(assetDetails.metadata, null, 2)}</pre>}
               </div>
+              {assetDetails.qrUrl && (
+  <div style={{ marginTop: 12 }}>
+    <h4 style={{ marginBottom: 8 }}>QR Code</h4>
+    <img
+      src={assetDetails.qrUrl}
+      alt={`QR for ${assetDetails.assetId}`}
+      style={{ width: 180, height: 180 }}
+    />
+    <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
+      Scans to: assetId “{assetDetails.assetId}”
+    </div>
+  </div>
+)}
 
               {/* History */}
 <h4 style={{ marginTop: 12, marginBottom: 8 }}>History</h4>
