@@ -291,9 +291,24 @@ export default function Marketing() {
                     {r.uid || r.authUid || r.id}
                   </td>
                   <td>
-                    <button className="cp-btn ghost" onClick={() => editRow(r)}>Edit</button>
-                    <button className="cp-btn ghost" onClick={() => deleteRow(r.id)}>Delete</button>
-                  </td>
+  <button className="cp-btn ghost" onClick={() => editRow(r)}>Edit</button>
+  <button className="cp-btn ghost" onClick={() => deleteRow(r.id)}>Delete</button>
+
+  {/* NEW: Attendance + Track (marketing) */}
+  <button
+    className="cp-btn ghost"
+    onClick={() => window.location.href = `/attendance?role=marketing&driverId=${r.id}`}
+  >
+    Attendance
+  </button>
+  <button
+    className="cp-btn ghost"
+    onClick={() => window.location.href = `/tracking?role=marketing&driverId=${r.id}`}
+  >
+    Track
+  </button>
+</td>
+
                 </tr>
               ))}
               {filtered.length === 0 && (

@@ -4,20 +4,22 @@ import { GoogleMap, Marker, Polyline, InfoWindow, Circle } from "@react-google-m
 import { collection, doc, onSnapshot, orderBy, query } from "firebase/firestore";
 
 /**
- * AdminDriverTracker (detailed report with reverse geocoded stop addresses)
+ * AdminDriverTracker (detailed report with reverse geocoded stop addresses) — ROLE AWARE
  *
  * Props:
  * - db: Firestore instance
  * - driverId: string
+ * - role: "drivers" | "marketing"  (default "drivers")
  * - initialDate: YYYY-MM-DD (optional; defaults to today)
  * - height: CSS height (default "70vh")
  * - autoFit: boolean (default true)
  *
  * Firestore:
- *   drivers/{driverId}/attendance/{yyyy-MM-dd}
- *   drivers/{driverId}/attendance/{yyyy-MM-dd}/locations/{id}
- *   drivers/{driverId}/live/current
- *   drivers/{driverId}/attendance/{yyyy-MM-dd}/live/current
+ *   <base>/{userId}/attendance/{yyyy-MM-dd}
+ *   <base>/{userId}/attendance/{yyyy-MM-dd}/locations/{id}
+ *   <base>/{userId}/live/current
+ *   <base>/{userId}/attendance/{yyyy-MM-dd}/live/current
+ * where <base> = "drivers" | "marketing"
  */
 
 const DEBUG = false;
@@ -28,10 +30,13 @@ const err  = (...a) => DEBUG && console.error("[Tracker]", ...a);
 export default function AdminDriverTracker({
   db,
   driverId,
+  role = "drivers",            // 👈 NEW: role prop
   initialDate,
   height = "70vh",
   autoFit = true,
 }) {
+  const base = role === "marketing" ? "marketing" : "drivers"; // 👈 role-aware base collection
+
   const [date, setDate] = useState(() => initialDate ?? toYmd(new Date()));
   const [points, setPoints] = useState([]);        // raw points
   const [live, setLive] = useState(null);          // live point
@@ -67,7 +72,7 @@ export default function AdminDriverTracker({
     if (!db || !driverId || !date) return;
     try { attnUnsubRef.current && attnUnsubRef.current(); } catch {}
     attnUnsubRef.current = onSnapshot(
-      doc(db, `drivers/${driverId}/attendance/${date}`),
+      doc(db, `${base}/${driverId}/attendance/${date}`), // 👈 role-aware
       (d) => {
         const v = d.data();
         if (v) {
@@ -86,7 +91,7 @@ export default function AdminDriverTracker({
       try { attnUnsubRef.current && attnUnsubRef.current(); } catch {}
       attnUnsubRef.current = null;
     };
-  }, [db, driverId, date]);
+  }, [db, driverId, date, base]);
 
   // Day locations
   useEffect(() => {
@@ -99,7 +104,7 @@ export default function AdminDriverTracker({
       locUnsubRef.current = null;
     }
 
-    const path = `drivers/${driverId}/attendance/${date}/locations`;
+    const path = `${base}/${driverId}/attendance/${date}/locations`; // 👈 role-aware
     const qy = query(collection(db, path), orderBy("capturedAtMs", "asc"));
     locUnsubRef.current = onSnapshot(
       qy,
@@ -145,9 +150,9 @@ export default function AdminDriverTracker({
         locUnsubRef.current = null;
       }
     };
-  }, [db, driverId, date, autoFit]);
+  }, [db, driverId, date, autoFit, base]);
 
-  // Live (driver-level, fallback to day-level)
+  // Live (user-level, fallback to day-level)
   useEffect(() => {
     if (!db || !driverId) return;
 
@@ -157,12 +162,12 @@ export default function AdminDriverTracker({
     dayUnsubRef.current = null;
 
     const today = date || toYmd(new Date());
-    const driverLivePath = `drivers/${driverId}/live/current`;
-    const dayLivePath = `drivers/${driverId}/attendance/${today}/live/current`;
+    const userLivePath = `${base}/${driverId}/live/current`;                       // 👈 role-aware
+    const dayLivePath = `${base}/${driverId}/attendance/${today}/live/current`;     // 👈 role-aware
 
-    // driver-level
+    // user-level
     liveUnsubRef.current = onSnapshot(
-      doc(db, driverLivePath),
+      doc(db, userLivePath),
       (d) => {
         const v = d.data();
         if (v && Number.isFinite(v.lat) && Number.isFinite(v.lng)) {
@@ -175,7 +180,7 @@ export default function AdminDriverTracker({
               ? v.capturedAt.toMillis()
               : null);
 
-          setLive({ ...v, id: d.id, _source: "driver", capturedAtMs: ts });
+          setLive({ ...v, id: d.id, _source: "user", capturedAtMs: ts });
           try { dayUnsubRef.current && dayUnsubRef.current(); } catch {}
           dayUnsubRef.current = null;
         } else {
@@ -205,10 +210,10 @@ export default function AdminDriverTracker({
           }
         }
       },
-      (e) => err("🔥 onSnapshot(driver-live)", e)
+      (e) => err("🔥 onSnapshot(user-live)", e)
     );
 
-  }, [db, driverId, date]);
+  }, [db, driverId, date, base]);
 
   // Clean points (looser thresholds)
   const cleanPoints = useMemo(() => {
@@ -457,7 +462,7 @@ export default function AdminDriverTracker({
           </div>
           <div>
             {live
-              ? `Live: ${isOnline(live) ? "online" : "offline"} (${live._source || "driver"})`
+              ? `Live: ${isOnline(live) ? "online" : "offline"} (${live._source || "user"})`
               : "Live unavailable"}
           </div>
         </div>

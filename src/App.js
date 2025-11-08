@@ -369,7 +369,14 @@ function TrackingPageWithParams() {
   const params = new URLSearchParams(useLocation().search);
   const presetDriverId = params.get("driverId") || "";
   const presetDate = params.get("date") || new Date().toISOString().slice(0,10);
-  return <TrackingPage presetDriverId={presetDriverId} presetDate={presetDate} />;
+  const presetRole = (params.get("role") || "drivers").toLowerCase();
+   return (
+   <TrackingPage
+     presetRole={presetRole}
+     presetDriverId={presetDriverId}
+     presetDate={presetDate}
+   />
+ );
 }
 /* ------------------------------ App root ------------------------------ */
 export default function App() {
