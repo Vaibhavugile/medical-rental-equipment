@@ -1,25 +1,26 @@
-// src/AdminDriverTracker.js
+// src/pages/AdminDriverTracker.js
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { GoogleMap, Marker, Polyline, InfoWindow } from "@react-google-maps/api";
+import { GoogleMap, Marker, Polyline, InfoWindow, Circle } from "@react-google-maps/api";
 import { collection, doc, onSnapshot, orderBy, query } from "firebase/firestore";
 
 /**
- * AdminDriverTracker
+ * AdminDriverTracker (detailed report with reverse geocoded stop addresses)
  *
  * Props:
- * - db: Firestore instance (required)
- * - driverId: string (required)
+ * - db: Firestore instance
+ * - driverId: string
  * - initialDate: YYYY-MM-DD (optional; defaults to today)
- * - height: string CSS value (default "70vh")
- * - autoFit: boolean (default true) → fit map to path on load/updates
+ * - height: CSS height (default "70vh")
+ * - autoFit: boolean (default true)
  *
  * Firestore:
- *   drivers/{driverId}/attendance/{yyyy-MM-dd}/locations/{autoId}
- *   drivers/{driverId}/live/current                          (preferred LIVE)
- *   drivers/{driverId}/attendance/{yyyy-MM-dd}/live/current  (fallback LIVE)
+ *   drivers/{driverId}/attendance/{yyyy-MM-dd}
+ *   drivers/{driverId}/attendance/{yyyy-MM-dd}/locations/{id}
+ *   drivers/{driverId}/live/current
+ *   drivers/{driverId}/attendance/{yyyy-MM-dd}/live/current
  */
 
-const DEBUG = true;
+const DEBUG = false;
 const log  = (...a) => DEBUG && console.log("[Tracker]", ...a);
 const warn = (...a) => DEBUG && console.warn("[Tracker]", ...a);
 const err  = (...a) => DEBUG && console.error("[Tracker]", ...a);
@@ -31,41 +32,63 @@ export default function AdminDriverTracker({
   height = "70vh",
   autoFit = true,
 }) {
-  /* -------------------- state -------------------- */
   const [date, setDate] = useState(() => initialDate ?? toYmd(new Date()));
-  const [points, setPoints] = useState([]);   // raw points
-  const [live, setLive] = useState(null);     // live point
+  const [points, setPoints] = useState([]);        // raw points
+  const [live, setLive] = useState(null);          // live point
+  const [attn, setAttn] = useState(null);          // attendance doc
   const [selectedPoint, setSelectedPoint] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [cursorIdx, setCursorIdx] = useState(0);
+  const [stopAddresses, setStopAddresses] = useState({}); // key => formatted address
 
   const mapRef = useRef(null);
   const playbackTimer = useRef(null);
   const liveUnsubRef = useRef(null);
   const dayUnsubRef = useRef(null);
   const locUnsubRef = useRef(null);
+  const attnUnsubRef = useRef(null);
 
   useEffect(() => {
-    log("🗺️ mounted; google loaded?", !!window.google);
     return () => {
-      // cleanup everything on unmount
       clearInterval(playbackTimer.current);
       try { liveUnsubRef.current && liveUnsubRef.current(); } catch {}
       try { dayUnsubRef.current && dayUnsubRef.current(); } catch {}
       try { locUnsubRef.current && locUnsubRef.current(); } catch {}
-      log("🧹 unmounted");
+      try { attnUnsubRef.current && attnUnsubRef.current(); } catch {}
     };
   }, []);
 
-  // keep date synced if prop changes
   useEffect(() => {
-    if (initialDate) {
-      log("🔁 initialDate prop →", initialDate);
-      setDate(initialDate);
-    }
+    if (initialDate) setDate(initialDate);
   }, [initialDate]);
 
-  /* -------------------- subscribe: locations (day path) -------------------- */
+  // Attendance (check-in/out/status)
+  useEffect(() => {
+    if (!db || !driverId || !date) return;
+    try { attnUnsubRef.current && attnUnsubRef.current(); } catch {}
+    attnUnsubRef.current = onSnapshot(
+      doc(db, `drivers/${driverId}/attendance/${date}`),
+      (d) => {
+        const v = d.data();
+        if (v) {
+          setAttn({
+            status: v.status || "unknown",
+            checkInMs: v.checkInMs ?? null,
+            checkOutMs: v.checkOutMs ?? null,
+          });
+        } else {
+          setAttn(null);
+        }
+      },
+      (e) => err("🔥 onSnapshot(attendance)", e)
+    );
+    return () => {
+      try { attnUnsubRef.current && attnUnsubRef.current(); } catch {}
+      attnUnsubRef.current = null;
+    };
+  }, [db, driverId, date]);
+
+  // Day locations
   useEffect(() => {
     if (!db || !driverId || !date) {
       warn("⏸️ missing db/driverId/date", { hasDb: !!db, driverId, date });
@@ -77,8 +100,6 @@ export default function AdminDriverTracker({
     }
 
     const path = `drivers/${driverId}/attendance/${date}/locations`;
-    log("🔎 subscribe locations:", path);
-
     const qy = query(collection(db, path), orderBy("capturedAtMs", "asc"));
     locUnsubRef.current = onSnapshot(
       qy,
@@ -87,6 +108,16 @@ export default function AdminDriverTracker({
         snap.forEach((d) => {
           const v = d.data();
           if (Number.isFinite(v?.lat) && Number.isFinite(v?.lng)) {
+            // robust timestamp extraction
+            const ts =
+              (Number.isFinite(v.capturedAtMs) ? v.capturedAtMs : null) ??
+              (v.capturedAtServer && typeof v.capturedAtServer.toMillis === "function"
+                ? v.capturedAtServer.toMillis()
+                : null) ??
+              (v.capturedAt && typeof v.capturedAt.toMillis === "function"
+                ? v.capturedAt.toMillis()
+                : null);
+
             arr.push({
               id: d.id,
               lat: v.lat,
@@ -94,18 +125,15 @@ export default function AdminDriverTracker({
               accuracy: v.accuracy ?? null,
               speed: v.speed ?? null,
               heading: v.heading ?? null,
-              capturedAtMs: v.capturedAtMs ?? null,
+              capturedAtMs: ts,
             });
           }
         });
-        log("📥 locations:", snap.size, "valid:", arr.length);
         setPoints(arr);
         setCursorIdx((idx) => Math.min(idx, Math.max(0, arr.length - 1)));
 
-        // auto-fit when we have points and a map
         if (autoFit && arr.length && mapRef.current && window.google?.maps) {
           fitToPath(mapRef.current, arr);
-          log("🎯 fit to path");
         }
       },
       (e) => err("🔥 onSnapshot(locations)", e)
@@ -113,18 +141,16 @@ export default function AdminDriverTracker({
 
     return () => {
       if (locUnsubRef.current) {
-        log("🧹 unsub locations");
         try { locUnsubRef.current(); } catch {}
         locUnsubRef.current = null;
       }
     };
   }, [db, driverId, date, autoFit]);
 
-  /* -------------------- subscribe: LIVE (driver-level, fallback day-level) -------------------- */
+  // Live (driver-level, fallback to day-level)
   useEffect(() => {
     if (!db || !driverId) return;
 
-    // clear previous listeners if any
     try { liveUnsubRef.current && liveUnsubRef.current(); } catch {}
     try { dayUnsubRef.current && dayUnsubRef.current(); } catch {}
     liveUnsubRef.current = null;
@@ -134,27 +160,42 @@ export default function AdminDriverTracker({
     const driverLivePath = `drivers/${driverId}/live/current`;
     const dayLivePath = `drivers/${driverId}/attendance/${today}/live/current`;
 
-    log("🔎 subscribe live (driver-level first):", driverLivePath);
+    // driver-level
     liveUnsubRef.current = onSnapshot(
       doc(db, driverLivePath),
       (d) => {
         const v = d.data();
         if (v && Number.isFinite(v.lat) && Number.isFinite(v.lng)) {
-          log("🟢 LIVE driver-level:", v);
-          setLive({ ...v, id: d.id, _source: "driver" });
-          // ensure any previous day listener is cleared
+          const ts =
+            (Number.isFinite(v.capturedAtMs) ? v.capturedAtMs : null) ??
+            (v.capturedAtServer && typeof v.capturedAtServer.toMillis === "function"
+              ? v.capturedAtServer.toMillis()
+              : null) ??
+            (v.capturedAt && typeof v.capturedAt.toMillis === "function"
+              ? v.capturedAt.toMillis()
+              : null);
+
+          setLive({ ...v, id: d.id, _source: "driver", capturedAtMs: ts });
           try { dayUnsubRef.current && dayUnsubRef.current(); } catch {}
           dayUnsubRef.current = null;
         } else {
-          // fallback: day-level
-          log("🟡 no driver-level live; try day-level:", dayLivePath);
+          // fallback day-level
           if (!dayUnsubRef.current) {
             dayUnsubRef.current = onSnapshot(
               doc(db, dayLivePath),
               (d2) => {
                 const v2 = d2.data();
                 if (v2 && Number.isFinite(v2.lat) && Number.isFinite(v2.lng)) {
-                  setLive({ ...v2, id: d2.id, _source: "day" });
+                  const ts2 =
+                    (Number.isFinite(v2.capturedAtMs) ? v2.capturedAtMs : null) ??
+                    (v2.capturedAtServer && typeof v2.capturedAtServer.toMillis === "function"
+                      ? v2.capturedAtServer.toMillis()
+                      : null) ??
+                    (v2.capturedAt && typeof v2.capturedAt.toMillis === "function"
+                      ? v2.capturedAt.toMillis()
+                      : null);
+
+                  setLive({ ...v2, id: d2.id, _source: "day", capturedAtMs: ts2 });
                 } else {
                   setLive(null);
                 }
@@ -167,63 +208,74 @@ export default function AdminDriverTracker({
       (e) => err("🔥 onSnapshot(driver-live)", e)
     );
 
-    return () => {
-      log("🧹 unsub live listeners");
-      try { liveUnsubRef.current && liveUnsubRef.current(); } catch {}
-      try { dayUnsubRef.current && dayUnsubRef.current(); } catch {}
-      liveUnsubRef.current = null;
-      dayUnsubRef.current = null;
-    };
   }, [db, driverId, date]);
 
-  /* -------------------- preprocess & derived -------------------- */
+  // Clean points (looser thresholds)
   const cleanPoints = useMemo(() => {
-    const cleaned = preprocessPoints(points, {
-      maxAcc: 60,
-      maxJump: 120,
-      collapseWithin: 12,
-      slowSpeed: 1.2,
-      emaAlpha: 0.25,
+    return preprocessPoints(points, {
+      maxAcc: 200,
+      maxJump: 2000,
+      collapseWithin: 8,
+      slowSpeed: 0.8,
+      emaAlpha: 0.15,
     });
-    log(`🧼 cleaned ${cleaned.length}/${points.length}`);
-    return cleaned;
   }, [points]);
 
+  // Fall back to raw if cleaning leaves < 2
+  const effectivePoints = cleanPoints.length >= 2 ? cleanPoints : points;
+
   const path = useMemo(
-    () => cleanPoints.map((p) => ({ lat: p.lat, lng: p.lng })),
-    [cleanPoints]
+    () => effectivePoints.map((p) => ({ lat: p.lat, lng: p.lng })),
+    [effectivePoints]
   );
 
-  const start = cleanPoints[0] ?? null;
-  const end   = cleanPoints.length ? cleanPoints[cleanPoints.length - 1] : null;
-  const cursor = cleanPoints[cursorIdx] ?? null;
+  const start  = effectivePoints[0] ?? null;
+  const end    = effectivePoints.length ? effectivePoints[effectivePoints.length - 1] : null;
+  const cursor = effectivePoints[cursorIdx] ?? null;
 
-  const summary = useMemo(() => summarizeDay(cleanPoints), [cleanPoints]);
+  // Report (distance, moving/idle, stops, offline gaps)
+  const report = useMemo(() => {
+    const { distanceM, movingMs, idleMs } = summarizeDay(effectivePoints);
+    const stops = detectStops(effectivePoints, { radiusM: 25, minDurationMs: 3 * 60 * 1000 });
+    const offline = computeOfflineGaps(
+      effectivePoints,
+      attn?.checkInMs ?? null,
+      attn?.checkOutMs ?? null,
+      5 * 60 * 1000
+    );
+    return { distanceM, movingMs, idleMs, stops, offline };
+  }, [effectivePoints, attn]);
 
-  /* -------------------- playback -------------------- */
+  // Fetch addresses for newly-detected stops (reverse geocode)
   useEffect(() => {
-    if (!playing || cleanPoints.length < 2) return;
+    if (!report?.stops?.length) return;
+    report.stops.forEach(async (s) => {
+      const key = stopKey(s.center.lat, s.center.lng);
+      if (!stopAddresses[key]) {
+        const address = await getAddressFromLatLng(s.center.lat, s.center.lng);
+        setStopAddresses((prev) => ({ ...prev, [key]: address }));
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [report.stops]);
+
+  // Playback
+  useEffect(() => {
+    if (!playing || effectivePoints.length < 2) return;
     clearInterval(playbackTimer.current);
     playbackTimer.current = setInterval(() => {
-      setCursorIdx((i) => (i + 1 < cleanPoints.length ? i + 1 : i));
+      setCursorIdx((i) => (i + 1 < effectivePoints.length ? i + 1 : i));
     }, 500);
-    log("▶️ playback start");
-    return () => {
-      clearInterval(playbackTimer.current);
-      log("⏸️ playback stop");
-    };
-  }, [playing, cleanPoints]);
+    return () => clearInterval(playbackTimer.current);
+  }, [playing, effectivePoints]);
 
   function onMapLoad(map) {
     mapRef.current = map;
-    log("🗺️ map onLoad");
     if (autoFit && path.length && window.google?.maps) {
-      fitToPath(map, cleanPoints);
-      log("🎯 fit to initial path");
+      fitToPath(map, effectivePoints);
     }
   }
 
-  /* -------------------- render -------------------- */
   const mapCenter = path[0] ?? { lat: 20.5937, lng: 78.9629 }; // India fallback
   const zoom = path.length ? 15 : 5;
 
@@ -236,34 +288,35 @@ export default function AdminDriverTracker({
           type="date"
           className="border rounded px-2 py-1"
           value={date}
-          onChange={(e) => {
-            log("📝 date change →", e.target.value);
-            setDate(e.target.value);
-          }}
+          onChange={(e) => setDate(e.target.value)}
         />
+
+        <div className="text-sm text-black/70 ml-4">
+          {attn
+            ? <>Status: <b>{attn.status}</b>{" "}
+               {attn.checkInMs ? `• In: ${toLocal(attn.checkInMs)}` : ""}{" "}
+               {attn.checkOutMs ? `• Out: ${toLocal(attn.checkOutMs)}` : ""}</>
+            : "No attendance record"}
+        </div>
 
         <div className="flex items-center gap-2 ml-auto">
           <button
             onClick={() => setPlaying((p) => !p)}
             className="px-3 py-1 rounded bg-black/80 text-white"
-            disabled={!cleanPoints.length}
+            disabled={!effectivePoints.length}
           >
             {playing ? "Pause" : "Play"}
           </button>
           <input
             type="range"
             min={0}
-            max={Math.max(0, cleanPoints.length - 1)}
-            value={cursorIdx}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              log("🎚️ cursor →", v, cleanPoints[v]);
-              setCursorIdx(v);
-            }}
+            max={Math.max(0, effectivePoints.length - 1)}
+            value={Math.min(cursorIdx, Math.max(0, effectivePoints.length - 1))}
+            onChange={(e) => setCursorIdx(Number(e.target.value))}
             className="w-56"
           />
           <span className="text-xs tabular-nums">
-            {cleanPoints.length ? `${cursorIdx + 1}/${cleanPoints.length}` : "0/0"}
+            {effectivePoints.length ? `${cursorIdx + 1}/${effectivePoints.length}` : "0/0"}
           </span>
         </div>
       </div>
@@ -277,12 +330,19 @@ export default function AdminDriverTracker({
           zoom={zoom}
           options={{ streetViewControl: false, mapTypeControl: false }}
         >
-          {/* Path */}
+          {/* Path with direction arrows */}
           {path.length > 1 && (
             <Polyline
               path={path}
-              options={{ strokeOpacity: 1, strokeWeight: 4 }}
-              onLoad={() => log("➰ polyline loaded")}
+              options={{
+                strokeOpacity: 1,
+                strokeWeight: 4,
+                icons: window.google?.maps ? [{
+                  icon: { path: window.google.maps.SymbolPath.FORWARD_OPEN_ARROW, scale: 2 },
+                  offset: "0",
+                  repeat: "60px",
+                }] : undefined,
+              }}
             />
           )}
 
@@ -291,14 +351,14 @@ export default function AdminDriverTracker({
             <Marker
               position={{ lat: start.lat, lng: start.lng }}
               label="S"
-              onClick={() => { log("📍 start click", start); setSelectedPoint(start); }}
+              onClick={() => setSelectedPoint(start)}
             />
           )}
           {end && (
             <Marker
               position={{ lat: end.lat, lng: end.lng }}
               label="E"
-              onClick={() => { log("🏁 end click", end); setSelectedPoint(end); }}
+              onClick={() => setSelectedPoint(end)}
             />
           )}
 
@@ -306,7 +366,7 @@ export default function AdminDriverTracker({
           {cursor && (
             <Marker
               position={{ lat: cursor.lat, lng: cursor.lng }}
-              onClick={() => { log("▶️ cursor click", cursor); setSelectedPoint(cursor); }}
+              onClick={() => setSelectedPoint(cursor)}
             />
           )}
 
@@ -317,40 +377,61 @@ export default function AdminDriverTracker({
               label="LIVE"
               onClick={() => {
                 const sel = { ...live, capturedAtMs: live.capturedAtMs ?? Date.now() };
-                log("🟢 live click", sel);
                 setSelectedPoint(sel);
               }}
             />
           )}
 
-          {/* InfoWindow */}
+          {/* Stops (circles + numbered markers) */}
+          {report.stops.map((s, i) => (
+            <React.Fragment key={`stop-${i}`}>
+              <Circle
+                center={{ lat: s.center.lat, lng: s.center.lng }}
+                radius={18}
+                options={{ strokeOpacity: 0.7, strokeWeight: 1, fillOpacity: 0.15 }}
+              />
+              <Marker
+                position={{ lat: s.center.lat, lng: s.center.lng }}
+                label={`${i + 1}`}
+                onClick={() => setSelectedPoint({
+                  lat: s.center.lat,
+                  lng: s.center.lng,
+                  capturedAtMs: s.startMs,
+                  _stop: s,
+                })}
+              />
+            </React.Fragment>
+          ))}
+
+          {/* InfoWindow (point or stop) */}
           {selectedPoint && (
             <InfoWindow
               position={{ lat: selectedPoint.lat, lng: selectedPoint.lng }}
-              onCloseClick={() => { log("❎ infowindow close"); setSelectedPoint(null); }}
+              onCloseClick={() => setSelectedPoint(null)}
             >
-              <div className="text-xs space-y-1">
-                <div>
-                  <span className="font-medium">Time: </span>
-                  {selectedPoint.capturedAtMs
-                    ? new Date(selectedPoint.capturedAtMs).toLocaleString()
-                    : "—"}
-                </div>
-                <div>
-                  <span className="font-medium">Lat/Lng: </span>
-                  {selectedPoint.lat.toFixed(6)}, {selectedPoint.lng.toFixed(6)}
-                </div>
-                {Number.isFinite(selectedPoint.speed) && (
-                  <div>
-                    <span className="font-medium">Speed: </span>
-                    {mpsToKmph(selectedPoint.speed).toFixed(1)} km/h
-                  </div>
-                )}
-                {Number.isFinite(selectedPoint.accuracy) && (
-                  <div>
-                    <span className="font-medium">Accuracy: </span>
-                    ±{Math.round(selectedPoint.accuracy)} m
-                  </div>
+              <div className="text-xs space-y-1" style={{ maxWidth: 260 }}>
+                {selectedPoint._stop ? (
+                  <>
+                    <div><b>Stop</b> #{report.stops.findIndex(s => s === selectedPoint._stop) + 1}</div>
+                    <div><b>Start:</b> {toLocal(selectedPoint._stop.startMs)}</div>
+                    <div><b>End:</b> {toLocal(selectedPoint._stop.endMs)}</div>
+                    <div><b>Duration:</b> {fmtDuration(selectedPoint._stop.durationMs)}</div>
+                    <div>
+                      <b>Location:</b>{" "}
+                      {stopAddresses[stopKey(selectedPoint.lat, selectedPoint.lng)] ?? "Loading..."}
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div><b>Time:</b> {selectedPoint.capturedAtMs ? toLocal(selectedPoint.capturedAtMs) : "—"}</div>
+                    <div><b>Lat/Lng:</b> {selectedPoint.lat.toFixed(6)}, {selectedPoint.lng.toFixed(6)}</div>
+                    {Number.isFinite(selectedPoint.speed) && (
+                      <div><b>Speed:</b> {mpsToKmph(selectedPoint.speed).toFixed(1)} km/h</div>
+                    )}
+                    {Number.isFinite(selectedPoint.accuracy) && (
+                      <div><b>Accuracy:</b> ±{Math.round(selectedPoint.accuracy)} m</div>
+                    )}
+                  </>
                 )}
               </div>
             </InfoWindow>
@@ -358,18 +439,64 @@ export default function AdminDriverTracker({
         </GoogleMap>
       </div>
 
-      {/* Summary / Diagnostics */}
-      <div className="text-xs text-black/70" style={{ marginTop: 8 }}>
-        <div>Points: {points.length} raw → {cleanPoints.length} clean</div>
-        <div>
-          Distance: {(summary.distanceM / 1000).toFixed(2)} km •{" "}
-          Moving: {fmtDuration(summary.movingMs)} •{" "}
-          Idle: {fmtDuration(summary.idleMs)}
+      {/* Summary / Detailed report */}
+      <div className="grid gap-3" style={{ gridTemplateColumns: "1.2fr 1fr" }}>
+        <div className="text-sm p-3 border rounded">
+          <div className="font-medium mb-2">Day Summary</div>
+          <div>Points: {points.length} raw → {cleanPoints.length} clean</div>
+          <div>
+            Distance: {(report.distanceM / 1000).toFixed(2)} km •{" "}
+            Moving: {fmtDuration(report.movingMs)} •{" "}
+            Idle: {fmtDuration(report.idleMs)}
+          </div>
+          <div>
+            Offline (between check-in & check-out): {fmtDuration(report.offline.totalMs)}
+            {report.offline.gaps.length
+              ? ` • ${report.offline.gaps.length} gap${report.offline.gaps.length > 1 ? "s" : ""}`
+              : ""}
+          </div>
+          <div>
+            {live
+              ? `Live: ${isOnline(live) ? "online" : "offline"} (${live._source || "driver"})`
+              : "Live unavailable"}
+          </div>
         </div>
-        <div>
-          {live
-            ? `Live OK (${isOnline(live) ? "online" : "offline"} via ${live._source || "driver"})`
-            : "Live unavailable."}
+
+        <div className="text-sm p-3 border rounded">
+          <div className="font-medium mb-2">
+            Stops ({report.stops.length})
+          </div>
+          {report.stops.length === 0 ? (
+            <div className="text-black/70">No stops detected.</div>
+          ) : (
+            <div className="overflow-auto" style={{ maxHeight: 260 }}>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left">
+                    <th>#</th>
+                    <th>Start</th>
+                    <th>End</th>
+                    <th>Duration</th>
+                    <th>Location</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {report.stops.map((s, i) => {
+                    const key = stopKey(s.center.lat, s.center.lng);
+                    return (
+                      <tr key={`row-${i}`}>
+                        <td>{i + 1}</td>
+                        <td>{toLocal(s.startMs)}</td>
+                        <td>{toLocal(s.endMs)}</td>
+                        <td>{fmtDuration(s.durationMs)}</td>
+                        <td>{stopAddresses[key] ?? "Loading..."}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -381,6 +508,14 @@ export default function AdminDriverTracker({
 function toYmd(d) {
   const tz = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
   return tz.toISOString().slice(0, 10);
+}
+function toLocal(ms) {
+  if (!ms) return "—";
+  return new Date(ms).toLocaleString();
+}
+function stopKey(lat, lng) {
+  // normalize to 6 decimals to avoid mismatched keys due to floating rounding
+  return `${Number(lat).toFixed(6)},${Number(lng).toFixed(6)}`;
 }
 
 function fitToPath(map, pts) {
@@ -399,7 +534,7 @@ function isOnline(l) {
   return Date.now() - l.capturedAtMs <= 3 * 60 * 1000; // 3 minutes
 }
 
-// Haversine in meters
+// Haversine (meters)
 function haversineMeters(a, b) {
   const R = 6371000;
   const dLat = (b.lat - a.lat) * Math.PI / 180;
@@ -412,11 +547,11 @@ function haversineMeters(a, b) {
 
 // Clean + smooth raw points
 function preprocessPoints(raw, {
-  maxAcc = 60,        // meters
-  maxJump = 120,      // meters between consecutive points
-  collapseWithin = 12,// meters: collapse near-duplicates when slow
-  slowSpeed = 1.2,    // m/s threshold for "slow/idle"
-  emaAlpha = 0.25,    // smoothing factor 0..1
+  maxAcc = 200,
+  maxJump = 2000,
+  collapseWithin = 8,
+  slowSpeed = 0.8,
+  emaAlpha = 0.15,
 } = {}) {
   const out = [];
   let ema = null;
@@ -443,7 +578,7 @@ function preprocessPoints(raw, {
       }
     }
 
-    // 4) EMA smoothing of lat/lng (visual only)
+    // 4) EMA smoothing (visual only)
     if (!ema) {
       ema = { lat: p.lat, lng: p.lng };
     } else {
@@ -456,11 +591,12 @@ function preprocessPoints(raw, {
   return out;
 }
 
+// Distance & time buckets
 function summarizeDay(points) {
   if (!points || points.length < 2) return { distanceM: 0, movingMs: 0, idleMs: 0 };
   let dist = 0, moving = 0, idle = 0;
   const MOVE_SPEED_MPS = 1.2;
-  const MAX_GAP = 10 * 60 * 1000; // ignore gaps > 10 min (phone sleeps etc.)
+  const MAX_GAP = 45 * 60 * 1000; // ignore gaps > 45 min
   for (let i = 1; i < points.length; i++) {
     const p1 = points[i - 1], p2 = points[i];
     const dt = Math.max(0, (p2.capturedAtMs ?? 0) - (p1.capturedAtMs ?? 0));
@@ -473,11 +609,113 @@ function summarizeDay(points) {
   return { distanceM: dist, movingMs: moving, idleMs: idle };
 }
 
+// Stops detection
+function detectStops(points, { radiusM = 25, minDurationMs = 3 * 60 * 1000 } = {}) {
+  if (!points || points.length < 2) return [];
+  const stops = [];
+  let cluster = [points[0]];
+  for (let i = 1; i < points.length; i++) {
+    const prev = cluster[cluster.length - 1];
+    const cur = points[i];
+    const d = haversineMeters(prev, cur);
+    if (d <= radiusM) {
+      cluster.push(cur);
+    } else {
+      maybePushStop(cluster);
+      cluster = [cur];
+    }
+  }
+  maybePushStop(cluster);
+
+  function maybePushStop(group) {
+    if (!group || group.length < 2) return;
+    const startMs = group[0].capturedAtMs ?? 0;
+    const endMs   = group[group.length - 1].capturedAtMs ?? 0;
+    const duration = Math.max(0, endMs - startMs);
+    if (duration >= minDurationMs) {
+      const center = centroid(group);
+      stops.push({ startMs, endMs, durationMs: duration, center });
+    }
+  }
+
+  return stops;
+}
+
+function centroid(arr) {
+  let lat = 0, lng = 0, n = 0;
+  for (const p of arr) {
+    if (Number.isFinite(p.lat) && Number.isFinite(p.lng)) {
+      lat += p.lat; lng += p.lng; n++;
+    }
+  }
+  return { lat: lat / n, lng: lng / n };
+}
+
+// Offline gaps confined to check-in/out window
+function computeOfflineGaps(points, checkInMs, checkOutMs, gapThresholdMs = 5 * 60 * 1000) {
+  const res = { totalMs: 0, gaps: [] };
+  if (!checkInMs || !checkOutMs || checkOutMs <= checkInMs) return res;
+
+  const inWindow = points.filter(p => {
+    const t = p.capturedAtMs ?? 0;
+    return t >= checkInMs && t <= checkOutMs;
+  });
+  if (inWindow.length < 2) {
+    res.totalMs = Math.max(0, checkOutMs - checkInMs);
+    res.gaps.push({ startMs: checkInMs, endMs: checkOutMs, durationMs: res.totalMs });
+    return res;
+  }
+
+  // Leading gap
+  if ((inWindow[0].capturedAtMs - checkInMs) > gapThresholdMs) {
+    const d = inWindow[0].capturedAtMs - checkInMs;
+    res.totalMs += d;
+    res.gaps.push({ startMs: checkInMs, endMs: inWindow[0].capturedAtMs, durationMs: d });
+  }
+
+  // Middle gaps
+  for (let i = 1; i < inWindow.length; i++) {
+    const prev = inWindow[i - 1], cur = inWindow[i];
+    const dt = (cur.capturedAtMs ?? 0) - (prev.capturedAtMs ?? 0);
+    if (dt > gapThresholdMs) {
+      res.totalMs += dt;
+      res.gaps.push({ startMs: prev.capturedAtMs, endMs: cur.capturedAtMs, durationMs: dt });
+    }
+  }
+
+  // Trailing gap
+  if ((checkOutMs - inWindow[inWindow.length - 1].capturedAtMs) > gapThresholdMs) {
+    const d = checkOutMs - inWindow[inWindow.length - 1].capturedAtMs;
+    res.totalMs += d;
+    res.gaps.push({ startMs: inWindow[inWindow.length - 1].capturedAtMs, endMs: checkOutMs, durationMs: d });
+  }
+
+  return res;
+}
+
+// Format durations like "1h 23m" or "12m 10s"
 function fmtDuration(ms) {
-  if (!ms || ms <= 0) return "0s";
+  if (!Number.isFinite(ms) || ms <= 0) return "0m";
   const s = Math.floor(ms / 1000);
   const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
-  const ss = s % 60;
-  return `${h}h ${m}m ${ss}s`;
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${sec}s`;
+  return `${sec}s`;
+}
+
+// Reverse Geocode (lat,lng → address)
+async function getAddressFromLatLng(lat, lng) {
+  return new Promise((resolve) => {
+    if (!window.google || !window.google.maps) return resolve("Unknown location");
+    const geocoder = new window.google.maps.Geocoder();
+    geocoder.geocode({ location: { lat, lng } }, (results, status) => {
+      if (status === "OK" && results?.[0]) {
+        resolve(results[0].formatted_address);
+      } else {
+        resolve("Unknown location");
+      }
+    });
+  });
 }
