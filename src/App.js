@@ -13,7 +13,7 @@ import DriverApp from "./pages/DriverApp";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import DriverAttendance from "./pages/DriverAttendance";
-
+import Marketing from "./pages/Marketing";
 import useAuth from "./pages/useAuth";
 import { auth } from "./firebase";
 import "./App.css";
@@ -239,6 +239,21 @@ function CRMApp() {
               >
                 Tracking
               </NavLink>
+              <NavLink
+                to="/marketing"
+                style={({ isActive }) => ({
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  textDecoration: "none",
+                  color: isActive ? "#fff" : "#0b5cff",
+                  background: isActive
+                    ? "linear-gradient(90deg,#0b69ff,#00b4d8)"
+                    : "transparent",
+                  fontWeight: 700,
+                })}
+              >
+                Marketing
+              </NavLink>
             </nav>
           </div>
 
@@ -255,7 +270,7 @@ function CRMApp() {
           <Route path="/drivers" element={<Drivers />} />
           <Route path="/branches" element={<Branches />} />
           <Route path="/products" element={<Products />} />
-
+          <Route path="/marketing" element={<Marketing />} />
           {/* Driver/testing routes inside CRM */}
           <Route path="/driver-app" element={<DriverApp />} />
           <Route path="/attendance" element={<AttendanceAdmin />} />

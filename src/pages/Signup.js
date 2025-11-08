@@ -1,113 +1,247 @@
 // src/pages/Signup.js
 import React, { useState } from "react";
-import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { setDoc, doc, serverTimestamp, getDocs, query, where, collection } from "firebase/firestore";
-import { auth, db } from "../firebase";
-import "./Signup.css";
+import { useNavigate, Link } from "react-router-dom";
+import { auth, db } from "../firebase"; // adjust the import path if your project differs
 
-function Signup({ onSignup }) {
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
+
+import {
+  setDoc,
+  doc,
+  serverTimestamp,
+  getDocs,
+  query,
+  where,
+  collection,
+} from "firebase/firestore";
+
+export default function Signup() {
+  const navigate = useNavigate();
+
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const handleSignup = async (e) => {
+  const onSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setErrorMsg("");
 
-    if (!name.trim() || !email.trim() || !password) {
-      setError("Name, email, and password are required.");
+    const trimmedEmail = email.trim().toLowerCase();
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      setErrorMsg("Please enter your name.");
+      return;
+    }
+    if (!trimmedEmail) {
+      setErrorMsg("Please enter your email.");
+      return;
+    }
+    if (!password || password.length < 6) {
+      setErrorMsg("Password must be at least 6 characters.");
       return;
     }
 
-    setLoading(true);
+    setSubmitting(true);
     try {
-      // Step 1 — check if email exists in 'drivers' collection
-      const driverQ = query(collection(db, "drivers"), where("loginEmail", "==", email.trim().toLowerCase()));
+      // 1) Check if this email belongs to a driver or marketing person
+      const driverQ = query(
+        collection(db, "drivers"),
+        where("loginEmail", "==", trimmedEmail)
+      );
       const driverSnap = await getDocs(driverQ);
       const isDriver = driverSnap.docs.length > 0;
 
-      // Step 2 — create user in Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      const user = userCredential.user;
+      const marketingQ = query(
+        collection(db, "marketing"),
+        where("loginEmail", "==", trimmedEmail)
+      );
+      const marketingSnap = await getDocs(marketingQ);
+      const isMarketing = marketingSnap.docs.length > 0;
 
-      // Step 3 — update display name for the auth profile
-      try {
-        await updateProfile(user, { displayName: name.trim() });
-      } catch (e) {
-        console.warn("updateProfile failed", e);
+      // 2) Create auth account
+      const cred = await createUserWithEmailAndPassword(
+        auth,
+        trimmedEmail,
+        password
+      );
+
+      // 3) Optionally set displayName for nicer UX elsewhere
+      if (trimmedName) {
+        await updateProfile(cred.user, { displayName: trimmedName });
       }
 
-      // Step 4 — create /users/{uid} document with auto role
-      const role = isDriver ? "driver" : "sales";
-      await setDoc(doc(db, "users", user.uid), {
-        name: name.trim(),
-        email: email.trim().toLowerCase(),
+      // 4) Create the /users/{uid} profile with the correct role
+      const role = isDriver ? "driver" : isMarketing ? "marketing" : "sales";
+
+      await setDoc(doc(db, "users", cred.user.uid), {
+        name: trimmedName,
+        email: trimmedEmail,
         role,
         createdAt: serverTimestamp(),
       });
 
-      // Optional: update the driver doc with authUid if matched
+      // 5) Backfill authUid into the matched domain document (drivers/marketing)
       if (isDriver) {
         const driverDocId = driverSnap.docs[0].id;
         await setDoc(
           doc(db, "drivers", driverDocId),
-          { authUid: user.uid, updatedAt: serverTimestamp() },
+          {
+            authUid: cred.user.uid,
+            updatedAt: serverTimestamp(),
+          },
           { merge: true }
         );
       }
 
-      if (typeof onSignup === "function") onSignup();
+      if (isMarketing) {
+        const marketingDocId = marketingSnap.docs[0].id;
+        await setDoc(
+          doc(db, "marketing", marketingDocId),
+          {
+            authUid: cred.user.uid,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
+
+      // 6) Send them to Login; your auth-based redirect can route to /marketing for marketing users
+      navigate("/login", { replace: true });
     } catch (err) {
-      console.error("signup error", err);
-      let msg = "Signup failed.";
-      if (err.code === "auth/email-already-in-use") msg = "Email already in use. Try logging in.";
-      if (err.code === "auth/weak-password") msg = "Password too weak (min 6 characters).";
-      setError(msg);
+      console.error(err);
+      let message = "Something went wrong. Please try again.";
+      if (err?.code === "auth/email-already-in-use") {
+        message = "That email is already in use.";
+      } else if (err?.code === "auth/invalid-email") {
+        message = "Please enter a valid email address.";
+      } else if (err?.code === "auth/weak-password") {
+        message = "Password is too weak (min 6 characters).";
+      }
+      setErrorMsg(message);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="signup-container">
-      <h2>Create Account</h2>
-      <form onSubmit={handleSignup}>
-        <input
-          type="text"
-          placeholder="Full Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          required
-        />
-        <input
-          type="email"
-          placeholder="Email Address"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <input
-          type="password"
-          placeholder="Create Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
-        <button type="submit" disabled={loading}>
-          {loading ? "Creating..." : "Sign Up"}
+    <div
+      style={{
+        maxWidth: 420,
+        margin: "40px auto",
+        padding: 24,
+        border: "1px solid #eee",
+        borderRadius: 12,
+      }}
+    >
+      <h2 style={{ marginBottom: 16 }}>Create your account</h2>
+
+      <form onSubmit={onSubmit}>
+        <label style={{ display: "block", marginBottom: 8 }}>
+          Name
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Jane Doe"
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              marginTop: 6,
+              borderRadius: 8,
+              border: "1px solid #ccc",
+            }}
+            disabled={submitting}
+            autoComplete="name"
+          />
+        </label>
+
+        <label style={{ display: "block", marginBottom: 8 }}>
+          Email
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="jane@example.com"
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              marginTop: 6,
+              borderRadius: 8,
+              border: "1px solid #ccc",
+            }}
+            disabled={submitting}
+            autoComplete="email"
+          />
+        </label>
+
+        <label style={{ display: "block", marginBottom: 12 }}>
+          Password
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            style={{
+              width: "100%",
+              padding: "10px 12px",
+              marginTop: 6,
+              borderRadius: 8,
+              border: "1px solid #ccc",
+            }}
+            disabled={submitting}
+            autoComplete="new-password"
+          />
+        </label>
+
+        {errorMsg ? (
+          <div
+            role="alert"
+            style={{
+              marginBottom: 12,
+              padding: "10px 12px",
+              background: "#ffeaea",
+              color: "#b00020",
+              borderRadius: 8,
+              border: "1px solid #ffcccc",
+            }}
+          >
+            {errorMsg}
+          </div>
+        ) : null}
+
+        <button
+          type="submit"
+          disabled={submitting}
+          style={{
+            width: "100%",
+            padding: "12px 14px",
+            borderRadius: 10,
+            border: "none",
+            background: submitting ? "#999" : "#111",
+            color: "#fff",
+            fontWeight: 600,
+            cursor: submitting ? "not-allowed" : "pointer",
+          }}
+        >
+          {submitting ? "Creating account..." : "Sign up"}
         </button>
       </form>
-      {error && <p className="error">{error}</p>}
-      <p style={{ marginTop: 12 }}>
-        Already have an account?{" "}
-        <a href="/login" style={{ color: "#007bff" }}>
-          Login
-        </a>
+
+      <div style={{ marginTop: 12, fontSize: 14 }}>
+        Already have an account? <Link to="/login">Log in</Link>
+      </div>
+
+      <p style={{ marginTop: 12, fontSize: 12, color: "#666" }}>
+        Tip: if your email matches a record in <code>drivers</code> or{" "}
+        <code>marketing</code>, your role is set automatically. Otherwise,
+        you’ll get the default <code>sales</code> role.
       </p>
     </div>
   );
 }
-
-export default Signup;
