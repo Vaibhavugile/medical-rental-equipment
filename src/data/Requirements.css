@@ -199,3 +199,24 @@
   /* keep transform for animation, but z-index will win because backdrop is fixed */
   transform: translateX(0);
 }
+.suggest-pop {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 8px;
+  color: #111827;
+  box-shadow: 0px 8px 22px rgba(0,0,0,0.08);
+}
+
+.suggest-item {
+  color: #111827 !important;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+.suggest-item:hover {
+  background: #f8fafc !important;
+}
+
+.suggest-item .muted {
+  color: #6b7280 !important;
+}

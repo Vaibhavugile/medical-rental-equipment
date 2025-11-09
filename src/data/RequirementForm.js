@@ -1,5 +1,14 @@
-import React, { useEffect, useState } from "react";
-import { addDoc, collection, doc, serverTimestamp, updateDoc } from "firebase/firestore";
+import React, { useEffect, useRef, useState } from "react";
+import {
+  addDoc,
+  collection,
+  doc,
+  serverTimestamp,
+  updateDoc,
+  onSnapshot,
+  query,
+  orderBy,
+} from "firebase/firestore";
 import { db, auth } from "../firebase";
 import "./Requirements.css";
 
@@ -12,7 +21,7 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
     leadSnapshot: {
       customerName: lead?.customerName || "",
       contactPerson: lead?.contactPerson || "",
-      phone: lead?.phone || ""
+      phone: lead?.phone || "",
     },
     equipment: [emptyLine()],
     expectedStartDate: "",
@@ -23,87 +32,127 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
     deliveryContact: {
       name: lead?.contactPerson || "",
       phone: lead?.phone || "",
-      email: lead?.email || ""
+      email: lead?.email || "",
     },
     urgency: "normal",
     specialInstructions: "",
     status: "draft",
-    assignedTo: ""
+    assignedTo: "",
   });
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [lastSaved, setLastSaved] = useState(null);
 
-  // --- Load or reset form on mount ---
+  // ───────────────────────────────────────────────────────────
+  // Products for suggestions
+  // ───────────────────────────────────────────────────────────
+  const [products, setProducts] = useState([]); // [{id, name, sku, defaultRate, ...}]
+  useEffect(() => {
+    const q = query(collection(db, "products"), orderBy("name", "asc"));
+    const unsub = onSnapshot(q, (snap) => {
+      setProducts(snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) })));
+    });
+    return () => unsub();
+  }, []);
+
+  // Suggestion UI state
+  const [suggestFor, setSuggestFor] = useState(null); // row index or null
+  const wrapsRef = useRef([]); // ref to each name input wrapper
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    function handleDocMouseDown(e) {
+      if (suggestFor == null) return;
+      const el = wrapsRef.current[suggestFor];
+      if (!el) return;
+      if (!el.contains(e.target)) setSuggestFor(null);
+    }
+    document.addEventListener("mousedown", handleDocMouseDown);
+    return () => document.removeEventListener("mousedown", handleDocMouseDown);
+  }, [suggestFor]);
+
+  const findSuggestions = (qstr) => {
+    const q = (qstr || "").trim().toLowerCase();
+    if (!q) return [];
+    const out = [];
+    for (const p of products) {
+      const name = String(p.name || "").toLowerCase();
+      const sku = String(p.sku || "").toLowerCase();
+      if (name.includes(q) || (sku && sku.includes(q))) {
+        out.push(p);
+        if (out.length >= 8) break; // cap results
+      }
+    }
+    return out;
+  };
+
+  // Load requirement or seed from lead
   useEffect(() => {
     if (requirement) {
-      setForm(prev => ({
+      setForm((prev) => ({
         ...prev,
         ...requirement,
-        requirementId: requirement.id || requirement.requirementId
+        requirementId: requirement.id || requirement.requirementId,
       }));
     } else {
-      setForm(prev => ({
+      setForm((prev) => ({
         ...prev,
         leadId: lead?.id || prev.leadId,
         leadSnapshot: {
           customerName: lead?.customerName || prev.leadSnapshot.customerName,
           contactPerson: lead?.contactPerson || prev.leadSnapshot.contactPerson,
-          phone: lead?.phone || prev.leadSnapshot.phone
+          phone: lead?.phone || prev.leadSnapshot.phone,
         },
-        deliveryAddress: lead?.address || prev.deliveryAddress
+        deliveryAddress: lead?.address || prev.deliveryAddress,
       }));
     }
   }, [requirement, lead]);
 
-  // --- Compute end date automatically ---
+  // Compute end date from start + duration
   useEffect(() => {
     if (form.expectedStartDate && form.expectedDurationDays) {
       const start = new Date(form.expectedStartDate);
       const end = new Date(start);
       end.setDate(start.getDate() + Number(form.expectedDurationDays));
-      setForm(prev => ({ ...prev, expectedEndDate: end.toISOString().slice(0, 10) }));
+      setForm((prev) => ({ ...prev, expectedEndDate: end.toISOString().slice(0, 10) }));
     } else {
-      setForm(prev => ({ ...prev, expectedEndDate: "" }));
+      setForm((prev) => ({ ...prev, expectedEndDate: "" }));
     }
   }, [form.expectedStartDate, form.expectedDurationDays]);
 
-  // --- Autosave draft every 15s ---
+  // Autosave draft every 15s (only if already created)
   useEffect(() => {
     const handler = setTimeout(() => {
       if (form.requirementId) {
-        save("draft", true).catch(() => {});
+        save(form.status || "draft", true).catch(() => {});
       }
     }, 15000);
     return () => clearTimeout(handler);
   }, [form]);
 
-  // --- Equipment handlers ---
-  const addLine = () => setForm(f => ({ ...f, equipment: [...f.equipment, emptyLine()] }));
-  const removeLine = i =>
-    setForm(f => ({ ...f, equipment: f.equipment.filter((_, idx) => idx !== i) }));
+  // Equipment handlers
+  const addLine = () => setForm((f) => ({ ...f, equipment: [...f.equipment, emptyLine()] }));
+  const removeLine = (i) => setForm((f) => ({ ...f, equipment: f.equipment.filter((_, idx) => idx !== i) }));
   const setLine = (i, patch) =>
-    setForm(f => {
+    setForm((f) => {
       const arr = [...f.equipment];
       arr[i] = { ...arr[i], ...patch };
       return { ...f, equipment: arr };
     });
 
-  // --- Validation ---
+  // Validation
   const validate = () => {
-    if (!form.equipment || !form.equipment.length)
-      return "Add at least one equipment line.";
+    if (!form.equipment || !form.equipment.length) return "Add at least one equipment line.";
     for (const l of form.equipment) {
-      if (!l.name || !l.qty || Number(l.qty) < 1)
-        return "Each equipment line needs a name and qty >= 1.";
+      if (!l.name || !l.qty || Number(l.qty) < 1) return "Each equipment line needs a name and qty >= 1.";
     }
     if (!form.expectedStartDate) return "Expected start date is required.";
     if (!form.deliveryAddress) return "Delivery address is required.";
     return null;
   };
 
-  // --- Save function (create/update) ---
+  // Save (create/update)
   async function save(nextStatus = "draft", silent = false) {
     const v = validate();
     if (v) {
@@ -130,7 +179,7 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
         assignedTo: form.assignedTo || "",
         updatedAt: serverTimestamp(),
         updatedBy: user.uid || "",
-        updatedByName: user.displayName || user.email || ""
+        updatedByName: user.displayName || user.email || "",
       };
 
       if (form.requirementId) {
@@ -142,7 +191,7 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
         payload.createdByName = user.displayName || user.email || "";
         const ref = await addDoc(collection(db, "requirements"), payload);
         await updateDoc(ref, { requirementId: ref.id });
-        setForm(f => ({ ...f, requirementId: ref.id }));
+        setForm((f) => ({ ...f, requirementId: ref.id }));
       }
 
       setLastSaved(new Date());
@@ -159,10 +208,11 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
 
   const saveReady = () => save("ready_for_quotation").catch(() => {});
 
-  // --- Render (pure React.createElement, no JSX) ---
+  // Render (React.createElement)
   return React.createElement(
     "div",
     { className: "req-drawer req-animate-in" },
+    // Header
     React.createElement(
       "div",
       { className: "req-header" },
@@ -189,13 +239,16 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
         )
       )
     ),
+
+    // Body
     React.createElement(
       "div",
       { className: "req-body" },
       React.createElement(
         "div",
         { className: "req-grid" },
-        // --- Contact & Delivery ---
+
+        // Contact & Delivery
         React.createElement(
           "div",
           { className: "card" },
@@ -204,37 +257,37 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
           React.createElement("input", {
             className: "input",
             value: form.deliveryAddress,
-            onChange: e => setForm(f => ({ ...f, deliveryAddress: e.target.value }))
+            onChange: (e) => setForm((f) => ({ ...f, deliveryAddress: e.target.value })),
           }),
           React.createElement("label", null, "City"),
           React.createElement("input", {
             className: "input",
             value: form.deliveryCity,
-            onChange: e => setForm(f => ({ ...f, deliveryCity: e.target.value }))
+            onChange: (e) => setForm((f) => ({ ...f, deliveryCity: e.target.value })),
           }),
           React.createElement("label", null, "Contact Name"),
           React.createElement("input", {
             className: "input",
             value: form.deliveryContact.name,
-            onChange: e =>
-              setForm(f => ({
+            onChange: (e) =>
+              setForm((f) => ({
                 ...f,
-                deliveryContact: { ...form.deliveryContact, name: e.target.value }
-              }))
+                deliveryContact: { ...form.deliveryContact, name: e.target.value },
+              })),
           }),
           React.createElement("label", null, "Contact Phone"),
           React.createElement("input", {
             className: "input",
             value: form.deliveryContact.phone,
-            onChange: e =>
-              setForm(f => ({
+            onChange: (e) =>
+              setForm((f) => ({
                 ...f,
-                deliveryContact: { ...form.deliveryContact, phone: e.target.value }
-              }))
+                deliveryContact: { ...form.deliveryContact, phone: e.target.value },
+              })),
           })
         ),
 
-        // --- Timing & Urgency ---
+        // Timing & Urgency
         React.createElement(
           "div",
           { className: "card" },
@@ -244,26 +297,25 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
             className: "input",
             type: "date",
             value: form.expectedStartDate,
-            onChange: e =>
-              setForm(f => ({ ...f, expectedStartDate: e.target.value }))
+            onChange: (e) => setForm((f) => ({ ...f, expectedStartDate: e.target.value })),
           }),
           React.createElement("label", null, "Duration (days)"),
           React.createElement("input", {
             className: "input",
             type: "number",
             value: form.expectedDurationDays,
-            onChange: e =>
-              setForm(f => ({
+            onChange: (e) =>
+              setForm((f) => ({
                 ...f,
-                expectedDurationDays: Number(e.target.value)
-              }))
+                expectedDurationDays: Number(e.target.value),
+              })),
           }),
           React.createElement("label", null, "Expected End Date"),
           React.createElement("input", {
             className: "input",
             type: "date",
             value: form.expectedEndDate,
-            readOnly: true
+            readOnly: true,
           }),
           React.createElement("label", null, "Urgency"),
           React.createElement(
@@ -271,7 +323,7 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
             {
               className: "input",
               value: form.urgency,
-              onChange: e => setForm(f => ({ ...f, urgency: e.target.value }))
+              onChange: (e) => setForm((f) => ({ ...f, urgency: e.target.value })),
             },
             React.createElement("option", { value: "normal" }, "Normal"),
             React.createElement("option", { value: "urgent" }, "Urgent"),
@@ -279,53 +331,148 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
           )
         ),
 
-        // --- Equipment Section ---
+        // Equipment (full width) with right-aligned Add button
         React.createElement(
           "div",
           { className: "card card-equip", style: { gridColumn: "1 / -1" } },
-          React.createElement("h3", null, "Equipment"),
+          React.createElement(
+            "h3",
+            { style: { display: "flex", justifyContent: "space-between", alignItems: "center" } },
+            "Equipment",
+            React.createElement(
+              "button",
+              { className: "btn", onClick: () => addLine() },
+              "+ Add"
+            )
+          ),
+
+          // Rows
           form.equipment.map((line, i) =>
             React.createElement(
               "div",
               { key: i, className: "equip-row" },
-              React.createElement("input", {
-                className: "input equip-name",
-                placeholder: "Product name",
-                value: line.name,
-                onChange: e => setLine(i, { name: e.target.value })
-              }),
+
+              // Name + suggestions dropdown (stable)
+              React.createElement(
+                "div",
+                {
+                  className: "equip-name-wrap",
+                  style: { position: "relative" },
+                  ref: (el) => (wrapsRef.current[i] = el),
+                  onMouseDown: (e) => e.stopPropagation(), // prevent outer click handlers
+                },
+                React.createElement("input", {
+                  className: "input equip-name",
+                  placeholder: "Product name",
+                  value: line.name,
+                  onFocus: () => setSuggestFor(i),
+                  onChange: (e) => {
+                    const v = e.target.value;
+                    setLine(i, { name: v, productId: "" }); // user typing breaks link
+                    setSuggestFor(i);
+                  },
+                }),
+
+                // linked indicator
+                line.productId
+                  ? React.createElement(
+                      "div",
+                      { className: "caps", style: { position: "absolute", right: 8, top: -14, color: "#16a34a" } },
+                      "linked"
+                    )
+                  : null,
+
+                // Suggestion dropdown
+                suggestFor === i && findSuggestions(line.name).length
+                  ? React.createElement(
+                      "div",
+                      {
+                        className: "suggest-pop",
+                        style: {
+                          position: "absolute",
+                          zIndex: 9999,
+                          left: 0,
+                          right: 0,
+                          top: "calc(100% + 4px)",
+                          background: "#fff",
+                          border: "1px solid rgba(15,23,42,0.08)",
+                          borderRadius: 8,
+                          boxShadow: "0 10px 24px rgba(15,23,42,0.08)",
+                          maxHeight: 260,
+                          overflowY: "auto",
+                          overflowX: "hidden",
+                        },
+                        onMouseDown: (e) => {
+                          // keep focus so click doesn't blur/close first
+                          e.preventDefault();
+                          e.stopPropagation();
+                        },
+                      },
+                      ...findSuggestions(line.name).map((p) =>
+                        React.createElement(
+                          "button",
+                          {
+                            key: p.id,
+                            type: "button",
+                            className: "suggest-item",
+                            onClick: () => {
+                              setLine(i, { name: p.name || "", productId: p.id });
+                              setSuggestFor(null);
+                            },
+                            style: {
+                              display: "flex",
+                              width: "100%",
+                              textAlign: "left",
+                              gap: 8,
+                              padding: "10px 12px",
+                              border: "none",
+                              background: "white",
+                              cursor: "pointer",
+                              alignItems: "center",
+                              borderBottom: "1px solid rgba(15,23,42,0.04)",
+                              color: "#111827",
+                            },
+                          },
+                          React.createElement("div", { style: { fontWeight: 700 } }, p.name || "Unnamed"),
+                          React.createElement(
+                            "div",
+                            { className: "muted", style: { marginLeft: "auto", fontSize: 12, color: "#6b7280" } },
+                            p.sku ? `SKU: ${p.sku}` : ""
+                          )
+                        )
+                      )
+                    )
+                  : null
+              ),
+
+              // Qty
               React.createElement("input", {
                 className: "input equip-qty",
                 type: "number",
                 min: "1",
                 value: line.qty,
-                onChange: e => setLine(i, { qty: Number(e.target.value) })
+                onChange: (e) => setLine(i, { qty: Number(e.target.value) }),
               }),
+
+              // Notes
               React.createElement("input", {
                 className: "input equip-note",
                 placeholder: "Notes (optional)",
                 value: line.unitNotes,
-                onChange: e => setLine(i, { unitNotes: e.target.value })
+                onChange: (e) => setLine(i, { unitNotes: e.target.value }),
               }),
+
+              // Remove row
               React.createElement(
                 "button",
                 { className: "btn icon", onClick: () => removeLine(i) },
                 "✕"
               )
             )
-          ),
-          React.createElement(
-            "div",
-            { className: "equip-actions" },
-            React.createElement(
-              "button",
-              { className: "btn", onClick: addLine },
-              "+ Add equipment"
-            )
           )
         ),
 
-        // --- Special Instructions ---
+        // Special Instructions
         React.createElement(
           "div",
           { className: "card", style: { gridColumn: "1 / -1" } },
@@ -333,14 +480,14 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
           React.createElement("textarea", {
             className: "input textarea",
             value: form.specialInstructions,
-            onChange: e =>
-              setForm(f => ({ ...f, specialInstructions: e.target.value }))
+            onChange: (e) => setForm((f) => ({ ...f, specialInstructions: e.target.value })),
           })
         )
       ),
 
       error && React.createElement("div", { className: "req-error" }, error),
 
+      // Footer (Save only, no "Save Draft")
       React.createElement(
         "div",
         { className: "req-footer" },
@@ -348,36 +495,19 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
           "div",
           { className: "req-left" },
           lastSaved &&
-            React.createElement(
-              "div",
-              { className: "req-saved" },
-              "Last saved: ",
-              lastSaved.toLocaleString()
-            )
+            React.createElement("div", { className: "req-saved" }, "Last saved: ", lastSaved.toLocaleString())
         ),
         React.createElement(
           "div",
           { className: "req-right" },
-          React.createElement(
-            "button",
-            { className: "btn ghost", onClick: onCancel },
-            "Cancel"
-          ),
-          React.createElement(
-            "button",
-            {
-              className: "btn",
-              onClick: () => save("draft"),
-              disabled: saving
-            },
-            saving ? "Saving…" : "Save Draft"
-          ),
+          React.createElement("button", { className: "btn ghost", onClick: onCancel }, "Cancel"),
+          
           React.createElement(
             "button",
             {
               className: "btn primary",
               onClick: saveReady,
-              disabled: saving
+              disabled: saving,
             },
             saving ? "Saving…" : "Save & Mark Ready"
           )
