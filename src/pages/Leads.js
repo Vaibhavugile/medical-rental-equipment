@@ -47,10 +47,9 @@ const fmtDate = (ts) => {
   }
 };
 
-// Stages used for chips (and count buckets)
+// Stages used for chips (qualified/converted removed)
 const STAGES = ["new", "contacted", "req shared", "lost"];
 const STATUS_FLOW = ["new", "contacted", "req shared"];
-// Helpers to normalize & map to CSS-friendly class
 const normStatus = (s = "") => s.toLowerCase();
 const statusClass = (s = "") =>
   s.split(" ").map(t => (t ? t[0].toUpperCase() + t.slice(1) : "")).join("");
@@ -85,8 +84,12 @@ export default function Leads() {
   // Requirement drawer
   const [openReq, setOpenReq] = useState(false);
   const [reqLead, setReqLead] = useState(null);
+  const [templateReq, setTemplateReq] = useState(null); // NEW: prefill for "Add another req"
 
-  // NEW: status chip filter
+  // Requirements index: latest requirement per leadId
+  const [reqByLead, setReqByLead] = useState({}); // { [leadId]: requirementObj }
+
+  // Status chip filter
   const [statusFilter, setStatusFilter] = useState("all");
 
   // Realtime leads
@@ -126,6 +129,26 @@ export default function Leads() {
         setError(err.message || "Failed to load leads.");
         setLoading(false);
       }
+    );
+    return () => unsub();
+  }, []);
+
+  // Realtime requirements → latest per leadId
+  useEffect(() => {
+    const qy = query(collection(db, "requirements"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(
+      qy,
+      (snap) => {
+        const map = {};
+        snap.docs.forEach((d) => {
+          const r = { id: d.id, ...(d.data() || {}) };
+          const leadId = r.leadId || r.lead?.id || "";
+          if (!leadId) return;
+          if (!map[leadId]) map[leadId] = r; // first seen is latest (desc)
+        });
+        setReqByLead(map);
+      },
+      (err) => console.error("requirements onSnapshot error", err)
     );
     return () => unsub();
   }, []);
@@ -347,14 +370,14 @@ export default function Leads() {
     }
   };
 
-  // Lock body scroll when any drawer/modal open
+  // lock body scroll when drawer/modal open
   useEffect(() => {
     if (showForm || detailsLead || statusModal.open || openReq) document.body.classList.add("coupons-drawer-open");
     else document.body.classList.remove("coupons-drawer-open");
     return () => document.body.classList.remove("coupons-drawer-open");
   }, [showForm, detailsLead, statusModal.open, openReq]);
 
-  // ESC to close
+  // esc to close
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") {
@@ -393,6 +416,7 @@ export default function Leads() {
               // Open requirement form standalone (no preselected lead)
               setDetailsLead(null);
               setReqLead(null);
+              setTemplateReq(null);
               setOpenReq(true);
             }}
           >
@@ -452,52 +476,79 @@ export default function Leads() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((l) => (
-                <tr key={l.id}>
-                  <td className="strong">{l.customerName}</td>
-                  <td className="muted">{l.contactPerson}{l.email ? ` · ${l.email}` : ""}</td>
-                  <td>{l.phone}</td>
-                  <td className="muted">{l.leadSource || "—"}</td>
-                  <td>
-                    <span className={`chip ${statusClass(l.status)}`}>{l.status}</span>
-                  </td>
-                  <td className="muted">{l.createdByName || l.createdBy || "—"}</td>
-                  <td className="muted">
-                    {l.updatedAt ? fmtDate(l.updatedAt) : (l.createdAt ? fmtDate(l.createdAt) : "—")} {l.updatedByName ? `· ${l.updatedByName}` : ""}
-                  </td>
-                  <td>
-                    <div className="row-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {/* edit */}
-                      <button title="Edit lead" className="row-action-icon" onClick={() => editLead(l)} style={{ padding: 6, borderRadius: 6, border: "1px solid rgba(0,0,0,0.04)", background: "#fff" }}>
-                        ✎
-                      </button>
-
-                      {/* + Req ONLY when status is req shared */}
-                      {normStatus(l.status) === "req shared" ? (
-                        <button
-                          title="Create Requirement"
-                          className="cp-link"
-                          onClick={(e) => { e.stopPropagation(); setReqLead(l); setDetailsLead(null); setOpenReq(true); }}
-                          style={{ padding: "6px 8px", borderRadius: 6, background: "#f3f4f6", border: "none", fontWeight: 700 }}
-                        >
-                          + Req
+              {filtered.map((l) => {
+                const latestReq = reqByLead[l.id]; // NEW: latest requirement for this lead (if any)
+                const canCreateReq = normStatus(l.status) === "req shared";
+                return (
+                  <tr key={l.id}>
+                    <td className="strong">{l.customerName}</td>
+                    <td className="muted">{l.contactPerson}{l.email ? ` · ${l.email}` : ""}</td>
+                    <td>{l.phone}</td>
+                    <td className="muted">{l.leadSource || "—"}</td>
+                    <td>
+                      <span className={`chip ${statusClass(l.status)}`}>{l.status}</span>
+                    </td>
+                    <td className="muted">{l.createdByName || l.createdBy || "—"}</td>
+                    <td className="muted">
+                      {l.updatedAt ? fmtDate(l.updatedAt) : (l.createdAt ? fmtDate(l.createdAt) : "—")} {l.updatedByName ? `· ${l.updatedByName}` : ""}
+                    </td>
+                    <td>
+                      <div className="row-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        {/* edit lead */}
+                        <button title="Edit lead" className="row-action-icon" onClick={() => editLead(l)} style={{ padding: 6, borderRadius: 6, border: "1px solid rgba(0,0,0,0.04)", background: "#fff" }}>
+                          ✎
                         </button>
-                      ) : null}
 
-                      {/* details */}
-                      <button className="cp-link" onClick={() => openDetails(l)}>View Details</button>
+                        {/* Requirement action:
+                            - If at least one exists → Add another req (prefilled from latest)
+                            - Else (status is req shared) → + Req */}
+                        {latestReq ? (
+                          <button
+                            title="Add another requirement (prefilled)"
+                            className="cp-link"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReqLead(l);
+                              setTemplateReq(latestReq);   // pass prefill
+                              setDetailsLead(null);
+                              setOpenReq(true);
+                            }}
+                            style={{ padding: "6px 8px", borderRadius: 6, background: "#eef2ff", border: "none", fontWeight: 700 }}
+                          >
+                            Add another req
+                          </button>
+                        ) : canCreateReq ? (
+                          <button
+                            title="Create Requirement"
+                            className="cp-link"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReqLead(l);
+                              setTemplateReq(null);
+                              setDetailsLead(null);
+                              setOpenReq(true);
+                            }}
+                            style={{ padding: "6px 8px", borderRadius: 6, background: "#f3f4f6", border: "none", fontWeight: 700 }}
+                          >
+                            + Req
+                          </button>
+                        ) : null}
 
-                      {/* next stage */}
-                      <button className="cp-link next-stage" onClick={() => openStatusModal(l)}>Next Stage →</button>
+                        {/* details */}
+                        <button className="cp-link" onClick={() => openDetails(l)}>View Details</button>
 
-                      {/* delete */}
-                      <button title="Delete lead" className="row-action-icon" onClick={() => setConfirmDelete(l)} style={{ padding: 6, borderRadius: 6, border: "1px solid rgba(0,0,0,0.04)", background: "#fff", color: "#b91c1c" }}>
-                        🗑
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        {/* next stage */}
+                        <button className="cp-link next-stage" onClick={() => openStatusModal(l)}>Next Stage →</button>
+
+                        {/* delete */}
+                        <button title="Delete lead" className="row-action-icon" onClick={() => setConfirmDelete(l)} style={{ padding: 6, borderRadius: 6, border: "1px solid rgba(0,0,0,0.04)", background: "#fff", color: "#b91c1c" }}>
+                          🗑
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
               {!filtered.length && (
                 <tr>
                   <td colSpan="8"><div className="empty">No leads found.</div></td>
@@ -561,8 +612,7 @@ export default function Leads() {
                 <select className="cp-input" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}>
                   <option value="new">new</option>
                   <option value="contacted">contacted</option>
-                                   <option value="req shared">req shared</option>
-
+                  <option value="req shared">req shared</option>
                   <option value="lost">lost</option>
                 </select>
               </div>
@@ -742,9 +792,21 @@ export default function Leads() {
 
             <div className="details-footer" style={{ marginTop: 12, display: "flex", justifyContent: "space-between", gap: 8 }}>
               <div style={{ display: "flex", gap: 8 }}>
-                {/* Create Requirement in details: ONLY when status is req shared */}
-                {normStatus(detailsLead.status) === "req shared" ? (
-                  <button className="cp-btn" onClick={() => { setReqLead(detailsLead); setOpenReq(true); }}>Create Requirement</button>
+                {/* Requirement action in details drawer */}
+                {reqByLead[detailsLead.id] ? (
+                  <button
+                    className="cp-btn"
+                    onClick={() => { setReqLead(detailsLead); setTemplateReq(reqByLead[detailsLead.id]); setOpenReq(true); }}
+                  >
+                    Add another req
+                  </button>
+                ) : normStatus(detailsLead.status) === "req shared" ? (
+                  <button
+                    className="cp-btn"
+                    onClick={() => { setReqLead(detailsLead); setTemplateReq(null); setOpenReq(true); }}
+                  >
+                    Create Requirement
+                  </button>
                 ) : null}
               </div>
               <div>
@@ -755,16 +817,19 @@ export default function Leads() {
         </div>
       )}
 
-      {/* Requirement drawer (modal or panel depending on your component) */}
+      {/* Requirement drawer (create new or clone from latest) */}
       {openReq && (
         <RequirementForm
           lead={reqLead || detailsLead || { id: "", customerName: "", contactPerson: "", phone: "", address: "" }}
-          onCancel={() => { setOpenReq(false); setReqLead(null); }}
+          templateRequirement={templateReq}   // NEW: prefill but create new
+          onCancel={() => { setOpenReq(false); setReqLead(null); setTemplateReq(null); }}
           onSaved={() => {
-            // Close and bump status to "req shared" on the selected lead
+            // Close requirement drawer
             setOpenReq(false);
             const leadToUse = reqLead || detailsLead;
             setReqLead(null);
+            setTemplateReq(null);
+
             if (leadToUse && leadToUse.id) {
               const user = auth.currentUser || {};
               const entry = makeHistoryEntry(user, {

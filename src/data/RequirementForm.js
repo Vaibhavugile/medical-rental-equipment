@@ -14,7 +14,7 @@ import "./Requirements.css";
 
 const emptyLine = () => ({ productId: "", name: "", qty: 1, unitNotes: "" });
 
-export default function RequirementForm({ lead, requirement = null, onSaved, onCancel }) {
+export default function RequirementForm({ lead, requirement = null, templateRequirement = null, onSaved, onCancel }) {
   const [form, setForm] = useState({
     requirementId: null,
     leadId: lead?.id || "",
@@ -44,9 +44,7 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
   const [error, setError] = useState("");
   const [lastSaved, setLastSaved] = useState(null);
 
-  // ───────────────────────────────────────────────────────────
   // Products for suggestions
-  // ───────────────────────────────────────────────────────────
   const [products, setProducts] = useState([]); // [{id, name, sku, defaultRate, ...}]
   useEffect(() => {
     const q = query(collection(db, "products"), orderBy("name", "asc"));
@@ -87,29 +85,78 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
     return out;
   };
 
-  // Load requirement or seed from lead
+  // Load for three cases:
+  // 1) requirement provided → edit mode
+  // 2) templateRequirement provided → CLONE MODE (prefill only, no requirementId)
+  // 3) neither → seed from lead for create
   useEffect(() => {
     if (requirement) {
+      // EDIT existing
       setForm((prev) => ({
         ...prev,
         ...requirement,
-        requirementId: requirement.id || requirement.requirementId,
+        requirementId: requirement.id || requirement.requirementId, // enables update flow
       }));
-    } else {
+      return;
+    }
+
+    if (templateRequirement) {
+      // CLONE/PREFILL (no requirementId!)
+      const {
+        equipment,
+        expectedStartDate,
+        expectedDurationDays,
+        expectedEndDate,
+        deliveryAddress,
+        deliveryCity,
+        deliveryContact,
+        urgency,
+        specialInstructions,
+        assignedTo,
+      } = templateRequirement;
+
       setForm((prev) => ({
         ...prev,
+        requirementId: null, // IMPORTANT → force create a new document
         leadId: lead?.id || prev.leadId,
         leadSnapshot: {
           customerName: lead?.customerName || prev.leadSnapshot.customerName,
           contactPerson: lead?.contactPerson || prev.leadSnapshot.contactPerson,
           phone: lead?.phone || prev.leadSnapshot.phone,
         },
-        deliveryAddress: lead?.address || prev.deliveryAddress,
+        equipment: Array.isArray(equipment) && equipment.length ? equipment.map(e => ({ ...e })) : [emptyLine()],
+        expectedStartDate: expectedStartDate || "",
+        expectedDurationDays: Number(expectedDurationDays || 7),
+        expectedEndDate: expectedEndDate || "",
+        deliveryAddress: deliveryAddress || lead?.address || "",
+        deliveryCity: deliveryCity || (lead?.address ? (lead.address.split(",").pop() || "") : ""),
+        deliveryContact: deliveryContact || {
+          name: lead?.contactPerson || "",
+          phone: lead?.phone || "",
+          email: lead?.email || "",
+        },
+        urgency: urgency || "normal",
+        specialInstructions: specialInstructions || "",
+        status: "draft",
+        assignedTo: assignedTo || "",
       }));
+      return;
     }
-  }, [requirement, lead]);
 
-  // Compute end date from start + duration
+    // CREATE from lead only
+    setForm((prev) => ({
+      ...prev,
+      leadId: lead?.id || prev.leadId,
+      leadSnapshot: {
+        customerName: lead?.customerName || prev.leadSnapshot.customerName,
+        contactPerson: lead?.contactPerson || prev.leadSnapshot.contactPerson,
+        phone: lead?.phone || prev.leadSnapshot.phone,
+      },
+      deliveryAddress: lead?.address || prev.deliveryAddress,
+    }));
+  }, [requirement, templateRequirement, lead]);
+
+  // Compute end date automatically
   useEffect(() => {
     if (form.expectedStartDate && form.expectedDurationDays) {
       const start = new Date(form.expectedStartDate);
@@ -121,7 +168,7 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
     }
   }, [form.expectedStartDate, form.expectedDurationDays]);
 
-  // Autosave draft every 15s (only if already created)
+  // Autosave (only if already created)
   useEffect(() => {
     const handler = setTimeout(() => {
       if (form.requirementId) {
@@ -183,13 +230,17 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
       };
 
       if (form.requirementId) {
+        // UPDATE existing
         const ref = doc(db, "requirements", form.requirementId);
         await updateDoc(ref, payload);
       } else {
-        payload.createdAt = serverTimestamp();
-        payload.createdBy = user.uid || "";
-        payload.createdByName = user.displayName || user.email || "";
-        const ref = await addDoc(collection(db, "requirements"), payload);
+        // CREATE new
+        const ref = await addDoc(collection(db, "requirements"), {
+          ...payload,
+          createdAt: serverTimestamp(),
+          createdBy: user.uid || "",
+          createdByName: user.displayName || user.email || "",
+        });
         await updateDoc(ref, { requirementId: ref.id });
         setForm((f) => ({ ...f, requirementId: ref.id }));
       }
@@ -368,7 +419,7 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
                   onFocus: () => setSuggestFor(i),
                   onChange: (e) => {
                     const v = e.target.value;
-                    setLine(i, { name: v, productId: "" }); // user typing breaks link
+                    setLine(i, { name: v, productId: "" });
                     setSuggestFor(i);
                   },
                 }),
@@ -487,7 +538,7 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
 
       error && React.createElement("div", { className: "req-error" }, error),
 
-      // Footer (Save only, no "Save Draft")
+      // Footer (only Save & Mark Ready)
       React.createElement(
         "div",
         { className: "req-footer" },
@@ -501,7 +552,6 @@ export default function RequirementForm({ lead, requirement = null, onSaved, onC
           "div",
           { className: "req-right" },
           React.createElement("button", { className: "btn ghost", onClick: onCancel }, "Cancel"),
-          
           React.createElement(
             "button",
             {
