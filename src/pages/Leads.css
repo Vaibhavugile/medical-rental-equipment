@@ -159,3 +159,90 @@ body {
 .cp-link.next-stage:hover {
   background: rgba(2,132,199,0.08);
 }
+/* ===== Visits: status chips & toolbar add-ons ===== */
+
+/* topbar layout tweaks (keeps your existing .coupons-toolbar) */
+.coupons-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+/* chip base already exists; refine for clickable filters */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  line-height: 1;
+  border-radius: 999px;
+  background: #f3f4f6;           /* light gray */
+  color: #111827;                /* slate-900 */
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 500;
+  user-select: none;
+  transition: background .15s ease, border-color .15s ease, box-shadow .15s ease;
+}
+
+.chip:hover {
+  background: #e5e7eb;           /* gray-200 */
+}
+
+/* active chip (we set inline border in JSX but keep a class too) */
+.chip.is-active {
+  background: rgba(37,99,235,0.10);   /* primary tint */
+  border-color: #2563eb;              /* primary */
+  box-shadow: 0 0 0 2px rgba(37,99,235,0.08) inset;
+  font-weight: 600;
+}
+
+/* status-color accents (optional, if you want different hues per status) */
+.chip.Planned,
+.chip.planned { background: #eef2ff; color: #3730a3; }      /* indigo tint */
+.chip.Started,
+.chip.started { background: #ecfeff; color: #155e75; }      /* cyan tint */
+.chip.Reached,
+.chip.reached { background: #f0fdf4; color: #166534; }      /* green tint */
+.chip.Done,
+.chip.done     { background: #e6ffe8; color: #166534; }
+.chip.Cancelled,
+.chip.cancelled { background: #fef2f2; color: #991b1b; }
+
+/* count badge inside chip (All (12) styling) */
+.chip .count {
+  font-variant-numeric: tabular-nums;
+  opacity: .9;
+}
+
+/* “Showing X of Y (total Z)” on the right */
+.coupons-toolbar .muted {
+  margin-left: auto;
+  font-size: 13px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+/* progress-bar look for the horizontal chip row (optional) */
+.visits-chip-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+.visits-chip-row .chip {
+  width: 100%;
+  justify-content: center;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+/* Responsive: stack nicely on small screens */
+@media (max-width: 720px) {
+  .coupons-toolbar .muted { order: 3; margin-left: 0; }
+  .visits-chip-row { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 440px) {
+  .visits-chip-row { grid-template-columns: repeat(2, 1fr); }
+}

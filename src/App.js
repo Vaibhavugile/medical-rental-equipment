@@ -18,6 +18,7 @@ import useAuth from "./pages/useAuth";
 import { auth } from "./firebase";
 import "./App.css";
 import AttendanceAdmin from "./pages/AttendanceAdmin";
+import Visits from "./pages/Visits";
 const TrackingPage = lazy(() => import("./pages/TrackingPage"));
 /* ---------------- Header for CRM ---------------- */
 function HeaderRight() {
@@ -254,6 +255,21 @@ function CRMApp() {
               >
                 Marketing
               </NavLink>
+              <NavLink
+                to="/visits"
+                style={({ isActive }) => ({
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  textDecoration: "none",
+                  color: isActive ? "#fff" : "#0b5cff",
+                  background: isActive
+                    ? "linear-gradient(90deg,#0b69ff,#00b4d8)"
+                    : "transparent",
+                  fontWeight: 700,
+                })}
+              >
+                Visits
+              </NavLink>
             </nav>
           </div>
 
@@ -275,6 +291,8 @@ function CRMApp() {
           <Route path="/driver-app" element={<DriverApp />} />
           <Route path="/attendance" element={<AttendanceAdmin />} />
  <Route path="/tracking" element={<TrackingPageWithParams />} />
+ <Route path="/visits" element={<Visits />} />
+
         </Routes>
       </main>
     </>

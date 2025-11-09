@@ -1,6 +1,15 @@
 // src/pages/AttendanceAdmin.js
 import React, { useEffect, useMemo, useState } from "react";
-import { collection, getDocs, getDoc, doc } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  getDoc,
+  doc,
+  query,
+  where,
+  Timestamp,
+  getCountFromServer,
+} from "firebase/firestore";
 import { db } from "../firebase";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import "./AttendanceAdmin.css";
@@ -15,7 +24,7 @@ export default function AttendanceAdmin() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // NEW: role = "drivers" | "marketing" (default drivers)
+  // role = "drivers" | "marketing" (default drivers)
   const [role, setRole] = useState(() => (searchParams.get("role") || "drivers").toLowerCase());
 
   const [loading, setLoading] = useState(true);
@@ -30,11 +39,16 @@ export default function AttendanceAdmin() {
 
   const [openRow, setOpenRow] = useState(null);
 
+  // Per-user Leads/Visits counters for current range
+  const [perUser, setPerUser] = useState([]);
+  const [perUserLoading, setPerUserLoading] = useState(false);
+  const [perUserError, setPerUserError] = useState("");
+
   // Keep URL in sync
   useEffect(() => {
     const params = {};
     if (role && role !== "drivers") params.role = role;
-    if (personId && personId !== "all") params.driverId = personId; // keep key name for backward compatibility
+    if (personId && personId !== "all") params.driverId = personId; // keep key for backward compatibility
     if (dateFrom) params.from = dateFrom;
     if (dateTo) params.to = dateTo;
     log("sync url params", params);
@@ -52,7 +66,9 @@ export default function AttendanceAdmin() {
         const snap = await getDocs(collection(db, base));
         if (!mounted) return;
         const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
-        if (DEBUG) console.table(rows.map(r => ({ id: r.id, name: r.name, email: r.loginEmail || r.email })));
+        if (DEBUG) console.table(rows.map(r => ({
+          id: r.id, name: r.name, email: r.loginEmail || r.email, authUid: r.authUid
+        })));
         setPeople(rows);
       } catch (e) {
         err("people load", e);
@@ -95,7 +111,6 @@ export default function AttendanceAdmin() {
           const { snap, p, dayId } = item;
           if (!snap || !snap.exists()) continue;
           const raw = snap.data() || {};
-          // Map identical to your original, just rename driverId -> personId
           const rec = mapDayDoc({ id: `${p.id}_${dayId}`, personId: p.id, dayId, raw });
           out.push(rec);
         }
@@ -112,9 +127,68 @@ export default function AttendanceAdmin() {
     return () => { mounted = false; };
   }, [role, people, personId, dateFrom, dateTo]);
 
+  // Build per-user (Leads, Visits) for current range — using AUTH UID mapping
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        setPerUserLoading(true);
+        setPerUserError("");
+
+        const { from, to } = toTimestampRange(dateFrom, dateTo);
+
+        const peopleList = (personId === "all")
+          ? people
+          : people.filter(p => p.id === personId);
+
+        if (!peopleList.length) {
+          if (live) { setPerUser([]); setPerUserLoading(false); }
+          return;
+        }
+
+        const leadsCol  = collection(db, "leads");
+        const visitsCol = collection(db, "visits");
+
+        const rows = await Promise.all(
+          peopleList.map(async (p) => {
+            const key = userKey(p); // <-- authUid || uid || doc id
+
+            // Leads: union (ownerId==key OR createdBy==key), de-dup IDs
+            const leadsCount  = await countLeadsForUser(leadsCol, from, to, key);
+
+            // Visits: union (assignedToId==key OR createdBy==key), de-dup IDs
+            const visitsCount = await countVisitsForUser(visitsCol, from, to, key);
+
+            return {
+              id: p.id,
+              name: p.name || p.loginEmail || p.email || p.id,
+              leads: leadsCount,
+              visits: visitsCount,
+              total: leadsCount + visitsCount,
+            };
+          })
+        );
+
+        rows.sort((a, b) => b.total - a.total);
+
+        if (!live) return;
+        setPerUser(rows);
+        setPerUserLoading(false);
+      } catch (e) {
+        if (!live) return;
+        console.error("[AttendanceAdmin] per-user stats error:", e);
+        setPerUser([]);
+        setPerUserLoading(false);
+        setPerUserError(e?.message || String(e));
+      }
+    })();
+
+    return () => { live = false; };
+  }, [people, personId, dateFrom, dateTo]);
+
   const peopleById = useMemo(() => Object.fromEntries(people.map(p => [p.id, p])), [people]);
 
-  // Aggregation per person
+  // Aggregation per person (existing attendance summary)
   const totals = useMemo(() => {
     const map = new Map();
     for (const r of records) {
@@ -126,6 +200,13 @@ export default function AttendanceAdmin() {
     }
     return map;
   }, [records]);
+
+  // quick lookup for per-user leads/visits
+  const perUserById = useMemo(() => {
+    const m = {};
+    for (const row of perUser) m[row.id] = row;
+    return m;
+  }, [perUser]);
 
   const exportCsv = () => {
     const header = [
@@ -233,16 +314,27 @@ export default function AttendanceAdmin() {
         )}
       </div>
 
-      {/* Per-person totals */}
+      {/* Per-person totals (same UI, now includes Leads/Visits) */}
       <div className="totals">
-        {[...totals.entries()].map(([id, t]) => (
-          <div className="total-row" key={id}>
-            <div className="name">{peopleById[id]?.name || id}</div>
-            <div className="muted">{peopleById[id]?.loginEmail || peopleById[id]?.email || ""}</div>
-            <div className="pill">{t.sessions} sessions</div>
-            <div className="pill">{minsToHhmm(t.minutes)}</div>
-          </div>
-        ))}
+        {[...totals.entries()].map(([id, t]) => {
+          const pu = perUserById[id] || { leads: 0, visits: 0 };
+          return (
+            <div className="total-row" key={id}>
+              <div className="name">{peopleById[id]?.name || id}</div>
+              <div className="muted">{peopleById[id]?.loginEmail || peopleById[id]?.email || ""}</div>
+              <div className="pill">{t.sessions} sessions</div>
+              <div className="pill">{minsToHhmm(t.minutes)}</div>
+              <div className="pill">Leads {pu.leads}</div>
+              <div className="pill">Visits {pu.visits}</div>
+              {perUserLoading && <div className="muted" style={{marginLeft:8}}>updating…</div>}
+              {perUserError && (
+                <div className="pill warn" title={perUserError}>
+                  {perUserError.length > 38 ? "stats error" : perUserError}
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {/* Drawer */}
@@ -283,7 +375,7 @@ function Info({ label, value, mono }) {
   );
 }
 
-// ---------- helpers (same as your original) ----------
+// ---------- helpers ----------
 function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d; }
 function isoOf(d) { return d.toISOString().slice(0, 10); }
 function daysBetween(fromIso, toIso) {
@@ -350,4 +442,64 @@ function mapDayDoc({ id, personId, dayId, raw }) {
   };
   rec.durationMinutes = durationInMinutes(rec.checkInAt, rec.checkOutAt);
   return rec;
+}
+
+// ---- NEW: time range + counting helpers ----
+function toStartOfDayIso(iso) { return iso + "T00:00:00.000Z"; }
+function toEndOfDayIso(iso)   { return iso + "T23:59:59.999Z"; }
+function toTimestampRange(fromIso, toIso) {
+  const from = Timestamp.fromDate(new Date(toStartOfDayIso(fromIso)));
+  const to   = Timestamp.fromDate(new Date(toEndOfDayIso(toIso)));
+  return { from, to };
+}
+async function countWithFallback(q) {
+  try {
+    const snap = await getCountFromServer(q);
+    return snap.data().count || 0;
+  } catch {
+    const snap = await getDocs(q);
+    return snap.size;
+  }
+}
+
+// ---- NEW: ID mapping helpers ----
+function userKey(person) {
+  // Prefer the auth UID saved in your visit/lead docs
+  return person?.authUid || person?.uid || person?.id;
+}
+
+// Leads count without OR(): de-duplicate IDs from two queries
+async function countLeadsForUser(leadsColRef, fromTs, toTs, userKeyVal) {
+  const base = [
+    where("createdAt", ">=", fromTs),
+    where("createdAt", "<=", toTs),
+  ];
+  // A: ownerId == auth uid
+  const qA = query(leadsColRef, ...base, where("ownerId", "==", userKeyVal));
+  // B: createdBy == auth uid (safety, depending on mobile save)
+  const qB = query(leadsColRef, ...base, where("createdBy", "==", userKeyVal));
+
+  const [snapA, snapB] = await Promise.all([getDocs(qA), getDocs(qB)]);
+  const ids = new Set();
+  snapA.forEach(d => ids.add(d.id));
+  snapB.forEach(d => ids.add(d.id));
+  return ids.size;
+}
+
+// Visits count without OR(): de-duplicate IDs from two queries
+async function countVisitsForUser(visitsColRef, fromTs, toTs, userKeyVal) {
+  const base = [
+    where("createdAt", ">=", fromTs),
+    where("createdAt", "<=", toTs),
+  ];
+  // A: assigned to user (assignedToId == auth uid)
+  const qA = query(visitsColRef, ...base, where("assignedToId", "==", userKeyVal));
+  // B: created by user (createdBy == auth uid) for directly-created visits
+  const qB = query(visitsColRef, ...base, where("createdBy", "==", userKeyVal));
+
+  const [snapA, snapB] = await Promise.all([getDocs(qA), getDocs(qB)]);
+  const ids = new Set();
+  snapA.forEach(d => ids.add(d.id));
+  snapB.forEach(d => ids.add(d.id));
+  return ids.size;
 }
