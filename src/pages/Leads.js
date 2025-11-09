@@ -15,11 +15,11 @@ import {
 import { db, auth } from "../firebase";
 import "./Leads.css";
 
-// Requirement form integration (place RequirementForm.js in src/data)
+// Requirement form integration
 import RequirementForm from "../data/RequirementForm";
 
-// IMPORTED shared helpers
-import { makeHistoryEntry, propagateToLead, STATUS_MAP_TO_LEAD } from "../utils/status";
+// Shared helpers
+import { makeHistoryEntry } from "../utils/status";
 
 const defaultForm = {
   id: null,
@@ -47,8 +47,13 @@ const fmtDate = (ts) => {
   }
 };
 
-// Extended status flow to include 'req shared' and 'lost' terminal states
-const STATUS_FLOW = ["new", "contacted", "req shared", "qualified", "converted"];
+// Stages used for chips (and count buckets)
+const STAGES = ["new", "contacted", "req shared", "lost"];
+const STATUS_FLOW = ["new", "contacted", "req shared"];
+// Helpers to normalize & map to CSS-friendly class
+const normStatus = (s = "") => s.toLowerCase();
+const statusClass = (s = "") =>
+  s.split(" ").map(t => (t ? t[0].toUpperCase() + t.slice(1) : "")).join("");
 
 export default function Leads() {
   const [leads, setLeads] = useState([]);
@@ -57,14 +62,16 @@ export default function Leads() {
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
 
-  // UI state
+  // Drawer/edit form
   const [showForm, setShowForm] = useState(false);
   const [closing, setClosing] = useState(false);
   const CLOSE_MS = 180;
   const [form, setForm] = useState(defaultForm);
 
+  // Delete confirm
   const [confirmDelete, setConfirmDelete] = useState(null);
 
+  // Status modal (next stage + note)
   const [statusModal, setStatusModal] = useState({
     open: false,
     lead: null,
@@ -72,21 +79,23 @@ export default function Leads() {
     note: "",
   });
 
+  // Right-side details
   const [detailsLead, setDetailsLead] = useState(null);
 
-  // separate state for the lead used by RequirementForm
+  // Requirement drawer
+  const [openReq, setOpenReq] = useState(false);
   const [reqLead, setReqLead] = useState(null);
 
-  // requirement drawer state
-  const [openReq, setOpenReq] = useState(false);
+  // NEW: status chip filter
+  const [statusFilter, setStatusFilter] = useState("all");
 
-  // Real-time leads listener
+  // Realtime leads
   useEffect(() => {
     setLoading(true);
     setError("");
-    const q = query(collection(db, "leads"), orderBy("createdAt", "desc"));
+    const qy = query(collection(db, "leads"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(
-      q,
+      qy,
       (snap) => {
         const docs = snap.docs.map((d) => {
           const data = d.data() || {};
@@ -121,11 +130,28 @@ export default function Leads() {
     return () => unsub();
   }, []);
 
-  // Search
+  // Counts for chips
+  const statusCounts = useMemo(() => {
+    const map = { all: leads.length };
+    for (const l of leads) {
+      const s = normStatus(l.status) || "new";
+      map[s] = (map[s] || 0) + 1;
+    }
+    return map;
+  }, [leads]);
+
+  // Search + status chip filter
   const filtered = useMemo(() => {
+    let list = leads;
+
+    if (statusFilter !== "all") {
+      list = list.filter((l) => normStatus(l.status) === statusFilter);
+    }
+
     const q = search.trim().toLowerCase();
-    if (!q) return leads;
-    return leads.filter((l) => {
+    if (!q) return list;
+
+    return list.filter((l) => {
       return (
         (l.customerName || "").toLowerCase().includes(q) ||
         (l.contactPerson || "").toLowerCase().includes(q) ||
@@ -135,7 +161,7 @@ export default function Leads() {
         (l.notes || "").toLowerCase().includes(q)
       );
     });
-  }, [leads, search]);
+  }, [leads, search, statusFilter]);
 
   // Drawer helpers
   const openDrawer = (initial = defaultForm) => {
@@ -191,7 +217,7 @@ export default function Leads() {
 
       const user = auth.currentUser || {};
       if (form.id) {
-        // UPDATE: don't touch createdAt; compute changes and append history
+        // UPDATE
         const existing = leads.find((x) => x.id === form.id) || {};
         const changes = [];
         const keys = ["customerName","contactPerson","phone","email","address","leadSource","notes","status"];
@@ -199,7 +225,6 @@ export default function Leads() {
           const oldV = existing[key] ?? "";
           const newV = payloadFields[key] ?? "";
           if (String(oldV) !== String(newV)) {
-            // pass user explicitly so changedBy/changedByName are set
             changes.push(makeHistoryEntry(user, {
               type: key === "status" ? "status" : "update",
               field: key,
@@ -224,14 +249,13 @@ export default function Leads() {
             history: arrayUnion(...changes),
           });
         } else {
-          // still update meta even if no other field changed (optional)
           await updateDoc(docRef, {
             ...payloadFields,
             ...meta,
           });
         }
       } else {
-        // CREATE: store createdBy and initial history (no assignedTo input)
+        // CREATE
         const userForCreate = auth.currentUser || {};
         const createEntry = makeHistoryEntry(userForCreate, {
           type: "create",
@@ -266,7 +290,7 @@ export default function Leads() {
     }
   };
 
-  // Open status modal (ask for note)
+  // Status modal helpers
   const openStatusModal = (lead) => {
     const cur = lead.status || "new";
     const idx = STATUS_FLOW.indexOf(cur);
@@ -323,14 +347,14 @@ export default function Leads() {
     }
   };
 
-  // lock body scroll when drawer/modal open
+  // Lock body scroll when any drawer/modal open
   useEffect(() => {
     if (showForm || detailsLead || statusModal.open || openReq) document.body.classList.add("coupons-drawer-open");
     else document.body.classList.remove("coupons-drawer-open");
     return () => document.body.classList.remove("coupons-drawer-open");
   }, [showForm, detailsLead, statusModal.open, openReq]);
 
-  // esc to close
+  // ESC to close
   useEffect(() => {
     const onKey = (e) => {
       if (e.key === "Escape") {
@@ -366,7 +390,7 @@ export default function Leads() {
           <button
             className="cp-btn primary"
             onClick={() => {
-              // open requirement form without opening details drawer
+              // Open requirement form standalone (no preselected lead)
               setDetailsLead(null);
               setReqLead(null);
               setOpenReq(true);
@@ -377,11 +401,41 @@ export default function Leads() {
         </div>
       </header>
 
+      {/* Toolbar: search + stage chips + counter */}
       <section className="coupons-toolbar">
-        <input className="cp-input" placeholder="Search by customer, contact, phone, source…" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input
+          className="cp-input"
+          placeholder="Search by customer, contact, phone, source…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+
+        {/* Stage chips row */}
+        <div className="visits-chip-row" style={{ flex: "1 1 100%" }}>
+          <button
+            type="button"
+            className={`chip ${statusFilter === "all" ? "is-active" : ""}`}
+            onClick={() => setStatusFilter("all")}
+          >
+            All <span className="count">({statusCounts.all || 0})</span>
+          </button>
+
+          {STAGES.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`chip ${statusClass(s)} ${statusFilter === s ? "is-active" : ""}`}
+              onClick={() => setStatusFilter(s)}
+            >
+              {s} <span className="count">({statusCounts[s] || 0})</span>
+            </button>
+          ))}
+        </div>
+
         <div className="muted">Showing {filtered.length} of {leads.length}</div>
       </section>
 
+      {/* Table */}
       <section className="coupons-card">
         <div className="tbl-wrap">
           <table className="cp-table">
@@ -404,35 +458,39 @@ export default function Leads() {
                   <td className="muted">{l.contactPerson}{l.email ? ` · ${l.email}` : ""}</td>
                   <td>{l.phone}</td>
                   <td className="muted">{l.leadSource || "—"}</td>
-                  <td><span className={`chip ${(l.status || "").split(" ").map(s => s[0]?.toUpperCase() + s.slice(1)).join("")}`}>{l.status}</span></td>
+                  <td>
+                    <span className={`chip ${statusClass(l.status)}`}>{l.status}</span>
+                  </td>
                   <td className="muted">{l.createdByName || l.createdBy || "—"}</td>
-                  <td className="muted">{l.updatedAt ? fmtDate(l.updatedAt) : (l.createdAt ? fmtDate(l.createdAt) : "—")} {l.updatedByName ? `· ${l.updatedByName}` : ""}</td>
+                  <td className="muted">
+                    {l.updatedAt ? fmtDate(l.updatedAt) : (l.createdAt ? fmtDate(l.createdAt) : "—")} {l.updatedByName ? `· ${l.updatedByName}` : ""}
+                  </td>
                   <td>
                     <div className="row-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                      {/* small edit icon */}
+                      {/* edit */}
                       <button title="Edit lead" className="row-action-icon" onClick={() => editLead(l)} style={{ padding: 6, borderRadius: 6, border: "1px solid rgba(0,0,0,0.04)", background: "#fff" }}>
                         ✎
                       </button>
 
-                      {/* Create Requirement per-row (ONLY for qualified leads) */}
-                      { (l.status || "").toLowerCase() === "qualified" ? (
+                      {/* + Req ONLY when status is req shared */}
+                      {normStatus(l.status) === "req shared" ? (
                         <button
                           title="Create Requirement"
                           className="cp-link"
-                          onClick={() => { setReqLead(l); setDetailsLead(null); setOpenReq(true); }}
+                          onClick={(e) => { e.stopPropagation(); setReqLead(l); setDetailsLead(null); setOpenReq(true); }}
                           style={{ padding: "6px 8px", borderRadius: 6, background: "#f3f4f6", border: "none", fontWeight: 700 }}
                         >
                           + Req
                         </button>
-                      ) : null }
+                      ) : null}
 
-                      {/* view details */}
+                      {/* details */}
                       <button className="cp-link" onClick={() => openDetails(l)}>View Details</button>
 
                       {/* next stage */}
                       <button className="cp-link next-stage" onClick={() => openStatusModal(l)}>Next Stage →</button>
 
-                      {/* small delete icon */}
+                      {/* delete */}
                       <button title="Delete lead" className="row-action-icon" onClick={() => setConfirmDelete(l)} style={{ padding: 6, borderRadius: 6, border: "1px solid rgba(0,0,0,0.04)", background: "#fff", color: "#b91c1c" }}>
                         🗑
                       </button>
@@ -450,9 +508,12 @@ export default function Leads() {
         </div>
       </section>
 
-      {/* Drawer: create / edit lead */}
+      {/* Edit drawer */}
       {showForm && (
-        <div className={`cp-drawer ${closing ? "closing" : ""}`} onClick={(e) => { if (e.target.classList.contains("cp-drawer")) closeDrawer(); }}>
+        <div
+          className={`cp-drawer ${closing ? "closing" : ""}`}
+          onClick={(e) => { if (e.target.classList.contains("cp-drawer")) closeDrawer(); }}
+        >
           <form className="cp-form" onSubmit={handleSave}>
             <div className="cp-form-head">
               <h2>{form.id ? "Edit Lead" : "New Lead"}</h2>
@@ -500,10 +561,9 @@ export default function Leads() {
                 <select className="cp-input" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}>
                   <option value="new">new</option>
                   <option value="contacted">contacted</option>
-                  <option value="qualified">qualified</option>
+                                   <option value="req shared">req shared</option>
+
                   <option value="lost">lost</option>
-                  <option value="converted">converted</option>
-                  <option value="req shared">req shared</option>
                 </select>
               </div>
 
@@ -514,16 +574,19 @@ export default function Leads() {
               </div>
             </div>
 
-            {/* compact history preview */}
+            {/* Compact history preview */}
             {form.id && (
               <>
                 <hr />
                 <h3 style={{ marginTop: 4 }}>Recent history</h3>
                 <div style={{ maxHeight: 180, overflowY: "auto", padding: "8px 4px" }}>
-                  {(form.history && form.history.length ? form.history : (leads.find(x => x.id === form.id)?.history || [])).slice().reverse().slice(0, 8).map((h, i) => (
+                  {(form.history && form.history.length ? form.history : (leads.find(x => x.id === form.id)?.history || []))
+                    .slice().reverse().slice(0, 8).map((h, i) => (
                     <div key={i} style={{ padding: "8px 6px", borderBottom: "1px solid #f1f5f9" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                        <div style={{ fontWeight: 700, fontSize: 13 }}>{h.type?.toUpperCase() || "UPDATE"} {h.field ? `— ${h.field}` : ""}</div>
+                        <div style={{ fontWeight: 700, fontSize: 13 }}>
+                          {h.type?.toUpperCase() || "UPDATE"} {h.field ? `— ${h.field}` : ""}
+                        </div>
                         <div className="muted" style={{ fontSize: 12 }}>{fmtDate(h.ts)}</div>
                       </div>
                       <div style={{ fontSize: 13, marginTop: 6 }}>
@@ -556,7 +619,13 @@ export default function Leads() {
 
             <div style={{ marginTop: 12 }}>
               <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>Note / Reason</label>
-              <textarea value={statusModal.note} onChange={(e) => setStatusModal(s => ({ ...s, note: e.target.value }))} rows={4} className="cp-input" placeholder="Enter a note explaining the status change (required)"></textarea>
+              <textarea
+                value={statusModal.note}
+                onChange={(e) => setStatusModal((s) => ({ ...s, note: e.target.value }))}
+                rows={4}
+                className="cp-input"
+                placeholder="Enter a note explaining the status change (required)"
+              ></textarea>
             </div>
 
             <div className="cp-form-actions" style={{ marginTop: 12 }}>
@@ -567,7 +636,7 @@ export default function Leads() {
         </div>
       )}
 
-      {/* Details drawer (full details + full history) */}
+      {/* Details drawer */}
       {detailsLead && (
         <div className="cp-drawer" onClick={(e) => { if (e.target.classList.contains("cp-drawer")) closeDetails(); }}>
           <div className="cp-form details">
@@ -608,7 +677,9 @@ export default function Leads() {
                 <div className="details-meta">
                   <div className="meta-row">
                     <div className="label muted">Status</div>
-                    <div className="value"><span className={`chip ${(detailsLead.status || "").split(" ").map(s => s[0]?.toUpperCase() + s.slice(1)).join("")}`}>{detailsLead.status}</span></div>
+                    <div className="value">
+                      <span className={`chip ${statusClass(detailsLead.status)}`}>{detailsLead.status}</span>
+                    </div>
                   </div>
 
                   <div className="meta-row">
@@ -623,7 +694,9 @@ export default function Leads() {
 
                   <div className="meta-row">
                     <div className="label muted">Last Updated</div>
-                    <div className="value">{detailsLead.updatedAt ? `${fmtDate(detailsLead.updatedAt)} · ${detailsLead.updatedByName || detailsLead.updatedBy}` : "—"}</div>
+                    <div className="value">
+                      {detailsLead.updatedAt ? `${fmtDate(detailsLead.updatedAt)} · ${detailsLead.updatedByName || detailsLead.updatedBy}` : "—"}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -669,10 +742,10 @@ export default function Leads() {
 
             <div className="details-footer" style={{ marginTop: 12, display: "flex", justifyContent: "space-between", gap: 8 }}>
               <div style={{ display: "flex", gap: 8 }}>
-                {/* Open requirement form for this lead ONLY if it's qualified */}
-                { (detailsLead.status || "").toLowerCase() === "qualified" ? (
+                {/* Create Requirement in details: ONLY when status is req shared */}
+                {normStatus(detailsLead.status) === "req shared" ? (
                   <button className="cp-btn" onClick={() => { setReqLead(detailsLead); setOpenReq(true); }}>Create Requirement</button>
-                ) : null }
+                ) : null}
               </div>
               <div>
                 <button className="cp-btn ghost" onClick={closeDetails}>Close</button>
@@ -682,13 +755,13 @@ export default function Leads() {
         </div>
       )}
 
-      {/* Requirement drawer (opens when Create Requirement clicked) */}
+      {/* Requirement drawer (modal or panel depending on your component) */}
       {openReq && (
         <RequirementForm
           lead={reqLead || detailsLead || { id: "", customerName: "", contactPerson: "", phone: "", address: "" }}
           onCancel={() => { setOpenReq(false); setReqLead(null); }}
           onSaved={() => {
-            // Close requirement drawer, then update the lead's status to "req shared" (if we have a lead)
+            // Close and bump status to "req shared" on the selected lead
             setOpenReq(false);
             const leadToUse = reqLead || detailsLead;
             setReqLead(null);
