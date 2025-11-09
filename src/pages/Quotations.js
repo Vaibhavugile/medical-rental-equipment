@@ -5,7 +5,6 @@ import {
   arrayUnion,
   collection,
   doc,
-  getDoc,
   onSnapshot,
   orderBy,
   query,
@@ -15,12 +14,9 @@ import {
 import { db, auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import "./Quotations.css";
-import { makeHistoryEntry, propagateToLead } from "../utils/status"; // <--- shared helpers
-
-// NEW: OrderCreate drawer component
+import { makeHistoryEntry, propagateToLead } from "../utils/status";
 import OrderCreate from "./OrderCreate";
 
-// currency formatter
 const fmtCurrency = (v) => {
   try {
     return Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -32,19 +28,12 @@ const fmtCurrency = (v) => {
 const parseDate = (ts) => {
   if (!ts) return "—";
   if (ts?.seconds) return new Date(ts.seconds * 1000).toLocaleString();
-  if (typeof ts === "string") {
-    const d = new Date(ts);
-    if (!isNaN(d)) return d.toLocaleString();
-  }
+  if (typeof ts === "string") { const d = new Date(ts); if (!isNaN(d)) return d.toLocaleString(); }
   if (ts instanceof Date) return ts.toLocaleString();
   if (typeof ts === "number") return new Date(ts).toLocaleString();
   return "—";
 };
 
-/**
- * Reused totals calculation from Requirements.jsx
- * returns: { subtotal, discountAmount, taxBreakdown, totalTax, total }
- */
 const calcAmounts = (items, discount, taxes) => {
   const subtotal = (items || []).reduce(
     (s, it) => s + Number(Number(it.qty || 0) * Number(it.rate || 0)),
@@ -56,7 +45,7 @@ const calcAmounts = (items, discount, taxes) => {
     else discountAmount = Number(discount.value || 0);
   }
   const taxable = Math.max(0, subtotal - discountAmount);
-  const taxBreakdown = (taxes || []).map((t) => ({ ...t, amount: (taxable * (Number(t.rate || 0) / 100)) }));
+  const taxBreakdown = (taxes || []).map((t) => ({ ...t, amount: taxable * (Number(t.rate || 0) / 100) }));
   const totalTax = taxBreakdown.reduce((s, t) => s + (t.amount || 0), 0);
   const total = Math.max(0, taxable + totalTax);
   return { subtotal, discountAmount, taxBreakdown, totalTax, total };
@@ -65,19 +54,20 @@ const calcAmounts = (items, discount, taxes) => {
 export default function Quotations() {
   const [quotations, setQuotations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
-  const [details, setDetails] = useState(null); // open quotation doc
+
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [search, setSearch] = useState("");
+
+  const [details, setDetails] = useState(null);
   const [error, setError] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editQuotation, setEditQuotation] = useState(null);
   const [versions, setVersions] = useState([]);
   const [viewingVersion, setViewingVersion] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [shareReady, setShareReady] = useState(false); // flag after a successful save so user can share/mark sent
+  const [shareReady, setShareReady] = useState(false);
 
-  // NEW: holds quotation object for which the OrderCreate drawer is open
   const [orderModalQuote, setOrderModalQuote] = useState(null);
-
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -99,29 +89,57 @@ export default function Quotations() {
     return () => unsub();
   }, []);
 
-  const filtered = useMemo(() => {
-    if (filter === "all") return quotations;
-    return quotations.filter((q) => (q.status || "draft").toLowerCase() === filter.toLowerCase());
-  }, [quotations, filter]);
+  const statusCounts = useMemo(() => {
+    const m = { all: quotations.length };
+    for (const q of quotations) {
+      const s = String(q.status || "draft").toLowerCase();
+      m[s] = (m[s] || 0) + 1;
+    }
+    for (const key of ["draft", "sent", "accepted", "rejected", "order_created"]) {
+      if (m[key] == null) m[key] = 0;
+    }
+    return m;
+  }, [quotations]);
 
-  /* ---------- Open details & subscribe to versions ---------- */
+  const filtered = useMemo(() => {
+    const list = statusFilter === "all"
+      ? quotations
+      : quotations.filter((q) => String(q.status || "draft").toLowerCase() === statusFilter);
+
+    if (!search.trim()) return list;
+
+    const term = search.trim().toLowerCase();
+    return list.filter((q) => {
+      const fields = [
+        q.quoNo,
+        q.quotationId,
+        q.requirementId,
+        q.createdByName,
+        q.createdBy,
+        q.notes,
+      ].map((x) => String(x || "").toLowerCase());
+      return fields.some((f) => f.includes(term));
+    });
+  }, [quotations, statusFilter, search]);
+
   const openDetails = async (qDoc) => {
     setError("");
     setDetails(qDoc);
-    setShareReady(false); // clear share flag when opening a new quotation
+    setShareReady(false);
     setIsEditing(false);
     setEditQuotation(null);
     setViewingVersion(null);
 
     try {
       const versionsQuery = query(collection(db, "quotations", qDoc.id, "versions"), orderBy("createdAt", "desc"));
-      const unsubVersions = onSnapshot(versionsQuery, (snap) => {
-        const vs = snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
-        setVersions(vs);
-      }, (err) => {
-        console.error("versions snapshot", err);
-        setVersions([]);
-      });
+      const unsubVersions = onSnapshot(
+        versionsQuery,
+        (snap) => {
+          const vs = snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+          setVersions(vs);
+        },
+        () => setVersions([])
+      );
       setDetails((prev) => ({ ...qDoc, __unsubVersions: unsubVersions }));
     } catch (err) {
       console.error("openDetails versions", err);
@@ -131,7 +149,7 @@ export default function Quotations() {
 
   const closeDetails = () => {
     if (details && details.__unsubVersions) {
-      try { details.__unsubVersions(); } catch (e) {}
+      try { details.__unsubVersions(); } catch {}
     }
     setDetails(null);
     setIsEditing(false);
@@ -141,19 +159,38 @@ export default function Quotations() {
     setShareReady(false);
   };
 
-  /* ---------- Editing helpers ---------- */
+  // ----- Editing helpers -----
   const startEdit = () => {
     setIsEditing(true);
-    setShareReady(false); // clear share flag when editing again
-    // deep clone for safe edits
-    setEditQuotation(JSON.parse(JSON.stringify(details)));
+    setShareReady(false);
+
+    // normalize older item keys
+    const clone = JSON.parse(JSON.stringify(details || {}));
+    clone.items = (clone.items || []).map((it) => {
+      const qty = Number(it.qty ?? it.quantity ?? 1);
+      const rate = Number(it.rate ?? 0);
+      return {
+        ...it,
+        name: it.name || it.itemName || it.productName || "",
+        qty,
+        rate,
+        amount: Number(it.amount ?? qty * rate),
+        notes: it.notes || it.unitNotes || "",
+        days: it.days ?? it.expectedDurationDays ?? 0,
+        expectedStartDate: it.expectedStartDate || it.startDate || "",
+        expectedEndDate: it.expectedEndDate || it.endDate || "",
+        productId: it.productId || "",
+      };
+    });
+
+    setEditQuotation(clone);
   };
+
   const cancelEdit = () => {
     setIsEditing(false);
     setEditQuotation(null);
   };
 
-  // Update an arbitrary path on editQuotation
   const updateEditField = (path, value) => {
     setEditQuotation((q) => {
       if (!q) return q;
@@ -170,18 +207,18 @@ export default function Quotations() {
     });
   };
 
-  // Item operations
   const updateEditItem = (idx, patch) => {
     setEditQuotation((q) => {
       if (!q) return q;
       const clone = JSON.parse(JSON.stringify(q));
       clone.items = clone.items || [];
       clone.items[idx] = { ...clone.items[idx], ...patch };
-      // recalc amount for item
-      clone.items[idx].amount = Number(clone.items[idx].qty || 0) * Number(clone.items[idx].rate || 0);
+      const qi = clone.items[idx];
+      qi.amount = Number(qi.qty || 0) * Number(qi.rate || 0);
       return clone;
     });
   };
+
   const addEditItem = () => {
     setEditQuotation((q) => {
       const clone = JSON.parse(JSON.stringify(q || {}));
@@ -201,6 +238,7 @@ export default function Quotations() {
       return clone;
     });
   };
+
   const removeEditItem = (idx) => {
     setEditQuotation((q) => {
       const clone = JSON.parse(JSON.stringify(q || {}));
@@ -209,7 +247,6 @@ export default function Quotations() {
     });
   };
 
-  // Taxes operations
   const updateEditTax = (idx, patch) => {
     setEditQuotation((q) => {
       const clone = JSON.parse(JSON.stringify(q || {}));
@@ -234,7 +271,6 @@ export default function Quotations() {
     });
   };
 
-  // Discount update
   const updateEditDiscount = (patch) => {
     setEditQuotation((q) => {
       const clone = JSON.parse(JSON.stringify(q || {}));
@@ -243,13 +279,12 @@ export default function Quotations() {
     });
   };
 
-  // Derived amounts for editing (live)
   const editAmounts = useMemo(() => {
     if (!isEditing || !editQuotation) return null;
     return calcAmounts(editQuotation.items || [], editQuotation.discount || {}, editQuotation.taxes || []);
   }, [isEditing, editQuotation]);
 
-  /* ---------- Save edits (version & update main doc) ---------- */
+  // ----- Save edits -----
   const saveEdits = async () => {
     if (!details || !editQuotation) return;
     setSaving(true);
@@ -258,7 +293,6 @@ export default function Quotations() {
       const user = auth.currentUser || {};
       const qRef = doc(db, "quotations", details.id);
 
-      // Create version snapshot from current details (previous state)
       const previousSnapshot = { ...details };
       delete previousSnapshot.__unsubVersions;
       await addDoc(collection(db, "quotations", details.id, "versions"), {
@@ -269,10 +303,8 @@ export default function Quotations() {
         note: "Edit snapshot - before update",
       });
 
-      // Compute totals from editQuotation
       const amounts = calcAmounts(editQuotation.items || [], editQuotation.discount || {}, editQuotation.taxes || []);
 
-      // Prepare update payload (persist full fields)
       const toUpdate = {
         quoNo: editQuotation.quoNo || editQuotation.quotationId || details.quoNo,
         quotationId: editQuotation.quotationId || details.quotationId || "",
@@ -303,10 +335,8 @@ export default function Quotations() {
         updatedByName: user.displayName || user.email || "",
       };
 
-      // Write update
       await updateDoc(qRef, toUpdate);
 
-      // Update requirement history/status if required
       if (details.requirementId) {
         const reqRef = doc(db, "requirements", details.requirementId);
         const entry = makeHistoryEntry(user, {
@@ -323,16 +353,12 @@ export default function Quotations() {
           updatedByName: user.displayName || user.email || "",
         });
 
-        // propagate the change to the lead via shared helper
         propagateToLead(details.requirementId, "quotation", details.status || "", toUpdate.status || "", entry.note);
       }
 
-      // Update local state so UI reflects saved data
       setDetails((d) => ({ ...d, ...toUpdate }));
       setIsEditing(false);
       setEditQuotation(null);
-
-      // allow the user to explicitly share the updated quotation & mark as sent
       setShareReady(true);
     } catch (err) {
       console.error("saveEdits", err);
@@ -342,7 +368,6 @@ export default function Quotations() {
     }
   };
 
-  /* ---------- Revert and version view ---------- */
   const viewVersion = (v) => setViewingVersion(v);
 
   const revertToVersion = async (version) => {
@@ -353,7 +378,6 @@ export default function Quotations() {
       const user = auth.currentUser || {};
       const qRef = doc(db, "quotations", details.id);
 
-      // snapshot current
       const currentSnapshot = { ...details };
       delete currentSnapshot.__unsubVersions;
       await addDoc(collection(db, "quotations", details.id, "versions"), {
@@ -364,7 +388,6 @@ export default function Quotations() {
         note: `Snapshot before revert to version ${version.id}`,
       });
 
-      // apply snapshot fields to main doc
       const snap = version.snapshot || {};
       const amounts = calcAmounts(snap.items || [], snap.discount || {}, snap.taxes || []);
       const payload = {
@@ -405,7 +428,6 @@ export default function Quotations() {
           updatedByName: user.displayName || user.email || "",
         });
 
-        // propagate revert to lead as well
         propagateToLead(details.requirementId, "quotation", details.status || "", payload.status || "", entry.note);
       }
 
@@ -422,7 +444,6 @@ export default function Quotations() {
     }
   };
 
-  /* ---------- Status update & convert to order (updated to propagate) ---------- */
   const updateQuotationStatus = async (quote, newStatus, note = "") => {
     setError("");
     try {
@@ -452,7 +473,6 @@ export default function Quotations() {
         if (newStatus === "accepted") updates.status = "order_created";
         await updateDoc(reqRef, updates);
 
-        // propagate this status change to the linked lead
         propagateToLead(quote.requirementId, "quotation", quote.status || "", newStatus, entry.note);
       }
       if (details && details.id === quote.id) {
@@ -464,28 +484,21 @@ export default function Quotations() {
     }
   };
 
-  /* ---------- convertToOrder now opens the OrderCreate drawer ---------- */
   const convertToOrder = (quote) => {
     setError("");
-    // open the OrderCreate drawer (handled in OrderCreate.jsx)
     setOrderModalQuote(quote);
   };
 
-  // Share the updated quotation and mark it as 'sent'
   const shareUpdated = async () => {
     if (!details) return;
     try {
-      // mark quotation as sent (this will also update requirement history via existing helper)
       await updateQuotationStatus(details, "sent", "Updated quotation shared");
-
-      // copy to clipboard for quick sharing
       if (navigator.clipboard) {
         navigator.clipboard.writeText(JSON.stringify(details, null, 2));
         alert("Updated quotation marked sent and copied to clipboard.");
       } else {
         alert("Updated quotation marked sent. Clipboard not available.");
       }
-
       setShareReady(false);
     } catch (err) {
       console.error("shareUpdated", err);
@@ -493,22 +506,44 @@ export default function Quotations() {
     }
   };
 
-  /* ---------- Render ---------- */
   if (loading) return <div className="qp-wrap"><div className="qp-loading">Loading quotations…</div></div>;
 
   return (
     <div className="qp-wrap">
       <header className="qp-header">
         <h1>Quotations</h1>
-        <div className="qp-toolbar">
-          <select value={filter} onChange={(e) => setFilter(e.target.value)} className="qp-select">
-            <option value="all">All status</option>
-            <option value="draft">Draft</option>
-            <option value="sent">Sent</option>
-            <option value="accepted">Accepted</option>
-            <option value="rejected">Rejected</option>
-            <option value="order_created">Order Created</option>
-          </select>
+
+        <div className="coupons-toolbar" style={{ marginTop: 8, width: "100%" }}>
+          <input
+            className="cp-input"
+            placeholder="Search quo no / requirement / created by / notes…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ minWidth: 240 }}
+          />
+
+          <div className="visits-chip-row" style={{ marginLeft: 8, flex: 1 }}>
+            <button className={`chip ${statusFilter === "all" ? "is-active" : ""}`} onClick={() => setStatusFilter("all")}>
+              All <span className="count">({statusCounts.all || 0})</span>
+            </button>
+            <button className={`chip ${statusFilter === "draft" ? "is-active" : ""}`} onClick={() => setStatusFilter("draft")}>
+              draft <span className="count">({statusCounts.draft || 0})</span>
+            </button>
+            <button className={`chip ${statusFilter === "sent" ? "is-active" : ""}`} onClick={() => setStatusFilter("sent")}>
+              sent <span className="count">({statusCounts.sent || 0})</span>
+            </button>
+            <button className={`chip ${statusFilter === "accepted" ? "is-active" : ""}`} onClick={() => setStatusFilter("accepted")}>
+              accepted <span className="count">({statusCounts.accepted || 0})</span>
+            </button>
+            <button className={`chip ${statusFilter === "rejected" ? "is-active" : ""}`} onClick={() => setStatusFilter("rejected")}>
+              rejected <span className="count">({statusCounts.rejected || 0})</span>
+            </button>
+            <button className={`chip ${statusFilter === "order_created" ? "is-active" : ""}`} onClick={() => setStatusFilter("order_created")}>
+              order created <span className="count">({statusCounts.order_created || 0})</span>
+            </button>
+          </div>
+
+          <div className="muted">Showing {filtered.length} of {quotations.length}</div>
         </div>
       </header>
 
@@ -520,7 +555,7 @@ export default function Quotations() {
             <tr>
               <th>Q No</th>
               <th>Requirement</th>
-              <th>Customer</th>
+              <th>Created By</th>
               <th>Status</th>
               <th>Created</th>
               <th>Totals</th>
@@ -528,36 +563,51 @@ export default function Quotations() {
             </tr>
           </thead>
           <tbody>
-            {filtered.map((q) => (
-              <tr key={q.id}>
-                <td className="strong">{q.quoNo || q.quotationId || q.id}</td>
-                <td>{q.requirementId || "—"}</td>
-                <td>{q.createdByName || q.createdBy || "—"}</td>
-                <td>{q.status || "draft"}</td>
-                <td>{parseDate(q.createdAt)}</td>
-                <td>{fmtCurrency(q.totals?.total || 0)}</td>
-                <td>
-                  <div className="qp-actions">
-                    <button className="qp-link" onClick={() => openDetails(q)}>View</button>
+            {filtered.map((q) => {
+              const sClass = (q.status || "draft")
+                .split(" ")
+                .map((s) => (s ? s[0].toUpperCase() + s.slice(1) : ""))
+                .join("");
+              return (
+                <tr key={q.id}>
+                  <td className="strong">{q.quoNo || q.quotationId || q.id}</td>
+                  <td>{q.requirementId || "—"}</td>
+                  <td>{q.createdByName || q.createdBy || "—"}</td>
+                  <td><span className={`chip ${sClass}`}>{q.status || "draft"}</span></td>
+                  <td>{parseDate(q.createdAt)}</td>
+                  <td>{fmtCurrency(q.totals?.total || 0)}</td>
+                  <td>
+                    <div className="qp-actions">
+                      <button className="qp-link" onClick={() => openDetails(q)}>View</button>
 
-                    {(q.status || "").toLowerCase() === "draft" && <button className="qp-link" onClick={() => updateQuotationStatus(q, "sent", "Sent to customer")}>Mark Sent</button>}
+                      {(q.status || "").toLowerCase() === "draft" && (
+                        <button className="qp-link" onClick={() => updateQuotationStatus(q, "sent", "Sent to customer")}>
+                          Mark Sent
+                        </button>
+                      )}
 
-                    {(q.status || "").toLowerCase() === "sent" && <>
-                      <button className="qp-link" onClick={() => updateQuotationStatus(q, "accepted", "Accepted by customer")}>Accept</button>
-                      <button className="qp-link" onClick={() => updateQuotationStatus(q, "rejected", "Rejected by customer")}>Reject</button>
-                    </>}
+                      {(q.status || "").toLowerCase() === "sent" && (
+                        <>
+                          <button className="qp-link" onClick={() => updateQuotationStatus(q, "accepted", "Accepted by customer")}>Accept</button>
+                          <button className="qp-link" onClick={() => updateQuotationStatus(q, "rejected", "Rejected by customer")}>Reject</button>
+                        </>
+                      )}
 
-                    {(q.status || "").toLowerCase() === "accepted" && !q.orderId && <button className="qp-link" onClick={() => convertToOrder(q)}>Convert to Order</button>}
+                      {(q.status || "").toLowerCase() === "accepted" && !q.orderId && (
+                        <button className="qp-link" onClick={() => convertToOrder(q)}>Convert to Order</button>
+                      )}
 
-                    {/* if an order was created from this quotation, offer quick nav to orders */}
-                    {(q.orderId || (q.status || "").toLowerCase() === "order_created") && (
-                      <button className="qp-link" onClick={() => navigate("/orders")}>View Orders</button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && <tr><td colSpan="7" className="qp-empty">No quotations found.</td></tr>}
+                      {(q.orderId || (q.status || "").toLowerCase() === "order_created") && (
+                        <button className="qp-link" onClick={() => navigate("/orders")}>View Orders</button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {filtered.length === 0 && (
+              <tr><td colSpan="7" className="qp-empty">No quotations found.</td></tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -590,49 +640,105 @@ export default function Quotations() {
                 <div className="qp-section">
                   <div className="label">Items</div>
 
-                  {isEditing ? (
-                    <div style={{ marginTop: 8 }}>
-                      {(editQuotation.items || []).map((it, i) => (
-                        <div key={it.id || i} className="quotation-item" style={{ marginBottom: 12 }}>
-                          <input className="cp-input" placeholder="Item name" value={it.name || ""} onChange={(e) => updateEditItem(i, { name: e.target.value })} />
-                          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                            <input className="cp-input" placeholder="Qty" value={it.qty} onChange={(e) => updateEditItem(i, { qty: Number(e.target.value || 0) })} />
-                            <input className="cp-input" placeholder="Rate" value={it.rate} onChange={(e) => updateEditItem(i, { rate: Number(e.target.value || 0) })} />
-                            <input className="cp-input" placeholder="Days" value={it.days ?? 0} onChange={(e) => updateEditItem(i, { days: Number(e.target.value || 0) })} />
-                          </div>
+       {isEditing ? (
+  <div style={{ marginTop: 8 }}>
+    {(editQuotation.items || []).map((it, i) => (
+      <div key={it.id || i} className="quotation-item">
 
-                          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                            <input className="cp-input" placeholder="Start date (YYYY-MM-DD)" value={it.expectedStartDate || ""} onChange={(e) => updateEditItem(i, { expectedStartDate: e.target.value })} />
-                            <input className="cp-input" placeholder="End date (YYYY-MM-DD)" value={it.expectedEndDate || ""} onChange={(e) => updateEditItem(i, { expectedEndDate: e.target.value })} />
-                          </div>
+        {/* ROW 1 → Name | Qty | Rate */}
+        <div className="row-1">
+          <input
+            className="cp-input"
+            placeholder="Item name"
+            value={it.name || it.itemName || it.productName || ""}
+            onChange={(e) => updateEditItem(i, { name: e.target.value })}
+          />
+          <input
+            className="cp-input"
+            type="number"
+            placeholder="Qty"
+            value={it.qty ?? it.quantity ?? 1}
+            onChange={(e) => updateEditItem(i, { qty: Number(e.target.value || 0) })}
+          />
+          <input
+            className="cp-input"
+            type="number"
+            placeholder="Rate"
+            value={it.rate ?? 0}
+            onChange={(e) => updateEditItem(i, { rate: Number(e.target.value || 0) })}
+          />
+        </div>
 
-                          <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                            <input className="cp-input" placeholder="Product ID" value={it.productId || ""} onChange={(e) => updateEditItem(i, { productId: e.target.value })} />
-                            <input className="cp-input" placeholder="Notes" value={it.notes || ""} onChange={(e) => updateEditItem(i, { notes: e.target.value })} />
-                            <button className="cp-btn ghost" onClick={() => removeEditItem(i)}>Remove</button>
-                          </div>
+        {/* ROW 2 → Days | Start | End */}
+        <div className="row-2">
+          <input
+            className="cp-input"
+            type="number"
+            placeholder="Days"
+            value={it.days ?? it.expectedDurationDays ?? 0}
+            onChange={(e) => updateEditItem(i, { days: Number(e.target.value || 0) })}
+          />
+          <input
+            className="cp-input"
+            type="date"
+            placeholder="Start date"
+            value={it.expectedStartDate || it.startDate || ""}
+            onChange={(e) => updateEditItem(i, { expectedStartDate: e.target.value })}
+          />
+          <input
+            className="cp-input"
+            type="date"
+            placeholder="End date"
+            value={it.expectedEndDate || it.endDate || ""}
+            onChange={(e) => updateEditItem(i, { expectedEndDate: e.target.value })}
+          />
+        </div>
 
-                          <div className="extra-details" style={{ marginTop: 8 }}>
-                            Amount: {fmtCurrency(it.amount || 0)}
-                          </div>
-                        </div>
-                      ))}
+        {/* ROW 3 → Product ID | Notes | Remove */}
+        <div className="row-3">
+          <input
+            className="cp-input"
+            placeholder="Product ID"
+            value={it.productId || ""}
+            onChange={(e) => updateEditItem(i, { productId: e.target.value })}
+          />
+          <input
+            className="cp-input"
+            placeholder="Notes"
+            value={it.notes || it.unitNotes || ""}
+            onChange={(e) => updateEditItem(i, { notes: e.target.value })}
+          />
+          <button className="cp-btn ghost" onClick={() => removeEditItem(i)}>Remove</button>
+        </div>
 
-                      <div style={{ marginTop: 8 }}>
-                        <button className="cp-btn" onClick={addEditItem}>+ Add item</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ marginTop: 8 }}>
-                      {(details.items || []).map((it, i) => (
-                        <div key={i} style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
-                          <div style={{ fontWeight: 700 }}>{it.name || "—"}</div>
-                          <div style={{ fontSize: 13, color: "#6b7280" }}>{it.qty || 0} × {fmtCurrency(it.rate || 0)} = {fmtCurrency(it.amount || 0)}</div>
-                          {it.notes ? <div style={{ marginTop: 6 }}>{it.notes}</div> : null}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+        <div className="extra-details">
+          Amount: {fmtCurrency((it.amount ?? ((it.qty ?? it.quantity ?? 0) * (it.rate ?? 0))) || 0)}
+        </div>
+      </div>
+    ))}
+
+    <div style={{ marginTop: 8 }}>
+      <button className="cp-btn" onClick={addEditItem}>+ Add item</button>
+    </div>
+  </div>
+) : (
+  /* keep your read-only block as-is */
+  <div style={{ marginTop: 8 }}>
+    {(details.items || []).map((it, idx) => (
+      <div key={idx} style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+        <div style={{ fontWeight: 700 }}>
+          {it.name || it.itemName || it.productName || it.productId || "—"}
+        </div>
+        <div style={{ fontSize: 13, color: "#6b7280" }}>
+          {(it.qty ?? it.quantity ?? 0)} × {fmtCurrency(it.rate ?? 0)} =
+          {" "}{fmtCurrency(it.amount ?? ((it.qty ?? it.quantity ?? 0) * (it.rate ?? 0)))}
+        </div>
+        {(it.notes || it.unitNotes) ? <div style={{ marginTop: 6 }}>{it.notes || it.unitNotes}</div> : null}
+      </div>
+    ))}
+  </div>
+)}
+
                 </div>
 
                 <div className="qp-section">
@@ -677,7 +783,7 @@ export default function Quotations() {
                       <div className="label">Quotation No</div>
                       {isEditing ? <input className="cp-input" value={editQuotation.quoNo || ""} onChange={(e) => updateEditField("quoNo", e.target.value)} /> : <div className="value">{details.quoNo}</div>}
                     </div>
-                    <div style={{ width: 140 }}>
+                    <div style={{ width: 160 }}>
                       <div className="label">Status</div>
                       {isEditing ? (
                         <select className="cp-input" value={editQuotation.status || "draft"} onChange={(e) => updateEditField("status", e.target.value)}>
@@ -687,11 +793,17 @@ export default function Quotations() {
                           <option value="rejected">rejected</option>
                           <option value="order_created">order_created</option>
                         </select>
-                      ) : <div className="value">{details.status}</div>}
+                      ) : (
+                        <div className="value">
+                          <span className={`chip ${(details.status || "draft").split(" ").map(s => s ? s[0].toUpperCase()+s.slice(1) : "").join("")}`}>
+                            {details.status || "draft"}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  {/* Discount editor */}
+                  {/* Discount */}
                   <div style={{ marginTop: 12 }}>
                     <div className="label">Discount</div>
                     {isEditing ? (
@@ -708,11 +820,15 @@ export default function Quotations() {
                         />
                       </div>
                     ) : (
-                      <div className="value">{details.discount?.type === "percent" ? `${details.discount?.value || 0}%` : fmtCurrency(details.discount?.value || 0)}</div>
+                      <div className="value">
+                        {details.discount?.type === "percent"
+                          ? `${details.discount?.value || 0}%`
+                          : fmtCurrency(details.discount?.value || 0)}
+                      </div>
                     )}
                   </div>
 
-                  {/* Taxes editor */}
+                  {/* Taxes */}
                   <div style={{ marginTop: 12 }}>
                     <div className="label">Taxes</div>
                     {isEditing ? (
@@ -741,7 +857,7 @@ export default function Quotations() {
                     <div className="meta-row"><div className="label strong">Total</div><div className="value strong">{fmtCurrency(isEditing ? (editAmounts?.total ?? 0) : (details.totals?.total || 0))}</div></div>
                   </div>
 
-                  {/* Save/Action buttons */}
+                  {/* Save/Actions */}
                   <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
                     {isEditing ? (
                       <>
@@ -763,8 +879,6 @@ export default function Quotations() {
                         )}
                         <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
                           <button className="cp-btn ghost" onClick={() => { navigator.clipboard && navigator.clipboard.writeText(JSON.stringify(details)); alert("Copied JSON to clipboard"); }}>Copy JSON</button>
-
-                          {/* show share button only when shareReady is true */}
                           {shareReady && (
                             <button className="cp-btn primary" onClick={() => {
                               if (window.confirm("Share the updated quotation and mark it as 'sent'?")) {
@@ -782,7 +896,6 @@ export default function Quotations() {
               </div>
             </div>
 
-            {/* Version viewer */}
             {viewingVersion && (
               <div style={{ marginTop: 12, borderTop: "1px solid #eef2f7", paddingTop: 12 }}>
                 <h3>Viewing Version: {viewingVersion.id}</h3>
@@ -814,12 +927,10 @@ export default function Quotations() {
           quotation={orderModalQuote}
           onClose={() => setOrderModalQuote(null)}
           onCreated={(orderId) => {
-            // update local details if the same quotation is open
             if (details && details.id === orderModalQuote.id) {
               setDetails((d) => ({ ...d, orderId, status: "order_created" }));
             }
             setOrderModalQuote(null);
-            // quotations list will be updated automatically by the Firestore snapshot listener
           }}
         />
       )}
