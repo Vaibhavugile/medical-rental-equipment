@@ -10,12 +10,18 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  getDoc, // ✅ added
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import "./Quotations.css";
 import { makeHistoryEntry, propagateToLead } from "../utils/status";
 import OrderCreate from "./OrderCreate";
+
+// NEW: PDF generation + Firebase Storage upload
+import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable"; // ✅ correct v3 import
 
 const fmtCurrency = (v) => {
   try {
@@ -67,6 +73,10 @@ export default function Quotations() {
   const [saving, setSaving] = useState(false);
   const [shareReady, setShareReady] = useState(false);
 
+  // NEW: WhatsApp send state
+  const [waPhone, setWaPhone] = useState("");
+  const [sendingWa, setSendingWa] = useState(false);
+
   const [orderModalQuote, setOrderModalQuote] = useState(null);
   const navigate = useNavigate();
 
@@ -117,10 +127,32 @@ export default function Quotations() {
         q.createdByName,
         q.createdBy,
         q.notes,
+        q.customerName,   // ✅ searchable
+        q.customerPhone,  // ✅ searchable
       ].map((x) => String(x || "").toLowerCase());
       return fields.some((f) => f.includes(term));
     });
   }, [quotations, statusFilter, search]);
+
+  // ===== Helpers to fetch from requirement -> leadssnapshop / leadSnapshot
+  const pickFromRequirement = (req = {}) => {
+    const ls = req.leadssnapshop || req.leadSnapshot || {};
+    const customerName =
+      req.customerName ||
+      ls.customerName ||
+      req.contactPerson ||
+      ls.contactPerson ||
+      req.contactName ||
+      "";
+    const customerPhone =
+      ls.phone ||
+      ls.mobile ||
+      req.phone ||
+      req.customerPhone ||
+      req.contactPhone ||
+      "";
+    return { customerName, customerPhone };
+  };
 
   const openDetails = async (qDoc) => {
     setError("");
@@ -129,9 +161,38 @@ export default function Quotations() {
     setIsEditing(false);
     setEditQuotation(null);
     setViewingVersion(null);
+    setWaPhone(""); // clear on open
 
     try {
-      const versionsQuery = query(collection(db, "quotations", qDoc.id, "versions"), orderBy("createdAt", "desc"));
+      // ① Fetch requirement to populate customer name & phone
+      if (qDoc?.requirementId) {
+        try {
+          const reqRef = doc(db, "requirements", qDoc.requirementId);
+          const reqSnap = await getDoc(reqRef);
+          if (reqSnap.exists()) {
+            const req = reqSnap.data() || {};
+            const { customerName, customerPhone } = pickFromRequirement(req);
+
+            // Merge onto details
+            setDetails((prev) => ({
+              ...(prev || qDoc),
+              customerName: customerName || prev?.customerName || "",
+              customerPhone: customerPhone || prev?.customerPhone || "",
+            }));
+
+            // Autofill WhatsApp if user hasn't typed
+            setWaPhone((prev) => prev || (customerPhone || ""));
+          }
+        } catch (e) {
+          console.warn("Requirement fetch failed", e);
+        }
+      }
+
+      // ② Versions subscription
+      const versionsQuery = query(
+        collection(db, "quotations", qDoc.id, "versions"),
+        orderBy("createdAt", "desc")
+      );
       const unsubVersions = onSnapshot(
         versionsQuery,
         (snap) => {
@@ -140,7 +201,7 @@ export default function Quotations() {
         },
         () => setVersions([])
       );
-      setDetails((prev) => ({ ...qDoc, __unsubVersions: unsubVersions }));
+      setDetails((prev) => ({ ...(prev || qDoc), __unsubVersions: unsubVersions }));
     } catch (err) {
       console.error("openDetails versions", err);
       setVersions([]);
@@ -157,6 +218,7 @@ export default function Quotations() {
     setVersions([]);
     setViewingVersion(null);
     setShareReady(false);
+    setWaPhone(""); // clear on close
   };
 
   // ----- Editing helpers -----
@@ -506,6 +568,124 @@ export default function Quotations() {
     }
   };
 
+  // =====================
+  // NEW: WhatsApp PDF helpers
+  // =====================
+  const normalizePhone = (raw) => {
+    let digits = String(raw || "").replace(/\D/g, "");
+    if (!digits) return "";
+    // If it's 11 digits starting with 0 (local format), drop the leading 0
+    if (digits.length === 11 && digits.startsWith("0")) digits = digits.slice(1);
+    // Assume India by default if 10 digits
+    if (digits.length === 10) return `91${digits}`;
+    return digits; // already includes country code
+  };
+
+  const buildQuotationPdf = async (q) => {
+    const doc = new jsPDF();
+    const marginLeft = 14;
+    const pageWidth = doc.internal.pageSize.getWidth();
+
+    // Header
+    doc.setFontSize(18);
+    doc.text("Quotation", marginLeft, 20);
+    doc.setFontSize(11);
+    doc.text(`Quotation No: ${q.quoNo || q.quotationId || q.id}`, marginLeft, 28);
+    doc.text(`Status: ${q.status || "draft"}`, marginLeft, 34);
+    doc.text(`Created: ${parseDate(q.createdAt)}`, marginLeft, 40);
+    if (q.createdByName || q.createdBy) doc.text(`By: ${q.createdByName || q.createdBy}`, marginLeft, 46);
+
+    // NEW: Customer lines
+    const custY = 52;
+    if (q.customerName) doc.text(`Customer: ${q.customerName}`, marginLeft, custY);
+    if (q.customerPhone) doc.text(`Mobile: ${q.customerPhone}`, marginLeft, custY + 6);
+
+    // Items table
+    const rows = (q.items || []).map((it, idx) => [
+      idx + 1,
+      it.name || it.itemName || it.productName || it.productId || "—",
+      String(it.qty ?? it.quantity ?? 0),
+      fmtCurrency(it.rate ?? 0),
+      fmtCurrency(it.amount ?? ((it.qty ?? it.quantity ?? 0) * (it.rate ?? 0)))
+    ]);
+
+    // ✅ use autoTable(doc, {...}) for v3
+    autoTable(doc, {
+      head: [["#", "Item", "Qty", "Rate", "Amount"]],
+      body: rows,
+      startY: (q.customerName || q.customerPhone) ? (custY + 14) : 54, // push down if customer block present
+      styles: { fontSize: 10 },
+      headStyles: { fillColor: [240, 240, 240] },
+      theme: "grid",
+      columnStyles: {
+        0: { cellWidth: 10 },
+        2: { halign: "right", cellWidth: 18 },
+        3: { halign: "right", cellWidth: 24 },
+        4: { halign: "right", cellWidth: 28 }
+      }
+    });
+
+    // Totals
+    const y = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : 64;
+    const totalLines = [
+      ["Subtotal", fmtCurrency(q.totals?.subtotal || 0)],
+      ["Discount", fmtCurrency(q.totals?.discountAmount || 0)],
+      ["Tax", fmtCurrency(q.totals?.totalTax || 0)],
+      ["Total", fmtCurrency(q.totals?.total || 0)]
+    ];
+    let lineY = y;
+    totalLines.forEach(([label, val], idx) => {
+      const isStrong = idx === totalLines.length - 1;
+      if (isStrong) doc.setFont(undefined, "bold");
+      doc.text(label, pageWidth - 80, lineY);
+      doc.text(val, pageWidth - 30, lineY, { align: "right" });
+      if (isStrong) doc.setFont(undefined, "normal");
+      lineY += 6;
+    });
+
+    // Notes
+    const notes = q.notes ? String(q.notes) : "";
+    if (notes) {
+      doc.setFontSize(11);
+      doc.text("Notes:", marginLeft, lineY + 8);
+      doc.setFontSize(10);
+      doc.text(doc.splitTextToSize(notes, pageWidth - marginLeft * 2), marginLeft, lineY + 14);
+    }
+
+    // Return Blob so we can upload
+    return doc.output("blob");
+  };
+
+  const sendWhatsappPdf = async () => {
+    if (!details) return;
+    const phone = normalizePhone(waPhone || details?.customerPhone); // ✅ uses fetched phone if input empty
+    if (!phone) {
+      alert("Please enter a WhatsApp phone number (with country code or 10-digit Indian number).");
+      return;
+    }
+    try {
+      setSendingWa(true);
+      const pdfBlob = await buildQuotationPdf(details);
+
+      // Upload to Firebase Storage
+      const storage = getStorage();
+      const filename = `quotation-${details.quoNo || details.id}-${Date.now()}.pdf`;
+      const fileRef = ref(storage, `quotations/${details.id}/${filename}`);
+      await uploadBytes(fileRef, pdfBlob, { contentType: "application/pdf" });
+      const url = await getDownloadURL(fileRef);
+
+      // Pre-fill WhatsApp message with a link to the PDF
+      const msg = `Hello, sharing quotation ${details.quoNo || details.id}.\nTotal: ${fmtCurrency(details.totals?.total || 0)}\n\nDownload PDF: ${url}`;
+      const waUrl = `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`;
+      window.open(waUrl, "_blank");
+    } catch (err) {
+      console.error("sendWhatsappPdf", err);
+      alert("Failed to prepare WhatsApp message: " + (err?.message || err));
+    } finally {
+      setSendingWa(false);
+    }
+  };
+
   if (loading) return <div className="qp-wrap"><div className="qp-loading">Loading quotations…</div></div>;
 
   return (
@@ -562,53 +742,53 @@ export default function Quotations() {
               <th>Actions</th>
             </tr>
           </thead>
-          <tbody>
-            {filtered.map((q) => {
-              const sClass = (q.status || "draft")
-                .split(" ")
-                .map((s) => (s ? s[0].toUpperCase() + s.slice(1) : ""))
-                .join("");
-              return (
-                <tr key={q.id}>
-                  <td className="strong">{q.quoNo || q.quotationId || q.id}</td>
-                  <td>{q.requirementId || "—"}</td>
-                  <td>{q.createdByName || q.createdBy || "—"}</td>
-                  <td><span className={`chip ${sClass}`}>{q.status || "draft"}</span></td>
-                  <td>{parseDate(q.createdAt)}</td>
-                  <td>{fmtCurrency(q.totals?.total || 0)}</td>
-                  <td>
-                    <div className="qp-actions">
-                      <button className="qp-link" onClick={() => openDetails(q)}>View</button>
+        <tbody>
+          {filtered.map((q) => {
+            const sClass = (q.status || "draft")
+              .split(" ")
+              .map((s) => (s ? s[0].toUpperCase() + s.slice(1) : ""))
+              .join("");
+            return (
+              <tr key={q.id}>
+                <td className="strong">{q.quoNo || q.quotationId || q.id}</td>
+                <td>{q.requirementId || "—"}</td>
+                <td>{q.createdByName || q.createdBy || "—"}</td>
+                <td><span className={`chip ${sClass}`}>{q.status || "draft"}</span></td>
+                <td>{parseDate(q.createdAt)}</td>
+                <td>{fmtCurrency(q.totals?.total || 0)}</td>
+                <td>
+                  <div className="qp-actions">
+                    <button className="qp-link" onClick={() => openDetails(q)}>View</button>
 
-                      {(q.status || "").toLowerCase() === "draft" && (
-                        <button className="qp-link" onClick={() => updateQuotationStatus(q, "sent", "Sent to customer")}>
-                          Mark Sent
-                        </button>
-                      )}
+                    {(q.status || "").toLowerCase() === "draft" && (
+                      <button className="qp-link" onClick={() => updateQuotationStatus(q, "sent", "Sent to customer")}>
+                        Mark Sent
+                      </button>
+                    )}
 
-                      {(q.status || "").toLowerCase() === "sent" && (
-                        <>
-                          <button className="qp-link" onClick={() => updateQuotationStatus(q, "accepted", "Accepted by customer")}>Accept</button>
-                          <button className="qp-link" onClick={() => updateQuotationStatus(q, "rejected", "Rejected by customer")}>Reject</button>
-                        </>
-                      )}
+                    {(q.status || "").toLowerCase() === "sent" && (
+                      <>
+                        <button className="qp-link" onClick={() => updateQuotationStatus(q, "accepted", "Accepted by customer")}>Accept</button>
+                        <button className="qp-link" onClick={() => updateQuotationStatus(q, "rejected", "Rejected by customer")}>Reject</button>
+                      </>
+                    )}
 
-                      {(q.status || "").toLowerCase() === "accepted" && !q.orderId && (
-                        <button className="qp-link" onClick={() => convertToOrder(q)}>Convert to Order</button>
-                      )}
+                    {(q.status || "").toLowerCase() === "accepted" && !q.orderId && (
+                      <button className="qp-link" onClick={() => convertToOrder(q)}>Convert to Order</button>
+                    )}
 
-                      {(q.orderId || (q.status || "").toLowerCase() === "order_created") && (
-                        <button className="qp-link" onClick={() => navigate("/orders")}>View Orders</button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {filtered.length === 0 && (
-              <tr><td colSpan="7" className="qp-empty">No quotations found.</td></tr>
-            )}
-          </tbody>
+                    {(q.orderId || (q.status || "").toLowerCase() === "order_created") && (
+                      <button className="qp-link" onClick={() => navigate("/orders")}>View Orders</button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+          {filtered.length === 0 && (
+            <tr><td colSpan="7" className="qp-empty">No quotations found.</td></tr>
+          )}
+        </tbody>
         </table>
       </div>
 
@@ -803,6 +983,15 @@ export default function Quotations() {
                     </div>
                   </div>
 
+                  {/* NEW: Customer summary */}
+                  <div style={{ marginTop: 12 }}>
+                    <div className="label">Customer</div>
+                    <div className="value">
+                      {(details?.customerName || "—")}
+                      {details?.customerPhone ? ` · ${details.customerPhone}` : ""}
+                    </div>
+                  </div>
+
                   {/* Discount */}
                   <div style={{ marginTop: 12 }}>
                     <div className="label">Discount</div>
@@ -858,7 +1047,7 @@ export default function Quotations() {
                   </div>
 
                   {/* Save/Actions */}
-                  <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end" }}>
+                  <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end", flexWrap: "wrap" }}>
                     {isEditing ? (
                       <>
                         <button className="cp-btn ghost" onClick={cancelEdit} disabled={saving}>Cancel</button>
@@ -877,7 +1066,8 @@ export default function Quotations() {
                         {(details.orderId || (details.status || "").toLowerCase() === "order_created") && (
                           <button className="cp-btn ghost" onClick={() => navigate("/orders")}>View Orders</button>
                         )}
-                        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+
+                        <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
                           <button className="cp-btn ghost" onClick={() => { navigator.clipboard && navigator.clipboard.writeText(JSON.stringify(details)); alert("Copied JSON to clipboard"); }}>Copy JSON</button>
                           {shareReady && (
                             <button className="cp-btn primary" onClick={() => {
@@ -888,6 +1078,24 @@ export default function Quotations() {
                               Share Updated &amp; Mark Sent
                             </button>
                           )}
+                          {/* NEW: WhatsApp share (PDF link) */}
+                          <input
+                            className="cp-input"
+                            style={{ width: 220 }}
+                            placeholder="WhatsApp phone (e.g. 9876543210 or +919876543210)"
+                            value={waPhone || details?.customerPhone || ""}  // ✅ fallback to fetched phone
+                            onChange={(e) => setWaPhone(e.target.value)}
+                          />
+                          <button className="cp-btn" onClick={sendWhatsappPdf} disabled={sendingWa} title="Send PDF via WhatsApp">
+                            {sendingWa ? "Preparing…" : (
+                              <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M20.52 3.48A11.86 11.86 0 0 0 12.07.02C5.5.02.18 5.33.18 11.9c0 2.1.55 4.15 1.6 5.96L.02 24l6.3-1.64a11.86 11.86 0 0 0 5.75 1.47h.01c6.57 0 11.89-5.31 11.89-11.88 0-3.18-1.24-6.17-3.45-8.47zM12.07 21.8h-.01a9.9 9.9 0 0 1-5.04-1.38l-.36-.21-3.74.97 1-3.64-.24-.37a9.89 9.89 0 0 1-1.53-5.27c0-5.46 4.45-9.9 9.92-9.9 2.65 0 5.14 1.03 7.02 2.9a9.86 9.86 0 0 1 2.9 7.02c0 5.47-4.45 9.88-9.92 9.88zm5.63-7.37c-.31-.15-1.83-.9-2.12-1-.28-.1-.49-.16-.7.16-.2.31-.8 1-.98 1.2-.18.2-.36.22-.66.07-.31-.15-1.3-.48-2.47-1.54-.9-.8-1.51-1.8-1.69-2.1-.18-.3-.02-.46.13-.6.14-.14.3-.37.45-.55.15-.18.2-.31.31-.52.1-.2.06-.38-.02-.54-.08-.16-.7-1.68-.96-2.3-.25-.6-.51-.52-.7-.53h-.6c-.2 0-.53.08-.8.38-.28.3-1.06 1.04-1.06 2.52s1.09 2.93 1.25 3.13c.15.2 2.14 3.26 5.2 4.57.73.31 1.3.49 1.74.63.73.23 1.4.2 1.92.12.59-.09 1.83-.74 2.09-1.46.26-.72.26-1.33.18-1.46-.07-.13-.28-.2-.59-.35z"/>
+                                </svg>
+                                Send on WhatsApp
+                              </span>
+                            )}
+                          </button>
                         </div>
                       </div>
                     )}
