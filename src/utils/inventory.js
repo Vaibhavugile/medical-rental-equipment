@@ -123,18 +123,31 @@ export async function changeAssetStatus(assetDocId, newStatus, note = "", extra 
   });
 }
 
+// --- replace your reserveAsset with this version (logs + before/after) ---
 export async function reserveAsset(
   assetDocId,
   { reservationId = null, orderId = null, customer = null, until = null, note = "Reserved for order" } = {}
 ) {
   if (!assetDocId) throw new Error("assetDocId required");
+  console.log("🔵 reserveAsset() called", { assetDocId, orderId, customer, until });
+
   const user = auth.currentUser || {};
   const assetRef = doc(db, "assets", assetDocId);
+
+  // log current state
+  const beforeSnap = await getDoc(assetRef);
+  if (!beforeSnap.exists()) {
+    console.error("❌ reserveAsset: asset not found:", assetDocId);
+    return;
+  }
+  console.log("📦 Before reserve — status:", beforeSnap.data()?.status, "reservation:", beforeSnap.data()?.reservation);
+
   const entry = makeInventoryHistoryEntry(user, {
     type: "reserve",
     note,
     data: { reservationId, orderId, customer, until },
   });
+
   await updateDoc(assetRef, {
     status: "reserved",
     reservation: { reservationId, orderId, customer, until },
@@ -143,16 +156,35 @@ export async function reserveAsset(
     updatedByName: user.displayName || user.email || "",
     history: arrayUnion(entry),
   });
+
+  // log after state (optional but useful)
+  const afterSnap = await getDoc(assetRef);
+  console.log("✅ After reserve — status:", afterSnap.data()?.status, "reservation:", afterSnap.data()?.reservation);
+
+  return { ok: true, id: assetDocId, status: afterSnap.data()?.status };
 }
+
 
 /**
 + * Clear reservation and return asset to stock.
 + */
+// --- replace your unreserveAsset with this version (logs + before/after) ---
 export async function unreserveAsset(assetDocId, { note = "Reservation cleared" } = {}) {
   if (!assetDocId) throw new Error("assetDocId required");
+  console.log("🟠 unreserveAsset() called", { assetDocId });
+
   const user = auth.currentUser || {};
   const assetRef = doc(db, "assets", assetDocId);
+
+  const beforeSnap = await getDoc(assetRef);
+  if (!beforeSnap.exists()) {
+    console.error("❌ unreserveAsset: asset not found:", assetDocId);
+    return;
+  }
+  console.log("📦 Before unreserve — status:", beforeSnap.data()?.status, "reservation:", beforeSnap.data()?.reservation);
+
   const entry = makeInventoryHistoryEntry(user, { type: "reserve_clear", note });
+
   await updateDoc(assetRef, {
     status: "in_stock",
     reservation: null,
@@ -160,8 +192,14 @@ export async function unreserveAsset(assetDocId, { note = "Reservation cleared" 
     updatedBy: user.uid || "",
     updatedByName: user.displayName || user.email || "",
     history: arrayUnion(entry),
- });
+  });
+
+  const afterSnap = await getDoc(assetRef);
+  console.log("✅ After unreserve — status:", afterSnap.data()?.status, "reservation:", afterSnap.data()?.reservation);
+
+  return { ok: true, id: assetDocId, status: afterSnap.data()?.status };
 }
+
 /**
  * checkoutAsset(assetDocId, { rentalId = null, customer = null, until = null, note })
  * Marks asset out_for_rental and records rental metadata and history entry.
