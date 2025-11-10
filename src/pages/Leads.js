@@ -11,6 +11,7 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import "./Leads.css";
@@ -21,21 +22,8 @@ import RequirementForm from "../data/RequirementForm";
 // Shared helpers
 import { makeHistoryEntry } from "../utils/status";
 
-const defaultForm = {
-  id: null,
-  customerName: "",
-  contactPerson: "",
-  phone: "",
-  email: "",
-  address: "",
-  leadSource: "",
-  notes: "",
-  status: "new",
-  createdBy: "",
-  createdByName: "",
-  history: [],
-};
-
+// ---------- Helpers ----------
+const norm = (v = "") => String(v || "").toLowerCase();
 const fmtDate = (ts) => {
   try {
     if (!ts) return "—";
@@ -47,12 +35,33 @@ const fmtDate = (ts) => {
   }
 };
 
-// Stages used for chips (qualified/converted removed)
+// Stages used for status chips
 const STAGES = ["new", "contacted", "req shared", "lost"];
 const STATUS_FLOW = ["new", "contacted", "req shared"];
 const normStatus = (s = "") => s.toLowerCase();
 const statusClass = (s = "") =>
-  s.split(" ").map(t => (t ? t[0].toUpperCase() + t.slice(1) : "")).join("");
+  s
+    .split(" ")
+    .map((t) => (t ? t[0].toUpperCase() + t.slice(1) : ""))
+    .join("");
+
+// ---------- Default form ----------
+const defaultForm = {
+  id: null,
+  customerName: "",
+  contactPerson: "",
+  phone: "",
+  email: "",
+  address: "",
+  leadSource: "",
+  notes: "",
+  status: "new",
+  // NEW
+  type: "equipment", // "equipment" | "nursing"
+  createdBy: "",
+  createdByName: "",
+  history: [],
+};
 
 export default function Leads() {
   const [leads, setLeads] = useState([]);
@@ -84,19 +93,26 @@ export default function Leads() {
   // Requirement drawer
   const [openReq, setOpenReq] = useState(false);
   const [reqLead, setReqLead] = useState(null);
-  const [templateReq, setTemplateReq] = useState(null); // NEW: prefill for "Add another req"
+  const [templateReq, setTemplateReq] = useState(null);
 
   // Requirements index: latest requirement per leadId
   const [reqByLead, setReqByLead] = useState({}); // { [leadId]: requirementObj }
 
-  // Status chip filter
-  const [statusFilter, setStatusFilter] = useState("all");
+  // Filters
+  const [typeFilter, setTypeFilter] = useState("all");   // PRIMARY FILTER (drives Firestore query)
+  const [statusFilter, setStatusFilter] = useState("all"); // Secondary filter (client-side)
 
-  // Realtime leads
+  // ---------- Realtime leads (TYPE-DRIVEN QUERY) ----------
   useEffect(() => {
     setLoading(true);
     setError("");
-    const qy = query(collection(db, "leads"), orderBy("createdAt", "desc"));
+
+    const base = collection(db, "leads");
+    const qy =
+      typeFilter === "all"
+        ? query(base, orderBy("createdAt", "desc"))
+        : query(base, where("type", "==", typeFilter), orderBy("createdAt", "desc"));
+
     const unsub = onSnapshot(
       qy,
       (snap) => {
@@ -112,6 +128,8 @@ export default function Leads() {
             leadSource: data.leadSource || "",
             notes: data.notes || "",
             status: data.status || "new",
+            // NEW
+            type: data.type || "equipment",
             createdAt: data.createdAt || null,
             createdBy: data.createdBy || "",
             createdByName: data.createdByName || "",
@@ -131,9 +149,9 @@ export default function Leads() {
       }
     );
     return () => unsub();
-  }, []);
+  }, [typeFilter]);
 
-  // Realtime requirements → latest per leadId
+  // ---------- Realtime requirements → latest per leadId ----------
   useEffect(() => {
     const qy = query(collection(db, "requirements"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(
@@ -153,7 +171,7 @@ export default function Leads() {
     return () => unsub();
   }, []);
 
-  // Counts for chips
+  // ---------- Counts for STATUS chips (within current TYPE selection) ----------
   const statusCounts = useMemo(() => {
     const map = { all: leads.length };
     for (const l of leads) {
@@ -163,7 +181,7 @@ export default function Leads() {
     return map;
   }, [leads]);
 
-  // Search + status chip filter
+  // ---------- Search + STATUS filter (TYPE already applied by Firestore) ----------
   const filtered = useMemo(() => {
     let list = leads;
 
@@ -186,7 +204,7 @@ export default function Leads() {
     });
   }, [leads, search, statusFilter]);
 
-  // Drawer helpers
+  // ---------- Drawer helpers ----------
   const openDrawer = (initial = defaultForm) => {
     setForm(initial);
     setShowForm(true);
@@ -211,13 +229,15 @@ export default function Leads() {
       leadSource: l.leadSource || "",
       notes: l.notes || "",
       status: l.status || "new",
+      // NEW
+      type: l.type || "equipment",
       createdBy: l.createdBy || "",
       createdByName: l.createdByName || "",
       history: l.history || [],
     });
   };
 
-  // Create or update lead
+  // ---------- Create or update lead ----------
   const handleSave = async (e) => {
     e?.preventDefault();
     setError("");
@@ -236,6 +256,8 @@ export default function Leads() {
         leadSource: form.leadSource?.trim() || "",
         notes: form.notes?.trim() || "",
         status: form.status || "new",
+        // NEW
+        type: form.type || "equipment",
       };
 
       const user = auth.currentUser || {};
@@ -243,18 +265,31 @@ export default function Leads() {
         // UPDATE
         const existing = leads.find((x) => x.id === form.id) || {};
         const changes = [];
-        const keys = ["customerName","contactPerson","phone","email","address","leadSource","notes","status"];
+        const keys = [
+          "customerName",
+          "contactPerson",
+          "phone",
+          "email",
+          "address",
+          "leadSource",
+          "notes",
+          "status",
+          // NEW
+          "type",
+        ];
         for (const key of keys) {
           const oldV = existing[key] ?? "";
           const newV = payloadFields[key] ?? "";
           if (String(oldV) !== String(newV)) {
-            changes.push(makeHistoryEntry(user, {
-              type: key === "status" ? "status" : "update",
-              field: key,
-              oldValue: oldV,
-              newValue: newV,
-              note: key === "notes" ? (payloadFields.notes || "") : null,
-            }));
+            changes.push(
+              makeHistoryEntry(user, {
+                type: key === "status" ? "status" : "update",
+                field: key,
+                oldValue: oldV,
+                newValue: newV,
+                note: key === "notes" ? payloadFields.notes || "" : null,
+              })
+            );
           }
         }
 
@@ -296,10 +331,18 @@ export default function Leads() {
           ...payloadFields,
           createdAt: serverTimestamp(),
           createdBy: userForCreate.uid || "",
-          createdByName: userForCreate.displayName || userForCreate.email || userForCreate.uid || "",
+          createdByName:
+            userForCreate.displayName ||
+            userForCreate.email ||
+            userForCreate.uid ||
+            "",
           updatedAt: serverTimestamp(),
           updatedBy: userForCreate.uid || "",
-          updatedByName: userForCreate.displayName || userForCreate.email || userForCreate.uid || "",
+          updatedByName:
+            userForCreate.displayName ||
+            userForCreate.email ||
+            userForCreate.uid ||
+            "",
           history: [createEntry],
         });
       }
@@ -307,20 +350,24 @@ export default function Leads() {
       closeDrawer();
     } catch (err) {
       console.error("save lead error", err);
-      setError(err.message || "Failed to save leads.");
+      setError(err.message || "Failed to save lead.");
     } finally {
       setSaving(false);
     }
   };
 
-  // Status modal helpers
+  // ---------- Status modal helpers ----------
   const openStatusModal = (lead) => {
     const cur = lead.status || "new";
     const idx = STATUS_FLOW.indexOf(cur);
-    const next = idx >= 0 && idx < STATUS_FLOW.length - 1 ? STATUS_FLOW[idx + 1] : STATUS_FLOW[Math.max(0, idx)];
+    const next =
+      idx >= 0 && idx < STATUS_FLOW.length - 1
+        ? STATUS_FLOW[idx + 1]
+        : STATUS_FLOW[Math.max(0, idx)];
     setStatusModal({ open: true, lead, nextStatus: next, note: "" });
   };
-  const closeStatusModal = () => setStatusModal({ open: false, lead: null, nextStatus: null, note: "" });
+  const closeStatusModal = () =>
+    setStatusModal({ open: false, lead: null, nextStatus: null, note: "" });
 
   const confirmStatusChange = async () => {
     const { lead, nextStatus, note } = statusModal;
@@ -355,11 +402,11 @@ export default function Leads() {
     }
   };
 
-  // Details drawer
+  // ---------- Details drawer ----------
   const openDetails = (lead) => setDetailsLead(lead);
   const closeDetails = () => setDetailsLead(null);
 
-  // Delete
+  // ---------- Delete ----------
   const handleDelete = async (l) => {
     try {
       await deleteDoc(doc(db, "leads", l.id));
@@ -372,7 +419,8 @@ export default function Leads() {
 
   // lock body scroll when drawer/modal open
   useEffect(() => {
-    if (showForm || detailsLead || statusModal.open || openReq) document.body.classList.add("coupons-drawer-open");
+    if (showForm || detailsLead || statusModal.open || openReq)
+      document.body.classList.add("coupons-drawer-open");
     else document.body.classList.remove("coupons-drawer-open");
     return () => document.body.classList.remove("coupons-drawer-open");
   }, [showForm, detailsLead, statusModal.open, openReq]);
@@ -406,14 +454,15 @@ export default function Leads() {
       <header className="coupons-header">
         <div>
           <h1>📋 Leads</h1>
-          <p>Capture basic lead info. Convert when the lead is qualified.</p>
+          <p>Primary filter: <strong>Type</strong>. Then refine by <strong>Status</strong>.</p>
         </div>
         <div className="coupons-actions">
-          <button className="cp-btn" onClick={() => openDrawer(defaultForm)}>+ New Lead</button>
+          <button className="cp-btn" onClick={() => openDrawer(defaultForm)}>
+            + New Lead
+          </button>
           <button
             className="cp-btn primary"
             onClick={() => {
-              // Open requirement form standalone (no preselected lead)
               setDetailsLead(null);
               setReqLead(null);
               setTemplateReq(null);
@@ -425,8 +474,43 @@ export default function Leads() {
         </div>
       </header>
 
-      {/* Toolbar: search + stage chips + counter */}
+      {/* Toolbar: TYPE chips (server filter) + search + STATUS chips (client filter) */}
       <section className="coupons-toolbar">
+        {/* NEW: Type chips row — drives Firestore query */}
+        <div className="visits-chip-row" style={{ flex: "1 1 100%" }}>
+          <span className="muted" style={{ marginRight: 8 }}>Type:</span>
+          <button
+            type="button"
+            className={`chip ${typeFilter === "all" ? "is-active" : ""}`}
+            onClick={() => {
+              setTypeFilter("all");
+              setStatusFilter("all");
+            }}
+          >
+            All
+          </button>
+          <button
+            type="button"
+            className={`chip ${typeFilter === "equipment" ? "is-active" : ""}`}
+            onClick={() => {
+              setTypeFilter("equipment");
+              setStatusFilter("all");
+            }}
+          >
+            equipment
+          </button>
+          <button
+            type="button"
+            className={`chip ${typeFilter === "nursing" ? "is-active" : ""}`}
+            onClick={() => {
+              setTypeFilter("nursing");
+              setStatusFilter("all");
+            }}
+          >
+            nursing
+          </button>
+        </div>
+
         <input
           className="cp-input"
           placeholder="Search by customer, contact, phone, source…"
@@ -434,8 +518,9 @@ export default function Leads() {
           onChange={(e) => setSearch(e.target.value)}
         />
 
-        {/* Stage chips row */}
+        {/* Status chips row — counts are within current TYPE selection */}
         <div className="visits-chip-row" style={{ flex: "1 1 100%" }}>
+          <span className="muted" style={{ marginRight: 8 }}>Status:</span>
           <button
             type="button"
             className={`chip ${statusFilter === "all" ? "is-active" : ""}`}
@@ -448,7 +533,9 @@ export default function Leads() {
             <button
               key={s}
               type="button"
-              className={`chip ${statusClass(s)} ${statusFilter === s ? "is-active" : ""}`}
+              className={`chip ${statusClass(s)} ${
+                statusFilter === s ? "is-active" : ""
+              }`}
               onClick={() => setStatusFilter(s)}
             >
               {s} <span className="count">({statusCounts[s] || 0})</span>
@@ -456,7 +543,11 @@ export default function Leads() {
           ))}
         </div>
 
-        <div className="muted">Showing {filtered.length} of {leads.length}</div>
+        <div className="muted">
+          Showing {filtered.length} of {leads.length}
+          {typeFilter !== "all" ? ` · Type: ${typeFilter}` : ""}
+          {statusFilter !== "all" ? ` · Status: ${statusFilter}` : ""}
+        </div>
       </section>
 
       {/* Table */}
@@ -469,6 +560,7 @@ export default function Leads() {
                 <th>Contact</th>
                 <th>Phone</th>
                 <th>Source</th>
+                <th>Type</th>
                 <th>Status</th>
                 <th>Created By</th>
                 <th>Updated</th>
@@ -477,31 +569,51 @@ export default function Leads() {
             </thead>
             <tbody>
               {filtered.map((l) => {
-                const latestReq = reqByLead[l.id]; // NEW: latest requirement for this lead (if any)
+                const latestReq = reqByLead[l.id];
                 const canCreateReq = normStatus(l.status) === "req shared";
                 return (
                   <tr key={l.id}>
                     <td className="strong">{l.customerName}</td>
-                    <td className="muted">{l.contactPerson}{l.email ? ` · ${l.email}` : ""}</td>
+                    <td className="muted">
+                      {l.contactPerson}
+                      {l.email ? ` · ${l.email}` : ""}
+                    </td>
                     <td>{l.phone}</td>
                     <td className="muted">{l.leadSource || "—"}</td>
+                    <td className="muted">{l.type || "equipment"}</td>
                     <td>
-                      <span className={`chip ${statusClass(l.status)}`}>{l.status}</span>
+                      <span className={`chip ${statusClass(l.status)}`}>
+                        {l.status}
+                      </span>
                     </td>
                     <td className="muted">{l.createdByName || l.createdBy || "—"}</td>
                     <td className="muted">
-                      {l.updatedAt ? fmtDate(l.updatedAt) : (l.createdAt ? fmtDate(l.createdAt) : "—")} {l.updatedByName ? `· ${l.updatedByName}` : ""}
+                      {l.updatedAt
+                        ? fmtDate(l.updatedAt)
+                        : l.createdAt
+                        ? fmtDate(l.createdAt)
+                        : "—"}{" "}
+                      {l.updatedByName ? `· ${l.updatedByName}` : ""}
                     </td>
                     <td>
-                      <div className="row-actions" style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                        {/* edit lead */}
-                        <button title="Edit lead" className="row-action-icon" onClick={() => editLead(l)} style={{ padding: 6, borderRadius: 6, border: "1px solid rgba(0,0,0,0.04)", background: "#fff" }}>
+                      <div
+                        className="row-actions"
+                        style={{ display: "flex", gap: 8, alignItems: "center" }}
+                      >
+                        <button
+                          title="Edit lead"
+                          className="row-action-icon"
+                          onClick={() => editLead(l)}
+                          style={{
+                            padding: 6,
+                            borderRadius: 6,
+                            border: "1px solid rgba(0,0,0,0.04)",
+                            background: "#fff",
+                          }}
+                        >
                           ✎
                         </button>
 
-                        {/* Requirement action:
-                            - If at least one exists → Add another req (prefilled from latest)
-                            - Else (status is req shared) → + Req */}
                         {latestReq ? (
                           <button
                             title="Add another requirement (prefilled)"
@@ -509,11 +621,17 @@ export default function Leads() {
                             onClick={(e) => {
                               e.stopPropagation();
                               setReqLead(l);
-                              setTemplateReq(latestReq);   // pass prefill
+                              setTemplateReq(latestReq);
                               setDetailsLead(null);
                               setOpenReq(true);
                             }}
-                            style={{ padding: "6px 8px", borderRadius: 6, background: "#eef2ff", border: "none", fontWeight: 700 }}
+                            style={{
+                              padding: "6px 8px",
+                              borderRadius: 6,
+                              background: "#eef2ff",
+                              border: "none",
+                              fontWeight: 700,
+                            }}
                           >
                             Add another req
                           </button>
@@ -528,20 +646,41 @@ export default function Leads() {
                               setDetailsLead(null);
                               setOpenReq(true);
                             }}
-                            style={{ padding: "6px 8px", borderRadius: 6, background: "#f3f4f6", border: "none", fontWeight: 700 }}
+                            style={{
+                              padding: "6px 8px",
+                              borderRadius: 6,
+                              background: "#f3f4f6",
+                              border: "none",
+                              fontWeight: 700,
+                            }}
                           >
                             + Req
                           </button>
                         ) : null}
 
-                        {/* details */}
-                        <button className="cp-link" onClick={() => openDetails(l)}>View Details</button>
+                        <button className="cp-link" onClick={() => openDetails(l)}>
+                          View Details
+                        </button>
 
-                        {/* next stage */}
-                        <button className="cp-link next-stage" onClick={() => openStatusModal(l)}>Next Stage →</button>
+                        <button
+                          className="cp-link next-stage"
+                          onClick={() => openStatusModal(l)}
+                        >
+                          Next Stage →
+                        </button>
 
-                        {/* delete */}
-                        <button title="Delete lead" className="row-action-icon" onClick={() => setConfirmDelete(l)} style={{ padding: 6, borderRadius: 6, border: "1px solid rgba(0,0,0,0.04)", background: "#fff", color: "#b91c1c" }}>
+                        <button
+                          title="Delete lead"
+                          className="row-action-icon"
+                          onClick={() => setConfirmDelete(l)}
+                          style={{
+                            padding: 6,
+                            borderRadius: 6,
+                            border: "1px solid rgba(0,0,0,0.04)",
+                            background: "#fff",
+                            color: "#b91c1c",
+                          }}
+                        >
                           🗑
                         </button>
                       </div>
@@ -551,7 +690,9 @@ export default function Leads() {
               })}
               {!filtered.length && (
                 <tr>
-                  <td colSpan="8"><div className="empty">No leads found.</div></td>
+                  <td colSpan="9">
+                    <div className="empty">No leads found.</div>
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -563,53 +704,124 @@ export default function Leads() {
       {showForm && (
         <div
           className={`cp-drawer ${closing ? "closing" : ""}`}
-          onClick={(e) => { if (e.target.classList.contains("cp-drawer")) closeDrawer(); }}
+          onClick={(e) => {
+            if (e.target.classList.contains("cp-drawer")) closeDrawer();
+          }}
         >
           <form className="cp-form" onSubmit={handleSave}>
             <div className="cp-form-head">
               <h2>{form.id ? "Edit Lead" : "New Lead"}</h2>
-              <button type="button" className="cp-icon" onClick={closeDrawer}>✕</button>
+              <button type="button" className="cp-icon" onClick={closeDrawer}>
+                ✕
+              </button>
             </div>
 
             <div className="cp-grid">
               <div className="cp-field">
                 <label>Customer / Hospital</label>
-                <input className="cp-input" value={form.customerName} onChange={(e) => setForm((f) => ({ ...f, customerName: e.target.value }))} required />
+                <input
+                  className="cp-input"
+                  value={form.customerName}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, customerName: e.target.value }))
+                  }
+                  required
+                />
               </div>
 
               <div className="cp-field">
                 <label>Contact Person</label>
-                <input className="cp-input" value={form.contactPerson} onChange={(e) => setForm((f) => ({ ...f, contactPerson: e.target.value }))} required />
+                <input
+                  className="cp-input"
+                  value={form.contactPerson}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, contactPerson: e.target.value }))
+                  }
+                  required
+                />
               </div>
 
               <div className="cp-field">
                 <label>Phone</label>
-                <input className="cp-input" value={form.phone} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} required />
+                <input
+                  className="cp-input"
+                  value={form.phone}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, phone: e.target.value }))
+                  }
+                  required
+                />
               </div>
 
               <div className="cp-field">
                 <label>Email</label>
-                <input className="cp-input" value={form.email} onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))} />
+                <input
+                  className="cp-input"
+                  value={form.email}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, email: e.target.value }))
+                  }
+                />
               </div>
 
               <div className="cp-field">
                 <label>Address / City</label>
-                <input className="cp-input" value={form.address} onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))} />
+                <input
+                  className="cp-input"
+                  value={form.address}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, address: e.target.value }))
+                  }
+                />
               </div>
 
               <div className="cp-field">
                 <label>Lead Source</label>
-                <input className="cp-input" value={form.leadSource} onChange={(e) => setForm((f) => ({ ...f, leadSource: e.target.value }))} />
+                <input
+                  className="cp-input"
+                  value={form.leadSource}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, leadSource: e.target.value }))
+                  }
+                />
+              </div>
+
+              {/* NEW: Type */}
+              <div className="cp-field">
+                <label>Type</label>
+                <select
+                  className="cp-input"
+                  value={form.type}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, type: e.target.value }))
+                  }
+                >
+                  <option value="equipment">equipment</option>
+                  <option value="nursing">nursing</option>
+                </select>
               </div>
 
               <div className="cp-field" style={{ gridColumn: "1 / -1" }}>
                 <label>Notes</label>
-                <textarea className="cp-input" value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={3} />
+                <textarea
+                  className="cp-input"
+                  value={form.notes}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, notes: e.target.value }))
+                  }
+                  rows={3}
+                />
               </div>
 
               <div className="cp-field">
                 <label>Status</label>
-                <select className="cp-input" value={form.status} onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}>
+                <select
+                  className="cp-input"
+                  value={form.status}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, status: e.target.value }))
+                  }
+                >
                   <option value="new">new</option>
                   <option value="contacted">contacted</option>
                   <option value="req shared">req shared</option>
@@ -619,7 +831,11 @@ export default function Leads() {
 
               <div className="cp-field">
                 <label>Created By</label>
-                <input className="cp-input" value={form.createdByName || form.createdBy || ""} readOnly />
+                <input
+                  className="cp-input"
+                  value={form.createdByName || form.createdBy || ""}
+                  readOnly
+                />
                 <small className="muted">Automatically recorded</small>
               </div>
             </div>
@@ -629,32 +845,49 @@ export default function Leads() {
               <>
                 <hr />
                 <h3 style={{ marginTop: 4 }}>Recent history</h3>
-                <div style={{ maxHeight: 180, overflowY: "auto", padding: "8px 4px" }}>
-                  {(form.history && form.history.length ? form.history : (leads.find(x => x.id === form.id)?.history || []))
-                    .slice().reverse().slice(0, 8).map((h, i) => (
-                    <div key={i} style={{ padding: "8px 6px", borderBottom: "1px solid #f1f5f9" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                        <div style={{ fontWeight: 700, fontSize: 13 }}>
-                          {h.type?.toUpperCase() || "UPDATE"} {h.field ? `— ${h.field}` : ""}
+                <div
+                  style={{ maxHeight: 180, overflowY: "auto", padding: "8px 4px" }}
+                >
+                  {(form.history && form.history.length
+                    ? form.history
+                    : (leads.find((x) => x.id === form.id)?.history || [])
+                  )
+                    .slice()
+                    .reverse()
+                    .slice(0, 8)
+                    .map((h, i) => (
+                      <div key={i} style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                          <div style={{ fontWeight: 700, fontSize: 13 }}>
+                            {(h.type || "update").toUpperCase()} {h.field ? `— ${h.field}` : ""}
+                          </div>
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            {fmtDate(h.ts)}
+                          </div>
                         </div>
-                        <div className="muted" style={{ fontSize: 12 }}>{fmtDate(h.ts)}</div>
+                        <div style={{ fontSize: 13, marginTop: 6 }}>
+                          <span className="muted" style={{ fontWeight: 600 }}>
+                            {h.changedByName || h.changedBy}
+                          </span>
+                          {h.note ? <div style={{ marginTop: 6 }}>{h.note}</div> : null}
+                        </div>
                       </div>
-                      <div style={{ fontSize: 13, marginTop: 6 }}>
-                        <span className="muted" style={{ fontWeight: 600 }}>{h.changedByName || h.changedBy}</span>
-                        {h.note ? <div style={{ marginTop: 6 }}>{h.note}</div> : null}
-                      </div>
-                    </div>
-                  ))}
-                  {!((form.history && form.history.length) || (leads.find(x => x.id === form.id)?.history || []).length) && (
-                    <div className="muted" style={{ padding: 8 }}>No history yet for this lead.</div>
-                  )}
+                    ))}
+                  {!(
+                    (form.history && form.history.length) ||
+                    (leads.find((x) => x.id === form.id)?.history || []).length
+                  ) && <div className="muted" style={{ padding: 8 }}>No history yet for this lead.</div>}
                 </div>
               </>
             )}
 
             <div className="cp-form-actions">
-              <button type="button" className="cp-btn ghost" onClick={closeDrawer} disabled={saving}>Cancel</button>
-              <button className="cp-btn primary" disabled={saving}>{saving ? "Saving…" : form.id ? "Update Lead" : "Create Lead"}</button>
+              <button type="button" className="cp-btn ghost" onClick={closeDrawer} disabled={saving}>
+                Cancel
+              </button>
+              <button className="cp-btn primary" disabled={saving}>
+                {saving ? "Saving…" : form.id ? "Update Lead" : "Create Lead"}
+              </button>
             </div>
           </form>
         </div>
@@ -662,13 +895,23 @@ export default function Leads() {
 
       {/* Status modal */}
       {statusModal.open && statusModal.lead && (
-        <div className="cp-modal" onClick={(e) => { if (e.target.classList.contains("cp-modal")) closeStatusModal(); }}>
+        <div
+          className="cp-modal"
+          onClick={(e) => {
+            if (e.target.classList.contains("cp-modal")) closeStatusModal();
+          }}
+        >
           <div className="cp-modal-card">
             <h3>Change status for “{statusModal.lead.customerName}”</h3>
-            <p className="muted">From <strong>{statusModal.lead.status}</strong> → <strong>{statusModal.nextStatus}</strong></p>
+            <p className="muted">
+              From <strong>{statusModal.lead.status}</strong> →{" "}
+              <strong>{statusModal.nextStatus}</strong>
+            </p>
 
             <div style={{ marginTop: 12 }}>
-              <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>Note / Reason</label>
+              <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>
+                Note / Reason
+              </label>
               <textarea
                 value={statusModal.note}
                 onChange={(e) => setStatusModal((s) => ({ ...s, note: e.target.value }))}
@@ -679,8 +922,16 @@ export default function Leads() {
             </div>
 
             <div className="cp-form-actions" style={{ marginTop: 12 }}>
-              <button className="cp-btn ghost" onClick={closeStatusModal}>Cancel</button>
-              <button className="cp-btn primary" onClick={confirmStatusChange} disabled={!statusModal.note.trim()}>Confirm</button>
+              <button className="cp-btn ghost" onClick={closeStatusModal}>
+                Cancel
+              </button>
+              <button
+                className="cp-btn primary"
+                onClick={confirmStatusChange}
+                disabled={!statusModal.note.trim()}
+              >
+                Confirm
+              </button>
             </div>
           </div>
         </div>
@@ -688,11 +939,18 @@ export default function Leads() {
 
       {/* Details drawer */}
       {detailsLead && (
-        <div className="cp-drawer" onClick={(e) => { if (e.target.classList.contains("cp-drawer")) closeDetails(); }}>
+        <div
+          className="cp-drawer"
+          onClick={(e) => {
+            if (e.target.classList.contains("cp-drawer")) closeDetails();
+          }}
+        >
           <div className="cp-form details">
             <div className="cp-form-head">
               <h2>Lead Details</h2>
-              <button type="button" className="cp-icon" onClick={closeDetails}>✕</button>
+              <button type="button" className="cp-icon" onClick={closeDetails}>
+                ✕
+              </button>
             </div>
 
             <div className="details-grid">
@@ -704,7 +962,10 @@ export default function Leads() {
 
                 <div className="details-row">
                   <div className="label muted">Contact</div>
-                  <div className="value">{detailsLead.contactPerson}{detailsLead.email ? ` · ${detailsLead.email}` : ""}</div>
+                  <div className="value">
+                    {detailsLead.contactPerson}
+                    {detailsLead.email ? ` · ${detailsLead.email}` : ""}
+                  </div>
                 </div>
 
                 <div className="details-row">
@@ -728,7 +989,9 @@ export default function Leads() {
                   <div className="meta-row">
                     <div className="label muted">Status</div>
                     <div className="value">
-                      <span className={`chip ${statusClass(detailsLead.status)}`}>{detailsLead.status}</span>
+                      <span className={`chip ${statusClass(detailsLead.status)}`}>
+                        {detailsLead.status}
+                      </span>
                     </div>
                   </div>
 
@@ -738,14 +1001,26 @@ export default function Leads() {
                   </div>
 
                   <div className="meta-row">
+                    <div className="label muted">Type</div>
+                    <div className="value">{detailsLead.type || "equipment"}</div>
+                  </div>
+
+                  <div className="meta-row">
                     <div className="label muted">Created</div>
-                    <div className="value">{fmtDate(detailsLead.createdAt)} · {detailsLead.createdByName || detailsLead.createdBy || "—"}</div>
+                    <div className="value">
+                      {fmtDate(detailsLead.createdAt)} ·{" "}
+                      {detailsLead.createdByName || detailsLead.createdBy || "—"}
+                    </div>
                   </div>
 
                   <div className="meta-row">
                     <div className="label muted">Last Updated</div>
                     <div className="value">
-                      {detailsLead.updatedAt ? `${fmtDate(detailsLead.updatedAt)} · ${detailsLead.updatedByName || detailsLead.updatedBy}` : "—"}
+                      {detailsLead.updatedAt
+                        ? `${fmtDate(detailsLead.updatedAt)} · ${
+                            detailsLead.updatedByName || detailsLead.updatedBy
+                          }`
+                        : "—"}
                     </div>
                   </div>
                 </div>
@@ -757,7 +1032,10 @@ export default function Leads() {
             <div style={{ marginTop: 8 }}>
               <h3>Full History</h3>
               <div className="history-list" style={{ marginTop: 8 }}>
-                {(detailsLead.history && detailsLead.history.length ? detailsLead.history.slice().reverse() : []).map((h, i) => (
+                {(detailsLead.history && detailsLead.history.length
+                  ? detailsLead.history.slice().reverse()
+                  : []
+                ).map((h, i) => (
                   <div key={i} className="history-item">
                     <div className="meta">
                       <div className="who">
@@ -768,10 +1046,12 @@ export default function Leads() {
                     </div>
 
                     <div style={{ marginTop: 8 }}>
-                      <div style={{ fontWeight: 700 }}>{h.changedByName || h.changedBy}</div>
+                      <div style={{ fontWeight: 700 }}>
+                        {h.changedByName || h.changedBy}
+                      </div>
                       {h.note ? <div className="note">{h.note}</div> : null}
 
-                      {(h.oldValue || h.newValue) ? (
+                      {h.oldValue || h.newValue ? (
                         <div className="changes" style={{ marginTop: 10 }}>
                           <div className="change-pill">
                             <div className="k">From</div>
@@ -786,31 +1066,52 @@ export default function Leads() {
                     </div>
                   </div>
                 ))}
-                {(!detailsLead.history || !detailsLead.history.length) && <div className="muted" style={{ padding: 8 }}>No history available.</div>}
+                {(!detailsLead.history || !detailsLead.history.length) && (
+                  <div className="muted" style={{ padding: 8 }}>
+                    No history available.
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="details-footer" style={{ marginTop: 12, display: "flex", justifyContent: "space-between", gap: 8 }}>
+            <div
+              className="details-footer"
+              style={{
+                marginTop: 12,
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+              }}
+            >
               <div style={{ display: "flex", gap: 8 }}>
-                {/* Requirement action in details drawer */}
                 {reqByLead[detailsLead.id] ? (
                   <button
                     className="cp-btn"
-                    onClick={() => { setReqLead(detailsLead); setTemplateReq(reqByLead[detailsLead.id]); setOpenReq(true); }}
+                    onClick={() => {
+                      setReqLead(detailsLead);
+                      setTemplateReq(reqByLead[detailsLead.id]);
+                      setOpenReq(true);
+                    }}
                   >
                     Add another req
                   </button>
                 ) : normStatus(detailsLead.status) === "req shared" ? (
                   <button
                     className="cp-btn"
-                    onClick={() => { setReqLead(detailsLead); setTemplateReq(null); setOpenReq(true); }}
+                    onClick={() => {
+                      setReqLead(detailsLead);
+                      setTemplateReq(null);
+                      setOpenReq(true);
+                    }}
                   >
                     Create Requirement
                   </button>
                 ) : null}
               </div>
               <div>
-                <button className="cp-btn ghost" onClick={closeDetails}>Close</button>
+                <button className="cp-btn ghost" onClick={closeDetails}>
+                  Close
+                </button>
               </div>
             </div>
           </div>
@@ -820,11 +1121,22 @@ export default function Leads() {
       {/* Requirement drawer (create new or clone from latest) */}
       {openReq && (
         <RequirementForm
-          lead={reqLead || detailsLead || { id: "", customerName: "", contactPerson: "", phone: "", address: "" }}
-          templateRequirement={templateReq}   // NEW: prefill but create new
-          onCancel={() => { setOpenReq(false); setReqLead(null); setTemplateReq(null); }}
+          lead={
+            reqLead || detailsLead || {
+              id: "",
+              customerName: "",
+              contactPerson: "",
+              phone: "",
+              address: "",
+            }
+          }
+          templateRequirement={templateReq}
+          onCancel={() => {
+            setOpenReq(false);
+            setReqLead(null);
+            setTemplateReq(null);
+          }}
           onSaved={() => {
-            // Close requirement drawer
             setOpenReq(false);
             const leadToUse = reqLead || detailsLead;
             setReqLead(null);
@@ -858,8 +1170,12 @@ export default function Leads() {
             <h3>Delete lead “{confirmDelete.customerName}”?</h3>
             <p className="muted">This will permanently remove the lead.</p>
             <div className="cp-form-actions">
-              <button className="cp-btn ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
-              <button className="cp-btn danger" onClick={() => handleDelete(confirmDelete)}>Delete</button>
+              <button className="cp-btn ghost" onClick={() => setConfirmDelete(null)}>
+                Cancel
+              </button>
+              <button className="cp-btn danger" onClick={() => handleDelete(confirmDelete)}>
+                Delete
+              </button>
             </div>
           </div>
         </div>
