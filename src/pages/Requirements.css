@@ -95,3 +95,20 @@ body{margin:0;font-family:Inter, "Segoe UI", Roboto, "Helvetica Neue", Arial, sa
 
 /* Accessibility */
 :focus{outline:3px solid rgba(11,92,255,0.08);outline-offset:2px}
+/* Quotation row inside Requirements */
+.req-quote-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: center;
+}
+.req-quote-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #fff;
+}
+.req-quote-input.small { text-align: center; }

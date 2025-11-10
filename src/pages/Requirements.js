@@ -1,4 +1,4 @@
-// src/pages/Requirements.jsx
+// src/pages/Requirements.js
 import React, { useEffect, useMemo, useState } from "react";
 import {
   addDoc,
@@ -16,7 +16,7 @@ import { db, auth } from "../firebase";
 import "./Requirements.css";
 import { makeHistoryEntry, propagateToLead } from "../utils/status";
 
-/* Quotation object — default as SENT (no draft) */
+/* Quotation object — default */
 const defaultQuotation = {
   id: null,
   requirementId: "",
@@ -39,7 +39,7 @@ const defaultQuotation = {
   discount: { type: "percent", value: 0 },
   taxes: [{ name: "GST", rate: 18 }],
   notes: "",
-  status: "sent", // SENT first; no draft anywhere
+  status: "sent",
   createdAt: null,
   createdBy: "",
   createdByName: "",
@@ -47,12 +47,12 @@ const defaultQuotation = {
 
 const fmtCurrency = (v) => {
   try {
-    return Number(v).toLocaleString(undefined, {
+    return Number(v || 0).toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
   } catch {
-    return v ?? "0.00";
+    return String(v ?? "0.00");
   }
 };
 
@@ -63,9 +63,10 @@ const calcAmounts = (items, discount, taxes) => {
   );
   let discountAmount = 0;
   if (discount) {
-    if (discount.type === "percent")
-      discountAmount = subtotal * (Number(discount.value || 0) / 100);
-    else discountAmount = Number(discount.value || 0);
+    discountAmount =
+      discount.type === "percent"
+        ? subtotal * (Number(discount.value || 0) / 100)
+        : Number(discount.value || 0);
   }
   const taxable = Math.max(0, subtotal - discountAmount);
   const taxBreakdown = (taxes || []).map((t) => ({
@@ -93,9 +94,8 @@ const parseDateForDisplay = (ts) => {
   }
 };
 
-/* Requirement statuses shown in chips — NO draft */
+/* Requirement statuses shown in chips */
 const REQ_STATUSES = ["ready_for_quotation", "quotation shared"];
-
 const norm = (s = "") => String(s || "").toLowerCase();
 const statusClass = (s = "") =>
   s
@@ -116,6 +116,9 @@ export default function Requirements() {
   const [openQuotation, setOpenQuotation] = useState(false);
   const [quotation, setQuotation] = useState(defaultQuotation);
   const [confirmDelete, setConfirmDelete] = useState(null);
+
+  // Track last focused item index for "+ Add Item below current"
+  const [activeItemIdx, setActiveItemIdx] = useState(null);
 
   useEffect(() => {
     setLoading(true);
@@ -139,11 +142,7 @@ export default function Requirements() {
   const openDetails = (r) => setDetailsReq(r);
   const closeDetails = () => setDetailsReq(null);
 
-  /* Create Quotation:
-     - quotation starts as SENT (no draft)
-     - requirement remains READY until Save & Share
-     - on save, requirement becomes QUOTATION SHARED
-  */
+  /* Create Quotation drawer */
   const openCreateQuotation = async (req) => {
     setError("");
     const user = auth.currentUser || {};
@@ -157,7 +156,7 @@ export default function Requirements() {
           field: "assignedTo",
           oldValue: req.assignedTo || "",
           newValue: user.uid,
-          note: "Assigned to user when opening quotation",
+          note: "Assigned when opening quotation",
         });
         updateDoc(reqDoc, {
           assignedTo: user.uid,
@@ -166,10 +165,8 @@ export default function Requirements() {
           updatedBy: user.uid || "",
           updatedByName: user.displayName || user.email || user.uid || "",
           history: arrayUnion(entry),
-        }).catch((e) => console.error("auto-assign on quotation open failed", e));
-      } catch (e) {
-        console.error("auto-assign error", e);
-      }
+        }).catch(() => {});
+      } catch {}
     }
 
     const sourceItems =
@@ -216,19 +213,21 @@ export default function Requirements() {
       quotationId: `QT-${Math.floor(Date.now() / 1000)}`,
       items,
       notes: `Quotation for requirement ${req?.reqNo || req?.id || ""}`,
-      status: "sent", // start as SENT (no draft)
+      status: "sent",
       createdAt: null,
       createdBy: user.uid || "",
       createdByName: user.displayName || user.email || "",
     };
 
     setQuotation(base);
+    setActiveItemIdx(null);
     setOpenQuotation(true);
   };
 
   const closeQuotation = () => {
     setOpenQuotation(false);
     setQuotation(defaultQuotation);
+    setActiveItemIdx(null);
   };
 
   const updateQuotationItem = (idx, patch) => {
@@ -240,28 +239,33 @@ export default function Requirements() {
       return { ...q, items };
     });
   };
+
+  // Insert NEW item right BELOW the last focused row; copy its dates/days
   const addQuotationItem = () =>
-    setQuotation((q) => ({
-      ...q,
-      items: [
-        ...(q.items || []),
-        {
-          id:
-            Date.now() +
-            "-i" +
-            Math.random().toString(36).slice(2, 7),
-          name: "",
-          qty: 1,
-          rate: 0,
-          amount: 0,
-          notes: "",
-          days: 0,
-          expectedStartDate: "",
-          expectedEndDate: "",
-          productId: "",
-        },
-      ],
-    }));
+    setQuotation((q) => {
+      const items = (q.items || []).slice();
+      const idx =
+        typeof activeItemIdx === "number" && activeItemIdx >= 0
+          ? activeItemIdx
+          : items.length - 1;
+      const base = items[idx] || {};
+      const newItem = {
+        id: Date.now() + "-i" + Math.random().toString(36).slice(2, 7),
+        name: "",
+        qty: 1,
+        rate: 0,
+        amount: 0,
+        days: base.days ?? 0,
+        expectedStartDate: base.expectedStartDate || "",
+        expectedEndDate: base.expectedEndDate || "",
+        notes: "",
+        productId: "",
+      };
+      const insertAt = Math.max(0, Math.min((idx ?? items.length - 1) + 1, items.length));
+      items.splice(insertAt, 0, newItem);
+      return { ...q, items };
+    });
+
   const removeQuotationItem = (idx) =>
     setQuotation((q) => ({
       ...q,
@@ -301,7 +305,7 @@ export default function Requirements() {
         discount: quotation.discount || { type: "percent", value: 0 },
         taxes: quotation.taxes || [],
         notes: quotation.notes || "",
-        status: quotation.status || "sent", // ensure not draft
+        status: quotation.status || "sent",
         totals: {
           subtotal: amounts.subtotal,
           discountAmount: amounts.discountAmount,
@@ -316,7 +320,7 @@ export default function Requirements() {
 
       const ref = await addDoc(collection(db, "quotations"), payload);
 
-      // On save (i.e., "sent"), mark requirement as "quotation shared"
+      // Mark requirement as "quotation shared"
       if (quotation.requirementId) {
         const reqDoc = doc(db, "requirements", quotation.requirementId);
         const entry = makeHistoryEntry(user, {
@@ -352,15 +356,15 @@ export default function Requirements() {
   };
 
   // Delete a requirement
-const handleDelete = async (req) => {
-  try {
-    await deleteDoc(doc(db, "requirements", req.id));
-    setConfirmDelete(null);
-  } catch (err) {
-    console.error("delete requirement", err);
-    setError(err.message || "Failed to delete requirement");
-  }
-};
+  const handleDelete = async (req) => {
+    try {
+      await deleteDoc(doc(db, "requirements", req.id));
+      setConfirmDelete(null);
+    } catch (err) {
+      console.error("delete requirement", err);
+      setError(err.message || "Failed to delete requirement");
+    }
+  };
 
   const changeReqStatus = async (req, newStatus, note = "") => {
     try {
@@ -372,7 +376,7 @@ const handleDelete = async (req) => {
         newValue: newStatus,
         note,
       });
-    await updateDoc(doc(db, "requirements", req.id), {
+      await updateDoc(doc(db, "requirements", req.id), {
         status: newStatus,
         updatedAt: serverTimestamp(),
         updatedBy: user.uid || "",
@@ -410,8 +414,7 @@ const handleDelete = async (req) => {
       });
       await updateDoc(reqDoc, {
         assignedTo: user.uid,
-        assignedToName:
-          user.displayName || user.email || user.uid || "",
+        assignedToName: user.displayName || user.email || user.uid || "",
         updatedAt: serverTimestamp(),
         updatedBy: user.uid || "",
         updatedByName: user.displayName || user.email || user.uid || "",
@@ -423,16 +426,14 @@ const handleDelete = async (req) => {
     }
   };
 
-  // Counts & filter for chips (no draft bucket)
+  // Counts & filter for chips
   const statusCounts = useMemo(() => {
     const map = { all: requirements.length };
     for (const r of requirements) {
       const s = norm(r.status);
       if (s) map[s] = (map[s] || 0) + 1;
     }
-    for (const s of REQ_STATUSES) {
-      if (map[s] == null) map[s] = 0;
-    }
+    for (const s of REQ_STATUSES) if (map[s] == null) map[s] = 0;
     return map;
   }, [requirements]);
 
@@ -456,14 +457,13 @@ const handleDelete = async (req) => {
         <div>
           <h1>📑 Requirements</h1>
           <p>
-            Operations → move requirements from{" "}
-            <strong>ready for quotation</strong> to{" "}
+            Operations → move requirements from <strong>ready for quotation</strong> to{" "}
             <strong>quotation shared</strong>.
           </p>
         </div>
       </header>
 
-      {/* Status chips toolbar — All / Ready for quotation / Quotation shared */}
+      {/* Status chips toolbar */}
       <section className="coupons-toolbar" style={{ marginTop: 8 }}>
         <div className="visits-chip-row" style={{ width: "100%" }}>
           <button
@@ -482,9 +482,7 @@ const handleDelete = async (req) => {
             onClick={() => setStatusFilter("ready_for_quotation")}
           >
             ready for quotation{" "}
-            <span className="count">
-              ({statusCounts.ready_for_quotation || 0})
-            </span>
+            <span className="count">({statusCounts.ready_for_quotation || 0})</span>
           </button>
 
           <button
@@ -495,15 +493,11 @@ const handleDelete = async (req) => {
             onClick={() => setStatusFilter("quotation shared")}
           >
             quotation shared{" "}
-            <span className="count">
-              ({statusCounts["quotation shared"] || 0})
-            </span>
+            <span className="count">({statusCounts["quotation shared"] || 0})</span>
           </button>
         </div>
 
-        <div className="muted">
-          Showing {filtered.length} of {requirements.length}
-        </div>
+        <div className="muted">Showing {filtered.length} of {requirements.length}</div>
       </section>
 
       <section className="coupons-card">
@@ -523,52 +517,32 @@ const handleDelete = async (req) => {
             <tbody>
               {filtered.map((r) => {
                 const customer =
-                  r.leadSnapshot?.customerName ||
-                  r.customerName ||
-                  r.name ||
-                  "—";
+                  r.leadSnapshot?.customerName || r.customerName || r.name || "—";
                 const contact =
-                  r.leadSnapshot?.contactPerson ||
-                  r.contactPerson ||
-                  "—";
+                  r.leadSnapshot?.contactPerson || r.contactPerson || "—";
                 const phone = r.leadSnapshot?.phone || r.phone || "—";
                 const sClass = statusClass(r.status || "");
                 return (
                   <tr key={r.id}>
-                    <td className="strong">
-                      {r.reqNo || r.requirementId || r.id}
-                    </td>
+                    <td className="strong">{r.reqNo || r.requirementId || r.id}</td>
                     <td className="muted">{customer}</td>
                     <td className="muted">{contact}</td>
                     <td>{phone}</td>
                     <td>
-                      <span className={`chip ${sClass}`}>
-                        {r.status || "—"}
-                      </span>
+                      <span className={`chip ${sClass}`}>{r.status || "—"}</span>
                     </td>
-                    <td className="muted">
-                      {parseDateForDisplay(r.createdAt)}
-                    </td>
+                    <td className="muted">{parseDateForDisplay(r.createdAt)}</td>
                     <td>
                       <div className="row-actions">
-                        <button
-                          className="cp-link"
-                          onClick={() => openDetails(r)}
-                        >
+                        <button className="cp-link" onClick={() => openDetails(r)}>
                           View
                         </button>
                         {norm(r.status) !== "quotation shared" ? (
-                          <button
-                            className="cp-link"
-                            onClick={() => openCreateQuotation(r)}
-                          >
+                          <button className="cp-link" onClick={() => openCreateQuotation(r)}>
                             Create Quotation
                           </button>
                         ) : null}
-                        <button
-                          className="cp-link"
-                          onClick={() => setConfirmDelete(r)}
-                        >
+                        <button className="cp-link" onClick={() => setConfirmDelete(r)}>
                           Delete
                         </button>
                       </div>
@@ -599,18 +573,9 @@ const handleDelete = async (req) => {
           <div className="cp-form details" onClick={(e) => e.stopPropagation()}>
             <div className="cp-form-head">
               <h2>
-                Requirement:{" "}
-                {detailsReq.reqNo ||
-                  detailsReq.requirementId ||
-                  detailsReq.id}
+                Requirement: {detailsReq.reqNo || detailsReq.requirementId || detailsReq.id}
               </h2>
-              <button
-                type="button"
-                className="cp-icon"
-                onClick={closeDetails}
-              >
-                ✕
-              </button>
+            <button type="button" className="cp-icon" onClick={closeDetails}>✕</button>
             </div>
 
             <div className="details-grid">
@@ -678,50 +643,46 @@ const handleDelete = async (req) => {
                       </tr>
                     </thead>
                     <tbody>
-                      {(detailsReq.equipment ||
-                        detailsReq.requirementItems ||
-                        []
-                      ).map((it, i) => {
-                        const name =
-                          it.name || it.itemName || it.productName || "";
-                        const qty = it.qty || it.quantity || 1;
-                        const days =
-                          it.expectedDurationDays ??
-                          it.days ??
-                          detailsReq?.expectedDurationDays ??
-                          "—";
-                        const start =
-                          it.expectedStartDate ||
-                          it.startDate ||
-                          detailsReq?.expectedStartDate ||
-                          "";
-                        const end =
-                          it.expectedEndDate ||
-                          it.endDate ||
-                          detailsReq?.expectedEndDate ||
-                          "";
-                        const notes = it.unitNotes || it.notes || "";
-                        const productId = it.productId || "";
-                        return (
-                          <tr key={i}>
-                            <td>{name || "—"}</td>
-                            <td>{qty}</td>
-                            <td>{days ?? "—"}</td>
-                            <td className="item-date">
-                              {start ? parseDateForDisplay(start) : "—"}
-                            </td>
-                            <td className="item-date">
-                              {end ? parseDateForDisplay(end) : "—"}
-                            </td>
-                            <td className="item-notes">{notes || "—"}</td>
-                            <td>{productId || "—"}</td>
-                          </tr>
-                        );
-                      })}
-                      {((detailsReq.equipment ||
-                        detailsReq.requirementItems ||
-                        []
-                      ).length === 0) && (
+                      {(detailsReq.equipment || detailsReq.requirementItems || []).map(
+                        (it, i) => {
+                          const name = it.name || it.itemName || it.productName || "";
+                          const qty = it.qty || it.quantity || 1;
+                          const days =
+                            it.expectedDurationDays ??
+                            it.days ??
+                            detailsReq?.expectedDurationDays ??
+                            "—";
+                          const start =
+                            it.expectedStartDate ||
+                            it.startDate ||
+                            detailsReq?.expectedStartDate ||
+                            "";
+                          const end =
+                            it.expectedEndDate ||
+                            it.endDate ||
+                            detailsReq?.expectedEndDate ||
+                            "";
+                          const notes = it.unitNotes || it.notes || "";
+                          const productId = it.productId || "";
+                          return (
+                            <tr key={i}>
+                              <td>{name || "—"}</td>
+                              <td>{qty}</td>
+                              <td>{days ?? "—"}</td>
+                              <td className="item-date">
+                                {start ? parseDateForDisplay(start) : "—"}
+                              </td>
+                              <td className="item-date">
+                                {end ? parseDateForDisplay(end) : "—"}
+                              </td>
+                              <td className="item-notes">{notes || "—"}</td>
+                              <td>{productId || "—"}</td>
+                            </tr>
+                          );
+                        }
+                      )}
+                      {((detailsReq.equipment || detailsReq.requirementItems || [])
+                        .length === 0) && (
                         <tr>
                           <td colSpan="7" className="muted">
                             No items listed.
@@ -794,10 +755,7 @@ const handleDelete = async (req) => {
                     <div className="label muted">Operations</div>
                     <div className="value">
                       {norm(detailsReq.status) !== "quotation shared" ? (
-                        <button
-                          className="cp-btn"
-                          onClick={() => openCreateQuotation(detailsReq)}
-                        >
+                        <button className="cp-btn" onClick={() => openCreateQuotation(detailsReq)}>
                           Create Quotation
                         </button>
                       ) : (
@@ -807,10 +765,7 @@ const handleDelete = async (req) => {
                   </div>
 
                   <div style={{ marginTop: 8 }}>
-                    <button
-                      className="cp-btn ghost"
-                      onClick={() => assignToMe(detailsReq)}
-                    >
+                    <button className="cp-btn ghost" onClick={() => assignToMe(detailsReq)}>
                       Assign to me
                     </button>
                   </div>
@@ -833,9 +788,7 @@ const handleDelete = async (req) => {
                         <span className="type">{h.type?.toUpperCase()}</span>{" "}
                         {h.field ? `— ${h.field}` : ""}
                       </div>
-                      <div className="time muted">
-                        {parseDateForDisplay(h.ts)}
-                      </div>
+                      <div className="time muted">{parseDateForDisplay(h.ts)}</div>
                     </div>
                     <div style={{ marginTop: 8 }}>
                       <div style={{ fontWeight: 700 }}>
@@ -867,12 +820,7 @@ const handleDelete = async (req) => {
 
             <div
               className="details-footer"
-              style={{
-                marginTop: 12,
-                display: "flex",
-                justifyContent: "space-between",
-                gap: 8,
-              }}
+              style={{ marginTop: 12, display: "flex", justifyContent: "space-between", gap: 8 }}
             >
               <div style={{ display: "flex", gap: 8 }}>
                 {norm(detailsReq.status) !== "quotation shared" && (
@@ -909,11 +857,7 @@ const handleDelete = async (req) => {
           <div className="cp-form details" onClick={(e) => e.stopPropagation()}>
             <div className="cp-form-head">
               <h2>Quotation for {quotation.requirementId || "—"}</h2>
-              <button
-                type="button"
-                className="cp-icon"
-                onClick={closeQuotation}
-              >
+              <button type="button" className="cp-icon" onClick={closeQuotation}>
                 ✕
               </button>
             </div>
@@ -930,16 +874,14 @@ const handleDelete = async (req) => {
                     }
                   />
                 </div>
+
                 <div className="cp-field">
                   <label>Quotation ID</label>
                   <input
                     className="cp-input"
                     value={quotation.quotationId}
                     onChange={(e) =>
-                      setQuotation((q) => ({
-                        ...q,
-                        quotationId: e.target.value,
-                      }))
+                      setQuotation((q) => ({ ...q, quotationId: e.target.value }))
                     }
                   />
                 </div>
@@ -949,44 +891,66 @@ const handleDelete = async (req) => {
                   <div className="quotation-items">
                     {quotation.items.map((it, idx) => (
                       <div key={it.id} className="quotation-item">
-                        <input
-                          className="cp-input"
-                          placeholder="Item name"
-                          value={it.name}
-                          onChange={(e) =>
-                            updateQuotationItem(idx, { name: e.target.value })
-                          }
-                        />
-                        <input
-                          className="cp-input"
-                          placeholder="Qty"
-                          value={it.qty}
-                          onChange={(e) =>
-                            updateQuotationItem(idx, {
-                              qty: Number(e.target.value || 0),
-                            })
-                          }
-                        />
-                        <input
-                          className="cp-input"
-                          placeholder="Rate"
-                          value={it.rate}
-                          onChange={(e) =>
-                            updateQuotationItem(idx, {
-                              rate: Number(e.target.value || 0),
-                            })
-                          }
-                        />
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button
-                            type="button"
-                            className="cp-btn ghost"
-                            onClick={() => removeQuotationItem(idx)}
-                          >
-                            Remove
-                          </button>
+                        {/* ONE ROW: Product name | Qty | Price | Total | Remove */}
+                        <div className="req-quote-row">
+                          <input
+                            className="req-quote-input"
+                            placeholder="Product name"
+                            value={it.name || ""}
+                            onFocus={() => setActiveItemIdx(idx)}
+                            onChange={(e) =>
+                              updateQuotationItem(idx, { name: e.target.value })
+                            }
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            className="req-quote-input small"
+                            placeholder="Qty"
+                            value={it.qty ?? ""}
+                            onFocus={() => setActiveItemIdx(idx)}
+                            onChange={(e) =>
+                              updateQuotationItem(idx, {
+                                qty: Number(e.target.value || 0),
+                              })
+                            }
+                          />
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            className="req-quote-input small"
+                            placeholder="Price"
+                            value={it.rate ?? ""}
+                            onFocus={() => setActiveItemIdx(idx)}
+                            onChange={(e) =>
+                              updateQuotationItem(idx, {
+                                rate: Number(e.target.value || 0),
+                              })
+                            }
+                          />
+
+                          {/* Line Total */}
+                          <div className="req-quote-total">
+                            {fmtCurrency(
+                              (Number(it.qty || 0) * Number(it.rate || 0)) || 0
+                            )}
+                          </div>
+
+                          {/* Remove */}
+                          <div className="req-quote-actions">
+                            <button
+                              type="button"
+                              className="cp-btn danger"
+                              onClick={() => removeQuotationItem(idx)}
+                              title="Remove item"
+                            >
+                              ✕
+                            </button>
+                          </div>
                         </div>
 
+                        {/* Extra details remain below */}
                         <div className="extra-details">
                           Days: {it.days ?? "—"} • Start:{" "}
                           {it.expectedStartDate
@@ -1003,11 +967,7 @@ const handleDelete = async (req) => {
                     ))}
 
                     <div>
-                      <button
-                        type="button"
-                        className="cp-btn"
-                        onClick={addQuotationItem}
-                      >
+                      <button type="button" className="cp-btn" onClick={addQuotationItem}>
                         + Add Item
                       </button>
                     </div>
@@ -1031,9 +991,7 @@ const handleDelete = async (req) => {
                 <div className="quotation-meta">
                   <div className="meta-row">
                     <div className="label muted">Subtotal</div>
-                    <div className="value">
-                      {fmtCurrency(amounts.subtotal)}
-                    </div>
+                    <div className="value">{fmtCurrency(amounts.subtotal)}</div>
                   </div>
 
                   <div className="meta-row">
@@ -1102,10 +1060,7 @@ const handleDelete = async (req) => {
                                 ...q,
                                 taxes: q.taxes.map((tt, ii) =>
                                   ii === i
-                                    ? {
-                                        ...tt,
-                                        rate: Number(e.target.value || 0),
-                                      }
+                                    ? { ...tt, rate: Number(e.target.value || 0) }
                                     : tt
                                 ),
                               }))
@@ -1130,34 +1085,24 @@ const handleDelete = async (req) => {
 
                   <div className="meta-row">
                     <div className="label muted">Discount Amount</div>
-                    <div className="value">
-                      {fmtCurrency(amounts.discountAmount)}
-                    </div>
+                    <div className="value">{fmtCurrency(amounts.discountAmount)}</div>
                   </div>
                   <div className="meta-row">
                     <div className="label muted">Total Tax</div>
-                    <div className="value">
-                      {fmtCurrency(amounts.totalTax)}
-                    </div>
+                    <div className="value">{fmtCurrency(amounts.totalTax)}</div>
                   </div>
                   <div className="meta-row">
                     <div className="label muted">Total</div>
-                    <div className="value strong">
-                      {fmtCurrency(amounts.total)}
-                    </div>
+                    <div className="value strong">{fmtCurrency(amounts.total)}</div>
                   </div>
 
-                  {/* Status — NO draft, Sent first */}
                   <div style={{ marginTop: 12 }}>
                     <label className="muted">Quotation Status</label>
                     <select
                       className="cp-input"
                       value={quotation.status}
                       onChange={(e) =>
-                        setQuotation((q) => ({
-                          ...q,
-                          status: e.target.value,
-                        }))
+                        setQuotation((q) => ({ ...q, status: e.target.value }))
                       }
                     >
                       <option value="sent">sent</option>
@@ -1193,23 +1138,16 @@ const handleDelete = async (req) => {
         <div className="cp-modal">
           <div className="cp-modal-card">
             <h3>
-              Delete requirement “
-              {confirmDelete.reqNo || confirmDelete.customerName}”?
+              Delete requirement “{confirmDelete.reqNo || confirmDelete.customerName}”?
             </h3>
             <p className="muted">
               This will permanently remove the requirement and its attachments (if any).
             </p>
             <div className="cp-form-actions">
-              <button
-                className="cp-btn ghost"
-                onClick={() => setConfirmDelete(null)}
-              >
+              <button className="cp-btn ghost" onClick={() => setConfirmDelete(null)}>
                 Cancel
               </button>
-              <button
-                className="cp-btn danger"
-                onClick={() => handleDelete(confirmDelete)}
-              >
+              <button className="cp-btn danger" onClick={() => handleDelete(confirmDelete)}>
                 Delete
               </button>
             </div>
