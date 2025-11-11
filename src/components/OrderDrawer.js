@@ -5,7 +5,7 @@ import {
   reserveAsset,
   unreserveAsset,
 } from "../utils/inventory";
-
+import DeliveryHistory from "./DeliveryHistory";
 export default function OrderDrawer({
   // state
   selectedOrder,
@@ -692,65 +692,11 @@ export default function OrderDrawer({
                       "—"}
                   </div>
 
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      marginTop: 8,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    <button
-                      className="cp-btn ghost"
-                      onClick={driverAcceptDelivery}
-                      disabled={
-                        !selectedOrder.delivery?.deliveryId ||
-                        selectedOrder.deliveryStatus === "accepted"
-                      }
-                    >
-                      Driver Accept
-                    </button>
-                    <button
-                      className="cp-btn ghost"
-                      onClick={markPickedUp}
-                      disabled={
-                        !selectedOrder.delivery?.deliveryId ||
-                        selectedOrder.deliveryStatus === "picked_up"
-                      }
-                    >
-                      Picked up
-                    </button>
-                    <button
-                      className="cp-btn ghost"
-                      onClick={markInTransit}
-                      disabled={
-                        !selectedOrder.delivery?.deliveryId ||
-                        selectedOrder.deliveryStatus === "in_transit"
-                      }
-                    >
-                      In transit
-                    </button>
-                    <button
-                      className="cp-btn ghost"
-                      onClick={markDelivered}
-                      disabled={
-                        !selectedOrder.delivery?.deliveryId ||
-                        selectedOrder.deliveryStatus === "delivered"
-                      }
-                    >
-                      Delivered
-                    </button>
-                    <button
-                      className="cp-btn"
-                      onClick={confirmDeliveryAccepted}
-                      disabled={
-                        !selectedOrder.delivery?.deliveryId ||
-                        selectedOrder.deliveryStatus === "completed"
-                      }
-                    >
-                      Accept delivery
-                    </button>
-                  </div>
+                 <section style={{ marginTop: 16 }}>
+  <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 800 }}>Delivery History</h3>
+  <DeliveryHistory order={selectedOrder} />
+</section>
+
                 </div>
 
                 {/* Totals */}

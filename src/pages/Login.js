@@ -2,30 +2,28 @@ import React, { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebase";
 import "./Login.css";
+import { useNavigate } from "react-router-dom";
 
 function Login({ onLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
+    const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password);
-      // onAuthStateChanged in App will fire — call onLogin to let parent know if provided
-      if (typeof onLogin === "function") onLogin();
+      navigate("/"); // ✅ Redirect after login
     } catch (err) {
-      // Friendly error messages
-      const msg = err?.code
-        ? (err.code === "auth/user-not-found"
-            ? "No account found for this email."
-            : err.code === "auth/wrong-password"
-            ? "Incorrect password."
-            : err.message)
-        : (err.message || "Login failed.");
+      const msg = err.code === "auth/user-not-found"
+        ? "No account found for this email."
+        : err.code === "auth/wrong-password"
+        ? "Incorrect password."
+        : err.message || "Login failed.";
       setError(msg);
     } finally {
       setLoading(false);
