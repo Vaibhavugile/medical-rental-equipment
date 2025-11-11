@@ -386,9 +386,9 @@ export default function Products() {
           <p className="muted">Realtime asset counts, reservations, maintenance, and safe creation flows.</p>
         </div>
         <div className="coupons-actions">
-          <button className="cp-btn" onClick={() => { setQueryText(""); setSelectedProduct(null); }}>Reset</button>
+          {/* <button className="cp-btn" onClick={() => { setQueryText(""); setSelectedProduct(null); }}>Reset</button> */}
           <button className="cp-btn primary" onClick={openAddProduct}>+ Add Product</button>
-          <button className="cp-btn" onClick={syncAllCountsToProducts}>Sync counts to products</button>
+          {/* <button className="cp-btn" onClick={syncAllCountsToProducts}>Sync counts to products</button> */}
         </div>
       </header>
 

@@ -246,3 +246,6 @@ body {
 @media (max-width: 440px) {
   .visits-chip-row { grid-template-columns: repeat(2, 1fr); }
 }
+button.cp-icon{
+  background-color: #2563eb;
+}

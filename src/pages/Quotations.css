@@ -32,7 +32,7 @@
 .qp-drawer{position:fixed!important;inset:0!important;display:flex!important;justify-content:center!important;align-items:flex-start!important;padding:20px!important;background:rgba(9,30,66,.22)!important;z-index:1300!important}
 .qp-form{width:min(1200px,96%)!important;max-height:calc(100vh - 60px)!important;overflow:auto!important;background:#fff!important;border-radius:12px!important;padding:18px!important;box-shadow:0 14px 48px rgba(2,6,23,.12)!important}
 .qp-form-head{display:flex!important;justify-content:space-between!important;align-items:center!important;border-bottom:1px solid #eef2f7!important;padding-bottom:8px!important;margin-bottom:12px!important}
-.qp-close{background:transparent!important;border:none!important;font-size:18px!important;cursor:pointer!important}
+.qp-close{background:transparent!important;border:none!important;font-size:18px!important;cursor:pointer!important;color: #0b5cff!important;}
 
 /* Two-column layout inside drawer */
 .qp-grid{display:grid!important;grid-template-columns:1fr 360px!important;gap:18px!important;align-items:start!important}
@@ -98,3 +98,4 @@
   background:#e8f1ff !important;
   border-color:#0b5cff !important;
 }
+

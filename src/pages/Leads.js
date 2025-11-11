@@ -609,6 +609,7 @@ export default function Leads() {
                             borderRadius: 6,
                             border: "1px solid rgba(0,0,0,0.04)",
                             background: "#fff",
+                            color:"black",
                           }}
                         >
                           ✎

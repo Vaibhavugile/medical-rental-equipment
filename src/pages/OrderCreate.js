@@ -46,6 +46,31 @@ function calcTotals(items = [], discount = { type: "percent", value: 0 }, taxes 
   return { subtotal, discountAmount, taxBreakdown, totalTax, total };
 }
 
+// --- helpers to normalize shape variations ---
+const normAddress = (addr) => {
+  if (!addr) return "";
+  if (typeof addr === "string") return addr;
+  const parts = [
+    addr.line1 || addr.address1 || addr.street,
+    addr.line2 || addr.address2,
+    addr.city || addr.town,
+    addr.state || addr.province,
+    addr.postalCode || addr.zip,
+    addr.country,
+  ].filter(Boolean);
+  return parts.join(", ");
+};
+
+const normContact = (c) => {
+  if (!c) return null;
+  if (typeof c === "string") return { name: c };
+  return {
+    name: c.name || c.person || c.contactPerson || c.contactperson || "",
+    phone: c.phone || c.mobile || c.contact || "",
+    email: c.email || "",
+  };
+};
+
 export default function OrderCreate({ open, quotation: incomingQuotation, onClose, onCreated }) {
   const navigate = useNavigate();
 
@@ -95,7 +120,6 @@ export default function OrderCreate({ open, quotation: incomingQuotation, onClos
   // build full draft (keeps same merging logic as before)
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
     const loadAll = async () => {
       setLoadingInitial(true);
       setError("");
@@ -128,29 +152,43 @@ export default function OrderCreate({ open, quotation: incomingQuotation, onClos
           } catch (err) { console.warn("Failed to fetch lead", err); }
         }
 
-        // canonical fields
-        const customerName =
-          freshQuotation?.createdByName ||
-          freshQuotation?.customerName ||
-          requirement?.customerName ||
-          requirement?.leadSnapshot?.customerName ||
-          lead?.customerName ||
-          lead?.name ||
-          "";
+        // tolerant handle to leadSnapshot variants (leadsnapshot/leadssnapshot)
+       // tolerant handle to leadSnapshot variants (leadsnapshot/leadssnapshot)
+const ls =
+  requirement?.leadSnapshot ||
+  requirement?.leadsnapshot ||
+  requirement?.leadssnapshot ||
+  null;
 
-        const deliveryAddress =
-          (freshQuotation?.deliveryAddress || freshQuotation?.address) ||
-          (requirement?.deliveryAddress || requirement?.address || requirement?.deliveryCity) ||
-          (requirement?.leadSnapshot?.address) ||
-          (lead?.address) ||
-          "";
+// read customerName from snapshot with tolerant keys
+const snapCustomerName =
+  (ls && (ls.customerName ?? ls.customername ?? ls.customer)) || null;
 
-        const deliveryContact =
-          freshQuotation?.deliveryContact ||
-          requirement?.deliveryContact ||
-          requirement?.leadSnapshot?.contactPerson ||
-          lead?.contactPerson ||
-          null;
+// canonical fields (prefer leadSnapshot.* and never use createdByName or lead.name)
+const customerName =
+  snapCustomerName ||
+  requirement?.customerName ||
+  freshQuotation?.customerName ||
+  lead?.customerName ||
+  lead?.companyName ||
+  lead?.organization ||
+  lead?.orgName ||
+  "";
+
+// keep contact logic as-is (yours was correct)
+const deliveryContact =
+  normContact(ls?.contactPerson || ls?.contactperson) ||
+  normContact(requirement?.deliveryContact) ||
+  normContact(freshQuotation?.deliveryContact) ||
+  normContact(lead?.contactPerson) ||
+  null;
+
+const deliveryAddress =
+  normAddress(ls?.address) ||
+  normAddress(freshQuotation?.deliveryAddress || freshQuotation?.address) ||
+  normAddress(requirement?.deliveryAddress || requirement?.address || requirement?.deliveryCity) ||
+  normAddress(lead?.address) ||
+  "";
 
         // taxes & discount priority
         const taxes =
@@ -158,8 +196,8 @@ export default function OrderCreate({ open, quotation: incomingQuotation, onClos
             ? freshQuotation.taxes
             : (requirement?.taxes && Array.isArray(requirement.taxes) && requirement.taxes.length)
               ? requirement.taxes
-              : (requirement?.leadSnapshot?.taxes && Array.isArray(requirement.leadSnapshot.taxes) && requirement.leadSnapshot.taxes.length)
-                ? requirement.leadSnapshot.taxes
+              : (ls?.taxes && Array.isArray(ls.taxes) && ls.taxes.length)
+                ? ls.taxes
                 : (lead?.taxes && Array.isArray(lead.taxes) && lead.taxes.length)
                   ? lead.taxes
                   : (freshQuotation?.taxes || []);
@@ -219,7 +257,6 @@ export default function OrderCreate({ open, quotation: incomingQuotation, onClos
           totals: freshQuotation?.totals || calcTotals(items, discount, taxes),
         };
 
-        if (!open) return;
         if (!open) return;
         setDraft(draftObj);
       } catch (err) {
@@ -368,13 +405,13 @@ export default function OrderCreate({ open, quotation: incomingQuotation, onClos
         if (Array.isArray(it.assignedAssets) && it.assignedAssets.length) {
           for (const assetDocId of it.assignedAssets) {
             try {
-               await reserveAsset(assetDocId, {
+              await reserveAsset(assetDocId, {
                 reservationId: ref.id,
                 orderId: ref.id,
                 customer: orderPayload.customerName || "",
-               until: it.expectedEndDate || null,
-               note: `Reserved for order ${orderPayload.orderNo}`,
-             });
+                until: it.expectedEndDate || null,
+                note: `Reserved for order ${orderPayload.orderNo}`,
+              });
             } catch (err) {
               console.warn("reserveAsset failed", assetDocId, err);
             }
@@ -445,7 +482,15 @@ export default function OrderCreate({ open, quotation: incomingQuotation, onClos
                 <div className="label muted">Customer</div>
                 <div style={{ fontWeight: 700 }}>{draft.customerName || "—"}</div>
                 <div className="muted" style={{ marginTop: 6 }}>{draft.deliveryAddress || "—"}</div>
-                {draft.deliveryContact ? <div style={{ marginTop: 6 }} className="muted">Contact: {draft.deliveryContact.name || draft.deliveryContact}</div> : null}
+
+                {/* Contact rendered safely: name • phone • email */}
+                {draft.deliveryContact ? (
+                  <div style={{ marginTop: 6 }} className="muted">
+                    Contact: {draft.deliveryContact.name || ""}
+                    {draft.deliveryContact.phone ? ` • ${draft.deliveryContact.phone}` : ""}
+                    {draft.deliveryContact.email ? ` • ${draft.deliveryContact.email}` : ""}
+                  </div>
+                ) : null}
               </div>
 
               <div>
