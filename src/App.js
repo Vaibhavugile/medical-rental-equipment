@@ -161,38 +161,6 @@ function CRMApp() {
               </NavLink>
 
               <NavLink
-                to="/drivers"
-                style={({ isActive }) => ({
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  textDecoration: "none",
-                  color: isActive ? "#fff" : "#0b5cff",
-                  background: isActive
-                    ? "linear-gradient(90deg,#0b69ff,#00b4d8)"
-                    : "transparent",
-                  fontWeight: 700,
-                })}
-              >
-                Drivers
-              </NavLink>
-
-              <NavLink
-                to="/branches"
-                style={({ isActive }) => ({
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  textDecoration: "none",
-                  color: isActive ? "#fff" : "#0b5cff",
-                  background: isActive
-                    ? "linear-gradient(90deg,#0b69ff,#00b4d8)"
-                    : "transparent",
-                  fontWeight: 700,
-                })}
-              >
-                Branches
-              </NavLink>
-
-              <NavLink
                 to="/products"
                 style={({ isActive }) => ({
                   padding: "8px 10px",
@@ -205,12 +173,13 @@ function CRMApp() {
                   fontWeight: 700,
                 })}
               >
-                Products
+                Inventory
               </NavLink>
 
-              {/* Optional: quick links to driver views for admins/testing */}
+
+
               <NavLink
-                to="/driver-app"
+                to="/drivers"
                 style={({ isActive }) => ({
                   padding: "8px 10px",
                   borderRadius: 8,
@@ -222,25 +191,9 @@ function CRMApp() {
                   fontWeight: 700,
                 })}
               >
-                Driver App
+                Runners
               </NavLink>
-
-              <NavLink
-                to="/tracking"
-                style={({ isActive }) => ({
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  textDecoration: "none",
-                  color: isActive ? "#fff" : "#0b5cff",
-                  background: isActive
-                    ? "linear-gradient(90deg,#0b69ff,#00b4d8)"
-                    : "transparent",
-                  fontWeight: 700,
-                })}
-              >
-                Tracking
-              </NavLink>
-              <NavLink
+               <NavLink
                 to="/marketing"
                 style={({ isActive }) => ({
                   padding: "8px 10px",
@@ -270,6 +223,59 @@ function CRMApp() {
               >
                 Visits
               </NavLink>
+
+              <NavLink
+                to="/branches"
+                style={({ isActive }) => ({
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  textDecoration: "none",
+                  color: isActive ? "#fff" : "#0b5cff",
+                  background: isActive
+                    ? "linear-gradient(90deg,#0b69ff,#00b4d8)"
+                    : "transparent",
+                  fontWeight: 700,
+                })}
+              >
+                Branches
+              </NavLink>
+
+              
+
+              {/* Optional: quick links to driver views for admins/testing */}
+              {/* <NavLink
+                to="/driver-app"
+                style={({ isActive }) => ({
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  textDecoration: "none",
+                  color: isActive ? "#fff" : "#0b5cff",
+                  background: isActive
+                    ? "linear-gradient(90deg,#0b69ff,#00b4d8)"
+                    : "transparent",
+                  fontWeight: 700,
+                })}
+              >
+                Driver App
+              </NavLink> */}
+
+              <NavLink
+                to="/tracking"
+                style={({ isActive }) => ({
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  textDecoration: "none",
+                  color: isActive ? "#fff" : "#0b5cff",
+                  background: isActive
+                    ? "linear-gradient(90deg,#0b69ff,#00b4d8)"
+                    : "transparent",
+                  fontWeight: 700,
+                })}
+              >
+                Tracking
+              </NavLink>
+             
+              
             </nav>
           </div>
 

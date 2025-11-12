@@ -1116,6 +1116,21 @@ export default function Orders() {
       setPaymentModal((s) => ({ ...s, saving: false }));
     }
   };
+  function formatYMDForDisplay(ymd) {
+  if (!ymd) return "—";
+  // expect "YYYY-MM-DD"
+  const parts = (ymd + "").split("-");
+  if (parts.length !== 3) return ymd;
+  const [y, m, d] = parts.map(Number);
+  try {
+    const dt = new Date(y, m - 1, d);
+    // locale formatting; change options if you prefer different style
+    return dt.toLocaleDateString(undefined, { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return ymd;
+  }
+}
+
 
   const removePayment = async (paymentId) => {
     if (!selectedOrder) return;
@@ -1241,6 +1256,7 @@ export default function Orders() {
               <th>Customer</th>
               <th>Status</th>
               <th>Delivery</th>
+              <th>Start Date</th> 
               <th>Created</th>
               <th>Items</th>
               <th>Total</th>
@@ -1319,6 +1335,8 @@ export default function Orders() {
                   <td style={{ textTransform: "capitalize" }}>
                     {o.deliveryStatus || o.delivery?.status || "—"}
                   </td>
+                  <td>{formatYMDForDisplay(getStartDate(o))}</td>
+
 
                   <td>
                     {o.createdAt?.seconds

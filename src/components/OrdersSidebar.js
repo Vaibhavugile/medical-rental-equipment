@@ -24,7 +24,7 @@ export default function OrdersSidebar({
     ["ending_today", "Ending Today", derivedCounts.ending_today],
     ["in_transit", "In Transit", derivedCounts.in_transit],
     ["delivered", "Delivered", derivedCounts.delivered],
-    ["active", "Active", derivedCounts.active],
+    ["active", "Active", derivedCounts.activated],
     ["completed", "Completed", derivedCounts.completed],
     ["cancelled", "Cancelled", derivedCounts.cancelled],
   ];

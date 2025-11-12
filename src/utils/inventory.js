@@ -80,28 +80,57 @@ export async function createProduct({ name, sku, description = "", defaultRate =
  *
  * Returns: array of created asset descriptors: { id, assetId, ...payload }
  */
-export async function createAssetsForProduct(productId, branchId = null, quantity = 1, assetMeta = {}, assetStatus = "in_stock") {
+export async function createAssetsForProduct(
+  productId,
+  branchId = null,
+  quantity = 1,
+  assetMeta = {},
+  assetStatus = "in_stock"
+) {
   if (!productId) throw new Error("productId required");
+
   const user = auth.currentUser || {};
   const created = [];
+
   for (let i = 0; i < Number(quantity || 0); i++) {
-    const assetId = makeUniqueAssetId(productId);
+    // 🔹 Generate a unique 5-letter uppercase asset ID
+    let assetId;
+    let exists = true;
+
+    while (exists) {
+      assetId = Math.random().toString(36).substring(2, 7).toUpperCase();
+      const q = query(collection(db, "assets"), where("assetId", "==", assetId));
+      const snapshot = await getDocs(q);
+      exists = !snapshot.empty; // keep generating until it's unique
+    }
+
+    // 🔹 Generate a QR code URL for the asset
     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(assetId)}`;
+
+    // 🔹 Prepare asset payload
     const payload = {
       assetId,
       productId,
       branchId: branchId || null,
       status: assetStatus,
       metadata: assetMeta || {},
-      qrUrl, 
+      qrUrl,
       createdAt: serverTimestamp(),
       createdBy: user.uid || "",
       createdByName: user.displayName || user.email || "",
-      history: [makeInventoryHistoryEntry(user, { type: "create", note: "Asset created" })],
+      history: [
+        makeInventoryHistoryEntry(user, { 
+          type: "create", 
+          note: "Asset created" 
+        }),
+      ],
     };
+
+    // 🔹 Save to Firestore
     const ref = await addDoc(collection(db, "assets"), payload);
     created.push({ id: ref.id, assetId, ...payload });
   }
+
   return created;
 }
 

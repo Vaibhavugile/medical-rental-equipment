@@ -203,7 +203,7 @@ export default function Drivers() {
 
   return (
     <div className="drivers-page">
-      <h2>Drivers Management</h2>
+      <h2>Runners Management</h2>
 
       {/* Toolbar */}
       <div className="drivers-toolbar">
