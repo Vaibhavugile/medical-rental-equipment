@@ -52,6 +52,9 @@ const fmt = {
   },
 };
 
+/* escape for safe inline HTML used in print popup */
+const escapeHtml = (s) => String(s || "").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
 /* ─────────────────────────────────────────────────────────────
    Main
 ────────────────────────────────────────────────────────────── */
@@ -393,6 +396,129 @@ export default function Products() {
     } finally { setMaintenanceBusy(false); }
   };
 
+  /* ── PRINT / EXPORT HELPERS ---------- */
+
+  // Open printable page with stickers (QR image + assetId) and trigger print
+  // Open printable page with stickers (QR image + assetId) and trigger print
+const printAssets = async (assets = []) => {
+  if (!Array.isArray(assets) || assets.length === 0) {
+    showToast("No assets to print", "error");
+    return;
+  }
+
+  const htmlHeader = `
+    <html>
+      <head>
+        <title>Print Asset QR Stickers</title>
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <style>
+          body { margin: 8mm; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial; color: #111; }
+          .stickers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8mm; }
+          .sticker { border: 1px solid #ddd; padding: 6mm; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 65mm; box-sizing: border-box; }
+          .sticker img { width: 48mm; height: 48mm; object-fit: contain; margin-bottom: 6px; }
+          .asset-id { font-weight: 700; font-size: 12pt; word-break: break-all; text-align: center; }
+          .product-name { font-size: 10pt; color: #444; margin-bottom: 4px; text-align: center; }
+          @media print {
+            body { margin: 4mm; }
+            .sticker { page-break-inside: avoid; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+          <div><strong>Stickers</strong></div>
+          <div class="no-print"><small>Generated: ${new Date().toLocaleString()}</small></div>
+        </div>
+        <div class="stickers">
+  `;
+
+  const htmlFooter = `
+        </div>
+      </body>
+    </html>
+  `;
+
+  const stickerHtml = assets.map(a => {
+    const id = (a.assetId || a.id || "—");
+    const qr = a.qrUrl || a.metadata?.qrUrl || (`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(id)}`);
+    const product = a.productName || a.metadata?.model || "";
+    // escape minimal characters to avoid simple HTML issues
+    const esc = (s) => String(s || "").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return `
+      <div class="sticker">
+        <div class="product-name">${esc(product)}</div>
+        <img src="${qr}" alt="QR for ${esc(id)}" />
+        <div class="asset-id">${esc(id)}</div>
+      </div>
+    `;
+  }).join("\n");
+
+  const w = window.open("", "_blank");
+  if (!w) {
+    showToast("Popup blocked. Allow popups for printing.", "error");
+    return;
+  }
+
+  w.document.write(htmlHeader + stickerHtml + htmlFooter);
+  w.document.close();
+
+  // Wait for images in the new window to load (or timeout)
+  const waitForImages = (win, timeout = 5000) => new Promise((resolve) => {
+    const start = Date.now();
+    function check() {
+      try {
+        const imgs = Array.from(win.document.images || []);
+        if (imgs.length === 0) return resolve(); // nothing to wait for
+        const allDone = imgs.every(img => img.complete && img.naturalWidth > 0);
+        if (allDone) return resolve();
+      } catch (err) {
+        // If accessing win.document fails (rare), fallback to timeout
+      }
+      if (Date.now() - start > timeout) return resolve();
+      setTimeout(check, 200);
+    }
+    // small initial delay to let browser begin fetching images
+    setTimeout(check, 200);
+  });
+
+  // wait (await) then print
+  try {
+    await waitForImages(w, 5000); // wait up to 5s (adjust if needed)
+    try {
+      w.focus();
+      w.print();
+    } catch (e) {
+      console.warn("Print call failed; user can manually print from the new tab.", e);
+    }
+  } catch (e) {
+    console.warn("Error waiting for images:", e);
+    try { w.print(); } catch {}
+  }
+};
+
+
+  // simple CSV exporter
+  const exportAssetsCSV = (assets = []) => {
+    if (!Array.isArray(assets) || assets.length === 0) {
+      showToast("No assets to export", "error");
+      return;
+    }
+    const rows = [["assetId", "qrUrl", "productName"]];
+    assets.forEach(a => rows.push([a.assetId || a.id || "", a.qrUrl || "", a.productName || a.metadata?.model || ""]));
+    const csv = rows.map(r => r.map(cell => `"${String(cell || "").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `assets-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    showToast("CSV exported", "success");
+  };
+
   /* ── asset details ── */
   const openAssetDetails = (a) => { setAssetDetails(a); setAssetDetailsOpen(true); };
 
@@ -565,6 +691,32 @@ export default function Products() {
 
                   {/* Preview line */}
                   <div style={{ marginTop: 6 }} className="muted">Preview next asset id: <strong>{previewNextAssetId}</strong></div>
+
+                  {/* Print / Export Buttons */}
+                  {/* Print all assets' QR for this product */}
+<div style={{ marginTop: 8 }}>
+  <button
+    className="cp-btn"
+    onClick={async () => {
+      if (!selectedProduct) return setError("Select a product first.");
+      try {
+        const all = await listAssets({ productId: selectedProduct.id });
+        if (!Array.isArray(all) || all.length === 0) {
+          showToast("No assets found for this product", "error");
+          return;
+        }
+        all.forEach(a => a.productName = selectedProduct.name);
+        printAssets(all);
+      } catch (e) {
+        console.error("Failed to load assets for printing", e);
+        setError(e.message || "Failed to load assets");
+      }
+    }}
+  >
+    Print QR — All assets for this product
+  </button>
+</div>
+
                 </div>
               </div>
 
@@ -653,12 +805,25 @@ export default function Products() {
                         <option value="">Move</option>
                         {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                       </select>
+
+                      {/* existing QR open */}
+                      {/* <button
+                        className="btn ghost"
+                        onClick={() => { if (a.qrUrl) window.open(a.qrUrl, "_blank"); }}
+                      >
+                        QR Code
+                      </button> */}
+
+                      {/* single-asset print */}
                       <button
-  className="btn ghost"
-  onClick={() => { if (a.qrUrl) window.open(a.qrUrl, "_blank"); }}
->
-  QR Code
-</button>
+                        className="btn ghost"
+                        onClick={() => {
+                          const item = [{ ...a, productName: (selectedProduct && selectedProduct.name) || a.metadata?.model || "" }];
+                          printAssets(item);
+                        }}
+                      >
+                        Print
+                      </button>
                     </div>
                   </div>
                 ))}
@@ -711,89 +876,89 @@ export default function Products() {
                 {assetDetails.metadata && <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(assetDetails.metadata, null, 2)}</pre>}
               </div>
               {assetDetails.qrUrl && (
-  <div style={{ marginTop: 12 }}>
-    <h4 style={{ marginBottom: 8 }}>QR Code</h4>
-    <img
-      src={assetDetails.qrUrl}
-      alt={`QR for ${assetDetails.assetId}`}
-      style={{ width: 180, height: 180 }}
-    />
-    <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-      Scans to: assetId “{assetDetails.assetId}”
-    </div>
-  </div>
-)}
+                <div style={{ marginTop: 12 }}>
+                  <h4 style={{ marginBottom: 8 }}>QR Code</h4>
+                  <img
+                    src={assetDetails.qrUrl}
+                    alt={`QR for ${assetDetails.assetId}`}
+                    style={{ width: 180, height: 180 }}
+                  />
+                  <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
+                    Scans to: assetId “{assetDetails.assetId}”
+                  </div>
+                </div>
+              )}
 
               {/* History */}
-<h4 style={{ marginTop: 12, marginBottom: 8 }}>History</h4>
+              <h4 style={{ marginTop: 12, marginBottom: 8 }}>History</h4>
 
-{Array.isArray(assetDetails.history) && assetDetails.history.length > 0 ? (
-  <div className="history-wrap">
-    <table className="history-table">
-      <thead>
-        <tr>
-          <th style={{ width: 180 }}>When</th>
-          <th style={{ width: 180 }}>By</th>
-          <th style={{ width: 140 }}>Event</th>
-          <th>Note</th>
-          <th style={{ width: 120, textAlign: "right" }}>Data</th>
-        </tr>
-      </thead>
-      <tbody>
-        {assetDetails.history
-          .slice()
-          .sort((a, b) => {
-            const ta = a?.ts?.seconds ? a.ts.seconds * 1000 : Date.parse(a?.ts || 0);
-            const tb = b?.ts?.seconds ? b.ts.seconds * 1000 : Date.parse(b?.ts || 0);
-            return tb - ta; // newest first
-          })
-          .map((h, i) => {
-            const ts = h?.ts?.seconds
-              ? new Date(h.ts.seconds * 1000)
-              : (h?.ts ? new Date(h.ts) : null);
-            const when = ts && !Number.isNaN(ts.getTime())
-              ? ts.toLocaleString()
-              : "—";
+              {Array.isArray(assetDetails.history) && assetDetails.history.length > 0 ? (
+                <div className="history-wrap">
+                  <table className="history-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: 180 }}>When</th>
+                        <th style={{ width: 180 }}>By</th>
+                        <th style={{ width: 140 }}>Event</th>
+                        <th>Note</th>
+                        <th style={{ width: 120, textAlign: "right" }}>Data</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {assetDetails.history
+                        .slice()
+                        .sort((a, b) => {
+                          const ta = a?.ts?.seconds ? a.ts.seconds * 1000 : Date.parse(a?.ts || 0);
+                          const tb = b?.ts?.seconds ? b.ts.seconds * 1000 : Date.parse(b?.ts || 0);
+                          return tb - ta; // newest first
+                        })
+                        .map((h, i) => {
+                          const ts = h?.ts?.seconds
+                            ? new Date(h.ts.seconds * 1000)
+                            : (h?.ts ? new Date(h.ts) : null);
+                          const when = ts && !Number.isNaN(ts.getTime())
+                            ? ts.toLocaleString()
+                            : "—";
 
-            const by =
-              h.byName || h.changedByName || h.by || h.changedBy || "system";
+                          const by =
+                            h.byName || h.changedByName || h.by || h.changedBy || "system";
 
-            const type =
-              h.type || h.changeType || h.event || h.status || "update";
+                          const type =
+                            h.type || h.changeType || h.event || h.status || "update";
 
-            const hasData = h.data && Object.keys(h.data).length > 0;
+                          const hasData = h.data && Object.keys(h.data).length > 0;
 
-            return (
-              <tr key={i}>
-                <td className="muted">{when}</td>
-                <td className="muted">{by}</td>
-                <td>
-                  <span className={`ev ev-${String(type).toLowerCase()}`}>
-                    {String(type).replace(/_/g, " ")}
-                  </span>
-                </td>
-                <td>{h.note || "—"}</td>
-                <td style={{ textAlign: "right" }}>
-                  {hasData ? (
-                    <details>
-                      <summary className="history-view-json">View</summary>
-                      <pre className="history-json">
-                        {JSON.stringify(h.data, null, 2)}
-                      </pre>
-                    </details>
-                  ) : (
-                    <span className="muted">—</span>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-      </tbody>
-    </table>
-  </div>
-) : (
-  <div className="muted">No history recorded for this asset.</div>
-)}
+                          return (
+                            <tr key={i}>
+                              <td className="muted">{when}</td>
+                              <td className="muted">{by}</td>
+                              <td>
+                                <span className={`ev ev-${String(type).toLowerCase()}`}>
+                                  {String(type).replace(/_/g, " ")}
+                                </span>
+                              </td>
+                              <td>{h.note || "—"}</td>
+                              <td style={{ textAlign: "right" }}>
+                                {hasData ? (
+                                  <details>
+                                    <summary className="history-view-json">View</summary>
+                                    <pre className="history-json">
+                                      {JSON.stringify(h.data, null, 2)}
+                                    </pre>
+                                  </details>
+                                ) : (
+                                  <span className="muted">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="muted">No history recorded for this asset.</div>
+              )}
 
             </div>
 
