@@ -532,7 +532,7 @@ export default function Visits() {
                         </button>
                       ) : null}
 
-                      <button title="Delete visit" className="row-action-icon" onClick={() => handleDelete(v)} style={{ padding: 6, color: "#b91c1c" }}>🗑</button>
+                      {/* <button title="Delete visit" className="row-action-icon" onClick={() => handleDelete(v)} style={{ padding: 6, color: "#b91c1c" }}>🗑</button> */}
                     </div>
                   </td>
                 </tr>

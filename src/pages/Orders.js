@@ -853,86 +853,100 @@ export default function Orders() {
     return ref.id;
   };
 
-  const assignDriverToOrder = async (driverId) => {
-    if (!selectedOrder) return setError("No order open");
-    const driverSnap = await getDoc(doc(db, "drivers", driverId));
-    if (!driverSnap.exists()) return setError("Choose a valid driver");
-    const driver = { id: driverSnap.id, ...(driverSnap.data() || {}) };
+ // Replace existing assignDriverToOrder in Orders.js with this:
+const assignDriverToOrder = async (driverId) => {
+  if (!selectedOrder) return setError("No order open");
+  if (!driverId) {
+    // clear local selection if empty
+    setSelectedOrder((s) => ({
+      ...(s || {}),
+      delivery: { ...(s?.delivery || {}), driverId: null, driverName: null },
+      deliveryStatus: null,
+    }));
+    return;
+  }
 
-    setSaving(true);
-    try {
-      const payload = {
-        orderId: selectedOrder.id,
-        orderNo: selectedOrder.orderNo,
-        driverId,
-        driverName: driver.name || "",
-        pickupAddress:
-          selectedOrder.pickupAddress || selectedOrder.deliveryAddress || "",
-        dropAddress: selectedOrder.deliveryAddress || "",
-        items: selectedOrder.items || [],
-        status: "assigned",
-        fetchedBy: auth.currentUser?.uid || "",
-        fetchedByName:
-          auth.currentUser?.displayName || auth.currentUser?.email || "",
-        createdAt: serverTimestamp(),
-      };
-      const deliveryId = await createDeliveryDoc(payload);
-      const deliveryObj = {
-        deliveryId,
-        driverId,
-        driverName: driver.name || "",
-        status: "assigned",
-        createdAt: serverTimestamp(),
-      };
+  // load driver data (sync)
+  let driverSnap;
+  try {
+    driverSnap = await getDoc(doc(db, "drivers", driverId));
+  } catch (err) {
+    console.error("failed to read driver", err);
+    return setError("Failed to read driver");
+  }
+  if (!driverSnap.exists()) return setError("Choose a valid driver");
+  const driver = { id: driverSnap.id, ...(driverSnap.data() || {}) };
 
-      const orderHistoryEntry = {
-        at: new Date().toISOString(),
-        by: auth.currentUser?.uid || "",
-        stage: "assigned",
-        note: `Driver ${driver.name} assigned`,
-      };
+  // --- optimistic local update so dropdown shows immediately ---
+  const prevOrder = selectedOrder;
+  setSelectedOrder((s) => ({
+    ...(s || {}),
+    delivery: {
+      ...(s?.delivery || {}),
+      driverId,
+      driverName: driver.name || "",
+      // do not set deliveryId yet (we'll get it from server)
+    },
+    deliveryStatus: "assigned",
+  }));
 
-      await updateDoc(doc(db, "orders", selectedOrder.id), {
-        delivery: deliveryObj,
-        deliveryStatus: "assigned",
-        deliveryHistory: arrayUnion(orderHistoryEntry),
-        updatedAt: serverTimestamp(),
-      });
+  setSaving(true);
+  setError("");
+  try {
+    const payload = {
+      orderId: selectedOrder.id,
+      orderNo: selectedOrder.orderNo,
+      driverId,
+      driverName: driver.name || "",
+      pickupAddress: selectedOrder.pickupAddress || selectedOrder.deliveryAddress || "",
+      dropAddress: selectedOrder.deliveryAddress || "",
+      items: selectedOrder.items || [],
+      status: "assigned",
+      fetchedBy: auth.currentUser?.uid || "",
+      fetchedByName: auth.currentUser?.displayName || auth.currentUser?.email || "",
+      createdAt: serverTimestamp(),
+    };
 
-      if (selectedOrder.requirementId) {
-        const entry = makeHistoryEntry(auth.currentUser || {}, {
-          type: "delivery",
-          field: "driverAssigned",
-          oldValue: "",
-          newValue: driverId,
-          note: `Driver ${driver.name} assigned`,
-        });
-        await updateDoc(doc(db, "requirements", selectedOrder.requirementId), {
-          history: arrayUnion(entry),
-          updatedAt: serverTimestamp(),
-        });
-        propagateToLead(
-          selectedOrder.requirementId,
-          "delivery",
-          "",
-          "assigned",
-          entry.note
-        );
-      }
+    const deliveryId = await createDeliveryDoc(payload);
+    const deliveryObj = {
+      deliveryId,
+      driverId,
+      driverName: driver.name || "",
+      status: "assigned",
+      createdAt: serverTimestamp(),
+    };
 
-      const snap = await getDoc(doc(db, "orders", selectedOrder.id));
-      if (snap.exists()) {
-        const fresh = { id: snap.id, ...(snap.data() || {}) };
-        fresh.payments = await fetchPaymentsForOrder(fresh.id);
-        setSelectedOrder(fresh);
-      }
-    } catch (err) {
-      console.error("assignDriverToOrder", err);
-      setError(err.message || "Failed to assign driver");
-    } finally {
-      setSaving(false);
+    const orderHistoryEntry = {
+      at: new Date().toISOString(),
+      by: auth.currentUser?.uid || "",
+      stage: "assigned",
+      note: `Driver ${driver.name} assigned`,
+    };
+
+    await updateDoc(doc(db, "orders", selectedOrder.id), {
+      delivery: deliveryObj,
+      deliveryStatus: "assigned",
+      deliveryHistory: arrayUnion(orderHistoryEntry),
+      updatedAt: serverTimestamp(),
+    });
+
+    // refresh the order from server so we have canonical state (payments etc)
+    const snap = await getDoc(doc(db, "orders", selectedOrder.id));
+    if (snap.exists()) {
+      const fresh = { id: snap.id, ...(snap.data() || {}) };
+      fresh.payments = await fetchPaymentsForOrder(fresh.id);
+      setSelectedOrder(fresh);
     }
-  };
+  } catch (err) {
+    console.error("assignDriverToOrder", err);
+    // revert optimistic update on failure
+    setSelectedOrder(prevOrder);
+    setError(err.message || "Failed to assign driver");
+  } finally {
+    setSaving(false);
+  }
+};
+
 
   const updateDeliveryStage = async (newStage, note = "") => {
     if (!selectedOrder) return setError("No order open");

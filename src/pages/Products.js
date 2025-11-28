@@ -81,6 +81,11 @@ export default function Products() {
   const [assetBranchFilter, setAssetBranchFilter] = useState("");
   const [assetPageSize, setAssetPageSize] = useState(24);
 
+  // new: options for asset id generation & preview
+  const [companyPrefix, setCompanyPrefix] = useState("BMM");
+  const [batchOverride, setBatchOverride] = useState(""); // empty => use year suffix
+  const [shortCodeOverride, setShortCodeOverride] = useState("");
+
   // product modal (add/edit)
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [productForm, setProductForm] = useState({ name: "", sku: "", description: "", defaultRate: "", category: "" });
@@ -234,7 +239,7 @@ export default function Products() {
           sku: productForm.sku?.trim() || "",
           description: productForm.description?.trim() || "",
           defaultRate: Number(productForm.defaultRate || 0),
-          category: productForm.category?.trim() || "",
+          category: productForm.category?.trim() || "general",
           updatedAt: serverTimestamp(),
           updatedBy: user.uid || "",
           updatedByName: user.displayName || user.email || "",
@@ -274,6 +279,45 @@ export default function Products() {
   const safeJSON = (str) => {
     try { return JSON.parse(str || "{}"); } catch { return null; }
   };
+
+  // derive short code (same algorithm as backend)
+  const deriveShortCode = (model) => {
+    if (!model || typeof model !== "string") return "PRD";
+    const parts = model
+      .trim()
+      .replace(/[^A-Za-z0-9\s]/g, " ")
+      .split(/\s+/)
+      .filter(Boolean);
+    if (parts.length === 0) return "PRD";
+    if (parts.length === 1) return parts[0].substring(0, 3).toUpperCase();
+    return parts.slice(0, 3).map(p => p[0]).join("").toUpperCase();
+  };
+
+  // preview next asset id based on currently loaded assets (best-effort client-side)
+  const previewNextAssetId = (() => {
+    if (!selectedProduct) return "—";
+    const parsedMeta = safeJSON(assetMetaJSON);
+    const model = (parsedMeta && parsedMeta.model) || selectedProduct.name || "";
+    const shortCode = (shortCodeOverride || deriveShortCode(model)).toUpperCase();
+    const batch = batchOverride || String(new Date().getFullYear()).slice(-2);
+    const prefix = `${(companyPrefix || "BMM").toUpperCase()}${shortCode}${batch}`;
+
+    let maxSeq = 0;
+    (assetsForProduct || []).forEach(a => {
+      if (!a.assetId || typeof a.assetId !== "string") return;
+      if (!a.assetId.startsWith(prefix)) return;
+      const m = a.assetId.match(/(\d+)$/);
+      if (m) {
+        const n = Number(m[1]);
+        if (!Number.isNaN(n) && n > maxSeq) maxSeq = n;
+      }
+    });
+
+    const nextSeq = maxSeq + 1;
+    const padLen = Math.max(3, String(maxSeq + 1).length);
+    return `${prefix}${String(nextSeq).padStart(padLen, "0")}`;
+  })();
+
   const onCreateAssets = async () => {
     setError("");
     if (!selectedProduct) return setError("Select a product first.");
@@ -287,7 +331,8 @@ export default function Products() {
         assetBranch || null,
         qty,
         { model: selectedProduct.name, ...meta },
-        "in_stock"
+        "in_stock",
+        { companyPrefix: companyPrefix || "BMM", batch: (batchOverride || undefined), shortCode: shortCodeOverride || undefined }
       );
       try {
         await updateDoc(doc(db, "products", selectedProduct.id), { assetCount: increment(qty) });
@@ -300,6 +345,7 @@ export default function Products() {
       showToast("Failed to create assets", "error");
     }
   };
+
   const doCheckout = async (id) => { try { await checkoutAsset(id, { note: "Checked out via UI" }); await refreshAssets(); } catch (e) { setError(e.message || "Checkout failed"); } };
   const doCheckin = async (id) => { try { await checkinAsset(id, { note: "Checked in via UI" }); await refreshAssets(); } catch (e) { setError(e.message || "Checkin failed"); } };
   const doReserve = async (id) => {
@@ -386,9 +432,7 @@ export default function Products() {
           <p className="muted">Realtime asset counts, reservations, maintenance, and safe creation flows.</p>
         </div>
         <div className="coupons-actions">
-          {/* <button className="cp-btn" onClick={() => { setQueryText(""); setSelectedProduct(null); }}>Reset</button> */}
           <button className="cp-btn primary" onClick={openAddProduct}>+ Add Product</button>
-          {/* <button className="cp-btn" onClick={syncAllCountsToProducts}>Sync counts to products</button> */}
         </div>
       </header>
 
@@ -474,7 +518,6 @@ export default function Products() {
               <h2>Product — {selectedProduct.name}</h2>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <button className="cp-btn" onClick={async () => {
-                  // sync selected product counts
                   const pid = selectedProduct.id;
                   try {
                     await updateDoc(doc(db, "products", pid), {
@@ -503,6 +546,11 @@ export default function Products() {
                 <div style={{ marginTop: 12 }}>
                   <h3>Create Assets</h3>
                   <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 8, flexWrap: "wrap" }}>
+                    {/* New: prefix / batch / shortcode overrides */}
+                    <input className="cp-input" value={companyPrefix} onChange={(e) => setCompanyPrefix(e.target.value)} style={{ width: 100 }} placeholder="Prefix (BMM)" />
+                    <input className="cp-input" value={batchOverride} onChange={(e) => setBatchOverride(e.target.value)} style={{ width: 90 }} placeholder="Batch e.g. 25" />
+                    <input className="cp-input" value={shortCodeOverride} onChange={(e) => setShortCodeOverride(e.target.value)} style={{ width: 120 }} placeholder="Short code (optional)" />
+
                     <input className="cp-input" type="number" min="1" value={assetQty} onChange={(e) => setAssetQty(Number(e.target.value || 0))} style={{ width: 90 }} />
                     <select className="cp-input" value={assetBranch} onChange={(e) => setAssetBranch(e.target.value)} style={{ minWidth: 160 }}>
                       <option value="">Default branch</option>
@@ -512,8 +560,11 @@ export default function Products() {
                     <button className="cp-btn" onClick={onCreateAssets}>Create</button>
                   </div>
                   <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-                    Tip: add arbitrary metadata (JSON) to tag assets (e.g., serial, size, color).
+                    Tip: add arbitrary metadata (JSON) to tag assets (e.g., serial, size, color). You can override prefix/batch/short code — preview below is best-effort.
                   </div>
+
+                  {/* Preview line */}
+                  <div style={{ marginTop: 6 }} className="muted">Preview next asset id: <strong>{previewNextAssetId}</strong></div>
                 </div>
               </div>
 

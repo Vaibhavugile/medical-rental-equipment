@@ -670,7 +670,7 @@ export default function Leads() {
                           Next Stage →
                         </button>
 
-                        <button
+                        {/* <button
                           title="Delete lead"
                           className="row-action-icon"
                           onClick={() => setConfirmDelete(l)}
@@ -683,7 +683,7 @@ export default function Leads() {
                           }}
                         >
                           🗑
-                        </button>
+                        </button> */}
                       </div>
                     </td>
                   </tr>
