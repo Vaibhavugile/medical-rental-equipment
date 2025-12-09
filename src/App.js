@@ -19,7 +19,20 @@ import { auth } from "./firebase";
 import "./App.css";
 import AttendanceAdmin from "./pages/AttendanceAdmin";
 import Visits from "./pages/Visits";
+import LandingPage from "./pages/LandingPage";
+import ICUPage from "./pages/ICUPage";
+import SurgeryPage from "./pages/SurgeryPage";
+import PalliativePage from "./pages/PalliativePage";
+import AmbulancePage from "./pages/AmbulancePage";
+import DiagnosticPage from "./pages/DiagnosticPage";
+import PharmacyPage from "./pages/PharmacyPage";
+import NursingPage from "./pages/NursingPage";
+import PhysiotherapyPage from "./pages/PhysiotherapyPage";
+import RespiratoryPage from "./pages/RespiratoryPage";
+import TeamPage from "./pages/TeamPage";
+
 const TrackingPage = lazy(() => import("./pages/TrackingPage"));
+
 /* ---------------- Header for CRM ---------------- */
 function HeaderRight() {
   const { user, userProfile } = useAuth();
@@ -28,7 +41,7 @@ function HeaderRight() {
   const handleSignOut = async () => {
     try {
       await auth.signOut();
-      navigate("/login");
+      navigate("/landing");
     } catch (err) {
       console.error("Signout error", err);
       alert("Signout failed");
@@ -312,7 +325,7 @@ function DriverLayout() {
   const handleSignOut = async () => {
     try {
       await auth.signOut();
-      navigate("/login");
+      navigate("/landing");
     } catch (err) {
       console.error("Signout error", err);
       alert("Signout failed");
@@ -412,7 +425,19 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Auth */}
-        <Route path="/login" element={<Login />} />
+        <Route path="/landing" element={<LandingPage/>} />
+        <Route path="/icu" element={<ICUPage/>} />
+        <Route path="/post-surgery-care" element={<SurgeryPage/>} />
+        <Route path="/palliative-care" element={<PalliativePage/>} />
+        <Route path="/ambulance" element={<AmbulancePage/>} />
+        <Route path="/lab-services" element={<DiagnosticPage/>} />
+        <Route path="/pharmacy-delivery" element={<PharmacyPage/>} />
+        <Route path="/nursing-care" element={<NursingPage/>} />
+        <Route path="/physiotherapy" element={<PhysiotherapyPage/>} />
+
+        <Route path="/respiratory-care" element={<RespiratoryPage/>} />
+        <Route path="/our-team" element={<TeamPage/>} />
+
         <Route path="/signup" element={<Signup />} />
 
         {/* Driver-only experience */}

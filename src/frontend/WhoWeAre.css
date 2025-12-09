@@ -1,0 +1,195 @@
+/* WhoWeAreUnique.css - unified, prefixed with bmm- */
+
+/* Theme tokens (shared) */
+:root {
+  --bmm-primary: #007bff;      /* header blue */
+  --bmm-navy: #0C2340;
+  --bmm-muted: #6b7e8c;
+  --bmm-section-bg: #f5fbff;   /* soft background */
+  --bmm-card-bg: #ffffff;
+  --bmm-ease: cubic-bezier(.16,.84,.24,1);
+}
+
+/* Outer section */
+.bmm-who-section {
+  padding: 56px 0;
+  display: flex;
+  justify-content: center;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+/* Rounded inner container */
+.bmm-who-inner {
+  width: 94%;
+  max-width: 1250px;
+  background: var(--bmm-section-bg);
+  border-radius: 28px;
+  padding: 30px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 28px;
+  align-items: center;
+  box-shadow: 0 16px 46px rgba(6,30,60,0.04);
+  transform: translateY(10px);
+  opacity: 0;
+  transition: transform 640ms var(--bmm-ease), opacity 640ms var(--bmm-ease);
+}
+
+/* Reveal when intersecting */
+.bmm-who-section.bmm-visible .bmm-who-inner {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* Left media card */
+.bmm-who-left {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding: 10px;
+}
+.bmm-who-media-card {
+  width: 100%;
+  max-width: 640px;
+  background: var(--bmm-card-bg);
+  padding: 18px;
+  border-radius: 24px;
+  box-shadow: 0 18px 48px rgba(6,30,60,0.06);
+  border: 1px solid rgba(6,30,60,0.03);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transform: translateY(12px);
+  transition: transform 560ms var(--bmm-ease), box-shadow 420ms var(--bmm-ease);
+}
+
+/* When visible media enters and optionally floats */
+.bmm-who-media-card.bmm-media-visible {
+  animation: bmm-float 6.6s ease-in-out infinite;
+  transform: translateY(-4px);
+}
+@keyframes bmm-float {
+  0% { transform: translateY(-2px); }
+  50% { transform: translateY(4px); }
+  100% { transform: translateY(-2px); }
+}
+
+.bmm-who-img {
+  width: 100%;
+  height: auto;
+  border-radius: 16px;
+  display:block;
+  object-fit: cover;
+  transition: transform 600ms var(--bmm-ease), box-shadow 600ms var(--bmm-ease);
+}
+
+/* Hover micro-lift on card */
+.bmm-who-media-card:hover .bmm-who-img {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: 0 32px 110px rgba(6,30,60,0.12);
+}
+
+/* Right copy */
+.bmm-who-right {
+  padding-left: 8px;
+}
+
+/* UNIFIED TITLE STYLE */
+.bmm-who-title {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--bmm-navy);
+  margin: 6px 0 22px 0;
+  letter-spacing: .6px;
+}
+.bmm-who-accent {
+  color: var(--bmm-primary);
+}
+
+/* LIST: unified with HowWeWork */
+.bmm-who-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 18px;
+}
+
+/* each item initial state: slightly down + transparent */
+.bmm-who-item {
+  display:flex;
+  gap: 16px;
+  align-items:flex-start;
+  transform: translateY(14px);
+  opacity: 0;
+  transition: transform 420ms var(--bmm-ease), opacity 420ms var(--bmm-ease);
+}
+
+/* visible item state (added by JS) */
+.bmm-who-item.bmm-item-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+
+/* ICON (UNIFIED) */
+.bmm-who-icon {
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  border-radius: 12px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background: linear-gradient(180deg, rgba(0,123,255,0.06), rgba(0,123,255,0.03));
+  color: var(--bmm-primary);
+  box-shadow: 0 10px 26px rgba(0,123,255,0.10);
+  transform: scale(.96);
+  transition: transform 320ms var(--bmm-ease), box-shadow 320ms var(--bmm-ease), background 320ms var(--bmm-ease);
+}
+
+/* icon pop when item visible */
+.bmm-who-item.bmm-item-visible .bmm-who-icon {
+  transform: scale(1);
+  box-shadow: 0 18px 44px rgba(0,123,255,0.14);
+  background: linear-gradient(180deg, rgba(0,123,255,0.10), rgba(0,123,255,0.04));
+}
+
+/* UNIFIED BULLET TEXT */
+.bmm-who-text {
+  margin: 0;
+  color: var(--bmm-navy);
+  font-weight: 700;       /* unified */
+  line-height: 1.6;       /* unified */
+  font-size: 1.03rem;     /* unified */
+  transition: color 220ms var(--bmm-ease);
+}
+
+/* accessibility focus effect */
+.bmm-who-item:focus-within {
+  outline: none;
+  transform: translateY(-4px);
+  box-shadow: 0 22px 60px rgba(6,30,60,0.08);
+}
+
+/* Responsive */
+@media (max-width: 980px) {
+  .bmm-who-inner {
+    grid-template-columns: 1fr;
+    padding: 20px;
+    border-radius: 18px;
+    gap: 18px;
+  }
+  .bmm-who-right { padding-left: 0; }
+  .bmm-who-title { text-align: center; }
+  .bmm-who-item { align-items: center; }
+  .bmm-who-media-card { padding: 12px; }
+  .bmm-who-img { border-radius: 12px; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .bmm-who-inner,
+  .bmm-who-item,
+  .bmm-who-media-card { transition: none !important; animation: none !important; transform: none !important; opacity: 1 !important; }
+}

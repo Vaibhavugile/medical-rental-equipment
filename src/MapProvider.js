@@ -3,7 +3,7 @@ import React from "react";
 import { useJsApiLoader } from "@react-google-maps/api";
 
 const LIBRARIES = ["places"]; // keep this constant outside the component
-const GOOGLE_MAPS_KEY = "AIzaSyCi0Y6Q3d5KUZBiF_umvz2-tFXJdjDf5cQ"; // <-- put your key here
+const GOOGLE_MAPS_KEY = "AIzaSyCg_lmNsg1ttu0pDIlxiCuQ4FIXFS7FL40"; // <-- put your key here
 
 export default function MapProvider({ children }) {
   console.log("🔧 MapProvider mounted. Using hard-coded key?",

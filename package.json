@@ -13,6 +13,7 @@
     "html5-qrcode": "^2.3.8",
     "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",
+    "lucide-react": "^0.555.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-router-dom": "^6.30.1",
