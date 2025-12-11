@@ -4,7 +4,7 @@ import {
   addDoc,
   arrayUnion,
   collection,
- doc,
+  doc,
   getDoc,
   getDocs,
   updateDoc,
@@ -285,9 +285,7 @@ export default function OrderCreate({
 
         const snapCustomerName =
           (ls &&
-            (ls.customerName ??
-              ls.customername ??
-              ls.customer)) ||
+            (ls.customerName ?? ls.customername ?? ls.customer)) ||
           null;
         const customerName =
           snapCustomerName ||
@@ -373,20 +371,11 @@ export default function OrderCreate({
           const notes =
             it.notes || it.unitNotes || it.specialInstructions || "";
           const days =
-            it.expectedDurationDays ??
-            it.days ??
-            requirement?.expectedDurationDays ??
-            0;
+            it.expectedDurationDays ?? it.days ?? requirement?.expectedDurationDays ?? 0;
           const expectedStartDate =
-            it.expectedStartDate ||
-            it.startDate ||
-            requirement?.expectedStartDate ||
-            "";
+            it.expectedStartDate || it.startDate || requirement?.expectedStartDate || "";
           const expectedEndDate =
-            it.expectedEndDate ||
-            it.endDate ||
-            requirement?.expectedEndDate ||
-            "";
+            it.expectedEndDate || it.endDate || requirement?.expectedEndDate || "";
           const productId = it.productId || it.product || "";
           return {
             id: it.id || `i-${Date.now()}-${idx}`,
@@ -447,10 +436,48 @@ export default function OrderCreate({
 
   // top-level draft updater
   const updateDraft = (patch) => {
-    setDraft((d) => ({
-      ...(d || {}),
-      ...(patch || {}),
-    }));
+    setDraft((d) => (d ? { ...d, ...(patch || {}) } : { ...(patch || {}) }));
+  };
+
+  // --- discount & taxes helpers ---
+  const updateDiscount = (patch) => {
+    setDraft((d) => {
+      const nd = JSON.parse(JSON.stringify(d || {}));
+      nd.discount = { ...(nd.discount || { type: "percent", value: 0 }), ...(patch || {}) };
+      nd.totals = calcTotals(nd.items || [], nd.discount, nd.taxes || []);
+      return nd;
+    });
+  };
+
+  const addTax = () => {
+    setDraft((d) => {
+      const nd = JSON.parse(JSON.stringify(d || {}));
+      nd.taxes = Array.isArray(nd.taxes) ? [...nd.taxes] : [];
+      nd.taxes.push({ id: `t-${Date.now()}`, name: "", type: "percent", rate: 0 });
+      nd.totals = calcTotals(nd.items || [], nd.discount || { type: "percent", value: 0 }, nd.taxes);
+      return nd;
+    });
+  };
+
+  const updateTaxAt = (index, patch) => {
+    setDraft((d) => {
+      const nd = JSON.parse(JSON.stringify(d || {}));
+      nd.taxes = Array.isArray(nd.taxes) ? [...nd.taxes] : [];
+      const t = { ...(nd.taxes[index] || {}), ...(patch || {}) };
+      nd.taxes[index] = t;
+      nd.totals = calcTotals(nd.items || [], nd.discount || { type: "percent", value: 0 }, nd.taxes);
+      return nd;
+    });
+  };
+
+  const removeTaxAt = (index) => {
+    setDraft((d) => {
+      const nd = JSON.parse(JSON.stringify(d || {}));
+      nd.taxes = Array.isArray(nd.taxes) ? [...nd.taxes] : [];
+      if (index >= 0 && index < nd.taxes.length) nd.taxes.splice(index, 1);
+      nd.totals = calcTotals(nd.items || [], nd.discount || { type: "percent", value: 0 }, nd.taxes);
+      return nd;
+    });
   };
 
   // open asset picker for an item
@@ -530,6 +557,7 @@ export default function OrderCreate({
 
       item.assignedAssets = [...existing, ...toAdd];
       nd.items[idx] = item;
+      nd.totals = calcTotals(nd.items, nd.discount, nd.taxes);
       return nd;
     });
 
@@ -588,6 +616,7 @@ export default function OrderCreate({
         item.assignedAssets = [...ex, ...pick];
         item.autoAssigned = true;
         nd.items[itemIndex] = item;
+        nd.totals = calcTotals(nd.items, nd.discount, nd.taxes);
         return nd;
       });
 
@@ -1183,70 +1212,115 @@ export default function OrderCreate({
               </div>
             </div>
 
-            {/* Right pane — totals */}
+            {/* Right pane — totals (editable discount + taxes) */}
             <div style={{ width: 320 }}>
               <div className="label muted">Totals</div>
               <div style={{ marginTop: 8 }}>
                 <div className="meta-row">
                   <div className="label">Subtotal</div>
                   <div className="value">
-                    {fmtCurrency(
-                      draft.totals?.subtotal || computeSubtotal()
-                    )}
-                  </div>
-                </div>
-                <div className="meta-row">
-                  <div className="label">Discount</div>
-                  <div className="value">
-                    {draft.discount?.type === "percent"
-                      ? `${draft.discount?.value || 0}%`
-                      : fmtCurrency(draft.discount?.value || 0)}
+                    {fmtCurrency(draft.totals?.subtotal || computeSubtotal())}
                   </div>
                 </div>
 
+                {/* Discount (editable) */}
                 <div style={{ marginTop: 8 }}>
-                  <div className="label muted">Taxes</div>
-                  <div style={{ marginTop: 6 }}>
+                  <div className="label muted">Discount</div>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 6 }}>
+                    <select
+                      className="cp-input"
+                      style={{ width: 120 }}
+                      value={(draft.discount?.type) || "percent"}
+                      onChange={(e) => updateDiscount({ type: e.target.value })}
+                    >
+                      <option value="percent">Percent</option>
+                      <option value="fixed">Fixed</option>
+                    </select>
+
+                    <input
+                      className="cp-input"
+                      style={{ width: 140 }}
+                      value={draft.discount?.value ?? 0}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const num = raw === "" ? "" : Number(raw);
+                        updateDiscount({ value: num });
+                      }}
+                      placeholder="Value"
+                    />
+                    <div style={{ minWidth: 60, textAlign: "right" }}>
+                      {(draft.discount?.type === "percent")
+                        ? `${draft.discount?.value || 0}%`
+                        : fmtCurrency(draft.discount?.value || 0)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Taxes (editable list) */}
+                <div style={{ marginTop: 12 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div className="label muted">Taxes</div>
+                    <button className="cp-btn ghost" onClick={addTax} type="button">+ Add tax</button>
+                  </div>
+
+                  <div style={{ marginTop: 8 }}>
                     {(draft.taxes || []).map((t, i) => (
-                      <div key={i}>
-                        {t.name} — {t.rate}%
+                      <div key={t.id || i} style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 6 }}>
+                        <input
+                          className="cp-input"
+                          style={{ width: 120 }}
+                          placeholder="Name"
+                          value={t.name || ""}
+                          onChange={(e) => updateTaxAt(i, { name: e.target.value })}
+                        />
+                        <select
+                          className="cp-input"
+                          style={{ width: 100 }}
+                          value={(t.type || "percent")}
+                          onChange={(e) => updateTaxAt(i, { type: e.target.value })}
+                        >
+                          <option value="percent">Percent</option>
+                          <option value="fixed">Fixed</option>
+                        </select>
+                        <input
+                          className="cp-input"
+                          style={{ width: 80 }}
+                          value={t.rate ?? t.value ?? 0}
+                          onChange={(e) => {
+                            const num = e.target.value === "" ? "" : Number(e.target.value);
+                            updateTaxAt(i, { rate: num, value: num });
+                          }}
+                        />
+                        <button
+                          className="cp-btn ghost"
+                          style={{ padding: "4px 8px" }}
+                          onClick={() => removeTaxAt(i)}
+                          type="button"
+                        >
+                          Remove
+                        </button>
                       </div>
                     ))}
+                    {(draft.taxes || []).length === 0 && <div className="muted" style={{ marginTop: 6 }}>No taxes defined</div>}
                   </div>
                 </div>
 
-                <div
-                  className="meta-row"
-                  style={{ marginTop: 12 }}
-                >
+                <div className="meta-row" style={{ marginTop: 12 }}>
                   <div className="label">Total Tax</div>
-                  <div className="value">
-                    {fmtCurrency(draft.totals?.totalTax || 0)}
-                  </div>
+                  <div className="value">{fmtCurrency(draft.totals?.totalTax || 0)}</div>
                 </div>
+
                 <div className="meta-row">
                   <div className="label strong">Total</div>
-                  <div className="value strong">
-                    {fmtCurrency(
-                      draft.totals?.total || computeSubtotal()
-                    )}
-                  </div>
+                  <div className="value strong">{fmtCurrency(draft.totals?.total || computeSubtotal())}</div>
                 </div>
               </div>
 
               <div style={{ marginTop: 18 }}>
-                <button
-                  className="cp-btn"
-                  onClick={createOrder}
-                  disabled={creating || loadingInitial}
-                >
+                <button className="cp-btn" onClick={createOrder} disabled={creating || loadingInitial}>
                   {creating ? "Creating…" : "Create Order"}
                 </button>
-                <button
-                  className="cp-btn ghost"
-                  style={{ marginLeft: 8 }}
-                  onClick={() => onClose && onClose()}
-                >
+                <button className="cp-btn ghost" style={{ marginLeft: 8 }} onClick={() => onClose && onClose()}>
                   Cancel
                 </button>
               </div>
