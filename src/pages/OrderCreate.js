@@ -4,7 +4,7 @@ import {
   addDoc,
   arrayUnion,
   collection,
-  doc,
+ doc,
   getDoc,
   getDocs,
   updateDoc,
@@ -12,39 +12,59 @@ import {
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
-import {
-  listBranches,
-  listAssets,
-  reserveAsset,
-} from "../utils/inventory";
+import { listBranches, listAssets, reserveAsset } from "../utils/inventory";
 import { makeHistoryEntry, propagateToLead } from "../utils/status";
 import "./OrderCreate.css";
 
 const safeNum = (v) => (typeof v === "number" ? v : Number(v || 0));
 const fmtCurrency = (v) => {
   try {
-    return Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return Number(v).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   } catch {
     return v ?? "0.00";
   }
 };
 
-function calcTotals(items = [], discount = { type: "percent", value: 0 }, taxes = []) {
-  const subtotal = (items || []).reduce((s, it) => s + (safeNum(it.qty) * safeNum(it.rate)), 0);
+function calcTotals(
+  items = [],
+  discount = { type: "percent", value: 0 },
+  taxes = []
+) {
+  const subtotal = (items || []).reduce(
+    (s, it) => s + safeNum(it.qty) * safeNum(it.rate),
+    0
+  );
   let discountAmount = 0;
   if (discount) {
-    if ((discount.type || "").toLowerCase() === "percent") discountAmount = subtotal * (safeNum(discount.value) / 100);
-    else discountAmount = safeNum(discount.value);
+    if ((discount.type || "").toLowerCase() === "percent") {
+      discountAmount = subtotal * (safeNum(discount.value) / 100);
+    } else {
+      discountAmount = safeNum(discount.value);
+    }
   }
   const taxable = Math.max(0, subtotal - discountAmount);
   const taxBreakdown = (taxes || []).map((t) => {
     const rate = safeNum(t.rate);
     return { name: t.name || "", rate, amount: taxable * (rate / 100) };
   });
-  const totalTax = taxBreakdown.reduce((s, t) => s + (safeNum(t.amount)), 0);
+  const totalTax = taxBreakdown.reduce((s, t) => s + safeNum(t.amount), 0);
   const total = Math.max(0, taxable + totalTax);
   return { subtotal, discountAmount, taxBreakdown, totalTax, total };
 }
+
+// days between two dates (inclusive)
+const diffDaysInclusive = (start, end) => {
+  if (!start || !end) return 0;
+  const s = new Date(start);
+  const e = new Date(end);
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return 0;
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const diff = Math.round((e - s) / msPerDay) + 1;
+  return diff > 0 ? diff : 0;
+};
 
 // --- helpers to normalize shape variations ---
 const normAddress = (addr) => {
@@ -61,27 +81,118 @@ const normAddress = (addr) => {
   return parts.join(", ");
 };
 
+// tolerant contact normalizer
 const normContact = (c) => {
   if (!c) return null;
   if (typeof c === "string") return { name: c };
   return {
-    name: c.name || c.person || c.contactPerson || c.contactperson || "",
-    phone: c.phone || c.mobile || c.contact || "",
-    email: c.email || "",
+    name:
+      c.name ||
+      c.person ||
+      c.contactPerson ||
+      c.contactperson ||
+      c.customerName ||
+      "",
+    phone:
+      c.phone ||
+      c.mobile ||
+      c.contact ||
+      c.customerPhone ||
+      c.contactPhone ||
+      c.whatsapp ||
+      c.whatsApp ||
+      "",
+    email:
+      c.email ||
+      c.customerEmail ||
+      c.contactEmail ||
+      c.mail ||
+      "",
   };
 };
 
-export default function OrderCreate({ open, quotation: incomingQuotation, onClose, onCreated }) {
+// builds name/phone/email from snapshot/requirement/quotation/lead
+const buildDeliveryContact = (ls, requirement, quotation, lead) => {
+  const snapName =
+    ls?.contactPerson ||
+    ls?.contactperson ||
+    ls?.customerName ||
+    ls?.customername ||
+    ls?.customer ||
+    "";
+  const snapPhone =
+    ls?.phone ||
+    ls?.mobile ||
+    ls?.customerPhone ||
+    ls?.contactPhone ||
+    ls?.whatsapp ||
+    ls?.whatsApp ||
+    "";
+  const snapEmail =
+    ls?.email || ls?.customerEmail || ls?.contactEmail || "";
+
+  const reqName =
+    requirement?.contactPerson ||
+    requirement?.customerName ||
+    requirement?.contactName ||
+    "";
+  const reqPhone =
+    requirement?.phone ||
+    requirement?.customerPhone ||
+    requirement?.contactPhone ||
+    "";
+  const reqEmail =
+    requirement?.email ||
+    requirement?.customerEmail ||
+    requirement?.contactEmail ||
+    "";
+
+  const qc = quotation?.deliveryContact || {};
+  const qContact = normContact(qc);
+  const qName = qContact?.name || quotation?.customerName || "";
+  const qPhone = qContact?.phone || quotation?.customerPhone || "";
+  const qEmail = qContact?.email || quotation?.customerEmail || "";
+
+  const leadContactObj = normContact(lead?.contactPerson);
+  const leadName =
+    leadContactObj?.name || lead?.customerName || lead?.name || "";
+  const leadPhone =
+    leadContactObj?.phone ||
+    lead?.phone ||
+    lead?.mobile ||
+    lead?.customerPhone ||
+    "";
+  const leadEmail =
+    leadContactObj?.email ||
+    lead?.email ||
+    lead?.customerEmail ||
+    "";
+
+  const name = snapName || reqName || qName || leadName || "";
+  const phone = snapPhone || reqPhone || qPhone || leadPhone || "";
+  const email = snapEmail || reqEmail || qEmail || leadEmail || "";
+
+  if (!name && !phone && !email) return null;
+  return { name, phone, email };
+};
+
+export default function OrderCreate({
+  open,
+  quotation: incomingQuotation,
+  onClose,
+  onCreated,
+}) {
   const navigate = useNavigate();
 
   const [branches, setBranches] = useState([]);
-  const [products, setProducts] = useState([]); // <-- new products list
+  const [products, setProducts] = useState([]);
   const [draft, setDraft] = useState(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerFor, setPickerFor] = useState(null);
   const [pickerAssets, setPickerAssets] = useState([]);
   const [pickerSelected, setPickerSelected] = useState({});
   const [pickerLoading, setPickerLoading] = useState(false);
+  const [assetsById, setAssetsById] = useState({});
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(false);
@@ -94,12 +205,13 @@ export default function OrderCreate({ open, quotation: incomingQuotation, onClos
       setLoadingInitial(true);
       setError("");
       try {
-        // fetch products once (snapshot not necessary)
         const prodSnap = await getDocs(collection(db, "products"));
-        const prods = prodSnap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+        const prods = prodSnap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() || {}),
+        }));
         if (!cancelled) setProducts(prods);
 
-        // branches
         try {
           const b = await listBranches();
           if (!cancelled) setBranches(b || []);
@@ -108,121 +220,173 @@ export default function OrderCreate({ open, quotation: incomingQuotation, onClos
         }
       } catch (err) {
         console.error("OrderCreate init (products) failed", err);
-        if (!cancelled) setError(err.message || "Failed to load products/branches");
+        if (!cancelled)
+          setError(err.message || "Failed to load products/branches");
       } finally {
         if (!cancelled) setLoadingInitial(false);
       }
     };
     init();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [open]);
 
-  // build full draft (keeps same merging logic as before)
+  // build full draft (merge quotation + requirement + lead)
   useEffect(() => {
     if (!open) return;
     const loadAll = async () => {
       setLoadingInitial(true);
       setError("");
       try {
-        // refresh quotation
         let freshQuotation = incomingQuotation;
         if (incomingQuotation?.id) {
           try {
-            const qSnap = await getDoc(doc(db, "quotations", incomingQuotation.id));
-            if (qSnap.exists()) freshQuotation = { id: qSnap.id, ...(qSnap.data() || {}) };
-          } catch (err) { console.warn("Failed to fetch fresh quotation", err); }
+            const qSnap = await getDoc(
+              doc(db, "quotations", incomingQuotation.id)
+            );
+            if (qSnap.exists())
+              freshQuotation = { id: qSnap.id, ...(qSnap.data() || {}) };
+          } catch (err) {
+            console.warn("Failed to fetch fresh quotation", err);
+          }
         }
 
-        // requirement
         let requirement = null;
         if (freshQuotation?.requirementId) {
           try {
-            const rSnap = await getDoc(doc(db, "requirements", freshQuotation.requirementId));
-            if (rSnap.exists()) requirement = { id: rSnap.id, ...(rSnap.data() || {}) };
-          } catch (err) { console.warn("Failed to fetch requirement", err); }
+            const rSnap = await getDoc(
+              doc(db, "requirements", freshQuotation.requirementId)
+            );
+            if (rSnap.exists())
+              requirement = { id: rSnap.id, ...(rSnap.data() || {}) };
+          } catch (err) {
+            console.warn("Failed to fetch requirement", err);
+          }
         }
 
-        // lead
         let lead = null;
         const leadId = requirement?.leadId || freshQuotation?.leadId;
         if (leadId) {
           try {
             const lSnap = await getDoc(doc(db, "leads", leadId));
-            if (lSnap.exists()) lead = { id: lSnap.id, ...(lSnap.data() || {}) };
-          } catch (err) { console.warn("Failed to fetch lead", err); }
+            if (lSnap.exists())
+              lead = { id: lSnap.id, ...(lSnap.data() || {}) };
+          } catch (err) {
+            console.warn("Failed to fetch lead", err);
+          }
         }
 
-        // tolerant handle to leadSnapshot variants (leadsnapshot/leadssnapshot)
-       // tolerant handle to leadSnapshot variants (leadsnapshot/leadssnapshot)
-const ls =
-  requirement?.leadSnapshot ||
-  requirement?.leadsnapshot ||
-  requirement?.leadssnapshot ||
-  null;
+        const ls =
+          requirement?.leadSnapshot ||
+          requirement?.leadsnapshot ||
+          requirement?.leadssnapshot ||
+          null;
 
-// read customerName from snapshot with tolerant keys
-const snapCustomerName =
-  (ls && (ls.customerName ?? ls.customername ?? ls.customer)) || null;
+        const snapCustomerName =
+          (ls &&
+            (ls.customerName ??
+              ls.customername ??
+              ls.customer)) ||
+          null;
+        const customerName =
+          snapCustomerName ||
+          requirement?.customerName ||
+          freshQuotation?.customerName ||
+          lead?.customerName ||
+          lead?.companyName ||
+          lead?.organization ||
+          lead?.orgName ||
+          "";
 
-// canonical fields (prefer leadSnapshot.* and never use createdByName or lead.name)
-const customerName =
-  snapCustomerName ||
-  requirement?.customerName ||
-  freshQuotation?.customerName ||
-  lead?.customerName ||
-  lead?.companyName ||
-  lead?.organization ||
-  lead?.orgName ||
-  "";
+        const deliveryAddress =
+          normAddress(ls?.address) ||
+          normAddress(
+            freshQuotation?.deliveryAddress || freshQuotation?.address
+          ) ||
+          normAddress(
+            requirement?.deliveryAddress ||
+              requirement?.address ||
+              requirement?.deliveryCity
+          ) ||
+          normAddress(lead?.address) ||
+          "";
 
-// keep contact logic as-is (yours was correct)
-const deliveryContact =
-  normContact(ls?.contactPerson || ls?.contactperson) ||
-  normContact(requirement?.deliveryContact) ||
-  normContact(freshQuotation?.deliveryContact) ||
-  normContact(lead?.contactPerson) ||
-  null;
+        const deliveryContact = buildDeliveryContact(
+          ls,
+          requirement,
+          freshQuotation,
+          lead
+        );
 
-const deliveryAddress =
-  normAddress(ls?.address) ||
-  normAddress(freshQuotation?.deliveryAddress || freshQuotation?.address) ||
-  normAddress(requirement?.deliveryAddress || requirement?.address || requirement?.deliveryCity) ||
-  normAddress(lead?.address) ||
-  "";
-
-        // taxes & discount priority
         const taxes =
-          (freshQuotation?.taxes && Array.isArray(freshQuotation.taxes) && freshQuotation.taxes.length)
+          freshQuotation?.taxes &&
+          Array.isArray(freshQuotation.taxes) &&
+          freshQuotation.taxes.length
             ? freshQuotation.taxes
-            : (requirement?.taxes && Array.isArray(requirement.taxes) && requirement.taxes.length)
-              ? requirement.taxes
-              : (ls?.taxes && Array.isArray(ls.taxes) && ls.taxes.length)
-                ? ls.taxes
-                : (lead?.taxes && Array.isArray(lead.taxes) && lead.taxes.length)
-                  ? lead.taxes
-                  : (freshQuotation?.taxes || []);
+            : requirement?.taxes &&
+              Array.isArray(requirement.taxes) &&
+              requirement.taxes.length
+            ? requirement.taxes
+            : ls?.taxes &&
+              Array.isArray(ls.taxes) &&
+              ls.taxes.length
+            ? ls.taxes
+            : lead?.taxes &&
+              Array.isArray(lead.taxes) &&
+              lead.taxes.length
+            ? lead.taxes
+            : freshQuotation?.taxes || [];
 
-        const discount = freshQuotation?.discount || requirement?.discount || { type: "percent", value: 0 };
+        const discount =
+          freshQuotation?.discount ||
+          requirement?.discount || { type: "percent", value: 0 };
 
-        // items source
-        let itemsSource = (freshQuotation?.items && Array.isArray(freshQuotation.items) && freshQuotation.items.length)
-          ? freshQuotation.items
-          : (requirement?.equipment && Array.isArray(requirement.equipment) && requirement.equipment.length)
+        let itemsSource =
+          freshQuotation?.items &&
+          Array.isArray(freshQuotation.items) &&
+          freshQuotation.items.length
+            ? freshQuotation.items
+            : requirement?.equipment &&
+              Array.isArray(requirement.equipment) &&
+              requirement.equipment.length
             ? requirement.equipment
-            : (requirement?.requirementItems && Array.isArray(requirement.requirementItems) && requirement.requirementItems.length)
-              ? requirement.requirementItems
-              : [];
+            : requirement?.requirementItems &&
+              Array.isArray(requirement.requirementItems) &&
+              requirement.requirementItems.length
+            ? requirement.requirementItems
+            : [];
 
-        // normalize items and try to preserve productId if present
-        const items = (itemsSource.length ? itemsSource : [{ name: "", qty: 1, rate: 0 }]).map((it, idx) => {
-          const name = it.name || it.itemName || it.productName || it.productTitle || "";
+        const items = (itemsSource.length
+          ? itemsSource
+          : [{ name: "", qty: 1, rate: 0 }]
+        ).map((it, idx) => {
+          const name =
+            it.name ||
+            it.itemName ||
+            it.productName ||
+            it.productTitle ||
+            "";
           const qty = Number(it.qty ?? it.quantity ?? 1);
           const rate = Number(it.rate ?? it.price ?? 0);
           const amount = Number(it.amount ?? qty * rate);
-          const notes = it.notes || it.unitNotes || it.specialInstructions || "";
-          const days = it.expectedDurationDays ?? it.days ?? requirement?.expectedDurationDays ?? 0;
-          const expectedStartDate = it.expectedStartDate || it.startDate || requirement?.expectedStartDate || "";
-          const expectedEndDate = it.expectedEndDate || it.endDate || requirement?.expectedEndDate || "";
+          const notes =
+            it.notes || it.unitNotes || it.specialInstructions || "";
+          const days =
+            it.expectedDurationDays ??
+            it.days ??
+            requirement?.expectedDurationDays ??
+            0;
+          const expectedStartDate =
+            it.expectedStartDate ||
+            it.startDate ||
+            requirement?.expectedStartDate ||
+            "";
+          const expectedEndDate =
+            it.expectedEndDate ||
+            it.endDate ||
+            requirement?.expectedEndDate ||
+            "";
           const productId = it.productId || it.product || "";
           return {
             id: it.id || `i-${Date.now()}-${idx}`,
@@ -235,26 +399,37 @@ const deliveryAddress =
             expectedStartDate,
             expectedEndDate,
             productId,
-            branchId: "", // user selects
+            branchId: "",
             assignedAssets: [],
             autoAssigned: false,
           };
         });
 
+        const totals =
+          freshQuotation?.totals || calcTotals(items, discount, taxes);
+
         const draftObj = {
           quotationId: freshQuotation?.id || incomingQuotation?.id || null,
-          quotationNo: freshQuotation?.quoNo || freshQuotation?.quotationId || incomingQuotation?.quoNo || "",
-          requirementId: freshQuotation?.requirementId || requirement?.id || "",
+          quotationNo:
+            freshQuotation?.quoNo ||
+            freshQuotation?.quotationId ||
+            incomingQuotation?.quoNo ||
+            "",
+          requirementId:
+            freshQuotation?.requirementId || requirement?.id || "",
           orderNo: `O-${Math.floor(Date.now() / 1000)}`,
           customerName,
           deliveryAddress,
           deliveryContact,
-          leadId: requirement?.leadId || freshQuotation?.leadId || (lead?.id || null),
+          leadId:
+            requirement?.leadId ||
+            freshQuotation?.leadId ||
+            (lead?.id || null),
           items,
           discount,
           taxes,
           notes: freshQuotation?.notes || requirement?.notes || "",
-          totals: freshQuotation?.totals || calcTotals(items, discount, taxes),
+          totals,
         };
 
         if (!open) return;
@@ -267,15 +442,25 @@ const deliveryAddress =
       }
     };
     loadAll();
-    return () => { /* cleanup if needed */ };
+    return () => {};
   }, [open, incomingQuotation]);
 
-  // open asset picker for an item: product must be selected first
+  // top-level draft updater
+  const updateDraft = (patch) => {
+    setDraft((d) => ({
+      ...(d || {}),
+      ...(patch || {}),
+    }));
+  };
+
+  // open asset picker for an item
   const openAssetPicker = async (itemIndex) => {
     if (!draft) return;
     const it = draft.items[itemIndex];
     if (!it.productId) {
-      setError("Please select a Product for this item before assigning assets.");
+      setError(
+        "Please select a Product for this item before assigning assets."
+      );
       return;
     }
     setPickerAssets([]);
@@ -285,9 +470,21 @@ const deliveryAddress =
     setPickerLoading(true);
     setError("");
     try {
-      // list only in_stock assets for product + branch
-      const assets = await listAssets({ productId: it.productId || null, branchId: it.branchId || null, status: "in_stock" });
+      const assets = await listAssets({
+        productId: it.productId || null,
+        branchId: it.branchId || null,
+        status: "in_stock",
+      });
       setPickerAssets(assets || []);
+
+      // local map so we can show assetId + model on chips
+      setAssetsById((prev) => {
+        const m = { ...(prev || {}) };
+        (assets || []).forEach((a) => {
+          if (a && a.id) m[a.id] = a;
+        });
+        return m;
+      });
     } catch (err) {
       console.error("openAssetPicker", err);
       setError(err.message || "Failed to load assets");
@@ -298,40 +495,109 @@ const deliveryAddress =
   };
 
   const togglePickerSelect = (assetId) => {
-    setPickerSelected((p) => ({ ...p, [assetId]: !p[assetId] }));
+    setPickerSelected((p) => ({ ...(p || {}), [assetId]: !p[assetId] }));
   };
 
+  // confirm selection: don't exceed qty, no duplicates
   const confirmPickerSelection = () => {
     if (!pickerFor) return;
     const idx = pickerFor.itemIndex;
-    const selectedIds = Object.keys(pickerSelected).filter((k) => pickerSelected[k]);
+
     setDraft((d) => {
       const nd = JSON.parse(JSON.stringify(d));
-      nd.items[idx].assignedAssets = [...(nd.items[idx].assignedAssets || []), ...selectedIds];
-      // update totals not needed here
+      const item = nd.items[idx];
+      const qty = Number(item.qty || 0);
+      const existing = Array.isArray(item.assignedAssets)
+        ? item.assignedAssets
+        : [];
+
+      const desired = Object.keys(pickerSelected).filter(
+        (k) => pickerSelected[k]
+      );
+
+      // remove already-assigned from new list
+      const fresh = desired.filter((id) => !existing.includes(id));
+
+      const remainingCapacity = Math.max(0, qty - existing.length);
+      const toAdd =
+        remainingCapacity > 0 ? fresh.slice(0, remainingCapacity) : [];
+
+      if (fresh.length > remainingCapacity && remainingCapacity >= 0) {
+        setError(
+          `You can assign max ${qty} assets for this item (already ${existing.length} assigned).`
+        );
+      }
+
+      item.assignedAssets = [...existing, ...toAdd];
+      nd.items[idx] = item;
       return nd;
     });
+
     setPickerOpen(false);
     setPickerFor(null);
     setPickerAssets([]);
     setPickerSelected({});
   };
 
+  // auto-assign: don't exceed qty, avoid duplicates
   const autoAssignAssetsForItem = async (itemIndex, count = 1) => {
     try {
       const it = draft.items[itemIndex];
-      if (!it.productId) { setError("Select product before auto-assign"); return; }
-      const assets = await listAssets({ productId: it.productId || null, branchId: it.branchId || null, status: "in_stock" });
-      if (!assets || assets.length === 0) {
-        setError("No assets available to auto-assign");
+      if (!it.productId) {
+        setError("Select product before auto-assign");
         return;
       }
-      const pick = assets.slice(0, Number(count || 1)).map(a => a.id);
+
+      const qty = Number(it.qty || 0);
+      const existing = Array.isArray(it.assignedAssets)
+        ? it.assignedAssets
+        : [];
+      const remainingCapacity = Math.max(0, qty - existing.length);
+
+      if (remainingCapacity <= 0) {
+        setError("This item already has enough assets assigned.");
+        return;
+      }
+
+      const assets = await listAssets({
+        productId: it.productId || null,
+        branchId: it.branchId || null,
+        status: "in_stock",
+      });
+
+      const available = (assets || []).filter(
+        (a) => !existing.includes(a.id)
+      );
+      if (!available.length) {
+        setError("No more assets available to auto-assign");
+        return;
+      }
+
+      const wanted = Math.min(
+        remainingCapacity,
+        Number(count || 1)
+      );
+      const pick = available.slice(0, wanted).map((a) => a.id);
+
       setDraft((d) => {
         const nd = JSON.parse(JSON.stringify(d));
-        nd.items[itemIndex].assignedAssets = [...(nd.items[itemIndex].assignedAssets || []), ...pick];
-        nd.items[itemIndex].autoAssigned = true;
+        const item = nd.items[itemIndex];
+        const ex = Array.isArray(item.assignedAssets)
+          ? item.assignedAssets
+          : [];
+        item.assignedAssets = [...ex, ...pick];
+        item.autoAssigned = true;
+        nd.items[itemIndex] = item;
         return nd;
+      });
+
+      // update asset map for chip labels
+      setAssetsById((prev) => {
+        const m = { ...(prev || {}) };
+        (assets || []).forEach((a) => {
+          if (a && a.id) m[a.id] = a;
+        });
+        return m;
       });
     } catch (err) {
       console.error("autoAssign failed", err);
@@ -339,23 +605,80 @@ const deliveryAddress =
     }
   };
 
+  // item updater with auto-days from date range
   const updateDraftItem = (idx, patch) => {
     setDraft((d) => {
       const nd = JSON.parse(JSON.stringify(d));
-      nd.items[idx] = { ...(nd.items[idx] || {}), ...patch };
-      nd.items[idx].amount = safeNum(nd.items[idx].qty) * safeNum(nd.items[idx].rate);
-      nd.totals = calcTotals(nd.items, nd.discount, nd.taxes);
-      // if productId changed, clear assigned assets to avoid mismatch
+      let item = { ...(nd.items[idx] || {}), ...patch };
+
+      // auto-calc days if dates changed
+      if (
+        Object.prototype.hasOwnProperty.call(patch, "expectedStartDate") ||
+        Object.prototype.hasOwnProperty.call(patch, "expectedEndDate")
+      ) {
+        const start =
+          patch.expectedStartDate ?? item.expectedStartDate;
+        const end = patch.expectedEndDate ?? item.expectedEndDate;
+        item.days = diffDaysInclusive(start, end);
+      }
+
+      item.amount = safeNum(item.qty) * safeNum(item.rate);
+      nd.items[idx] = item;
+
       if (patch.productId !== undefined) {
         nd.items[idx].assignedAssets = [];
       }
+
+      nd.totals = calcTotals(nd.items, nd.discount, nd.taxes);
       return nd;
+    });
+  };
+
+  // add / remove items
+  const addItem = () => {
+    setDraft((d) => {
+      const base = d || {};
+      const items = Array.isArray(base.items) ? [...base.items] : [];
+      const nextIndex = items.length;
+
+      items.push({
+        id: `i-${Date.now()}-${nextIndex}`,
+        name: "",
+        qty: 1,
+        rate: 0,
+        amount: 0,
+        notes: "",
+        days: 0,
+        expectedStartDate: "",
+        expectedEndDate: "",
+        productId: "",
+        branchId: "",
+        assignedAssets: [],
+        autoAssigned: false,
+      });
+
+      const totals = calcTotals(items, base.discount, base.taxes);
+      return { ...base, items, totals };
+    });
+  };
+
+  const removeItem = (idx) => {
+    setDraft((d) => {
+      if (!d) return d;
+      const items = Array.isArray(d.items) ? [...d.items] : [];
+      if (items.length <= 1) return d;
+      items.splice(idx, 1);
+      const totals = calcTotals(items, d.discount, d.taxes);
+      return { ...d, items, totals };
     });
   };
 
   const computeSubtotal = () => {
     if (!draft) return 0;
-    return draft.items.reduce((s, it) => s + (safeNum(it.qty) * safeNum(it.rate)), 0);
+    return draft.items.reduce(
+      (s, it) => s + safeNum(it.qty) * safeNum(it.rate),
+      0
+    );
   };
 
   const createOrder = async () => {
@@ -385,6 +708,8 @@ const deliveryAddress =
         requirementId: draft.requirementId || "",
         orderNo: draft.orderNo,
         customerName: draft.customerName || "",
+        customerPhone: draft.deliveryContact?.phone || "",
+        customerEmail: draft.deliveryContact?.email || "",
         deliveryAddress: draft.deliveryAddress || "",
         deliveryContact: draft.deliveryContact || null,
         leadId: draft.leadId || null,
@@ -400,7 +725,7 @@ const deliveryAddress =
 
       const ref = await addDoc(collection(db, "orders"), orderPayload);
 
-      // checkout assigned assets
+      // reserve assigned assets
       for (const it of itemsPayload) {
         if (Array.isArray(it.assignedAssets) && it.assignedAssets.length) {
           for (const assetDocId of it.assignedAssets) {
@@ -419,7 +744,6 @@ const deliveryAddress =
         }
       }
 
-      // update quotation & requirement history
       if (draft.quotationId) {
         await updateDoc(doc(db, "quotations", draft.quotationId), {
           orderId: ref.id,
@@ -436,7 +760,9 @@ const deliveryAddress =
           field: "status",
           oldValue: "",
           newValue: "order_created",
-          note: `Order ${orderPayload.orderNo} created from quotation ${draft.quotationId || draft.quotationNo}`,
+          note: `Order ${orderPayload.orderNo} created from quotation ${
+            draft.quotationId || draft.quotationNo
+          }`,
         });
         await updateDoc(doc(db, "requirements", draft.requirementId), {
           status: "order_created",
@@ -445,7 +771,13 @@ const deliveryAddress =
           updatedByName: user.displayName || user.email || "",
           history: arrayUnion(entry),
         });
-        propagateToLead(draft.requirementId, "order", "", "order_created", entry.note);
+        propagateToLead(
+          draft.requirementId,
+          "order",
+          "",
+          "order_created",
+          entry.note
+        );
       }
 
       if (onCreated) onCreated(ref.id);
@@ -463,87 +795,385 @@ const deliveryAddress =
 
   return (
     <div className="cp-drawer" onClick={() => onClose && onClose()}>
-      <div className="cp-form details" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="cp-form details"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="cp-form-head">
           <h2>Create Order — {draft?.orderNo || "…"}</h2>
           <div>
-            <button className="cp-btn ghost" onClick={() => onClose && onClose()}>Cancel</button>
-            <button className="cp-btn" onClick={createOrder} disabled={creating || loadingInitial}>{creating ? "Creating…" : "Create Order"}</button>
+            <button
+              className="cp-btn ghost"
+              onClick={() => onClose && onClose()}
+            >
+              Cancel
+            </button>
+            <button
+              className="cp-btn"
+              onClick={createOrder}
+              disabled={creating || loadingInitial}
+            >
+              {creating ? "Creating…" : "Create Order"}
+            </button>
           </div>
         </div>
 
         {loadingInitial && <div className="muted">Loading details…</div>}
-        {error && <div style={{ background: "#fff5f5", color: "#9b1c1c", padding: 8, borderRadius: 6 }}>{error}</div>}
+        {error && (
+          <div
+            style={{
+              background: "#fff5f5",
+              color: "#9b1c1c",
+              padding: 8,
+              borderRadius: 6,
+              marginTop: 8,
+            }}
+          >
+            {error}
+          </div>
+        )}
 
         {!loadingInitial && draft && (
           <div style={{ display: "flex", gap: 16, marginTop: 12 }}>
             <div style={{ flex: 1 }}>
+              {/* Customer / contact (editable) */}
               <div style={{ marginBottom: 12 }}>
-                <div className="label muted">Customer</div>
-                <div style={{ fontWeight: 700 }}>{draft.customerName || "—"}</div>
-                <div className="muted" style={{ marginTop: 6 }}>{draft.deliveryAddress || "—"}</div>
+                <div className="label muted">Customer name</div>
+                <input
+                  className="cp-input"
+                  style={{ maxWidth: 320 }}
+                  value={draft.customerName || ""}
+                  onChange={(e) =>
+                    updateDraft({ customerName: e.target.value })
+                  }
+                  placeholder="Customer / company name"
+                />
 
-                {/* Contact rendered safely: name • phone • email */}
-                {draft.deliveryContact ? (
-                  <div style={{ marginTop: 6 }} className="muted">
-                    Contact: {draft.deliveryContact.name || ""}
-                    {draft.deliveryContact.phone ? ` • ${draft.deliveryContact.phone}` : ""}
-                    {draft.deliveryContact.email ? ` • ${draft.deliveryContact.email}` : ""}
+                <div
+                  className="label muted"
+                  style={{ marginTop: 8 }}
+                >
+                  Delivery address
+                </div>
+                <textarea
+                  className="cp-input"
+                  style={{ minHeight: 60, maxWidth: 420 }}
+                  value={draft.deliveryAddress || ""}
+                  onChange={(e) =>
+                    updateDraft({ deliveryAddress: e.target.value })
+                  }
+                  placeholder="Address"
+                />
+
+                <div
+                  style={{
+                    marginTop: 8,
+                    display: "grid",
+                    gap: 8,
+                    gridTemplateColumns:
+                      "repeat(auto-fit, minmax(140px, 1fr))",
+                  }}
+                >
+                  <div>
+                    <div className="label muted">Contact person</div>
+                    <input
+                      className="cp-input"
+                      value={draft.deliveryContact?.name || ""}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...(d || {}),
+                          deliveryContact: {
+                            ...(d?.deliveryContact || {}),
+                            name: e.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="Name"
+                    />
                   </div>
-                ) : null}
+
+                  <div>
+                    <div className="label muted">Contact phone</div>
+                    <input
+                      className="cp-input"
+                      value={draft.deliveryContact?.phone || ""}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...(d || {}),
+                          deliveryContact: {
+                            ...(d?.deliveryContact || {}),
+                            phone: e.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="Phone"
+                    />
+                  </div>
+
+                  <div>
+                    <div className="label muted">Contact email</div>
+                    <input
+                      className="cp-input"
+                      value={draft.deliveryContact?.email || ""}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...(d || {}),
+                          deliveryContact: {
+                            ...(d?.deliveryContact || {}),
+                            email: e.target.value,
+                          },
+                        }))
+                      }
+                      placeholder="Email"
+                    />
+                  </div>
+                </div>
               </div>
 
+              {/* Items section */}
               <div>
-                <h3>Items</h3>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                  {draft.items.map((it, idx) => (
-                    <div key={it.id} style={{ border: "1px solid #eef2f7", padding: 10, borderRadius: 6 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                        <div>
-                          <div style={{ fontWeight: 700 }}>{it.name || "—"}</div>
-                          <div className="muted" style={{ fontSize: 13, marginTop: 4 }}>Product</div>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginBottom: 6,
+                  }}
+                >
+                  <h3 style={{ margin: 0 }}>Items</h3>
+                  <button
+                    type="button"
+                    className="cp-btn ghost"
+                    onClick={addItem}
+                  >
+                    + Add item
+                  </button>
+                </div>
 
-                          {/* Product select: populated from products collection */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                  }}
+                >
+                  {draft.items.map((it, idx) => (
+                    <div
+                      key={it.id}
+                      style={{
+                        border: "1px solid #eef2f7",
+                        padding: 10,
+                        borderRadius: 6,
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          gap: 8,
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 700 }}>
+                            {it.name || "—"}
+                          </div>
+                          <div
+                            className="muted"
+                            style={{ fontSize: 13, marginTop: 4 }}
+                          >
+                            Product
+                          </div>
+
                           <select
                             className="cp-input"
                             value={it.productId || ""}
-                            onChange={(e) => updateDraftItem(idx, { productId: e.target.value })}
+                            onChange={(e) =>
+                              updateDraftItem(idx, {
+                                productId: e.target.value,
+                              })
+                            }
                             style={{ marginTop: 6, width: 280 }}
                           >
-                            <option value="">Select product (required before asset assign)</option>
-                            {products.map((p) => <option key={p.id} value={p.id}>{p.name} {p.sku ? `· ${p.sku}` : ""}</option>)}
+                            <option value="">
+                              Select product (required before asset assign)
+                            </option>
+                            {products.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                                {p.sku ? ` · ${p.sku}` : ""}
+                              </option>
+                            ))}
                           </select>
                         </div>
 
-                        <div style={{ width: 220 }}>
-                          <div className="muted">Branch</div>
-                          <select className="cp-input" value={it.branchId || ""} onChange={(e) => updateDraftItem(idx, { branchId: e.target.value })}>
-                            <option value="">Default branch</option>
-                            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                          </select>
+                        <div
+                          style={{
+                            width: 220,
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: 6,
+                          }}
+                        >
+                          <div>
+                            <div className="muted">Branch</div>
+                            <select
+                              className="cp-input"
+                              value={it.branchId || ""}
+                              onChange={(e) =>
+                                updateDraftItem(idx, {
+                                  branchId: e.target.value,
+                                })
+                              }
+                            >
+                              <option value="">Default branch</option>
+                              {branches.map((b) => (
+                                <option key={b.id} value={b.id}>
+                                  {b.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <button
+                            type="button"
+                            className="cp-btn ghost"
+                            style={{
+                              alignSelf: "flex-end",
+                              padding: "4px 8px",
+                              fontSize: 12,
+                            }}
+                            onClick={() => removeItem(idx)}
+                            disabled={draft.items.length <= 1}
+                          >
+                            Remove
+                          </button>
                         </div>
                       </div>
 
-                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        <input className="cp-input" style={{ width: 90 }} value={it.qty} onChange={(e) => updateDraftItem(idx, { qty: Number(e.target.value || 0) })} />
-                        <input className="cp-input" style={{ width: 140 }} value={it.rate} onChange={(e) => updateDraftItem(idx, { rate: Number(e.target.value || 0) })} />
-                        <input className="cp-input" style={{ width: 140 }} value={it.days} onChange={(e) => updateDraftItem(idx, { days: Number(e.target.value || 0) })} />
-                        <input className="cp-input" placeholder="Start (YYYY-MM-DD)" value={it.expectedStartDate || ""} onChange={(e) => updateDraftItem(idx, { expectedStartDate: e.target.value })} />
-                        <input className="cp-input" placeholder="End (YYYY-MM-DD)" value={it.expectedEndDate || ""} onChange={(e) => updateDraftItem(idx, { expectedEndDate: e.target.value })} />
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          marginTop: 8,
+                        }}
+                      >
+                        <input
+                          className="cp-input"
+                          style={{ width: 90 }}
+                          value={it.qty}
+                          onChange={(e) =>
+                            updateDraftItem(idx, {
+                              qty: Number(e.target.value || 0),
+                            })
+                          }
+                          placeholder="Qty"
+                        />
+                        <input
+                          className="cp-input"
+                          style={{ width: 140 }}
+                          value={it.rate}
+                          onChange={(e) =>
+                            updateDraftItem(idx, {
+                              rate: Number(e.target.value || 0),
+                            })
+                          }
+                          placeholder="Rate"
+                        />
+                        <input
+                          className="cp-input"
+                          style={{ width: 140 }}
+                          value={it.days}
+                          onChange={(e) =>
+                            updateDraftItem(idx, {
+                              days: Number(e.target.value || 0),
+                            })
+                          }
+                          placeholder="Days"
+                        />
+                        <input
+                          type="date"
+                          className="cp-input"
+                          value={it.expectedStartDate || ""}
+                          onChange={(e) =>
+                            updateDraftItem(idx, {
+                              expectedStartDate: e.target.value,
+                            })
+                          }
+                        />
+                        <input
+                          type="date"
+                          className="cp-input"
+                          value={it.expectedEndDate || ""}
+                          onChange={(e) =>
+                            updateDraftItem(idx, {
+                              expectedEndDate: e.target.value,
+                            })
+                          }
+                        />
                       </div>
 
-                      <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center" }}>
-                        <div style={{ fontSize: 13 }}><strong>Assigned:</strong> {(it.assignedAssets || []).length}</div>
-                        <button className="cp-btn ghost" onClick={() => openAssetPicker(idx)}>Assign Product</button>
-                        <button className="cp-btn ghost" onClick={() => autoAssignAssetsForItem(idx, it.qty || 1)}>Auto-assign</button>
-                        <div style={{ marginLeft: "auto", fontWeight: 700 }}>Amount: {fmtCurrency(it.amount || 0)}</div>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          marginTop: 8,
+                          alignItems: "center",
+                        }}
+                      >
+                        <div style={{ fontSize: 13 }}>
+                          <strong>Assigned:</strong>{" "}
+                          {(it.assignedAssets || []).length} /{" "}
+                          {Number(it.qty || 0)}
+                        </div>
+                        <button
+                          className="cp-btn ghost"
+                          onClick={() => openAssetPicker(idx)}
+                        >
+                          Assign Product
+                        </button>
+                        <button
+                          className="cp-btn ghost"
+                          onClick={() =>
+                            autoAssignAssetsForItem(idx, it.qty || 1)
+                          }
+                        >
+                          Auto-assign
+                        </button>
+                        <div
+                          style={{
+                            marginLeft: "auto",
+                            fontWeight: 700,
+                          }}
+                        >
+                          Amount: {fmtCurrency(it.amount || 0)}
+                        </div>
                       </div>
 
                       {(it.assignedAssets || []).length > 0 && (
                         <div style={{ marginTop: 8 }}>
                           <div className="muted">Assigned assets</div>
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-                            {it.assignedAssets.map(a => <div key={a} className="chip">{a}</div>)}
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: 8,
+                              flexWrap: "wrap",
+                              marginTop: 6,
+                            }}
+                          >
+                            {it.assignedAssets.map((id) => {
+                              const asset = assetsById[id];
+                              const labelId = asset?.assetId || id;
+                              const labelName =
+                                asset?.metadata?.model ||
+                                asset?.name ||
+                                "";
+                              return (
+                                <div key={id} className="chip">
+                                  {labelId}
+                                  {labelName ? ` · ${labelName}` : ""}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -553,72 +1183,217 @@ const deliveryAddress =
               </div>
             </div>
 
+            {/* Right pane — totals */}
             <div style={{ width: 320 }}>
               <div className="label muted">Totals</div>
               <div style={{ marginTop: 8 }}>
-                <div className="meta-row"><div className="label">Subtotal</div><div className="value">{fmtCurrency(draft.totals?.subtotal || computeSubtotal())}</div></div>
-                <div className="meta-row"><div className="label">Discount</div><div className="value">{draft.discount?.type === "percent" ? `${draft.discount?.value || 0}%` : fmtCurrency(draft.discount?.value || 0)}</div></div>
+                <div className="meta-row">
+                  <div className="label">Subtotal</div>
+                  <div className="value">
+                    {fmtCurrency(
+                      draft.totals?.subtotal || computeSubtotal()
+                    )}
+                  </div>
+                </div>
+                <div className="meta-row">
+                  <div className="label">Discount</div>
+                  <div className="value">
+                    {draft.discount?.type === "percent"
+                      ? `${draft.discount?.value || 0}%`
+                      : fmtCurrency(draft.discount?.value || 0)}
+                  </div>
+                </div>
 
                 <div style={{ marginTop: 8 }}>
                   <div className="label muted">Taxes</div>
                   <div style={{ marginTop: 6 }}>
-                    {(draft.taxes || []).map((t, i) => <div key={i}>{t.name} — {t.rate}%</div>)}
+                    {(draft.taxes || []).map((t, i) => (
+                      <div key={i}>
+                        {t.name} — {t.rate}%
+                      </div>
+                    ))}
                   </div>
                 </div>
 
-                <div className="meta-row" style={{ marginTop: 12 }}><div className="label">Total Tax</div><div className="value">{fmtCurrency(draft.totals?.totalTax || 0)}</div></div>
-                <div className="meta-row"><div className="label strong">Total</div><div className="value strong">{fmtCurrency(draft.totals?.total || computeSubtotal())}</div></div>
+                <div
+                  className="meta-row"
+                  style={{ marginTop: 12 }}
+                >
+                  <div className="label">Total Tax</div>
+                  <div className="value">
+                    {fmtCurrency(draft.totals?.totalTax || 0)}
+                  </div>
+                </div>
+                <div className="meta-row">
+                  <div className="label strong">Total</div>
+                  <div className="value strong">
+                    {fmtCurrency(
+                      draft.totals?.total || computeSubtotal()
+                    )}
+                  </div>
+                </div>
               </div>
 
               <div style={{ marginTop: 18 }}>
-                <button className="cp-btn" onClick={createOrder} disabled={creating || loadingInitial}>{creating ? "Creating…" : "Create Order"}</button>
-                <button className="cp-btn ghost" style={{ marginLeft: 8 }} onClick={() => onClose && onClose()}>Cancel</button>
+                <button
+                  className="cp-btn"
+                  onClick={createOrder}
+                  disabled={creating || loadingInitial}
+                >
+                  {creating ? "Creating…" : "Create Order"}
+                </button>
+                <button
+                  className="cp-btn ghost"
+                  style={{ marginLeft: 8 }}
+                  onClick={() => onClose && onClose()}
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
         )}
-        
+
         {/* Asset picker modal */}
         {pickerOpen && pickerFor !== null && (
-          <div className="cp-modal" onClick={() => { setPickerOpen(false); setPickerFor(null); setPickerAssets([]); }}>
-            <div className="cp-modal-card" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="cp-modal"
+            onClick={() => {
+              setPickerOpen(false);
+              setPickerFor(null);
+              setPickerAssets([]);
+            }}
+          >
+            <div
+              className="cp-modal-card"
+              onClick={(e) => e.stopPropagation()}
+            >
               <h4>Select assets for item #{pickerFor.itemIndex + 1}</h4>
 
-              {pickerLoading && <div className="muted">Loading…</div>}
+              {pickerLoading && (
+                <div className="muted">Loading…</div>
+              )}
 
-              {/* In-stock summary at top */}
               {!pickerLoading && (
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
-                  <div className="muted">In stock: {(pickerAssets || []).length}</div>
-                  <div style={{ fontSize: 13, color: "#6b7280" }}>
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    marginTop: 8,
+                  }}
+                >
+                  <div className="muted">
+                    In stock: {(pickerAssets || []).length}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "#6b7280",
+                    }}
+                  >
                     {(() => {
                       const it = draft?.items?.[pickerFor.itemIndex];
                       if (!it) return "";
-                      const prod = products.find((p) => p.id === it.productId);
+                      const prod = products.find(
+                        (p) => p.id === it.productId
+                      );
                       return prod ? `Product: ${prod.name}` : "Product: —";
                     })()}
                   </div>
                 </div>
               )}
 
-              {!pickerLoading && pickerAssets.length === 0 && <div className="muted" style={{ marginTop: 8 }}>No assets in stock for this product / branch.</div>}
+              {!pickerLoading && pickerAssets.length === 0 && (
+                <div
+                  className="muted"
+                  style={{ marginTop: 8 }}
+                >
+                  No assets in stock for this product / branch.
+                </div>
+              )}
 
-              <div style={{ maxHeight: 300, overflowY: "auto", marginTop: 8 }}>
+              <div
+                style={{
+                  maxHeight: 300,
+                  overflowY: "auto",
+                  marginTop: 8,
+                }}
+              >
                 {pickerAssets.map((a) => (
-                  <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, borderBottom: "1px solid #eef2f7" }}>
-                    <input type="checkbox" checked={!!pickerSelected[a.id]} onChange={() => togglePickerSelect(a.id)} />
+                  <div
+                    key={a.id}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: 8,
+                      borderBottom: "1px solid #eef2f7",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!pickerSelected[a.id]}
+                      onChange={() => togglePickerSelect(a.id)}
+                    />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700 }}>{a.assetId || a.id}</div>
-                      <div className="muted" style={{ fontSize: 12 }}>{a.metadata?.model || a.productId} · {(branches.find(b => b.id === a.branchId) || {}).name || a.branchId || "—"}</div>
+                      <div style={{ fontWeight: 700 }}>
+                        {a.assetId || a.id}
+                      </div>
+                      <div
+                        className="muted"
+                        style={{ fontSize: 12 }}
+                      >
+                        {a.metadata?.model || a.productId} ·{" "}
+                        {(
+                          branches.find(
+                            (b) => b.id === a.branchId
+                          ) || {}
+                        ).name ||
+                          a.branchId ||
+                          "—"}
+                      </div>
                     </div>
-                    <div className="muted" style={{ fontSize: 12 }}>Status: <strong style={{ textTransform: "capitalize" }}>{a.status}</strong></div>
+                    <div
+                      className="muted"
+                      style={{ fontSize: 12 }}
+                    >
+                      Status:{" "}
+                      <strong
+                        style={{ textTransform: "capitalize" }}
+                      >
+                        {a.status}
+                      </strong>
+                    </div>
                   </div>
                 ))}
               </div>
 
-              <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
-                <button className="cp-btn ghost" onClick={() => { setPickerOpen(false); setPickerFor(null); setPickerAssets([]); setPickerSelected({}); }}>Cancel</button>
-                <button className="cp-btn" onClick={confirmPickerSelection}>Assign selected</button>
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  justifyContent: "flex-end",
+                  marginTop: 12,
+                }}
+              >
+                <button
+                  className="cp-btn ghost"
+                  onClick={() => {
+                    setPickerOpen(false);
+                    setPickerFor(null);
+                    setPickerAssets([]);
+                    setPickerSelected({});
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="cp-btn"
+                  onClick={confirmPickerSelection}
+                >
+                  Assign selected
+                </button>
               </div>
             </div>
           </div>

@@ -29,6 +29,8 @@ import { makeHistoryEntry, propagateToLead } from "../utils/status";
 
 // Extracted drawer component
 import OrderDrawer from "../components/OrderDrawer";
+import OrderCreate from "./OrderCreate"; // adjust path if needed
+
 
 const fmtCurrency = (v) => {
   try {
@@ -319,6 +321,8 @@ export default function Orders() {
   const [saving, setSaving] = useState(false);
   const [assetsById, setAssetsById] = useState({});
   const [drivers, setDrivers] = useState([]);
+  const [createOpen, setCreateOpen] = useState(false);
+
 
   // Payments
   const [paymentModal, setPaymentModal] = useState({
@@ -1248,18 +1252,28 @@ const assignDriverToOrder = async (driverId) => {
       {/* RIGHT MAIN */}
       <main className="orders-main">
         <header
-          className="orders-header"
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "baseline",
-          }}
-        >
-          <h1>Orders / Rentals</h1>
-          <div className="muted" style={{ fontSize: 13 }}>
-            Showing <strong>{filtered.length}</strong> of {orders.length}
-          </div>
-        </header>
+  className="orders-header"
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+  }}
+>
+  <h1>Orders / Rentals</h1>
+
+  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+    <div className="muted" style={{ fontSize: 13 }}>
+      Showing <strong>{filtered.length}</strong> of {orders.length}
+    </div>
+    <button
+      className="cp-btn"
+      onClick={() => setCreateOpen(true)}
+    >
+      + Add Order
+    </button>
+  </div>
+</header>
+
 
         {error && <div className="orders-error">{error}</div>}
 
@@ -1490,6 +1504,15 @@ const assignDriverToOrder = async (driverId) => {
             paymentSummary={paymentSummary}
           />
         )}
+        <OrderCreate
+  open={createOpen}
+  quotation={null}              // manual order (not from quotation)
+  onClose={() => setCreateOpen(false)}
+  onCreated={() => {
+    setCreateOpen(false);       // close after successful create
+  }}
+/>
+
       </main>
     </div>
   );
