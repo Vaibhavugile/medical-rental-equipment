@@ -22,6 +22,7 @@ import {
   checkinAsset,
   changeAssetStatus,
   moveAssetToBranch,
+  deleteAsset,
 } from "../utils/inventory";
 import "./Products.css";
 
@@ -53,7 +54,7 @@ const fmt = {
 };
 
 /* escape for safe inline HTML used in print popup */
-const escapeHtml = (s) => String(s || "").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const escapeHtml = (s) => String(s || "").replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /* ─────────────────────────────────────────────────────────────
    Main
@@ -78,11 +79,14 @@ export default function Products() {
   // drawer – create assets & filters
   const [assetQty, setAssetQty] = useState(1);
   const [assetBranch, setAssetBranch] = useState("");
-  const [assetMetaJSON, setAssetMetaJSON] = useState('{"model":""}');
   const [assetSearch, setAssetSearch] = useState("");
+  const [assetCompany, setAssetCompany] = useState("");
+
   const [assetStatusFilter, setAssetStatusFilter] = useState("");
   const [assetBranchFilter, setAssetBranchFilter] = useState("");
   const [assetPageSize, setAssetPageSize] = useState(24);
+  const [selectedAssetIds, setSelectedAssetIds] = useState([]);
+
 
   // new: options for asset id generation & preview
   const [companyPrefix, setCompanyPrefix] = useState("BMM");
@@ -101,6 +105,7 @@ export default function Products() {
   const [maintenanceTechnician, setMaintenanceTechnician] = useState("");
   const [maintenanceNote, setMaintenanceNote] = useState("");
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
+  const [assetCompanyFilter, setAssetCompanyFilter] = useState("");
 
   // asset details
   const [assetDetailsOpen, setAssetDetailsOpen] = useState(false);
@@ -116,19 +121,36 @@ export default function Products() {
   // shortcuts
   const searchRef = useRef(null);
   useEffect(() => {
-    const key = (e) => {
-      if (e.key === "/" && searchRef.current) {
-        e.preventDefault();
-        searchRef.current.focus();
-      }
-      if (e.key.toLowerCase() === "n") {
-        e.preventDefault();
-        openAddProduct();
-      }
-    };
-    window.addEventListener("keydown", key);
-    return () => window.removeEventListener("keydown", key);
-  }, []);
+  const key = (e) => {
+    const tag = e.target?.tagName;
+    const isTyping =
+      tag === "INPUT" ||
+      tag === "TEXTAREA" ||
+      e.target?.isContentEditable;
+
+    if (isTyping) return;
+
+    // Ctrl+N / Cmd+N → Add product
+    if (
+      e.key.toLowerCase() === "n" &&
+      (e.ctrlKey || e.metaKey)
+    ) {
+      e.preventDefault(); // stop browser "new window"
+      openAddProduct();
+      return;
+    }
+
+    // "/" → focus search
+    if (e.key === "/" && searchRef.current) {
+      e.preventDefault();
+      searchRef.current.focus();
+    }
+  };
+
+  window.addEventListener("keydown", key);
+  return () => window.removeEventListener("keydown", key);
+}, []);
+
 
   /* ── realtime: products + branches ── */
   useEffect(() => {
@@ -142,7 +164,7 @@ export default function Products() {
     const qb = query(collection(db, "branches"), orderBy("name", "asc"));
     const unsubB = onSnapshot(qb, (snap) => setBranches(snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }))));
 
-    return () => { try { unsubP(); unsubB(); } catch {} };
+    return () => { try { unsubP(); unsubB(); } catch { } };
   }, []);
 
   /* ── realtime: assets → build counts ── */
@@ -164,22 +186,32 @@ export default function Products() {
       setProductAssetCounts(totals);
       setProductAssetStatusCounts(statusTotals);
     }, (err) => console.error("assets listener", err));
-    return () => { try { unsub(); } catch {} };
+    return () => { try { unsub(); } catch { } };
   }, []);
 
   /* ── load assets for selected product ── */
   useEffect(() => {
-    (async () => {
-      if (!selectedProduct) return setAssetsForProduct([]);
-      try {
-        const list = await listAssets({ productId: selectedProduct.id });
-        setAssetsForProduct(list);
-      } catch (e) {
-        console.error(e);
-        setAssetsForProduct([]);
-      }
-    })();
-  }, [selectedProduct]);
+  (async () => {
+    if (!selectedProduct) {
+      setAssetsForProduct([]);
+      return;
+    }
+
+    try {
+      const list = await listAssets({ productId: selectedProduct.id });
+      setAssetsForProduct(list);
+
+      // 🔥 RESET FILTERS ON PRODUCT CHANGE
+      setAssetCompanyFilter("");
+      setAssetSearch("");
+      setSelectedAssetIds([]);
+    } catch (e) {
+      console.error(e);
+      setAssetsForProduct([]);
+    }
+  })();
+}, [selectedProduct]);
+
 
   /* ── filtering ── */
   const filteredProducts = useMemo(() => {
@@ -193,17 +225,98 @@ export default function Products() {
 
   const visibleAssets = useMemo(() => {
     let list = (assetsForProduct || []).slice();
-    if (assetStatusFilter) list = list.filter((a) => (a.status || "") === assetStatusFilter);
-    if (assetBranchFilter) list = list.filter((a) => (a.branchId || "") === assetBranchFilter);
+
+    if (assetStatusFilter) {
+      list = list.filter((a) => a.status === assetStatusFilter);
+    }
+
+    if (assetBranchFilter) {
+      list = list.filter((a) => a.branchId === assetBranchFilter);
+    }
+
+   if (assetCompanyFilter) {
+  if (assetCompanyFilter === "__none__") {
+    list = list.filter((a) => !a.company);
+  } else {
+    list = list.filter(
+      (a) =>
+        (a.company || "").toLowerCase() ===
+        assetCompanyFilter.toLowerCase()
+    );
+  }
+}
+
+
     if (assetSearch) {
       const s = assetSearch.trim().toLowerCase();
-      list = list.filter((a) =>
-        (a.assetId || "").toLowerCase().includes(s) ||
-        (a.metadata?.model || "").toLowerCase().includes(s)
+      list = list.filter(
+        (a) =>
+          (a.assetId || "").toLowerCase().includes(s) ||
+          (a.company || "").toLowerCase().includes(s)
       );
     }
+
     return list.slice(0, assetPageSize);
-  }, [assetsForProduct, assetStatusFilter, assetBranchFilter, assetSearch, assetPageSize]);
+  }, [
+    assetsForProduct,
+    assetStatusFilter,
+    assetBranchFilter,
+    assetCompanyFilter,
+    assetSearch,
+    assetPageSize,
+  ]);
+
+  const doDeleteAsset = async (assetId) => {
+    const ok = window.confirm("Are you sure you want to delete this asset?");
+    if (!ok) return;
+
+    try {
+      await deleteAsset(assetId);
+      await refreshAssets();
+      showToast("Asset deleted", "success");
+    } catch (e) {
+      setError(e.message || "Failed to delete asset");
+    }
+  };
+  const doBulkDeleteAssets = async () => {
+    if (selectedAssetIds.length === 0) {
+      showToast("No assets selected", "error");
+      return;
+    }
+
+    const ok = window.confirm(
+      `Delete ${selectedAssetIds.length} selected assets? This cannot be undone.`
+    );
+    if (!ok) return;
+
+    try {
+      await Promise.all(
+        selectedAssetIds.map((id) => deleteAsset(id))
+      );
+
+      setSelectedAssetIds([]);
+      await refreshAssets();
+      showToast("Assets deleted", "success");
+    } catch (e) {
+      setError(e.message || "Bulk delete failed");
+    }
+  };
+
+
+const allVisibleAssetIds = visibleAssets.map((a) => a.id);
+const allSelected =
+  allVisibleAssetIds.length > 0 &&
+  allVisibleAssetIds.every((id) => selectedAssetIds.includes(id));
+const toggleSelectCompany = (companyAssets) => {
+  const ids = companyAssets.map((a) => a.id);
+  const allSelected = ids.every((id) => selectedAssetIds.includes(id));
+
+  setSelectedAssetIds((prev) =>
+    allSelected
+      ? prev.filter((id) => !ids.includes(id))
+      : [...new Set([...prev, ...ids])]
+  );
+};
 
   /* ── product modal ── */
   const openAddProduct = () => {
@@ -279,9 +392,7 @@ export default function Products() {
     const list = await listAssets({ productId: selectedProduct.id });
     setAssetsForProduct(list);
   };
-  const safeJSON = (str) => {
-    try { return JSON.parse(str || "{}"); } catch { return null; }
-  };
+
 
   // derive short code (same algorithm as backend)
   const deriveShortCode = (model) => {
@@ -297,57 +408,80 @@ export default function Products() {
   };
 
   // preview next asset id based on currently loaded assets (best-effort client-side)
+  const makeCompanyCode = (company) => {
+    return String(company || "")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "")
+      .slice(0, 5) || "COMP";
+  };
+
   const previewNextAssetId = (() => {
     if (!selectedProduct) return "—";
-    const parsedMeta = safeJSON(assetMetaJSON);
-    const model = (parsedMeta && parsedMeta.model) || selectedProduct.name || "";
-    const shortCode = (shortCodeOverride || deriveShortCode(model)).toUpperCase();
+    if (!assetCompany.trim()) return "—";
+
+    const companyCode = makeCompanyCode(assetCompany);
+    const shortCode = (shortCodeOverride || "PRD").toUpperCase();
     const batch = batchOverride || String(new Date().getFullYear()).slice(-2);
-    const prefix = `${(companyPrefix || "BMM").toUpperCase()}${shortCode}${batch}`;
+
+    const prefix = `${(companyPrefix || "BMM").toUpperCase()}${companyCode}${shortCode}${batch}`;
 
     let maxSeq = 0;
-    (assetsForProduct || []).forEach(a => {
+
+    (assetsForProduct || []).forEach((a) => {
       if (!a.assetId || typeof a.assetId !== "string") return;
       if (!a.assetId.startsWith(prefix)) return;
+
       const m = a.assetId.match(/(\d+)$/);
       if (m) {
         const n = Number(m[1]);
-        if (!Number.isNaN(n) && n > maxSeq) maxSeq = n;
+        if (!Number.isNaN(n) && n > maxSeq) {
+          maxSeq = n;
+        }
       }
     });
 
     const nextSeq = maxSeq + 1;
-    const padLen = Math.max(3, String(maxSeq + 1).length);
+    const padLen = Math.max(3, String(nextSeq).length);
+
     return `${prefix}${String(nextSeq).padStart(padLen, "0")}`;
   })();
+
 
   const onCreateAssets = async () => {
     setError("");
     if (!selectedProduct) return setError("Select a product first.");
+
     const qty = Number(assetQty || 0);
     if (!qty || qty < 1) return setError("Quantity must be at least 1");
-    const meta = safeJSON(assetMetaJSON);
-    if (meta == null) return setError("Invalid metadata JSON");
+
     try {
       const created = await createAssetsForProduct(
         selectedProduct.id,
         assetBranch || null,
         qty,
-        { model: selectedProduct.name, ...meta },
+        assetCompany.trim() || null, // 🔥 COMPANY
         "in_stock",
-        { companyPrefix: companyPrefix || "BMM", batch: (batchOverride || undefined), shortCode: shortCodeOverride || undefined }
+        {
+          companyPrefix,
+          batch: batchOverride || undefined,
+          shortCode: shortCodeOverride || undefined,
+        }
       );
-      try {
-        await updateDoc(doc(db, "products", selectedProduct.id), { assetCount: increment(qty) });
-      } catch {}
+
       await refreshAssets();
-      showToast(`Created ${Array.isArray(created) ? created.length : qty} asset(s)`, "success");
+      setAssetCompany(""); // reset input
+
+      showToast(
+        `Created ${Array.isArray(created) ? created.length : qty} asset(s)`,
+        "success"
+      );
     } catch (err) {
       console.error(err);
       setError(err.message || "Failed to create assets");
       showToast("Failed to create assets", "error");
     }
   };
+
 
   const doCheckout = async (id) => { try { await checkoutAsset(id, { note: "Checked out via UI" }); await refreshAssets(); } catch (e) { setError(e.message || "Checkout failed"); } };
   const doCheckin = async (id) => { try { await checkinAsset(id, { note: "Checked in via UI" }); await refreshAssets(); } catch (e) { setError(e.message || "Checkin failed"); } };
@@ -400,13 +534,13 @@ export default function Products() {
 
   // Open printable page with stickers (QR image + assetId) and trigger print
   // Open printable page with stickers (QR image + assetId) and trigger print
-const printAssets = async (assets = []) => {
-  if (!Array.isArray(assets) || assets.length === 0) {
-    showToast("No assets to print", "error");
-    return;
-  }
+  const printAssets = async (assets = []) => {
+    if (!Array.isArray(assets) || assets.length === 0) {
+      showToast("No assets to print", "error");
+      return;
+    }
 
-  const htmlHeader = `
+    const htmlHeader = `
     <html>
       <head>
         <title>Print Asset QR Stickers</title>
@@ -433,69 +567,69 @@ const printAssets = async (assets = []) => {
         <div class="stickers">
   `;
 
-  const htmlFooter = `
+    const htmlFooter = `
         </div>
       </body>
     </html>
   `;
 
-  const stickerHtml = assets.map(a => {
-    const id = (a.assetId || a.id || "—");
-    const qr = a.qrUrl || a.metadata?.qrUrl || (`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(id)}`);
-    const product = a.productName || a.metadata?.model || "";
-    // escape minimal characters to avoid simple HTML issues
-    const esc = (s) => String(s || "").replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    return `
+    const stickerHtml = assets.map(a => {
+      const id = (a.assetId || a.id || "—");
+      const qr = a.qrUrl || a.metadata?.qrUrl || (`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(id)}`);
+      const product = a.productName || a.metadata?.model || "";
+      // escape minimal characters to avoid simple HTML issues
+      const esc = (s) => String(s || "").replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      return `
       <div class="sticker">
         <div class="product-name">${esc(product)}</div>
         <img src="${qr}" alt="QR for ${esc(id)}" />
         <div class="asset-id">${esc(id)}</div>
       </div>
     `;
-  }).join("\n");
+    }).join("\n");
 
-  const w = window.open("", "_blank");
-  if (!w) {
-    showToast("Popup blocked. Allow popups for printing.", "error");
-    return;
-  }
+    const w = window.open("", "_blank");
+    if (!w) {
+      showToast("Popup blocked. Allow popups for printing.", "error");
+      return;
+    }
 
-  w.document.write(htmlHeader + stickerHtml + htmlFooter);
-  w.document.close();
+    w.document.write(htmlHeader + stickerHtml + htmlFooter);
+    w.document.close();
 
-  // Wait for images in the new window to load (or timeout)
-  const waitForImages = (win, timeout = 5000) => new Promise((resolve) => {
-    const start = Date.now();
-    function check() {
-      try {
-        const imgs = Array.from(win.document.images || []);
-        if (imgs.length === 0) return resolve(); // nothing to wait for
-        const allDone = imgs.every(img => img.complete && img.naturalWidth > 0);
-        if (allDone) return resolve();
-      } catch (err) {
-        // If accessing win.document fails (rare), fallback to timeout
+    // Wait for images in the new window to load (or timeout)
+    const waitForImages = (win, timeout = 5000) => new Promise((resolve) => {
+      const start = Date.now();
+      function check() {
+        try {
+          const imgs = Array.from(win.document.images || []);
+          if (imgs.length === 0) return resolve(); // nothing to wait for
+          const allDone = imgs.every(img => img.complete && img.naturalWidth > 0);
+          if (allDone) return resolve();
+        } catch (err) {
+          // If accessing win.document fails (rare), fallback to timeout
+        }
+        if (Date.now() - start > timeout) return resolve();
+        setTimeout(check, 200);
       }
-      if (Date.now() - start > timeout) return resolve();
+      // small initial delay to let browser begin fetching images
       setTimeout(check, 200);
-    }
-    // small initial delay to let browser begin fetching images
-    setTimeout(check, 200);
-  });
+    });
 
-  // wait (await) then print
-  try {
-    await waitForImages(w, 5000); // wait up to 5s (adjust if needed)
+    // wait (await) then print
     try {
-      w.focus();
-      w.print();
+      await waitForImages(w, 5000); // wait up to 5s (adjust if needed)
+      try {
+        w.focus();
+        w.print();
+      } catch (e) {
+        console.warn("Print call failed; user can manually print from the new tab.", e);
+      }
     } catch (e) {
-      console.warn("Print call failed; user can manually print from the new tab.", e);
+      console.warn("Error waiting for images:", e);
+      try { w.print(); } catch { }
     }
-  } catch (e) {
-    console.warn("Error waiting for images:", e);
-    try { w.print(); } catch {}
-  }
-};
+  };
 
 
   // simple CSV exporter
@@ -506,12 +640,12 @@ const printAssets = async (assets = []) => {
     }
     const rows = [["assetId", "qrUrl", "productName"]];
     assets.forEach(a => rows.push([a.assetId || a.id || "", a.qrUrl || "", a.productName || a.metadata?.model || ""]));
-    const csv = rows.map(r => r.map(cell => `"${String(cell || "").replace(/"/g,'""')}"`).join(",")).join("\n");
+    const csv = rows.map(r => r.map(cell => `"${String(cell || "").replace(/"/g, '""')}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `assets-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'')}.csv`;
+    a.download = `assets-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '')}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -544,6 +678,17 @@ const printAssets = async (assets = []) => {
       showToast("Synced counts to products", "success");
     } catch (e) { setError(e.message || "Failed to sync counts"); }
   };
+
+  const assetsGroupedByCompany = useMemo(() => {
+    const groups = {};
+    (visibleAssets || []).forEach((a) => {
+      const company = a.company || "Unknown company";
+      if (!groups[company]) groups[company] = [];
+      groups[company].push(a);
+    });
+    return groups;
+  }, [visibleAssets]);
+
 
   /* ── render ── */
   return (
@@ -682,7 +827,8 @@ const printAssets = async (assets = []) => {
                       <option value="">Default branch</option>
                       {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
-                    <input className="cp-input" value={assetMetaJSON} onChange={(e) => setAssetMetaJSON(e.target.value)} placeholder='{"model":"X"}' style={{ minWidth: 240, flex: "1 1 260px" }} />
+                    <input className="cp-input" value={assetCompany} onChange={(e) => setAssetCompany(e.target.value)} placeholder="Company name (e.g. Company A)" style={{ minWidth: 200 }} />
+
                     <button className="cp-btn" onClick={onCreateAssets}>Create</button>
                   </div>
                   <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
@@ -694,28 +840,28 @@ const printAssets = async (assets = []) => {
 
                   {/* Print / Export Buttons */}
                   {/* Print all assets' QR for this product */}
-<div style={{ marginTop: 8 }}>
-  <button
-    className="cp-btn"
-    onClick={async () => {
-      if (!selectedProduct) return setError("Select a product first.");
-      try {
-        const all = await listAssets({ productId: selectedProduct.id });
-        if (!Array.isArray(all) || all.length === 0) {
-          showToast("No assets found for this product", "error");
-          return;
-        }
-        all.forEach(a => a.productName = selectedProduct.name);
-        printAssets(all);
-      } catch (e) {
-        console.error("Failed to load assets for printing", e);
-        setError(e.message || "Failed to load assets");
-      }
-    }}
-  >
-    Print QR — All assets for this product
-  </button>
-</div>
+                  <div style={{ marginTop: 8 }}>
+                    <button
+                      className="cp-btn"
+                      onClick={async () => {
+                        if (!selectedProduct) return setError("Select a product first.");
+                        try {
+                          const all = await listAssets({ productId: selectedProduct.id });
+                          if (!Array.isArray(all) || all.length === 0) {
+                            showToast("No assets found for this product", "error");
+                            return;
+                          }
+                          all.forEach(a => a.productName = selectedProduct.name);
+                          printAssets(all);
+                        } catch (e) {
+                          console.error("Failed to load assets for printing", e);
+                          setError(e.message || "Failed to load assets");
+                        }
+                      }}
+                    >
+                      Print QR — All assets for this product
+                    </button>
+                  </div>
 
                 </div>
               </div>
@@ -743,96 +889,296 @@ const printAssets = async (assets = []) => {
 
             {/* Assets */}
             <div style={{ marginTop: 8 }}>
-              <h3>Assets</h3>
-              <div style={{ display: "flex", gap: 8, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <input className="cp-input" placeholder="Search assets by id or model…" value={assetSearch} onChange={(e) => setAssetSearch(e.target.value)} style={{ flex: "1 1 320px" }} />
-                <select value={assetStatusFilter} onChange={(e) => setAssetStatusFilter(e.target.value)} className="cp-input" style={{ width: 160 }}>
-                  <option value="">All statuses</option>
-                  <option value="in_stock">In stock</option>
-                  <option value="out_for_rental">Out for rental</option>
-                  <option value="maintenance">Maintenance</option>
-                  <option value="reserved">Reserved</option>
-                </select>
-                <select value={assetBranchFilter} onChange={(e) => setAssetBranchFilter(e.target.value)} className="cp-input" style={{ width: 160 }}>
-                  <option value="">All branches</option>
-                  {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-                </select>
-                <select value={assetPageSize} onChange={(e) => setAssetPageSize(Number(e.target.value))} className="cp-input" style={{ width: 120 }}>
-                  {[12, 24, 48, 96].map(n => <option key={n} value={n}>{n}/page</option>)}
-                </select>
-                <button className="cp-btn" onClick={refreshAssets}>Refresh</button>
-              </div>
+  <h3>Assets</h3>
 
-              <div className="assets-grid" style={{ marginTop: 12 }}>
-                {visibleAssets.length === 0 && <div className="muted" style={{ padding: 12 }}>No assets matching filters.</div>}
-                {visibleAssets.map((a) => (
-                  <div key={a.id} className="asset-card">
-                    <div className="asset-top">
-                      <div>
-                        <div style={{ fontWeight: 700 }}>{a.assetId}</div>
-                        <div className="muted" style={{ fontSize: 12 }}>
-                          {(branches.find(b => b.id === a.branchId) || {}).name || a.branchId || "—"}
-                        </div>
-                      </div>
+  {/* 🔥 BULK DELETE BAR — THIS WAS MISSING */}
+  {visibleAssets.length > 0 && (
+  <div className="bulk-bar"
+  
+  >
+    <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
+      <input
+        type="checkbox"
+        checked={allSelected}
+        onChange={(e) => {
+          setSelectedAssetIds(
+            e.target.checked ? allVisibleAssetIds : []
+          );
+        }}
+      />
+      Select all assets
+    </label>
 
-                      <div style={{ textAlign: "right" }}>
-                        <div className="muted" style={{ fontSize: 12 }}>{a.metadata?.model || ""}</div>
-                        <div className="muted" style={{ fontSize: 12 }}>Status: <span className={`status ${a.status}`}>{a.status}</span></div>
-                      </div>
-                    </div>
+    {selectedAssetIds.length > 0 && (
+      <button className="cp-btn danger" onClick={doBulkDeleteAssets}>
+        Delete selected ({selectedAssetIds.length})
+      </button>
+    )}
+  </div>
+)}
 
-                    <div className="asset-meta muted">
-                      {a.rental?.customer && <div>Rented to: {a.rental.customer}</div>}
-                      {a.metadata?.reservedFor && <div>Reserved for: {a.metadata.reservedFor}</div>}
-                      <div>Created: {fmt.date(a.createdAt)} · {a.createdByName}</div>
-                    </div>
 
-                    <div className="asset-actions">
-                      <button className="btn ghost" onClick={() => openAssetDetails(a)}>Details</button>
-                      {a.status !== "out_for_rental" && a.status !== "reserved" && a.status !== "maintenance" && (
-                        <button className="btn" onClick={() => doCheckout(a.id)}>Checkout</button>
-                      )}
-                      {a.status === "out_for_rental" && (
-                        <button className="btn" onClick={() => doCheckin(a.id)}>Checkin</button>
-                      )}
-                      {a.status === "reserved"
-                        ? <button className="btn ghost" onClick={() => doRelease(a.id)}>Release</button>
-                        : (a.status !== "out_for_rental" && a.status !== "maintenance") &&
-                          <button className="btn" onClick={() => doReserve(a.id)}>Reserve</button>}
-                      <button className="btn ghost" onClick={() => openMaintenance(a)}>Maintenance</button>
+  {/* Filters */}
+  <div
+    style={{
+      display: "flex",
+      gap: 8,
+      marginTop: 8,
+      alignItems: "center",
+      flexWrap: "wrap",
+    }}
+  >
+    <input
+      className="cp-input"
+      placeholder="Search assets by id or company…"
+      value={assetSearch}
+      onChange={(e) => setAssetSearch(e.target.value)}
+      style={{ flex: "1 1 320px" }}
+    />
 
-                      <select onChange={(e) => { const to = e.target.value; if (!to) return; doMove(a.id, to); e.target.value = ""; }} defaultValue="">
-                        <option value="">Move</option>
-                        {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                      </select>
+    <select
+      value={assetStatusFilter}
+      onChange={(e) => setAssetStatusFilter(e.target.value)}
+      className="cp-input"
+      style={{ width: 160 }}
+    >
+      <option value="">All statuses</option>
+      <option value="in_stock">In stock</option>
+      <option value="out_for_rental">Out for rental</option>
+      <option value="maintenance">Maintenance</option>
+      <option value="reserved">Reserved</option>
+    </select>
 
-                      {/* existing QR open */}
-                      {/* <button
-                        className="btn ghost"
-                        onClick={() => { if (a.qrUrl) window.open(a.qrUrl, "_blank"); }}
-                      >
-                        QR Code
-                      </button> */}
+    <select
+      value={assetBranchFilter}
+      onChange={(e) => setAssetBranchFilter(e.target.value)}
+      className="cp-input"
+      style={{ width: 160 }}
+    >
+      <option value="">All branches</option>
+      {branches.map((b) => (
+        <option key={b.id} value={b.id}>
+          {b.name}
+        </option>
+      ))}
+    </select>
 
-                      {/* single-asset print */}
-                      <button
-                        className="btn ghost"
-                        onClick={() => {
-                          const item = [{ ...a, productName: (selectedProduct && selectedProduct.name) || a.metadata?.model || "" }];
-                          printAssets(item);
-                        }}
-                      >
-                        Print
-                      </button>
-                    </div>
+    <select
+      value={assetCompanyFilter}
+      onChange={(e) => setAssetCompanyFilter(e.target.value)}
+      className="cp-input"
+      style={{ width: 180 }}
+    >
+      <option value="">All companies</option>
+<option value="__none__">No company</option>
+
+{[...new Set((assetsForProduct || [])
+  .map((a) => a.company)
+  .filter(Boolean))].map((company) => (
+    <option key={company} value={company}>
+      {company}
+    </option>
+))}
+
+    </select>
+
+    <select
+      value={assetPageSize}
+      onChange={(e) => setAssetPageSize(Number(e.target.value))}
+      className="cp-input"
+      style={{ width: 120 }}
+    >
+      {[12, 24, 48, 96].map((n) => (
+        <option key={n} value={n}>
+          {n}/page
+        </option>
+      ))}
+    </select>
+
+    <button className="cp-btn" onClick={refreshAssets}>
+      Refresh
+    </button>
+  </div>
+
+  {/* Assets grid */}
+  <div className="assets-grid" style={{ marginTop: 12 }}>
+    {visibleAssets.length === 0 && (
+      <div className="muted" style={{ padding: 12 }}>
+        No assets matching filters.
+      </div>
+    )}
+
+    {Object.entries(
+      visibleAssets.reduce((groups, asset) => {
+        const company = asset.company || "Unknown company";
+        if (!groups[company]) groups[company] = [];
+        groups[company].push(asset);
+        return groups;
+      }, {})
+    ).map(([company, assets]) => (
+      <div key={company} style={{ gridColumn: "1 / -1" }}>
+       <div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    margin: "12px 0 6px",
+  }}
+>
+  <h4>
+    🏢 {company} <span className="muted">({assets.length})</span>
+  </h4>
+
+  <label className="muted" style={{ fontSize: 12 }}>
+    <input
+      type="checkbox"
+      checked={assets.every((a) => selectedAssetIds.includes(a.id))}
+      onChange={() => toggleSelectCompany(assets)}
+    />{" "}
+    Select all
+  </label>
+</div>
+
+
+        <div className="assets-grid">
+          {assets.map((a) => (
+            <div key={a.id} className="asset-card">
+              {/* Checkbox */}
+              <input
+                type="checkbox"
+                checked={selectedAssetIds.includes(a.id)}
+                onChange={(e) => {
+                  setSelectedAssetIds((prev) =>
+                    e.target.checked
+                      ? [...prev, a.id]
+                      : prev.filter((id) => id !== a.id)
+                  );
+                }}
+                onClick={(e) => e.stopPropagation()}
+                style={{ marginBottom: 6 }}
+              />
+
+              <div className="asset-top">
+                <div>
+                  <div style={{ fontWeight: 700 }}>{a.assetId}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    {(branches.find((b) => b.id === a.branchId) || {}).name ||
+                      a.branchId ||
+                      "—"}
                   </div>
-                ))}
+                </div>
+
+                <div style={{ textAlign: "right" }}>
+                  <div className="asset-company">🏢 {a.company || "—"}</div>
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    Status:{" "}
+                    <span className={`status ${a.status}`}>{a.status}</span>
+                  </div>
+                </div>
               </div>
 
-              <div className="cp-form-actions" style={{ marginTop: 12 }}>
-                <button className="cp-btn ghost" onClick={() => setSelectedProduct(null)}>Close</button>
+              <div className="asset-meta muted">
+                {a.rental?.customer && (
+                  <div>Rented to: {a.rental.customer}</div>
+                )}
+                <div>
+                  Created: {fmt.date(a.createdAt)} · {a.createdByName}
+                </div>
+              </div>
+
+              <div className="asset-actions">
+                <button className="btn ghost" onClick={() => openAssetDetails(a)}>
+                  Details
+                </button>
+
+                {a.status !== "out_for_rental" &&
+                  a.status !== "reserved" &&
+                  a.status !== "maintenance" && (
+                    <button className="btn" onClick={() => doCheckout(a.id)}>
+                      Checkout
+                    </button>
+                  )}
+
+                {a.status === "out_for_rental" && (
+                  <button className="btn" onClick={() => doCheckin(a.id)}>
+                    Checkin
+                  </button>
+                )}
+
+                {a.status === "reserved" ? (
+                  <button className="btn ghost" onClick={() => doRelease(a.id)}>
+                    Release
+                  </button>
+                ) : (
+                  a.status !== "out_for_rental" &&
+                  a.status !== "maintenance" && (
+                    <button className="btn" onClick={() => doReserve(a.id)}>
+                      Reserve
+                    </button>
+                  )
+                )}
+
+                <button className="btn ghost" onClick={() => openMaintenance(a)}>
+                  Maintenance
+                </button>
+
+                <select
+                  onChange={(e) => {
+                    const to = e.target.value;
+                    if (!to) return;
+                    doMove(a.id, to);
+                    e.target.value = "";
+                  }}
+                  defaultValue=""
+                >
+                  <option value="">Move</option>
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  className="btn ghost"
+                  onClick={() => {
+                    const item = [
+                      {
+                        ...a,
+                        productName:
+                          (selectedProduct && selectedProduct.name) || "",
+                      },
+                    ];
+                    printAssets(item);
+                  }}
+                >
+                  Print
+                </button>
+
+                <button
+                  className="btn danger"
+                  onClick={() => doDeleteAsset(a.id)}
+                >
+                  Delete
+                </button>
               </div>
             </div>
+          ))}
+        </div>
+      </div>
+    ))}
+  </div>
+
+  <div className="cp-form-actions" style={{ marginTop: 12 }}>
+    <button
+      className="cp-btn ghost"
+      onClick={() => setSelectedProduct(null)}
+    >
+      Close
+    </button>
+  </div>
+</div>
+
           </div>
         </div>
       )}

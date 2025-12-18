@@ -1,11 +1,11 @@
 // src/components/OrderDrawer.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React from "react";
 import {
   listAssets,
   reserveAsset,
   unreserveAsset,
 } from "../utils/inventory";
-import DeliveryHistory from "./DeliveryHistory";
+
 export default function OrderDrawer({
   // state
   selectedOrder,
@@ -20,6 +20,7 @@ export default function OrderDrawer({
   saving,
   detailedStatus,
   detailedStatusColor,
+
   // actions
   closeOrder,
   changeOrderStatus,
@@ -27,17 +28,10 @@ export default function OrderDrawer({
   openAssetPickerForItem,
   togglePickerSelect,
   confirmAssignAssetsFromPicker,
-  // checkoutAssignedAssetsForItem,  // removed (reserve-only)
-  // autoAssignAssets,               // replaced by local reserve-only impl
   unassignAsset,
-  // checkinAssignedAsset,           // not used when reserve-only
-  assignDriverToOrder,             // existing single-driver API
-  assignRunnersToOrder,            // optional new API: (orderId, runners[]) => Promise
-  driverAcceptDelivery,
-  markPickedUp,
-  markInTransit,
-  markDelivered,
-  confirmDeliveryAccepted,
+  assignDriverToOrder,
+
+  // payments
   openPaymentModal,
   closePaymentModal,
   updatePaymentForm,
@@ -47,7 +41,8 @@ export default function OrderDrawer({
 
   // misc
   navigate,
-}) {
+}) 
+ {
   // --- local helpers (UI-only) ---
   const fmtCurrency = (v) => {
     try {
@@ -78,166 +73,6 @@ export default function OrderDrawer({
     return { totalPaid, balance };
   };
 
-  // --- NEW: multiple runners state (local edit buffer) ---
-  const [runnersDraft, setRunnersDraft] = useState([]);
-  const [runnerSelectId, setRunnerSelectId] = useState("");
-  const [editingRunners, setEditingRunners] = useState(false);
-  const [savingRunners, setSavingRunners] = useState(false);
-
-  // initialize runnersDraft from selectedOrder when drawer opens / order changes
-  useEffect(() => {
-    if (!selectedOrder) return;
-    const existing = (selectedOrder.delivery && selectedOrder.delivery.runners) || [];
-    // normalize to shape: { id, driverId, driverName, phone, assignedItemIndexes: [], status }
-    const normalized = (existing || []).map((r, idx) => ({
-      id: r.id || `r-${Date.now()}-${idx}`,
-      driverId: r.driverId || r.id || "",
-      driverName: r.driverName || r.name || "",
-      phone: r.phone || r.driverPhone || "",
-      assignedItemIndexes: Array.isArray(r.assignedItemIndexes) ? r.assignedItemIndexes : (r.assignedItems ? r.assignedItems : []),
-      status: r.status || "assigned",
-      note: r.note || "",
-    }));
-    setRunnersDraft(normalized);
-  }, [selectedOrder]);
-
-  // convenience: list of order item labels for checkboxes
-  const itemLabels = useMemo(() => {
-    return (selectedOrder?.items || []).map((it, idx) => ({
-      idx,
-      label: it.name || `${it.productId || "item"} #${idx + 1}`,
-    }));
-  }, [selectedOrder]);
-
-  const toggleAssignedItemForRunner = (runnerIdx, itemIdx) => {
-    setRunnersDraft((prev) => {
-      const arr = JSON.parse(JSON.stringify(prev || []));
-      arr[runnerIdx] = arr[runnerIdx] || {};
-      arr[runnerIdx].assignedItemIndexes = arr[runnerIdx].assignedItemIndexes || [];
-      const pos = arr[runnerIdx].assignedItemIndexes.indexOf(itemIdx);
-      if (pos === -1) arr[runnerIdx].assignedItemIndexes.push(itemIdx);
-      else arr[runnerIdx].assignedItemIndexes.splice(pos, 1);
-      return arr;
-    });
-  };
-
-  const addRunnerDraft = () => {
-    if (!runnerSelectId) return;
-    const d = drivers.find((d) => d.id === runnerSelectId);
-    if (!d) return;
-    setRunnersDraft((prev) => [
-      ...(prev || []),
-      {
-        id: `r-${Date.now()}`,
-        driverId: d.id,
-        driverName: d.name,
-        phone: d.phone || "",
-        assignedItemIndexes: [],
-        status: "assigned",
-      },
-    ]);
-    setRunnerSelectId("");
-  };
-
-  const removeRunnerDraft = (idx) => {
-    setRunnersDraft((prev) => {
-      const arr = JSON.parse(JSON.stringify(prev || []));
-      arr.splice(idx, 1);
-      return arr;
-    });
-  };
-
-  // Save runners: attempt to call assignRunnersToOrder (preferred) else fall back
-  const saveRunners = async () => {
-    if (!selectedOrder) return;
-    setSavingRunners(true);
-    setEditingRunners(false);
-
-    // prepare payload: minimal runner objects to save on order.delivery.runners
-    const toSave = (runnersDraft || []).map((r) => ({
-      id: r.id,
-      driverId: r.driverId,
-      driverName: r.driverName,
-      phone: r.phone,
-      assignedItemIndexes: r.assignedItemIndexes || [],
-      status: r.status || "assigned",
-      note: r.note || "",
-    }));
-
-    try {
-      // 1) If parent provides assignRunnersToOrder(orderId, runners[]) -> call it.
-      if (typeof assignRunnersToOrder === "function") {
-        await assignRunnersToOrder(selectedOrder.id || selectedOrder.orderNo, toSave);
-      } else if (typeof assignDriverToOrder === "function") {
-        // Fallback: call assignDriverToOrder for each runner sequentially (backwards-compatible).
-        // assignDriverToOrder might expect a single driverId — we call it for each runner and rely on parent to update order doc.
-        for (const r of toSave) {
-          try {
-            // If parent expects just driverId, pass driverId
-            await assignDriverToOrder(r.driverId, {
-              meta: {
-                assignedItems: r.assignedItemIndexes,
-                runnerId: r.id,
-                runnerName: r.driverName,
-                runnerPhone: r.phone,
-              },
-            });
-          } catch (err) {
-            console.warn("assignDriverToOrder fallback failed for", r.driverId, err);
-          }
-        }
-      } else {
-        // No handler available: we'll just update local selectedOrder.delivery object in-memory
-        // (Parent must persist these changes later via Save Order action).
-        selectedOrder.delivery = selectedOrder.delivery || {};
-        selectedOrder.delivery.runners = toSave;
-      }
-      setRunnersDraft(toSave);
-    } catch (err) {
-      console.error("saveRunners failed", err);
-      alert(err?.message || "Failed to save runners");
-    } finally {
-      setSavingRunners(false);
-    }
-  };
-
-  // render driver chips
-  const renderRunnerChip = (r, idx) => (
-    <div
-      key={r.id || `${r.driverId}-${idx}`}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 8,
-        padding: "6px 10px",
-        borderRadius: 8,
-        background: "#f3f4f6",
-        marginRight: 8,
-      }}
-    >
-      <div style={{ fontWeight: 700 }}>
-        {r.driverName || r.driverId || "—"}
-      </div>
-      <div style={{ fontSize: 12, color: "#6b7280" }}>
-        {r.phone || ""}
-      </div>
-      <div style={{ fontSize: 12, color: "#6b7280" }}>
-        {r.assignedItemIndexes && r.assignedItemIndexes.length
-          ? `${r.assignedItemIndexes.length} item(s)`
-          : "no items"}
-      </div>
-      <button
-        className="cp-btn ghost"
-        onClick={() => {
-          setEditingRunners(true);
-          // keep current runnersDraft as-is for editing
-        }}
-      >
-        Edit
-      </button>
-    </div>
-  );
-
   if (!selectedOrder) return null;
 
   const paymentSummary = computePaymentsSummary(
@@ -246,100 +81,136 @@ export default function OrderDrawer({
   );
 
   // ====== SAME-AS-OrderCreate reserve flow ======
-  // (confirmAssignAndReserve, autoAssignAndReserve, unassignAndUnreserve unchanged — left as-is)
+
+  // Confirm from picker: add selected IDs then reserve each (no checkout)
   const confirmAssignAndReserve = async () => {
-    try {
-      const idx = assetPicker.itemIndex;
-      if (idx == null) {
-        confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
-        return;
-      }
+  console.log("🔥 confirmAssignAndReserve() clicked");
 
-      const picked = Object.keys(assetPicker.selected || {}).filter(
-        (id) => assetPicker.selected[id]
-      );
+  try {
+    const idx = assetPicker.itemIndex;
+    console.log("Item index:", idx);
 
-      if (!picked.length) {
-        confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
-        return;
-      }
-
-      const item = selectedOrder.items?.[idx] || {};
-      const orderId = selectedOrder.id || selectedOrder.orderNo;
-
-      // 1) Update assigned assets
-      const existing = Array.isArray(item.assignedAssets)
-        ? item.assignedAssets
-        : [];
-      const merged = Array.from(new Set([...existing, ...picked]));
-      updateOrderItem?.(idx, { assignedAssets: merged });
-
-      // 2) Reserve each asset
-      for (const assetDocId of picked) {
-        try {
-          await reserveAsset(assetDocId, {
-            reservationId: orderId,
-            orderId: orderId,
-            customer: selectedOrder.customerName || "",
-            until: item?.expectedEndDate || null,
-            note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
-          });
-        } catch (err) {
-          console.warn("reserveAsset failed", assetDocId, err);
-        }
-      }
+    if (idx == null) {
+      console.log("No item index, closing modal.");
       confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
-    } catch (e) {
-      console.error("Assign & reserve error:", e);
-      alert(e?.message || "Failed to reserve selected assets");
+      return;
     }
-  };
 
+    const picked = Object.keys(assetPicker.selected || {}).filter(
+      (id) => assetPicker.selected[id]
+    );
+
+    console.log("Picked assets:", picked);
+
+    if (!picked.length) {
+      console.log("No assets selected, closing modal.");
+      confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
+      return;
+    }
+
+    const item = selectedOrder.items?.[idx] || {};
+    const orderId = selectedOrder.id || selectedOrder.orderNo;
+    console.log("Order ID used for reservation:", orderId);
+    console.log("Item expectedEndDate:", item?.expectedEndDate);
+
+    // 1) Update assigned assets
+    const existing = Array.isArray(item.assignedAssets)
+      ? item.assignedAssets
+      : [];
+    const merged = Array.from(new Set([...existing, ...picked]));
+
+    console.log("Merged assignedAssets:", merged);
+
+    updateOrderItem?.(idx, { assignedAssets: merged });
+
+    // 2) Reserve each asset
+    for (const assetDocId of picked) {
+      console.log(`⚙️ Reserving asset ${assetDocId}...`);
+      try {
+        const result = await reserveAsset(assetDocId, {
+          reservationId: orderId,
+          orderId: orderId,
+          customer: selectedOrder.customerName || "",
+          until: item?.expectedEndDate || null,
+          note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
+        });
+        console.log(`✅ reserveAsset success for ${assetDocId}`, result);
+      } catch (err) {
+        console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
+      }
+    }
+
+    console.log("✅ All reserve attempts complete, closing picker.");
+    confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
+
+  } catch (e) {
+    console.error("🔥 Assign & reserve error:", e);
+    alert(e?.message || "Failed to reserve selected assets");
+  }
+};
+
+
+  // Auto-assign N: pick in-stock assets for product+branch, set & reserve (no checkout)
   const autoAssignAndReserve = async (itemIndex, count = 1) => {
-    try {
-      const it = selectedOrder.items?.[itemIndex];
-      if (!it?.productId) {
-        alert("Select a product first");
-        return;
-      }
+  console.log("🔥 autoAssignAndReserve()", { itemIndex, count });
 
-      const assets = await listAssets({
-        productId: it.productId || null,
-        branchId: it.branchId || null,
-        status: "in_stock",
-      });
+  try {
+    const it = selectedOrder.items?.[itemIndex];
+    console.log("Item:", it);
 
-      if (!assets?.length) {
-        alert("No assets available to auto-assign");
-        return;
-      }
-
-      const pick = assets.slice(0, Number(count || 1)).map((a) => a.id);
-      const existing = Array.isArray(it.assignedAssets) ? it.assignedAssets : [];
-      const merged = Array.from(new Set([...existing, ...pick]));
-
-      updateOrderItem?.(itemIndex, { assignedAssets: merged, autoAssigned: true });
-
-      const orderId = selectedOrder.id || selectedOrder.orderNo;
-      for (const assetDocId of pick) {
-        try {
-          await reserveAsset(assetDocId, {
-            reservationId: orderId,
-            orderId: orderId,
-            customer: selectedOrder.customerName || "",
-            until: it?.expectedEndDate || null,
-            note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
-          });
-        } catch (err) {
-          console.warn("reserveAsset failed", assetDocId, err);
-        }
-      }
-    } catch (e) {
-      console.error("autoAssignAndReserve error:", e);
-      alert(e?.message || "Auto-assign failed");
+    if (!it?.productId) {
+      alert("Select a product first");
+      return;
     }
-  };
 
+    const assets = await listAssets({
+      productId: it.productId || null,
+      branchId: it.branchId || null,
+      status: "in_stock",
+    });
+
+    console.log("Available assets from listAssets:", assets);
+
+    if (!assets?.length) {
+      alert("No assets available to auto-assign");
+      return;
+    }
+
+    const pick = assets.slice(0, Number(count || 1)).map((a) => a.id);
+    console.log("Auto-picked assets:", pick);
+
+    const existing = Array.isArray(it.assignedAssets) ? it.assignedAssets : [];
+    const merged = Array.from(new Set([...existing, ...pick]));
+    console.log("Merged assignedAssets:", merged);
+
+    updateOrderItem?.(itemIndex, { assignedAssets: merged, autoAssigned: true });
+
+    const orderId = selectedOrder.id || selectedOrder.orderNo;
+
+    for (const assetDocId of pick) {
+      console.log(`⚙️ Reserving auto-picked asset ${assetDocId}`);
+      try {
+        const result = await reserveAsset(assetDocId, {
+          reservationId: orderId,
+          orderId: orderId,
+          customer: selectedOrder.customerName || "",
+          until: it?.expectedEndDate || null,
+          note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
+        });
+        console.log(`✅ reserveAsset success for ${assetDocId}`, result);
+      } catch (err) {
+        console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
+      }
+    }
+
+  } catch (e) {
+    console.error("🔥 autoAssignAndReserve error:", e);
+    alert(e?.message || "Auto-assign failed");
+  }
+};
+
+
+  // Unassign chip: remove from item + unreserve (return to in_stock)
   const unassignAndUnreserve = async (itemIndex, assetDocId) => {
     try {
       await unassignAsset?.(itemIndex, assetDocId, false);
@@ -426,7 +297,7 @@ export default function OrderDrawer({
             gap: 18,
           }}
         >
-          {/* Left — items (unchanged) */}
+          {/* Left — items */}
           <div>
             <div style={{ marginBottom: 12 }}>
               <div className="label">Customer</div>
@@ -722,128 +593,111 @@ export default function OrderDrawer({
                 <h4>Delivery</h4>
 
                 <div style={{ marginTop: 8 }}>
-                  <div className="label muted">Runners / Drivers</div>
+  <div className="label muted">Add Driver</div>
 
-                  {/* show existing runner chips */}
-                  <div style={{ marginTop: 6, marginBottom: 8 }}>
-                    {((selectedOrder.delivery && selectedOrder.delivery.runners) || runnersDraft || []).length === 0 && (
-                      <div className="muted">No runners assigned</div>
-                    )}
-                    <div style={{ marginTop: 6 }}>
-                      {((selectedOrder.delivery && selectedOrder.delivery.runners) || runnersDraft || []).map((r, idx) =>
-                        renderRunnerChip(r, idx)
-                      )}
-                    </div>
-                  </div>
+  <select
+    className="cp-input"
+    value=""
+    onChange={(e) => {
+      const driverId = e.target.value;
+      if (!driverId) return;
+      assignDriverToOrder(driverId);
+      e.target.value = "";
+    }}
+  >
+    <option value="">Select driver</option>
+    {drivers.map((d) => (
+      <option key={d.id} value={d.id}>
+        {d.name}
+        {d.phone ? ` · ${d.phone}` : ""}
+      </option>
+    ))}
+  </select>
 
-                  {/* edit area */}
-                  {editingRunners ? (
-                    <div
-                      style={{
-                        border: "1px dashed #e6edf3",
-                        padding: 10,
-                        borderRadius: 8,
-                        marginTop: 8,
-                      }}
-                    >
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                        <select
-                          className="cp-input"
-                          value={runnerSelectId}
-                          onChange={(e) => setRunnerSelectId(e.target.value)}
-                        >
-                          <option value="">Select driver to add</option>
-                          {drivers.map((d) => (
-                            <option key={d.id} value={d.id}>
-                              {d.name}{d.phone ? ` · ${d.phone}` : ""}
-                            </option>
-                          ))}
-                        </select>
-                        <button className="cp-btn" onClick={addRunnerDraft} disabled={!runnerSelectId}>
-                          Add runner
-                        </button>
-                        <button className="cp-btn ghost" onClick={() => { setEditingRunners(false); setRunnersDraft((selectedOrder.delivery && selectedOrder.delivery.runners) || []); }}>
-                          Cancel
-                        </button>
-                      </div>
+  <div
+    style={{
+      display: "flex",
+      gap: 8,
+      marginTop: 8,
+      alignItems: "center",
+      flexWrap: "wrap",
+    }}
+  >
+    <button
+      className="cp-btn ghost"
+      onClick={() => navigate("/drivers")}
+    >
+      Manage drivers
+    </button>
+  </div>
 
-                      {/* runners edit list */}
-                      <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-                        {(runnersDraft || []).map((r, ridx) => (
-                          <div key={r.id || ridx} style={{ border: "1px solid #f1f5f9", padding: 8, borderRadius: 8 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                              <div style={{ fontWeight: 700 }}>{r.driverName || r.driverId}</div>
-                              <div style={{ display: "flex", gap: 8 }}>
-                                <button className="cp-btn ghost" onClick={() => removeRunnerDraft(ridx)}>Remove</button>
-                              </div>
-                            </div>
+  {/* ASSIGNED DRIVERS */}
+ {/* ASSIGNED DRIVERS */}
+{(selectedOrder.delivery?.assignedDrivers || []).length > 0 && (
+  <div style={{ marginTop: 10 }}>
+    <div className="label muted">Assigned Drivers</div>
 
-                            <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                              <div>
-                                <div className="label muted">Phone</div>
-                                <input className="cp-input" value={r.phone || ""} onChange={(e) => setRunnersDraft(prev => { const a = JSON.parse(JSON.stringify(prev || [])); a[ridx].phone = e.target.value; return a; })} />
-                              </div>
-                              <div>
-                                <div className="label muted">Status</div>
-                                <select className="cp-input" value={r.status || "assigned"} onChange={(e) => setRunnersDraft(prev => { const a = JSON.parse(JSON.stringify(prev || [])); a[ridx].status = e.target.value; return a; })}>
-                                  <option value="assigned">Assigned</option>
-                                  <option value="picked_up">Picked up</option>
-                                  <option value="in_transit">In transit</option>
-                                  <option value="delivered">Delivered</option>
-                                  <option value="cancelled">Cancelled</option>
-                                </select>
-                              </div>
-                            </div>
+    {selectedOrder.delivery.assignedDrivers.map((d) => (
+      <div
+        key={d.id}
+        style={{
+          padding: "6px 10px",
+          marginTop: 6,
+          borderRadius: 8,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          background: "#ecfdf5",
+          fontWeight: 600,
+        }}
+      >
+        <span>{d.name || d.id}</span>
 
-                            <div style={{ marginTop: 8 }}>
-                              <div className="label muted">Assign items to this runner</div>
-                              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 6 }}>
-                                {itemLabels.map((it) => (
-                                  <label key={it.idx} style={{ display: "inline-flex", gap: 6, alignItems: "center", padding: "6px 8px", borderRadius: 6, background: (r.assignedItemIndexes || []).includes(it.idx) ? "#eef2ff" : "#f8fafc" }}>
-                                    <input type="checkbox" checked={(r.assignedItemIndexes || []).includes(it.idx)} onChange={() => toggleAssignedItemForRunner(ridx, it.idx)} />
-                                    <div style={{ fontSize: 13 }}>{it.label}</div>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+        <span
+          style={{
+            fontSize: 12,
+            color: "#065f46",
+          }}
+        >
+          Assigned
+        </span>
+      </div>
+    ))}
+  </div>
+)}
 
-                      <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 12 }}>
-                        <button className="cp-btn ghost" onClick={() => { setEditingRunners(false); setRunnersDraft((selectedOrder.delivery && selectedOrder.delivery.runners) || []); }}>Close</button>
-                        <button className="cp-btn" onClick={saveRunners} disabled={savingRunners}>{savingRunners ? "Saving…" : "Save runners"}</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      <button className="cp-btn" onClick={() => setEditingRunners(true)}>Manage runners</button>
-                    </div>
-                  )}
-                </div>
+</div>
+
 
                 <div style={{ marginTop: 12 }}>
-                  <div className="label muted">Delivery Status</div>
-                  <div
-                    style={{
-                      fontWeight: 700,
-                      marginTop: 6,
-                      textTransform: "capitalize",
-                    }}
-                  >
-                    {selectedOrder.deliveryStatus ||
-                      selectedOrder.delivery?.status ||
-                      "—"}
-                  </div>
+  <div className="label muted">Delivery Status</div>
 
-                 <section style={{ marginTop: 16 }}>
-  <h3 style={{ margin: "0 0 8px", fontSize: 16, fontWeight: 800 }}>Delivery History</h3>
-  <DeliveryHistory order={selectedOrder} />
-</section>
+  <div
+    style={{
+      fontWeight: 700,
+      marginTop: 6,
+      textTransform: "capitalize",
+    }}
+  >
+    {selectedOrder.delivery?.status ||
+      selectedOrder.deliveryStatus ||
+      "—"}
+  </div>
 
-                </div>
+  <div
+    style={{
+      marginTop: 6,
+      fontSize: 12,
+      color: "#6b7280",
+    }}
+  >
+    Status is updated automatically by drivers
+    (accept → scan → pickup → delivery → completion)
+  </div>
+</div>
 
-                {/* Totals (unchanged) */}
+
+                {/* Totals */}
                 <div style={{ marginTop: 12 }}>
                   <h4>Totals</h4>
                   <div className="meta-row">
@@ -874,7 +728,7 @@ export default function OrderDrawer({
                   </div>
                 </div>
 
-                {/* Payments (unchanged) */}
+                {/* Payments */}
                 <div style={{ marginTop: 12 }}>
                   <h4>Payments</h4>
                   <div
@@ -1023,7 +877,7 @@ export default function OrderDrawer({
           </div>
         </div>
 
-        {/* Asset picker modal (unchanged) */}
+        {/* Asset picker modal */}
         {assetPicker.open && assetPicker.itemIndex !== null && (
           <div
             className="cp-modal"
@@ -1123,7 +977,7 @@ export default function OrderDrawer({
           </div>
         )}
 
-        {/* Payment modal (unchanged) */}
+        {/* Payment modal */}
         {paymentModal.open && paymentModal.form && (
           <div className="cp-modal" onClick={closePaymentModal}>
             <div className="cp-modal-card" onClick={(e) => e.stopPropagation()}>

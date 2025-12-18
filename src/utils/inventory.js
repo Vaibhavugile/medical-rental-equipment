@@ -67,121 +67,61 @@ export async function createProduct({ name, sku, description = "", defaultRate =
   return { id: ref.id, ...payload };
 }
 
-/**
- * createAssetsForProduct(productId, branchId, quantity = 1, assetMeta = {}, assetStatus = "in_stock")
- * Creates `quantity` asset documents in `assets` collection. Each asset gets:
- *  - assetId (human-friendly unique string)
- *  - productId
- *  - branchId (nullable)
- *  - status (in_stock | out_for_rental | maintenance | reserved)
- *  - metadata
- *  - createdAt, createdBy, createdByName
- *  - history: initial creation entry
- *
- * Returns: array of created asset descriptors: { id, assetId, ...payload }
- */
-// export async function createAssetsForProduct(
-//   productId,
-//   branchId = null,
-//   quantity = 1,
-//   assetMeta = {},
-//   assetStatus = "in_stock"
-// ) {
-//   if (!productId) throw new Error("productId required");
+const makeCompanyCode = (company) => {
+  return String(company || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "") // remove spaces & symbols
+    .slice(0, 5) || "COMP";
+};
+export async function deleteAsset(assetDocId) {
+  if (!assetDocId) throw new Error("assetDocId required");
+  await deleteDoc(doc(db, "assets", assetDocId));
+}
 
-//   const user = auth.currentUser || {};
-//   const created = [];
 
-//   for (let i = 0; i < Number(quantity || 0); i++) {
-//     // 🔹 Generate a unique 5-letter uppercase asset ID
-//     let assetId;
-//     let exists = true;
-
-//     while (exists) {
-//       assetId = Math.random().toString(36).substring(2, 7).toUpperCase();
-//       const q = query(collection(db, "assets"), where("assetId", "==", assetId));
-//       const snapshot = await getDocs(q);
-//       exists = !snapshot.empty; // keep generating until it's unique
-//     }
-
-//     // 🔹 Generate a QR code URL for the asset
-//     const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(assetId)}`;
-
-//     // 🔹 Prepare asset payload
-//     const payload = {
-//       assetId,
-//       productId,
-//       branchId: branchId || null,
-//       status: assetStatus,
-//       metadata: assetMeta || {},
-//       qrUrl,
-//       createdAt: serverTimestamp(),
-//       createdBy: user.uid || "",
-//       createdByName: user.displayName || user.email || "",
-//       history: [
-//         makeInventoryHistoryEntry(user, { 
-//           type: "create", 
-//           note: "Asset created" 
-//         }),
-//       ],
-//     };
-
-//     // 🔹 Save to Firestore
-//     const ref = await addDoc(collection(db, "assets"), payload);
-//     created.push({ id: ref.id, assetId, ...payload });
-//   }
-
-//   return created;
-// }
-// createAssetsForProduct(productId, branchId = null, quantity = 1, assetMeta = {}, assetStatus = "in_stock", options = {})
-// options: { companyPrefix, batch, shortCode }
 export async function createAssetsForProduct(
   productId,
   branchId = null,
   quantity = 1,
-  assetMeta = {},
+  company = null, // ✅ optional
   assetStatus = "in_stock",
   options = {}
 ) {
   if (!productId) throw new Error("productId required");
+
   const user = auth.currentUser || {};
   const created = [];
 
   const companyPrefix = (options.companyPrefix || "BMM").toUpperCase();
-  const batch = (options.batch != null)
-    ? String(options.batch)
-    : String(new Date().getFullYear()).slice(-2); // e.g. "25"
+  const batch =
+    options.batch != null
+      ? String(options.batch)
+      : String(new Date().getFullYear()).slice(-2);
 
-  // Derive short code from assetMeta.model by default
-  const deriveShortCode = (model) => {
-    if (!model || typeof model !== "string") return "PRD";
-    const parts = model
-      .trim()
-      .replace(/[^A-Za-z0-9\s]/g, " ")
-      .split(/\s+/)
-      .filter(Boolean);
+  const shortCode = (options.shortCode || "PRD").toUpperCase();
 
-    if (parts.length === 0) return "PRD";
-    if (parts.length === 1) {
-      return parts[0].substring(0, 3).toUpperCase();
-    }
-    // take first letter of up to 3 words
-    return parts.slice(0, 3).map(p => p[0]).join("").toUpperCase();
-  };
+  // ✅ SAFE company handling
+  const cleanCompany =
+    typeof company === "string" && company.trim()
+      ? company.trim()
+      : null;
 
-  const shortCode = (options.shortCode || deriveShortCode(assetMeta?.model || "")).toUpperCase();
+  // ✅ If no company → use neutral code
+  const companyCode = cleanCompany
+    ? makeCompanyCode(cleanCompany)
+    : "GEN"; // ← generic assets
 
-  // Compute prefix (no dashes, per Option B)
-  const prefix = `${companyPrefix}${shortCode}${batch}`; // e.g. BMMDL25
+  const prefix = `${companyPrefix}${companyCode}${shortCode}${batch}`;
 
-  // Fetch existing assets for this product to find current max sequence for same prefix
+  // Fetch existing assets for this product
   const q = query(collection(db, "assets"), where("productId", "==", productId));
   const snap = await getDocs(q);
+
   let maxSeq = 0;
   snap.docs.forEach((d) => {
-    const aid = (d.data() || {}).assetId || "";
-    if (typeof aid !== "string") return;
+    const aid = d.data()?.assetId || "";
     if (!aid.startsWith(prefix)) return;
+
     const m = aid.match(/(\d+)$/);
     if (m) {
       const n = Number(m[1]);
@@ -189,39 +129,37 @@ export async function createAssetsForProduct(
     }
   });
 
-  // decide padding length (min 3 digits)
   const lastSeqIfAllCreated = maxSeq + Number(quantity || 0);
   const padLen = Math.max(3, String(lastSeqIfAllCreated).length);
-  const pad = (num, len) => String(num).padStart(len, "0");
+  const pad = (num) => String(num).padStart(padLen, "0");
 
-  // create assets one-by-one, verifying uniqueness for each candidate id
   for (let i = 1; i <= Number(quantity || 0); i++) {
     let candidateSeq = maxSeq + i;
-    let candidateId = `${prefix}${pad(candidateSeq, padLen)}`; // e.g. BMMDL25001
+    let candidateId = `${prefix}${pad(candidateSeq)}`;
 
-    // ensure candidate not already present (race-safety)
-    // if exists, increment candidateSeq until unique
-    let exists = true;
-    while (exists) {
-      const qExist = query(collection(db, "assets"), where("assetId", "==", candidateId));
+    // ensure uniqueness
+    while (true) {
+      const qExist = query(
+        collection(db, "assets"),
+        where("assetId", "==", candidateId)
+      );
       const exSnap = await getDocs(qExist);
-      if (exSnap.empty) {
-        exists = false;
-      } else {
-        candidateSeq += 1;
-        candidateId = `${prefix}${pad(candidateSeq, padLen)}`;
-      }
+      if (exSnap.empty) break;
+
+      candidateSeq += 1;
+      candidateId = `${prefix}${pad(candidateSeq)}`;
     }
 
-    // generate QR code URL
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(candidateId)}`;
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(
+      candidateId
+    )}`;
 
     const payload = {
       assetId: candidateId,
       productId,
+      company: cleanCompany, // ✅ null when not used
       branchId: branchId || null,
       status: assetStatus,
-      metadata: assetMeta || {},
       qrUrl,
       createdAt: serverTimestamp(),
       createdBy: user.uid || "",
@@ -229,18 +167,21 @@ export async function createAssetsForProduct(
       history: [
         makeInventoryHistoryEntry(user, {
           type: "create",
-          note: "Asset created",
+          note: cleanCompany
+            ? `Asset created for company ${cleanCompany}`
+            : "Asset created (no company)",
         }),
       ],
     };
 
-    // save
     const ref = await addDoc(collection(db, "assets"), payload);
     created.push({ id: ref.id, assetId: candidateId, ...payload });
   }
 
   return created;
 }
+
+
 
 
 /**
