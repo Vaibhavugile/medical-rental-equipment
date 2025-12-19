@@ -279,3 +279,21 @@
     flex: 1 1 160px;
   }
 }
+.photo-block {
+  grid-column: span 2;
+}
+
+.attendance-photo {
+  max-width: 100%;
+  max-height: 220px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  object-fit: cover;
+}
+
+.drawer-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 24px;
+}

@@ -27,6 +27,12 @@ const fmtCurrency = (v) => {
     return v ?? "0.00";
   }
 };
+const parseNumberInput = (value, fallback = 0) => {
+  if (value === "" || value === null || value === undefined) return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+};
+
 
 function calcTotals(
   items = [],
@@ -47,9 +53,27 @@ function calcTotals(
   }
   const taxable = Math.max(0, subtotal - discountAmount);
   const taxBreakdown = (taxes || []).map((t) => {
-    const rate = safeNum(t.rate);
-    return { name: t.name || "", rate, amount: taxable * (rate / 100) };
-  });
+  const type = (t.type || "percent").toLowerCase();
+  const value = safeNum(t.rate ?? t.value);
+
+  let amount = 0;
+
+  if (type === "fixed") {
+    // Fixed tax = direct amount
+    amount = value;
+  } else {
+    // Percent tax
+    amount = taxable * (value / 100);
+  }
+
+  return {
+    name: t.name || "",
+    type,
+    value,
+    amount,
+  };
+});
+
   const totalTax = taxBreakdown.reduce((s, t) => s + safeNum(t.amount), 0);
   const total = Math.max(0, taxable + totalTax);
   return { subtotal, discountAmount, taxBreakdown, totalTax, total };
@@ -1092,7 +1116,7 @@ export default function OrderCreate({
                           value={it.qty}
                           onChange={(e) =>
                             updateDraftItem(idx, {
-                              qty: Number(e.target.value || 0),
+                             qty: parseNumberInput(e.target.value, 0),
                             })
                           }
                           placeholder="Qty"
@@ -1103,7 +1127,8 @@ export default function OrderCreate({
                           value={it.rate}
                           onChange={(e) =>
                             updateDraftItem(idx, {
-                              rate: Number(e.target.value || 0),
+                              rate: parseNumberInput(e.target.value, 0),
+
                             })
                           }
                           placeholder="Rate"
@@ -1114,7 +1139,8 @@ export default function OrderCreate({
                           value={it.days}
                           onChange={(e) =>
                             updateDraftItem(idx, {
-                              days: Number(e.target.value || 0),
+                              days: parseNumberInput(e.target.value, 0),
+
                             })
                           }
                           placeholder="Days"
@@ -1243,8 +1269,9 @@ export default function OrderCreate({
                       value={draft.discount?.value ?? 0}
                       onChange={(e) => {
                         const raw = e.target.value;
-                        const num = raw === "" ? "" : Number(raw);
+                        const num = parseNumberInput(e.target.value, 0);
                         updateDiscount({ value: num });
+
                       }}
                       placeholder="Value"
                     />
@@ -1287,8 +1314,9 @@ export default function OrderCreate({
                           style={{ width: 80 }}
                           value={t.rate ?? t.value ?? 0}
                           onChange={(e) => {
-                            const num = e.target.value === "" ? "" : Number(e.target.value);
+                           const num = parseNumberInput(e.target.value, 0);
                             updateTaxAt(i, { rate: num, value: num });
+
                           }}
                         />
                         <button

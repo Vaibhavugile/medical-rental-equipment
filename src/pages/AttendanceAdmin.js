@@ -16,9 +16,9 @@ import "./AttendanceAdmin.css";
 
 // --- Debug helpers ---
 const DEBUG = true;
-const log  = (...a) => DEBUG && console.log("[AttendanceAdmin]", ...a);
+const log = (...a) => DEBUG && console.log("[AttendanceAdmin]", ...a);
 const warn = (...a) => DEBUG && console.warn("[AttendanceAdmin]", ...a);
-const err  = (...a) => DEBUG && console.error("[AttendanceAdmin]", ...a);
+const err = (...a) => DEBUG && console.error("[AttendanceAdmin]", ...a);
 
 export default function AttendanceAdmin() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -146,7 +146,7 @@ export default function AttendanceAdmin() {
           return;
         }
 
-        const leadsCol  = collection(db, "leads");
+        const leadsCol = collection(db, "leads");
         const visitsCol = collection(db, "visits");
 
         const rows = await Promise.all(
@@ -154,7 +154,7 @@ export default function AttendanceAdmin() {
             const key = userKey(p); // <-- authUid || uid || doc id
 
             // Leads: union (ownerId==key OR createdBy==key), de-dup IDs
-            const leadsCount  = await countLeadsForUser(leadsCol, from, to, key);
+            const leadsCount = await countLeadsForUser(leadsCol, from, to, key);
 
             // Visits: union (assignedToId==key OR createdBy==key), de-dup IDs
             const visitsCount = await countVisitsForUser(visitsCol, from, to, key);
@@ -211,7 +211,7 @@ export default function AttendanceAdmin() {
   const exportCsv = () => {
     const header = [
       role === "marketing" ? "Marketing Name" : "Driver Name",
-      "Email","Date","Check-in","Check-out","Duration (minutes)","Status","Notes","Record ID",
+      "Email", "Date", "Check-in", "Check-out", "Duration (minutes)", "Status", "Notes", "Record ID",
     ];
     const rows = records.map(r => [
       peopleById[r.personId]?.name || r.personId || "",
@@ -286,7 +286,7 @@ export default function AttendanceAdmin() {
             <tbody>
               {records.map(r => (
                 <tr key={r.id}>
-                  <td style={{minWidth:220}}>
+                  <td style={{ minWidth: 220 }}>
                     <div className="dname">{peopleById[r.personId]?.name || "(unknown)"}</div>
                     <div className="muted">{peopleById[r.personId]?.loginEmail || peopleById[r.personId]?.email || r.personId}</div>
                   </td>
@@ -295,7 +295,7 @@ export default function AttendanceAdmin() {
                   <td>{fmtDT(r.checkOutAt) || <span className="chip warn">Open</span>}</td>
                   <td>{minsToHhmm(r.durationMinutes || 0)}</td>
                   <td>{r.status || (r.checkOutAt ? "present" : "open")}</td>
-                  <td style={{maxWidth:280, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis"}}>{r.notes || "-"}</td>
+                  <td style={{ maxWidth: 280, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.notes || "-"}</td>
                   <td>
                     <button
                       className="cp-btn ghost"
@@ -326,7 +326,7 @@ export default function AttendanceAdmin() {
               <div className="pill">{minsToHhmm(t.minutes)}</div>
               <div className="pill">Leads {pu.leads}</div>
               <div className="pill">Visits {pu.visits}</div>
-              {perUserLoading && <div className="muted" style={{marginLeft:8}}>updating…</div>}
+              {perUserLoading && <div className="muted" style={{ marginLeft: 8 }}>updating…</div>}
               {perUserError && (
                 <div className="pill warn" title={perUserError}>
                   {perUserError.length > 38 ? "stats error" : perUserError}
@@ -346,18 +346,48 @@ export default function AttendanceAdmin() {
               <h3>Attendance Details</h3>
               <button className="cp-btn ghost" onClick={() => setOpenRow(null)}>Close</button>
             </div>
-            <div className="detail-grid">
-              <Info label={role === "marketing" ? "Marketing User" : "Driver"} value={peopleById[openRow.personId]?.name || openRow.personId} />
-              <Info label="Email" value={peopleById[openRow.personId]?.loginEmail || peopleById[openRow.personId]?.email || "-"} />
-              <Info label="Date" value={openRow.dayId} mono />
-              <Info label="Check-in" value={fmtDT(openRow.checkInAt)} />
-              <Info label="Check-in location" value={locToText(openRow.checkInLocation)} mono />
-              <Info label="Check-out" value={fmtDT(openRow.checkOutAt) || "(open)"} />
-              <Info label="Check-out location" value={locToText(openRow.checkOutLocation)} mono />
-              <Info label="Duration" value={minsToHhmm(openRow.durationMinutes || 0)} />
-              <Info label="Status" value={openRow.status || (openRow.checkOutAt ? "present" : "open")} />
-              <Info label="Notes" value={openRow.notes || "-"} />
-              <Info label="Record ID" value={openRow.id} mono />
+            <div className="drawer-content">
+
+              <div className="detail-grid">
+                <Info label={role === "marketing" ? "Marketing User" : "Driver"} value={peopleById[openRow.personId]?.name || openRow.personId} />
+                <Info label="Email" value={peopleById[openRow.personId]?.loginEmail || peopleById[openRow.personId]?.email || "-"} />
+                <Info label="Date" value={openRow.dayId} mono />
+                <Info label="Check-in" value={fmtDT(openRow.checkInAt)} />
+                <Info label="Check-in location" value={locToText(openRow.checkInLocation)} mono />
+                <Info label="Check-out" value={fmtDT(openRow.checkOutAt) || "(open)"} />
+                <Info label="Check-out location" value={locToText(openRow.checkOutLocation)} mono />
+
+                <Info label="Duration" value={minsToHhmm(openRow.durationMinutes || 0)} />
+                {/* Check-in photo */}
+                {openRow.checkInPhotoUrl && (
+                  <div className="photo-block">
+                    <div className="info-label">Check-in Photo</div>
+                    <img
+                      src={openRow.checkInPhotoUrl}
+                      alt="Check-in"
+                      className="attendance-photo"
+                      onClick={() => window.open(openRow.checkInPhotoUrl, "_blank")}
+                    />
+                  </div>
+                )}
+
+                {/* Check-out photo */}
+                {openRow.checkOutPhotoUrl && (
+                  <div className="photo-block">
+                    <div className="info-label">Check-out Photo</div>
+                    <img
+                      src={openRow.checkOutPhotoUrl}
+                      alt="Check-out"
+                      className="attendance-photo"
+                      onClick={() => window.open(openRow.checkOutPhotoUrl, "_blank")}
+                    />
+                  </div>
+                )}
+
+                <Info label="Status" value={openRow.status || (openRow.checkOutAt ? "present" : "open")} />
+                <Info label="Notes" value={openRow.notes || "-"} />
+                <Info label="Record ID" value={openRow.id} mono />
+              </div>
             </div>
           </div>
         )}
@@ -427,29 +457,42 @@ function durationInMinutes(checkInAt, checkOutAt) {
   return Math.round(diffMs / 60000);
 }
 function mapDayDoc({ id, personId, dayId, raw }) {
-  const checkInAt  = raw.checkInServer ?? raw.checkInMs ?? null;
+  const checkInAt = raw.checkInServer ?? raw.checkInMs ?? null;
   const checkOutAt = raw.checkOutServer ?? raw.checkOutMs ?? null;
   const rec = {
     id,
     personId,
     dayId: raw.date || dayId,
+
     checkInAt,
     checkOutAt,
-    checkInLocation: raw.checkInLocation || raw.inLocation || null,
-    checkOutLocation: raw.checkOutLocation || raw.outLocation || null,
-    notes: raw.note || raw.notes || raw.remarks || "",
+
+    checkInLocation: raw.checkInLocation || null,
+    checkOutLocation: raw.checkOutLocation || null,
+
+    // ✅ PHOTOS
+    checkInPhotoUrl: raw["check-inPhotoUrl"] || raw.checkInPhotoUrl || "",
+    checkOutPhotoUrl: raw["check-outPhotoUrl"] || raw.checkOutPhotoUrl || "",
+
+    checkInPhotoStoragePath:
+      raw["check-inPhotoStoragePath"] || raw.checkInPhotoStoragePath || "",
+    checkOutPhotoStoragePath:
+      raw["check-outPhotoStoragePath"] || raw.checkOutPhotoStoragePath || "",
+
+    notes: raw.note || raw.notes || "",
     status: raw.status || (checkOutAt ? "present" : "open"),
   };
+
   rec.durationMinutes = durationInMinutes(rec.checkInAt, rec.checkOutAt);
   return rec;
 }
 
 // ---- NEW: time range + counting helpers ----
 function toStartOfDayIso(iso) { return iso + "T00:00:00.000Z"; }
-function toEndOfDayIso(iso)   { return iso + "T23:59:59.999Z"; }
+function toEndOfDayIso(iso) { return iso + "T23:59:59.999Z"; }
 function toTimestampRange(fromIso, toIso) {
   const from = Timestamp.fromDate(new Date(toStartOfDayIso(fromIso)));
-  const to   = Timestamp.fromDate(new Date(toEndOfDayIso(toIso)));
+  const to = Timestamp.fromDate(new Date(toEndOfDayIso(toIso)));
   return { from, to };
 }
 async function countWithFallback(q) {
