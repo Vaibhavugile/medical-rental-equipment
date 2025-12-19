@@ -20,6 +20,7 @@ export default function OrderDrawer({
   saving,
   detailedStatus,
   detailedStatusColor,
+  createReturnDelivery,
 
   // actions
   closeOrder,
@@ -41,8 +42,7 @@ export default function OrderDrawer({
 
   // misc
   navigate,
-}) 
- {
+}) {
   // --- local helpers (UI-only) ---
   const fmtCurrency = (v) => {
     try {
@@ -84,130 +84,130 @@ export default function OrderDrawer({
 
   // Confirm from picker: add selected IDs then reserve each (no checkout)
   const confirmAssignAndReserve = async () => {
-  console.log("🔥 confirmAssignAndReserve() clicked");
+    console.log("🔥 confirmAssignAndReserve() clicked");
 
-  try {
-    const idx = assetPicker.itemIndex;
-    console.log("Item index:", idx);
+    try {
+      const idx = assetPicker.itemIndex;
+      console.log("Item index:", idx);
 
-    if (idx == null) {
-      console.log("No item index, closing modal.");
-      confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
-      return;
-    }
-
-    const picked = Object.keys(assetPicker.selected || {}).filter(
-      (id) => assetPicker.selected[id]
-    );
-
-    console.log("Picked assets:", picked);
-
-    if (!picked.length) {
-      console.log("No assets selected, closing modal.");
-      confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
-      return;
-    }
-
-    const item = selectedOrder.items?.[idx] || {};
-    const orderId = selectedOrder.id || selectedOrder.orderNo;
-    console.log("Order ID used for reservation:", orderId);
-    console.log("Item expectedEndDate:", item?.expectedEndDate);
-
-    // 1) Update assigned assets
-    const existing = Array.isArray(item.assignedAssets)
-      ? item.assignedAssets
-      : [];
-    const merged = Array.from(new Set([...existing, ...picked]));
-
-    console.log("Merged assignedAssets:", merged);
-
-    updateOrderItem?.(idx, { assignedAssets: merged });
-
-    // 2) Reserve each asset
-    for (const assetDocId of picked) {
-      console.log(`⚙️ Reserving asset ${assetDocId}...`);
-      try {
-        const result = await reserveAsset(assetDocId, {
-          reservationId: orderId,
-          orderId: orderId,
-          customer: selectedOrder.customerName || "",
-          until: item?.expectedEndDate || null,
-          note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
-        });
-        console.log(`✅ reserveAsset success for ${assetDocId}`, result);
-      } catch (err) {
-        console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
+      if (idx == null) {
+        console.log("No item index, closing modal.");
+        confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
+        return;
       }
+
+      const picked = Object.keys(assetPicker.selected || {}).filter(
+        (id) => assetPicker.selected[id]
+      );
+
+      console.log("Picked assets:", picked);
+
+      if (!picked.length) {
+        console.log("No assets selected, closing modal.");
+        confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
+        return;
+      }
+
+      const item = selectedOrder.items?.[idx] || {};
+      const orderId = selectedOrder.id || selectedOrder.orderNo;
+      console.log("Order ID used for reservation:", orderId);
+      console.log("Item expectedEndDate:", item?.expectedEndDate);
+
+      // 1) Update assigned assets
+      const existing = Array.isArray(item.assignedAssets)
+        ? item.assignedAssets
+        : [];
+      const merged = Array.from(new Set([...existing, ...picked]));
+
+      console.log("Merged assignedAssets:", merged);
+
+      updateOrderItem?.(idx, { assignedAssets: merged });
+
+      // 2) Reserve each asset
+      for (const assetDocId of picked) {
+        console.log(`⚙️ Reserving asset ${assetDocId}...`);
+        try {
+          const result = await reserveAsset(assetDocId, {
+            reservationId: orderId,
+            orderId: orderId,
+            customer: selectedOrder.customerName || "",
+            until: item?.expectedEndDate || null,
+            note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
+          });
+          console.log(`✅ reserveAsset success for ${assetDocId}`, result);
+        } catch (err) {
+          console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
+        }
+      }
+
+      console.log("✅ All reserve attempts complete, closing picker.");
+      confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
+
+    } catch (e) {
+      console.error("🔥 Assign & reserve error:", e);
+      alert(e?.message || "Failed to reserve selected assets");
     }
-
-    console.log("✅ All reserve attempts complete, closing picker.");
-    confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
-
-  } catch (e) {
-    console.error("🔥 Assign & reserve error:", e);
-    alert(e?.message || "Failed to reserve selected assets");
-  }
-};
+  };
 
 
   // Auto-assign N: pick in-stock assets for product+branch, set & reserve (no checkout)
   const autoAssignAndReserve = async (itemIndex, count = 1) => {
-  console.log("🔥 autoAssignAndReserve()", { itemIndex, count });
+    console.log("🔥 autoAssignAndReserve()", { itemIndex, count });
 
-  try {
-    const it = selectedOrder.items?.[itemIndex];
-    console.log("Item:", it);
+    try {
+      const it = selectedOrder.items?.[itemIndex];
+      console.log("Item:", it);
 
-    if (!it?.productId) {
-      alert("Select a product first");
-      return;
-    }
-
-    const assets = await listAssets({
-      productId: it.productId || null,
-      branchId: it.branchId || null,
-      status: "in_stock",
-    });
-
-    console.log("Available assets from listAssets:", assets);
-
-    if (!assets?.length) {
-      alert("No assets available to auto-assign");
-      return;
-    }
-
-    const pick = assets.slice(0, Number(count || 1)).map((a) => a.id);
-    console.log("Auto-picked assets:", pick);
-
-    const existing = Array.isArray(it.assignedAssets) ? it.assignedAssets : [];
-    const merged = Array.from(new Set([...existing, ...pick]));
-    console.log("Merged assignedAssets:", merged);
-
-    updateOrderItem?.(itemIndex, { assignedAssets: merged, autoAssigned: true });
-
-    const orderId = selectedOrder.id || selectedOrder.orderNo;
-
-    for (const assetDocId of pick) {
-      console.log(`⚙️ Reserving auto-picked asset ${assetDocId}`);
-      try {
-        const result = await reserveAsset(assetDocId, {
-          reservationId: orderId,
-          orderId: orderId,
-          customer: selectedOrder.customerName || "",
-          until: it?.expectedEndDate || null,
-          note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
-        });
-        console.log(`✅ reserveAsset success for ${assetDocId}`, result);
-      } catch (err) {
-        console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
+      if (!it?.productId) {
+        alert("Select a product first");
+        return;
       }
-    }
 
-  } catch (e) {
-    console.error("🔥 autoAssignAndReserve error:", e);
-    alert(e?.message || "Auto-assign failed");
-  }
-};
+      const assets = await listAssets({
+        productId: it.productId || null,
+        branchId: it.branchId || null,
+        status: "in_stock",
+      });
+
+      console.log("Available assets from listAssets:", assets);
+
+      if (!assets?.length) {
+        alert("No assets available to auto-assign");
+        return;
+      }
+
+      const pick = assets.slice(0, Number(count || 1)).map((a) => a.id);
+      console.log("Auto-picked assets:", pick);
+
+      const existing = Array.isArray(it.assignedAssets) ? it.assignedAssets : [];
+      const merged = Array.from(new Set([...existing, ...pick]));
+      console.log("Merged assignedAssets:", merged);
+
+      updateOrderItem?.(itemIndex, { assignedAssets: merged, autoAssigned: true });
+
+      const orderId = selectedOrder.id || selectedOrder.orderNo;
+
+      for (const assetDocId of pick) {
+        console.log(`⚙️ Reserving auto-picked asset ${assetDocId}`);
+        try {
+          const result = await reserveAsset(assetDocId, {
+            reservationId: orderId,
+            orderId: orderId,
+            customer: selectedOrder.customerName || "",
+            until: it?.expectedEndDate || null,
+            note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
+          });
+          console.log(`✅ reserveAsset success for ${assetDocId}`, result);
+        } catch (err) {
+          console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
+        }
+      }
+
+    } catch (e) {
+      console.error("🔥 autoAssignAndReserve error:", e);
+      alert(e?.message || "Auto-assign failed");
+    }
+  };
 
 
   // Unassign chip: remove from item + unreserve (return to in_stock)
@@ -474,7 +474,12 @@ export default function OrderDrawer({
                                   <button
                                     className="cp-btn ghost"
                                     onClick={() => openAssetPickerForItem(idx)}
-                                    disabled={!it.productId}
+                                    disabled={
+                                      !it.productId ||
+                                      selectedOrder.deliveryType === "return" ||
+                                      !!selectedOrder.delivery?.deliveryId
+                                    }
+
                                   >
                                     Assign Assets
                                   </button>
@@ -483,7 +488,12 @@ export default function OrderDrawer({
                                     onClick={() =>
                                       autoAssignAndReserve(idx, it.qty || 1)
                                     }
-                                    disabled={!it.productId}
+                                    disabled={
+                                      !it.productId ||
+                                      selectedOrder.deliveryType === "return" ||
+                                      !!selectedOrder.delivery?.deliveryId
+                                    }
+
                                   >
                                     Auto-assign (Reserve)
                                   </button>
@@ -516,19 +526,17 @@ export default function OrderDrawer({
                                           style={{ fontSize: 12 }}
                                         >
                                           {meta
-                                            ? `${
-                                                meta.metadata?.model ||
-                                                meta.productId ||
-                                                ""
-                                              } · ${
-                                                (
-                                                  branches.find(
-                                                    (b) => b.id === meta.branchId
-                                                  ) || {}
-                                                ).name ||
-                                                meta.branchId ||
-                                                ""
-                                              }`
+                                            ? `${meta.metadata?.model ||
+                                            meta.productId ||
+                                            ""
+                                            } · ${(
+                                              branches.find(
+                                                (b) => b.id === meta.branchId
+                                              ) || {}
+                                            ).name ||
+                                            meta.branchId ||
+                                            ""
+                                            }`
                                             : ""}
                                         </div>
                                       </div>
@@ -542,9 +550,11 @@ export default function OrderDrawer({
                                       >
                                         <button
                                           className="cp-btn ghost"
-                                          onClick={() =>
-                                            unassignAndUnreserve(idx, aid)
-                                          }
+                                          onClick={() => {
+                                            if (selectedOrder.deliveryType === "return") return;
+                                            unassignAndUnreserve(idx, aid);
+                                          }}
+
                                         >
                                           Unassign
                                         </button>
@@ -576,8 +586,8 @@ export default function OrderDrawer({
                 <div className="value">
                   {selectedOrder.createdAt?.seconds
                     ? new Date(
-                        selectedOrder.createdAt.seconds * 1000
-                      ).toLocaleString()
+                      selectedOrder.createdAt.seconds * 1000
+                    ).toLocaleString()
                     : "—"}
                 </div>
               </div>
@@ -591,110 +601,153 @@ export default function OrderDrawer({
               {/* Delivery */}
               <div style={{ marginTop: 12 }}>
                 <h4>Delivery</h4>
+                {/* DELIVERY TYPE */}
+                <div style={{ marginTop: 8 }}>
+                  <div className="label muted">Delivery Type</div>
+
+                  <select
+                    className="cp-input"
+                    value={selectedOrder.deliveryType || "pickup"}
+                    onChange={(e) =>
+                      updateOrderItem("__DELIVERY__", {
+                        deliveryType: e.target.value,
+                      })
+                    }
+                  >
+
+                    <option value="pickup">Pickup (Rent Out)</option>
+                    <option value="return">Return (Collect Back)</option>
+                  </select>
+
+                  <div className="muted" style={{ marginTop: 4 }}>
+                    Pickup = assets go out · Return = assets come back
+                  </div>
+                </div>
+
 
                 <div style={{ marginTop: 8 }}>
-  <div className="label muted">Add Driver</div>
+                  <div className="label muted">Add Driver</div>
 
-  <select
-    className="cp-input"
-    value=""
-    onChange={(e) => {
-      const driverId = e.target.value;
-      if (!driverId) return;
-      assignDriverToOrder(driverId);
-      e.target.value = "";
-    }}
-  >
-    <option value="">Select driver</option>
-    {drivers.map((d) => (
-      <option key={d.id} value={d.id}>
-        {d.name}
-        {d.phone ? ` · ${d.phone}` : ""}
-      </option>
-    ))}
-  </select>
+                  <select
+                    className="cp-input"
+                    value=""
+                    onChange={(e) => {
+                      const driverId = e.target.value;
+                      if (!driverId) return;
+                      assignDriverToOrder(driverId);
+                      e.target.value = "";
+                    }}
+                  >
+                    <option value="">Select driver</option>
+                    {drivers.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                        {d.phone ? ` · ${d.phone}` : ""}
+                      </option>
+                    ))}
+                  </select>
 
-  <div
-    style={{
-      display: "flex",
-      gap: 8,
-      marginTop: 8,
-      alignItems: "center",
-      flexWrap: "wrap",
-    }}
-  >
-    <button
-      className="cp-btn ghost"
-      onClick={() => navigate("/drivers")}
-    >
-      Manage drivers
-    </button>
-  </div>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      marginTop: 8,
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <button
+                      className="cp-btn ghost"
+                      onClick={() => navigate("/drivers")}
+                    >
+                      Manage drivers
+                    </button>
+                  </div>
 
-  {/* ASSIGNED DRIVERS */}
- {/* ASSIGNED DRIVERS */}
-{(selectedOrder.delivery?.assignedDrivers || []).length > 0 && (
-  <div style={{ marginTop: 10 }}>
-    <div className="label muted">Assigned Drivers</div>
+                  {/* ASSIGNED DRIVERS */}
+                  {/* ASSIGNED DRIVERS */}
+                  {(selectedOrder.delivery?.assignedDrivers || []).length > 0 && (
+                    <div style={{ marginTop: 10 }}>
+                      <div className="label muted">Assigned Drivers</div>
 
-    {selectedOrder.delivery.assignedDrivers.map((d) => (
-      <div
-        key={d.id}
-        style={{
-          padding: "6px 10px",
-          marginTop: 6,
-          borderRadius: 8,
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          background: "#ecfdf5",
-          fontWeight: 600,
-        }}
-      >
-        <span>{d.name || d.id}</span>
+                      {selectedOrder.delivery.assignedDrivers.map((d) => (
+                        <div
+                          key={d.id}
+                          style={{
+                            padding: "6px 10px",
+                            marginTop: 6,
+                            borderRadius: 8,
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            background: "#ecfdf5",
+                            fontWeight: 600,
+                          }}
+                        >
+                          <span>{d.name || d.id}</span>
 
-        <span
-          style={{
-            fontSize: 12,
-            color: "#065f46",
-          }}
-        >
-          Assigned
-        </span>
-      </div>
-    ))}
-  </div>
-)}
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "#065f46",
+                            }}
+                          >
+                            Assigned
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
-</div>
+                </div>
 
 
                 <div style={{ marginTop: 12 }}>
-  <div className="label muted">Delivery Status</div>
+                  <div className="label muted">Delivery Status</div>
 
-  <div
-    style={{
-      fontWeight: 700,
-      marginTop: 6,
-      textTransform: "capitalize",
-    }}
-  >
-    {selectedOrder.delivery?.status ||
-      selectedOrder.deliveryStatus ||
-      "—"}
-  </div>
+                  <div
+                    style={{
+                      fontWeight: 700,
+                      marginTop: 6,
+                      textTransform: "capitalize",
+                    }}
+                  >
+                    {selectedOrder.delivery?.status ||
+                      selectedOrder.deliveryStatus ||
+                      "—"}
+                  </div>
 
-  <div
-    style={{
-      marginTop: 6,
-      fontSize: 12,
-      color: "#6b7280",
-    }}
-  >
-    Status is updated automatically by drivers
-    (accept → scan → pickup → delivery → completion)
-  </div>
-</div>
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 12,
+                      color: "#6b7280",
+                    }}
+                  >
+                    Status is updated automatically by drivers
+                    (accept → scan → pickup → delivery → completion)
+                  </div>
+                </div>
+                {/* Return Delivery CTA */}
+                <button
+                  className="cp-btn"
+                  style={{ marginTop: 8 }}
+                  onClick={async () => {
+                    try {
+                      await createReturnDelivery();
+                      alert("Return delivery created");
+                    } catch (e) {
+                      alert(e.message || "Failed to create return delivery");
+                    }
+                  }}
+                >
+                  Create Return Delivery
+                </button>
+
+
+
+
+
 
 
                 {/* Totals */}
@@ -778,7 +831,7 @@ export default function OrderDrawer({
                           gap: 8,
                           alignItems: "center",
                           padding: 8,
-                          borderBottom: "1px solid #f3f6f9" ,
+                          borderBottom: "1px solid #f3f6f9",
                         }}
                       >
                         <div style={{ flex: 1 }}>
@@ -791,8 +844,8 @@ export default function OrderDrawer({
                             {p.date
                               ? p.date.seconds
                                 ? new Date(
-                                    p.date.seconds * 1000
-                                  ).toLocaleDateString()
+                                  p.date.seconds * 1000
+                                ).toLocaleDateString()
                                 : new Date(p.date).toLocaleDateString()
                               : ""}
                           </div>

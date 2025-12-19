@@ -905,6 +905,7 @@ const assignDriversToOrder = async (driverIds = []) => {
       await updateDoc(deliveryRef, {
         assignedDrivers: mergedDrivers,
         assignedDriverIds, // ✅ ADD
+        deliveryType: selectedOrder.deliveryType ?? "pickup", 
         updatedAt: serverTimestamp(),
       });
 
@@ -932,6 +933,7 @@ const assignDriversToOrder = async (driverIds = []) => {
     const payload = {
       orderId: selectedOrder.id,
       orderNo: selectedOrder.orderNo,
+      deliveryType: selectedOrder.deliveryType ?? "pickup", // ✅ ADD
       assignedDrivers: mergedDrivers,
       assignedDriverIds, // ✅ ADD
       pickupAddress:
@@ -952,6 +954,7 @@ const assignDriversToOrder = async (driverIds = []) => {
     const ref = await addDoc(collection(db, "deliveries"), payload);
 
     await updateDoc(doc(db, "orders", selectedOrder.id), {
+      deliveryType: selectedOrder.deliveryType ?? "pickup", 
       delivery: {
         deliveryId: ref.id,
         assignedDrivers: mergedDrivers,
@@ -981,6 +984,83 @@ const assignDriversToOrder = async (driverIds = []) => {
   }
 };
 
+const createReturnDelivery = async () => {
+  if (!selectedOrder) return setError("No order open");
+
+  // 🚫 prevent duplicate return
+  if (selectedOrder.returnDelivery?.deliveryId) {
+    return setError("Return delivery already exists");
+  }
+
+  setSaving(true);
+  setError("");
+
+  const prevOrder = selectedOrder;
+
+  try {
+    // 1️⃣ Build expected assets from original order
+    const expectedAssetIds = (selectedOrder.items || [])
+      .flatMap((i) => i.assignedAssets || [])
+      .filter(Boolean);
+
+    if (expectedAssetIds.length === 0) {
+      throw new Error("No assets found to return");
+    }
+
+    // 2️⃣ Create RETURN delivery payload
+    const payload = {
+      orderId: selectedOrder.id,
+      orderNo: selectedOrder.orderNo,
+
+      deliveryType: "return", // 🔑 IMPORTANT
+
+      assignedDrivers: [],
+      assignedDriverIds: [],
+
+      // 🔁 reverse logical direction
+      pickupAddress: selectedOrder.deliveryAddress || "",
+      dropAddress:
+        selectedOrder.pickupAddress ||
+        selectedOrder.branchAddress ||
+        "",
+
+      items: selectedOrder.items || [],
+      expectedAssetIds,
+      scannedAssets: {},
+
+      status: "assigned",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    // 3️⃣ Create delivery document
+    const ref = await addDoc(collection(db, "deliveries"), payload);
+
+    // 4️⃣ Update order with returnDelivery reference
+    await updateDoc(doc(db, "orders", selectedOrder.id), {
+      returnDelivery: {
+        deliveryId: ref.id,
+        status: "assigned",
+      },
+      updatedAt: serverTimestamp(),
+    });
+
+    // 5️⃣ Update local state
+    setSelectedOrder((s) => ({
+      ...(s || {}),
+      returnDelivery: {
+        deliveryId: ref.id,
+        status: "assigned",
+      },
+    }));
+  } catch (err) {
+    console.error("createReturnDelivery", err);
+    setSelectedOrder(prevOrder);
+    setError(err.message || "Failed to create return delivery");
+  } finally {
+    setSaving(false);
+  }
+};
 
 
 
@@ -1450,6 +1530,7 @@ const assignDriversToOrder = async (driverIds = []) => {
             branches={branches}
             productsMap={productsMap}
             productsList={productsList}
+            createReturnDelivery={createReturnDelivery}
             drivers={drivers}
             assetsById={assetsById}
             assetPicker={assetPicker}
