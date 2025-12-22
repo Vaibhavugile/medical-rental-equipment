@@ -5,6 +5,9 @@ import {
   reserveAsset,
   unreserveAsset,
 } from "../utils/inventory";
+import { doc, onSnapshot } from "firebase/firestore";
+import { db } from "../firebase";
+
 
 export default function OrderDrawer({
   // state
@@ -64,6 +67,8 @@ export default function OrderDrawer({
       : 0;
     return qty > 0 && assigned >= qty;
   };
+  const [liveDelivery, setLiveDelivery] = useState(null);
+
 
   const computePaymentsSummary = (payments = [], totalOrderAmount = 0) => {
     const totalPaid = (payments || []).reduce(
@@ -98,6 +103,22 @@ export default function OrderDrawer({
   }, [
     selectedOrder,
   ]);
+useEffect(() => {
+  if (!activeDelivery?.deliveryId) {
+    setLiveDelivery(null);
+    return;
+  }
+
+  const ref = doc(db, "deliveries", activeDelivery.deliveryId);
+
+  const unsubscribe = onSnapshot(ref, (snap) => {
+    if (snap.exists()) {
+      setLiveDelivery({ id: snap.id, ...snap.data() });
+    }
+  });
+
+  return () => unsubscribe();
+}, [activeDelivery?.deliveryId]);
 
   // ⛔ early return comes AFTER hooks
   if (!selectedOrder) return null;
@@ -751,9 +772,10 @@ export default function OrderDrawer({
                       textTransform: "capitalize",
                     }}
                   >
-                    {activeDelivery?.status ||
-                      selectedOrder.deliveryStatus ||
-                      "—"}
+                    {liveDelivery?.status ||
+  selectedOrder.deliveryStatus ||
+  "—"}
+
                   </div>
 
                   <div
