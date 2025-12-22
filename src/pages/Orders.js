@@ -859,130 +859,230 @@ export default function Orders() {
     });
     return ref.id;
   };
+  
+const getActiveDelivery = (order) => {
+  if (!order) return null;
+
+  const deliveryType = order.deliveryType || "pickup";
+
+  if (deliveryType === "pickup" && order.pickupDeliveryId) {
+    return {
+      deliveryId: order.pickupDeliveryId,
+      deliveryType: "pickup",
+    };
+  }
+
+  if (deliveryType === "return" && order.returnDeliveryId) {
+    return {
+      deliveryId: order.returnDeliveryId,
+      deliveryType: "return",
+    };
+  }
+
+  return null;
+};
+
+
 
  // Replace existing assignDriverToOrder in Orders.js with this:
 const assignDriversToOrder = async (driverIds = []) => {
-  if (!selectedOrder) return setError("No order open");
+  console.log("🟡 assignDriversToOrder CALLED with:", driverIds);
+
+  if (!selectedOrder) {
+    console.error("❌ No order open");
+    return setError("No order open");
+  }
 
   setSaving(true);
   setError("");
-
   const prevOrder = selectedOrder;
 
   try {
-    // 1️⃣ Load driver documents
-    const drivers = [];
-    for (const driverId of driverIds) {
-      const snap = await getDoc(doc(db, "drivers", driverId));
-      if (!snap.exists()) throw new Error("Driver not found");
-      drivers.push({ id: snap.id, ...(snap.data() || {}) });
+    const deliveryType = selectedOrder.deliveryType || "pickup";
+    console.log("🟡 deliveryType:", deliveryType);
+
+    const activeDeliveryId =
+      deliveryType === "pickup"
+        ? selectedOrder.pickupDeliveryId
+        : selectedOrder.returnDeliveryId;
+
+    console.log("🟡 activeDeliveryId:", activeDeliveryId);
+
+    /**
+     * 🔥 BULLETPROOF NORMALIZATION
+     * Handles:
+     *  - "id"
+     *  - ["id"]
+     *  - [["id"]]
+     */
+    const normalizedDriverIds = (Array.isArray(driverIds)
+      ? driverIds.flat(Infinity)
+      : [driverIds]
+    )
+      .map((d) => (typeof d === "string" ? d : d?.id))
+      .filter(Boolean);
+
+    console.log("🟡 normalizedDriverIds:", normalizedDriverIds);
+
+    if (!normalizedDriverIds.length) {
+      console.error("❌ NO DRIVER IDS AFTER NORMALIZATION");
+      throw new Error("No valid driver IDs received");
     }
 
-    // 2️⃣ Merge with existing assigned drivers
-    const existing = selectedOrder.delivery?.assignedDrivers || [];
+    // 1️⃣ Load driver documents
+    const drivers = [];
+    for (const driverId of normalizedDriverIds) {
+      console.log("🟠 Fetching driver:", driverId);
 
+      const snap = await getDoc(doc(db, "drivers", driverId));
+      if (!snap.exists()) {
+        console.error("❌ Driver not found:", driverId);
+        throw new Error("Driver not found");
+      }
+
+      const driverData = { id: snap.id, ...(snap.data() || {}) };
+      console.log("🟢 Loaded driver:", driverData);
+
+      drivers.push(driverData);
+    }
+
+    console.log("🟡 drivers loaded:", drivers);
+
+    // 2️⃣ Load existing drivers from THIS delivery only
+    let existingDrivers = [];
+    if (activeDeliveryId) {
+      console.log("🟠 Loading existing drivers from delivery:", activeDeliveryId);
+
+      const snap = await getDoc(doc(db, "deliveries", activeDeliveryId));
+      if (snap.exists()) {
+        existingDrivers = snap.data().assignedDrivers || [];
+      }
+    }
+
+    console.log("🟡 existingDrivers:", existingDrivers);
+
+    // 3️⃣ Merge drivers (no duplicates)
     const mergedDrivers = [
-      ...existing,
-      ...drivers
-        .filter((d) => !existing.some((e) => e.id === d.id))
-        .map((d) => ({
-          id: d.id,
-          name: d.name || "",
-        })),
+      ...existingDrivers,
+      ...drivers.filter(
+        (d) => !existingDrivers.some((e) => e.id === d.id)
+      ),
     ];
 
-    // ✅ NEW: driver IDs array (IMPORTANT)
     const assignedDriverIds = mergedDrivers.map((d) => d.id);
 
-    // 3️⃣ If delivery already exists → UPDATE it
-    if (selectedOrder.delivery?.deliveryId) {
-      const deliveryRef = doc(
-        db,
-        "deliveries",
-        selectedOrder.delivery.deliveryId
-      );
+    console.log("🟡 mergedDrivers:", mergedDrivers);
+    console.log("🟡 assignedDriverIds:", assignedDriverIds);
 
-      await updateDoc(deliveryRef, {
+    const driversKey =
+      deliveryType === "return"
+        ? "returnAssignedDrivers"
+        : "pickupAssignedDrivers";
+
+    console.log("🟡 driversKey:", driversKey);
+
+    // 4️⃣ UPDATE existing delivery
+    if (activeDeliveryId) {
+      console.log("🟠 Updating existing delivery", {
+        activeDeliveryId,
+        mergedDrivers,
+        assignedDriverIds,
+      });
+
+      await updateDoc(doc(db, "deliveries", activeDeliveryId), {
         assignedDrivers: mergedDrivers,
-        assignedDriverIds, // ✅ ADD
-        deliveryType: selectedOrder.deliveryType ?? "pickup", 
+        assignedDriverIds,
         updatedAt: serverTimestamp(),
       });
 
       await updateDoc(doc(db, "orders", selectedOrder.id), {
-        "delivery.assignedDrivers": mergedDrivers,
-        "delivery.assignedDriverIds": assignedDriverIds, // ✅ ADD
-        deliveryStatus: "assigned",
+        [driversKey]: mergedDrivers,
         updatedAt: serverTimestamp(),
       });
 
       setSelectedOrder((s) => ({
-        ...(s || {}),
-        delivery: {
-          ...(s?.delivery || {}),
-          assignedDrivers: mergedDrivers,
-          assignedDriverIds, // ✅ ADD
-        },
-        deliveryStatus: "assigned",
+        ...s,
+        [driversKey]: mergedDrivers,
       }));
 
+      console.log("✅ Existing delivery updated successfully");
       return;
     }
 
-    // 4️⃣ FIRST TIME ONLY → create delivery
+    // 5️⃣ CREATE new delivery
     const payload = {
       orderId: selectedOrder.id,
       orderNo: selectedOrder.orderNo,
-      deliveryType: selectedOrder.deliveryType ?? "pickup", // ✅ ADD
+      deliveryType,
+
       assignedDrivers: mergedDrivers,
-      assignedDriverIds, // ✅ ADD
+      assignedDriverIds,
+
       pickupAddress:
-        selectedOrder.pickupAddress ||
-        selectedOrder.deliveryAddress ||
-        "",
-      dropAddress: selectedOrder.deliveryAddress || "",
+        deliveryType === "return"
+          ? selectedOrder.deliveryAddress || ""
+          : selectedOrder.pickupAddress ||
+            selectedOrder.deliveryAddress ||
+            "",
+
+      dropAddress:
+        deliveryType === "return"
+          ? selectedOrder.pickupAddress || ""
+          : selectedOrder.deliveryAddress || "",
+
       items: selectedOrder.items || [],
-      status: "assigned",
-      scannedAssets: {},
       expectedAssetIds: (selectedOrder.items || [])
         .flatMap((i) => i.assignedAssets || [])
         .filter(Boolean),
+
+      scannedAssets: {},
+      status: "assigned",
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
 
+    console.log("🟠 Creating delivery with payload:", payload);
+
     const ref = await addDoc(collection(db, "deliveries"), payload);
 
+    console.log("🟢 Delivery created with ID:", ref.id);
+
+    const deliveryKey =
+      deliveryType === "return"
+        ? "returnDeliveryId"
+        : "pickupDeliveryId";
+
     await updateDoc(doc(db, "orders", selectedOrder.id), {
-      deliveryType: selectedOrder.deliveryType ?? "pickup", 
-      delivery: {
-        deliveryId: ref.id,
-        assignedDrivers: mergedDrivers,
-        assignedDriverIds, // ✅ ADD
-        status: "assigned",
-      },
+      [deliveryKey]: ref.id,
+      [driversKey]: mergedDrivers,
+      deliveryType,
       deliveryStatus: "assigned",
       updatedAt: serverTimestamp(),
     });
 
     setSelectedOrder((s) => ({
-      ...(s || {}),
-      delivery: {
-        deliveryId: ref.id,
-        assignedDrivers: mergedDrivers,
-        assignedDriverIds, // ✅ ADD
-        status: "assigned",
-      },
+      ...s,
+      [deliveryKey]: ref.id,
+      [driversKey]: mergedDrivers,
+      deliveryType,
       deliveryStatus: "assigned",
     }));
+
+    console.log("✅ Order updated with delivery + drivers");
   } catch (err) {
-    console.error("assignDriversToOrder", err);
+    console.error("❌ assignDriversToOrder ERROR:", err);
     setSelectedOrder(prevOrder);
     setError(err.message || "Failed to assign drivers");
   } finally {
     setSaving(false);
   }
 };
+
+
+
+
+
+
 
 const createReturnDelivery = async () => {
   if (!selectedOrder) return setError("No order open");
@@ -1527,6 +1627,7 @@ const createReturnDelivery = async () => {
           <OrderDrawer
             /* state */
             selectedOrder={selectedOrder}
+            setSelectedOrder={setSelectedOrder}
             branches={branches}
             productsMap={productsMap}
             productsList={productsList}

@@ -9,9 +9,10 @@
    THEME / TOKENS
    ========================= */
 :root{
-  --bmm-primary: #007bff;
-  --bmm2-primary: #176fd7;
-  --bmm2-accent: #58a3ff;
+  --bmm-primary: #f28c28;     /* PRIMARY → Orange (BookMyMedicare) */
+--bmm2-primary: #f28c28;   /* Secondary → Trust Blue */
+--bmm2-accent: #f28c28;    /* Accent → Deep Navy */
+
   --bmm-navy: #0C2340;
   --bmm2-navy: #0C2340;
   --bmm-muted: #6b7e8c;

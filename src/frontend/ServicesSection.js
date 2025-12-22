@@ -244,8 +244,11 @@ export default function ServicesSection() {
     <section className="bmm-services-section" ref={rootRef} aria-labelledby="bmm-services-title">
       <div className="bmm-services-inner">
         <div className="bmm-services-head">
-          <h2 id="bmm-services-title" className="bmm-services-title">OUR SERVICES</h2>
-          <p className="bmm-services-sub">AT YOUR HOME</p>
+        <h2 id="bmm-services-title" className="bmm-services-title">
+  OUR <span>SERVICES</span>
+</h2>
+<p className="bmm-services-sub">AT YOUR HOME</p>
+
         </div>
 
         <div className="bmm-services-grid" role="list">

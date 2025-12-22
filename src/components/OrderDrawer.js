@@ -1,5 +1,5 @@
 // src/components/OrderDrawer.jsx
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   listAssets,
   reserveAsset,
@@ -9,6 +9,7 @@ import {
 export default function OrderDrawer({
   // state
   selectedOrder,
+  setSelectedOrder,
   branches,
   productsMap,
   productsList,
@@ -72,8 +73,36 @@ export default function OrderDrawer({
     const balance = Math.max(0, Number(totalOrderAmount || 0) - totalPaid);
     return { totalPaid, balance };
   };
+  // 🔹 ALWAYS put hooks first (before any return)
+  const activeDelivery = React.useMemo(() => {
+    if (!selectedOrder) return null;
 
+    const deliveryType = selectedOrder.deliveryType || "pickup";
+
+    const deliveryId =
+      deliveryType === "return"
+        ? selectedOrder.returnDeliveryId
+        : selectedOrder.pickupDeliveryId;
+
+    if (!deliveryId) return null;
+
+    return {
+      deliveryId,
+      deliveryType,
+      assignedDrivers:
+        deliveryType === "return"
+          ? selectedOrder.returnAssignedDrivers || []
+          : selectedOrder.pickupAssignedDrivers || [],
+      status: selectedOrder.deliveryStatus,
+    };
+  }, [
+    selectedOrder,
+  ]);
+
+  // ⛔ early return comes AFTER hooks
   if (!selectedOrder) return null;
+
+
 
   const paymentSummary = computePaymentsSummary(
     selectedOrder.payments || [],
@@ -477,7 +506,7 @@ export default function OrderDrawer({
                                     disabled={
                                       !it.productId ||
                                       selectedOrder.deliveryType === "return" ||
-                                      !!selectedOrder.delivery?.deliveryId
+                                      !!activeDelivery?.deliveryId
                                     }
 
                                   >
@@ -491,7 +520,7 @@ export default function OrderDrawer({
                                     disabled={
                                       !it.productId ||
                                       selectedOrder.deliveryType === "return" ||
-                                      !!selectedOrder.delivery?.deliveryId
+                                      !!activeDelivery?.deliveryId
                                     }
 
                                   >
@@ -602,27 +631,22 @@ export default function OrderDrawer({
               <div style={{ marginTop: 12 }}>
                 <h4>Delivery</h4>
                 {/* DELIVERY TYPE */}
-                <div style={{ marginTop: 8 }}>
-                  <div className="label muted">Delivery Type</div>
+                <select
+                  className="cp-input"
+                  value={selectedOrder.deliveryType ?? "pickup"}
+                  onChange={(e) => {
+                    const val = e.target.value;
 
-                  <select
-                    className="cp-input"
-                    value={selectedOrder.deliveryType || "pickup"}
-                    onChange={(e) =>
-                      updateOrderItem("__DELIVERY__", {
-                        deliveryType: e.target.value,
-                      })
-                    }
-                  >
+                    setSelectedOrder((prev) => ({
+                      ...prev,
+                      deliveryType: val,
+                    }));
+                  }}
+                >
+                  <option value="pickup">Pickup (Rent Out)</option>
+                  <option value="return">Return (Collect Back)</option>
+                </select>
 
-                    <option value="pickup">Pickup (Rent Out)</option>
-                    <option value="return">Return (Collect Back)</option>
-                  </select>
-
-                  <div className="muted" style={{ marginTop: 4 }}>
-                    Pickup = assets go out · Return = assets come back
-                  </div>
-                </div>
 
 
                 <div style={{ marginTop: 8 }}>
@@ -630,14 +654,24 @@ export default function OrderDrawer({
 
                   <select
                     className="cp-input"
-                    value=""
+                    defaultValue=""
                     onChange={(e) => {
                       const driverId = e.target.value;
-                      if (!driverId) return;
+
+                      console.log("🟢 UI selected driverId:", driverId);
+
+                      if (!driverId) {
+                        console.warn("⚠️ UI driverId empty");
+                        return;
+                      }
+
                       assignDriverToOrder(driverId);
-                      e.target.value = "";
+
+
+                      e.target.selectedIndex = 0;
                     }}
                   >
+
                     <option value="">Select driver</option>
                     {drivers.map((d) => (
                       <option key={d.id} value={d.id}>
@@ -665,12 +699,11 @@ export default function OrderDrawer({
                   </div>
 
                   {/* ASSIGNED DRIVERS */}
-                  {/* ASSIGNED DRIVERS */}
-                  {(selectedOrder.delivery?.assignedDrivers || []).length > 0 && (
+                  {activeDelivery?.assignedDrivers?.length > 0 && (
                     <div style={{ marginTop: 10 }}>
                       <div className="label muted">Assigned Drivers</div>
 
-                      {selectedOrder.delivery.assignedDrivers.map((d) => (
+                      {activeDelivery.assignedDrivers.map((d) => (
                         <div
                           key={d.id}
                           style={{
@@ -680,25 +713,31 @@ export default function OrderDrawer({
                             display: "flex",
                             justifyContent: "space-between",
                             alignItems: "center",
-                            background: "#ecfdf5",
+                            background:
+                              selectedOrder.deliveryType === "return"
+                                ? "#fff7ed"
+                                : "#ecfdf5",
                             fontWeight: 600,
                           }}
                         >
                           <span>{d.name || d.id}</span>
-
                           <span
                             style={{
                               fontSize: 12,
-                              color: "#065f46",
+                              color:
+                                selectedOrder.deliveryType === "return"
+                                  ? "#9a3412"
+                                  : "#065f46",
                             }}
                           >
-                            Assigned
+                            {selectedOrder.deliveryType === "return"
+                              ? "Return"
+                              : "Pickup"}
                           </span>
                         </div>
                       ))}
                     </div>
                   )}
-
                 </div>
 
 
@@ -712,7 +751,7 @@ export default function OrderDrawer({
                       textTransform: "capitalize",
                     }}
                   >
-                    {selectedOrder.delivery?.status ||
+                    {activeDelivery?.status ||
                       selectedOrder.deliveryStatus ||
                       "—"}
                   </div>

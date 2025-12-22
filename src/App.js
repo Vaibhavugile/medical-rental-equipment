@@ -30,6 +30,9 @@ import NursingPage from "./pages/NursingPage";
 import PhysiotherapyPage from "./pages/PhysiotherapyPage";
 import RespiratoryPage from "./pages/RespiratoryPage";
 import TeamPage from "./pages/TeamPage";
+import BlogList from "./pages/BlogList";
+import BlogDetail from "./pages/BlogDetail";
+import AddBlog from "./pages/AddBlog";
 
 const TrackingPage = lazy(() => import("./pages/TrackingPage"));
 
@@ -437,6 +440,9 @@ export default function App() {
 
         <Route path="/respiratory-care" element={<RespiratoryPage/>} />
         <Route path="/our-team" element={<TeamPage/>} />
+        <Route path="/blogs" element={<BlogList />} />
+        <Route path="/blogs/:slug" element={<BlogDetail />} />
+        <Route path="/add-blog" element={<AddBlog />} />
 
         <Route path="/signup" element={<Signup />} />
 

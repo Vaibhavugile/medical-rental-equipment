@@ -1,21 +1,20 @@
-:root{
-  /* topbar height used by Header to offset its position */
-  --topbar-height: 48px;      /* default desktop height (update if you change padding) */
-  --topbar-gradient-1: #e9f5ff;
-  --topbar-gradient-2: #dff8ff;
-  --accent: #007bff;
-  --accent-dark: #005fcc;
-  --text-dark: #0e2a3a;
-  --muted: #476274;
-  --glass-border: rgba(0,0,0,0.06);
-  --shadow: 0 4px 18px rgba(2,10,36,0.05);
-  --badge-glow: rgba(0,123,255,0.12);
+:root {
+  /* Brand Colors – BookMyMedicare */
+  --bm-blue-dark: #0b3558;
+  --bm-blue: #0e3f66;
+  --bm-orange: #f28c28;
+  --bm-white: #ffffff;
+  --bm-muted: rgba(255,255,255,0.85);
+
+  /* Layout */
+  --topbar-height: 48px;
+  --shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   --ease: cubic-bezier(.17,.67,.31,1);
 }
 
-/* ------------------------------------------------------------------------
-   TOPBAR: fixed strip at the top
-   ------------------------------------------------------------------------ */
+/* ------------------------------------------------------------------
+   TOPBAR
+------------------------------------------------------------------- */
 .topbar {
   position: fixed;
   top: 0;
@@ -23,43 +22,11 @@
   right: 0;
   height: var(--topbar-height);
   z-index: 1002;
-  pointer-events: auto;
-
-  /* animated, pleasant gradient */
-  background: linear-gradient(90deg, var(--topbar-gradient-1), var(--topbar-gradient-2));
-  border-bottom: 1px solid var(--glass-border);
+  background: var(--bm-blue-dark);
   box-shadow: var(--shadow);
-  will-change: transform;
-  overflow: visible;
 }
 
-/* animated sheen overlay */
-.topbar::before{
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(
-    120deg,
-    rgba(255,255,255,0.28),
-    rgba(255,255,255,0.06) 22%,
-    rgba(255,255,255,0.02) 50%,
-    rgba(255,255,255,0.06) 78%,
-    rgba(255,255,255,0.20)
-  );
-  mix-blend-mode: overlay;
-  opacity: 0.95;
-  animation: sheen 9s linear infinite;
-}
-
-/* move sheen */
-@keyframes sheen {
-  0% { transform: translateX(-22%); }
-  50% { transform: translateX(22%); }
-  100% { transform: translateX(-22%); }
-}
-
-/* inner container */
+/* Inner container */
 .topbar-inner {
   max-width: 1300px;
   margin: 0 auto;
@@ -67,122 +34,133 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   padding: 0 4vw;
+  gap: 12px;
 }
 
-/* left/right groups */
-.topbar .left { display:flex; gap:14px; align-items:center; min-width:0; }
-.topbar .right { display:flex; gap:12px; align-items:center; }
+/* Left / Right */
+.topbar .left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
 
-/* welcome */
+.topbar .right {
+  display: flex;
+  align-items: center;
+}
+
+/* Welcome text */
 .welcome {
-  font-size: 0.95rem;
-  color: var(--text-dark);
+  color: var(--bm-white);
+  font-size: 0.9rem;
   font-weight: 600;
-  display:inline-block;
-  white-space:nowrap;
+  white-space: nowrap;
 }
 
-/* contact row */
-.contact-row { display:flex; gap:10px; align-items:center; margin-left:8px; flex-wrap:wrap; }
+/* Contact row */
+.contact-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
 
-/* contact pill */
+/* Contact items (flat inline style) */
 .contact-item {
-  display:inline-flex;
-  gap:10px;
-  align-items:center;
-  text-decoration:none;
-  color: var(--muted);
-  font-size: 0.92rem;
-  background: rgba(255,255,255,0.82);
-  padding: 6px 10px;
-  border-radius: 999px;
-  box-shadow: 0 6px 18px rgba(2,10,36,0.04);
-  transition: transform 210ms var(--ease), box-shadow 210ms var(--ease), color 180ms var(--ease), background 180ms var(--ease);
-  white-space:nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  color: var(--bm-muted);
+  font-size: 0.88rem;
+  transition: color 180ms var(--ease);
+  white-space: nowrap;
 }
+
 .contact-item:hover {
-  transform: translateY(-3px);
-  color: var(--accent-dark);
-  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(246,252,255,0.96));
-  box-shadow: 0 10px 28px rgba(0,123,255,0.08);
+  color: var(--bm-orange);
 }
 
-/* icon container */
-.icon { display:inline-flex; align-items:center; justify-content:center; color: var(--accent); flex-shrink:0; }
-.icon svg { display:block; width:18px; height:18px; }
-
-/* phone icon pulse */
-.icon-phone { animation: phonePulse 2.6s ease-in-out infinite; transform-origin:center; }
-@keyframes phonePulse {
-  0% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(0,123,255,0)); }
-  50% { transform: scale(1.06); filter: drop-shadow(0 6px 18px rgba(0,123,255,0.08)); }
-  100% { transform: scale(1); filter: drop-shadow(0 0 0 rgba(0,123,255,0)); }
+/* Icons */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--bm-white);
 }
 
-/* mail icon float */
-.icon-mail { animation: mailFloat 3.2s ease-in-out infinite; }
-@keyframes mailFloat {
-  0% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-  100% { transform: translateY(0); }
+.icon svg {
+  width: 16px;
+  height: 16px;
+  display: block;
 }
 
-/* contact text */
-.contact-text { color: var(--text-dark); font-weight:600; }
+/* Contact text */
+.contact-text {
+  color: inherit;
+  font-weight: 500;
+}
 
-/* 24/7 badge */
+/* 24/7 Support badge */
 .badge {
-  display:inline-flex;
-  align-items:center;
-  gap:10px;
-  font-weight:700;
-  color: #02314a;
-  background: linear-gradient(90deg, rgba(0,123,255,0.12), rgba(0,172,255,0.06));
-  padding: 7px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bm-orange);
+  color: var(--bm-white);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 12px;
   border-radius: 999px;
-  border: 1px solid rgba(0,123,255,0.12);
-  box-shadow: 0 10px 36px rgba(0,123,255,0.06);
-  font-size:0.92rem;
-  position: relative;
-  overflow: visible;
+  white-space: nowrap;
 }
 
-/* animated dot inside badge */
+/* Static dot */
 .badge .pulse {
-  width:10px;
-  height:10px;
-  border-radius:50%;
-  background: linear-gradient(180deg,#00b1ff,#007bff);
-  box-shadow: 0 6px 18px rgba(0,123,255,0.28);
-  display:inline-block;
-  margin-right:2px;
-  animation: badgePulse 1500ms ease-in-out infinite;
-}
-@keyframes badgePulse {
-  0% { transform: scale(1); opacity: 1; }
-  50% { transform: scale(1.45); opacity: 0.55; }
-  100% { transform: scale(1); opacity: 1; }
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bm-white);
+  display: inline-block;
 }
 
-/* subtle entrance for topbar content */
-.topbar-inner > * { transform: translateY(0); transition: transform 420ms var(--ease); }
-
-/* responsive adjustments */
+/* ------------------------------------------------------------------
+   RESPONSIVE
+------------------------------------------------------------------- */
 @media (max-width: 900px) {
-  :root { --topbar-height: 64px; }
-  .topbar { height: var(--topbar-height); }
-  .topbar-inner { flex-direction: column; gap:6px; align-items:center; justify-content:center; padding: 6px 4vw; }
-  .welcome { font-size: 0.98rem; }
-  .contact-row { gap:8px; justify-content:center; }
-  .badge { padding: 6px 10px; font-size: 0.88rem; }
+  :root {
+    --topbar-height: 56px;
+  }
+
+  .topbar-inner {
+    flex-direction: column;
+    justify-content: center;
+    padding: 6px 4vw;
+    gap: 6px;
+  }
+
+  .welcome {
+    font-size: 0.92rem;
+  }
+
+  .contact-row {
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .badge {
+    font-size: 0.82rem;
+    padding: 5px 10px;
+  }
 }
 
-/* respect prefers-reduced-motion */
+/* ------------------------------------------------------------------
+   ACCESSIBILITY
+------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
-  .topbar::before, .icon-phone, .icon-mail, .badge .pulse, .contact-item {
-    animation: none !important;
+  * {
     transition: none !important;
   }
 }

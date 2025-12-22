@@ -1,46 +1,73 @@
-/* ServicesSection.css - blue themed premium icons + refined layout
-   Updated: clickable cards (anchor fills card), improved focus-visible, minor polish
+/* ServicesSection.css – PREMIUM BookMyMedicare THEME (FIXED ICONS)
+   Layout, grid, animations unchanged
 */
 
-/* import font (Poppins) */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bmm-blue: #0C63B8;         /* main icon stroke / strong blue (tuned to header) */
-  --bmm-blue-grad-1: #8CC7FF;  /* gradient start */
-  --bmm-blue-grad-2: #0C63B8;  /* gradient end */
-  --bmm-navy: #0C2340;
-  --bmm-muted: #6b7785;
-  --bmm-bg-soft: #f6fbff;
+  /* ================= BRAND COLORS ================= */
+  --bmm-blue-dark: #0b3558;
+  --bmm-blue: #0e3f66;
+  --bmm-orange: #f28c28;
+
+  /* ✅ REQUIRED FOR SVG ICON GRADIENTS (FIX) */
+  --bmm-blue-grad-1: #3b82f6; /* light blue */
+  --bmm-blue-grad-2: #0e3f66; /* brand blue */
+
+  /* ================= TEXT ================= */
+  --bmm-text-dark: #0e2a3a;
+  --bmm-text-muted: #546b7a;
+
+  /* ================= SURFACES ================= */
   --bmm-card-bg: #ffffff;
-  --bmm-border: rgba(2, 54, 120, 0.06);
+  --bmm-border: rgba(11,53,88,0.08);
+
+  /* ================= SHADOWS ================= */
+  --bmm-shadow-soft: 0 18px 60px rgba(11,53,88,0.10);
+
+  /* ================= MOTION ================= */
   --bmm-ease: cubic-bezier(.16,.84,.24,1);
-  --bmm-focus: rgba(88,163,255,0.14);
+  --bmm-focus: rgba(242,140,40,0.28);
 }
 
-/* section */
+/* ================= SECTION ================= */
 .bmm-services-section {
-  background: linear-gradient(180deg, var(--bmm-bg-soft) 0%, #f3faff 100%);
-  padding: 64px 0;
-  display:flex;
-  justify-content:center;
+  background: #ffffff; /* keep section white */
+  padding: 80px 0;
+  display: flex;
+  justify-content: center;
   box-sizing: border-box;
 }
 
-/* inner */
+/* ================= INNER ================= */
 .bmm-services-inner {
   width: 96%;
   max-width: 1320px;
   padding: 12px;
-  font-family: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  font-family: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, Arial;
 }
 
-/* head */
-.bmm-services-head { text-align:center; margin-bottom:26px; }
-.bmm-services-title { font-size: 2.05rem; font-weight:700; color: var(--bmm-navy); margin:0; letter-spacing:.4px; }
-.bmm-services-sub { margin:6px 0 0; color:var(--bmm-navy); font-weight:600; }
+/* ================= HEADER ================= */
+.bmm-services-head {
+  text-align: center;
+  margin-bottom: 36px;
+}
 
-/* grid */
+.bmm-services-title {
+  font-size: 2.1rem;
+  font-weight: 800;
+  color: var(--bmm-blue-dark);
+  margin: 0;
+}
+
+.bmm-services-sub {
+  margin-top: 6px;
+  color: var(--bmm-text-muted);
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+/* ================= GRID ================= */
 .bmm-services-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -48,33 +75,30 @@
   align-items: stretch;
 }
 
-/* card (rectangular & refined) */
+/* ================= CARD ================= */
 .bmm-service-card {
   --tx: 0px;
   --ty: 0px;
+
   transform: translate3d(var(--tx), var(--ty), 0) translateY(12px);
   opacity: 0;
+
   background: var(--bmm-card-bg);
-  border-radius: 14px;
-  padding: 26px 40px; /* wider (rectangular) */
-  display:flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
+  border-radius: 16px;
+  padding: 28px 40px;
+
   border: 1px solid var(--bmm-border);
-  box-shadow: 0 10px 30px rgba(2, 54, 120, 0.04);
+  box-shadow: var(--bmm-shadow-soft);
+
   transition:
     transform 420ms var(--bmm-ease),
     box-shadow 360ms var(--bmm-ease),
     opacity 420ms var(--bmm-ease),
     border-color 280ms var(--bmm-ease);
-  will-change: transform, box-shadow;
+
   cursor: pointer;
   min-height: 160px;
-  gap: 8px;
-
-  position: relative; /* needed so .bmm-service-link can fill it */
-  overflow: hidden;   /* ensure focus ring doesn't escape */
+  position: relative;
 }
 
 /* reveal */
@@ -83,104 +107,135 @@
   opacity: 1;
 }
 
-/* make the anchor fill the card and inherit layout */
+/* hover – subtle premium */
+.bmm-service-card:hover {
+  transform: translate3d(var(--tx), var(--ty), 0) translateY(-6px);
+  box-shadow: 0 26px 80px rgba(11,53,88,0.18);
+  border-color: rgba(242,140,40,0.35);
+}
+
+/* stagger delay */
+.bmm-service-card {
+  transition-delay: calc(var(--i) * 60ms);
+}
+
+/* ================= LINK ================= */
 .bmm-service-link {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  width: 100%;
   height: 100%;
   color: inherit;
   text-decoration: none;
-  background: transparent;
-  border-radius: inherit;
   outline: none;
 }
 
-/* anchor should receive hover/focus visual treatment; keep card hover for pointer area */
-.bmm-service-link:focus-visible,
-.bmm-service-card:focus-within .bmm-service-link {
-  box-shadow: 0 10px 40px var(--bmm-focus);
-  border-radius: 14px;
+/* focus-visible */
+.bmm-service-link:focus-visible {
   outline: 3px solid var(--bmm-focus);
-  outline-offset: 3px;
+  outline-offset: 4px;
 }
 
-/* hover/focus */
-.bmm-service-card:focus,
-.bmm-service-card:hover {
-  transform: translate3d(var(--tx), var(--ty), 0) translateY(-8px) scale(1.006);
-  box-shadow: 0 26px 80px rgba(2, 54, 120, 0.10);
-  border-color: rgba(12,99,184,0.10);
-  outline: none;
+/* ================= ICON ================= */
+.bmm-service-icon {
+  margin-bottom: 14px;
+  pointer-events: none;
 }
 
-/* icon tile */
-.bmm-service-icon { margin-bottom: 12px; display:flex; align-items:center; justify-content:center; pointer-events: none; }
 .bmm-icon-circle {
-  width: 84px;
-  height: 84px;
-  border-radius: 12px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background: linear-gradient(180deg, rgba(12,99,184,0.10), rgba(12,99,184,0.04));
-  box-shadow: 0 10px 30px rgba(12,99,184,0.05);
-  transition: transform 360ms var(--bmm-ease), box-shadow 360ms var(--bmm-ease);
+  width: 80px;
+  height: 80px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  background: linear-gradient(180deg, #f3f8ff, #ffffff);
+  box-shadow: 0 14px 40px rgba(11,53,88,0.14);
+
+  transition:
+    transform 360ms var(--bmm-ease),
+    box-shadow 360ms var(--bmm-ease);
 }
 
-/* svg icon sizing */
-.bmm-svg-icon { width: 56px; height: 56px; display:block; }
-
-/* text */
-.bmm-service-body { text-align: center; pointer-events: none; }
-.bmm-service-title {
-  color: var(--bmm-navy);
-  font-size: 1.02rem;
-  font-weight: 600; /* slightly lighter */
-  margin: 8px 0 8px;
-  line-height: 1.16;
-}
-.bmm-service-subtitle {
-  color: var(--bmm-muted);
-  font-size: 0.95rem;
-  font-weight: 500;
-  margin-bottom: 8px;
-}
-.bmm-service-cta {
-  color: var(--bmm-blue);
-  font-weight: 700;
-  font-size: 0.95rem;
+/* svg */
+.bmm-svg-icon {
+  width: 56px;
+  height: 56px;
+  display: block;
 }
 
 /* icon hover */
 .bmm-service-card:hover .bmm-icon-circle {
-  transform: translateY(-6px) scale(1.03);
-  box-shadow: 0 22px 60px rgba(12,99,184,0.08);
+  transform: translateY(-6px) scale(1.04);
+  box-shadow: 0 22px 60px rgba(242,140,40,0.28);
 }
 
-/* transition delay fallback via --i */
-.bmm-service-card { transition-delay: calc(var(--i) * 60ms); }
+/* ================= TEXT ================= */
+.bmm-service-body {
+  text-align: center;
+  pointer-events: none;
+}
 
-/* ensure anchor gets click/tap area on iOS */
-.bmm-service-link { -webkit-tap-highlight-color: rgba(0,0,0,0); }
+.bmm-service-title {
+  color: var(--bmm-blue-dark);
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 10px 0 4px;
+}
 
-/* responsive */
+.bmm-service-subtitle {
+  color: var(--bmm-text-muted);
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.bmm-service-cta {
+  margin-top: 6px;
+  color: var(--bmm-orange);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+/* ================= RESPONSIVE ================= */
 @media (max-width: 1100px) {
-  .bmm-services-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
-  .bmm-service-card { padding: 22px 28px; min-height: 150px; }
-  .bmm-svg-icon { width: 48px; height: 48px; }
-}
-@media (max-width: 720px) {
-  .bmm-services-grid { grid-template-columns: 1fr; gap: 16px; }
-  .bmm-service-card { padding: 18px; border-radius: 12px; min-height: auto; }
-  .bmm-icon-circle { width: 64px; height: 64px; }
-  .bmm-svg-icon { width: 40px; height: 40px; }
-  .bmm-service-title { font-size: 0.98rem; }
+  .bmm-services-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .bmm-service-card {
+    padding: 24px 28px;
+  }
+
+  .bmm-svg-icon {
+    width: 48px;
+    height: 48px;
+  }
 }
 
-/* reduced motion */
+@media (max-width: 720px) {
+  .bmm-services-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .bmm-service-card {
+    padding: 20px;
+    border-radius: 14px;
+  }
+
+  .bmm-icon-circle {
+    width: 64px;
+    height: 64px;
+  }
+
+  .bmm-svg-icon {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* ================= REDUCED MOTION ================= */
 @media (prefers-reduced-motion: reduce) {
   .bmm-service-card,
   .bmm-icon-circle {
@@ -189,10 +244,7 @@
     opacity: 1 !important;
   }
 }
-
-/* small utilities: ensure anchor text truncation doesn't overflow if you add long text */
-.bmm-service-title,
-.bmm-service-subtitle {
-  word-break: keep-all;
-  hyphens: none;
+.bmm-services-title span {
+  color: var(--bmm-orange);
 }
+

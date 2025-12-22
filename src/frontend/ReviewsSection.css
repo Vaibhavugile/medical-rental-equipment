@@ -1,214 +1,303 @@
-/* ReviewsSection.css - updated to use shared bmm- tokens and blue theme */
+/* ReviewsSection.css — PREMIUM WHITE THEME
+   Layout & JS unchanged
+*/
 
-/* Use the same tokens as other sections (expects these to be declared globally) */
-:root{
-  --bmm-primary: #007bff;       /* primary blue */
-  --bmm-navy: #0C2340;         /* dark/navy */
-  --bmm-muted: #6b7e8c;        /* muted text */
-  --bmm-section-bg: #f5fbff;   /* section background token */
+:root {
+  /* ================= BRAND ================= */
+  --bmm-blue-dark: #0b3558;
+  --bmm-blue: #0e3f66;
+  --bmm-orange: #f28c28;
+
+  /* ================= TEXT ================= */
+  --bmm-text-dark: #0e2a3a;
+  --bmm-text-muted: #546b7a;
+
+  /* ================= SURFACES ================= */
   --bmm-card-bg: #ffffff;
-  --bmm-radius: 14px;
-  --bmm-gap: 20px;
+  --bmm-border: rgba(11,53,88,0.08);
+
+  /* ================= SHADOWS ================= */
+  --bmm-shadow-soft: 0 18px 60px rgba(11,53,88,0.10);
+
+  /* ================= MOTION ================= */
   --bmm-ease: cubic-bezier(.18,.92,.32,1);
 }
 
-/* Section wrapper */
+/* ================= SECTION ================= */
 .bmm-reviews {
-  background: linear-gradient(180deg, var(--bmm-card-bg) 0%, var(--bmm-section-bg) 100%);
-  padding: 56px 4vw 80px;
-  color: var(--bmm-navy);
+  background: #ffffff; /* FIXED: white section */
+  padding: 80px 4vw;
+  color: var(--bmm-text-dark);
   font-family: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
 }
 
-/* Center container */
+/* ================= INNER ================= */
 .bmm-reviews-inner {
   max-width: 1320px;
   margin: 0 auto;
 }
 
-/* Header */
-.bmm-reviews-header { text-align:center; margin-bottom: 18px; }
-.bmm-title {
-  font-size: 2.25rem;
-  margin: 6px 0;
-  color: var(--bmm-primary);   /* changed to header blue */
-  font-weight: 700;
-  letter-spacing: .2px;
-}
-.bmm-sub {
-  color: var(--bmm-navy);
-  font-weight: 600;
-  margin: 0 0 6px;
+/* ================= HEADER ================= */
+.bmm-reviews-header {
+  text-align: center;
+  margin-bottom: 26px;
 }
 
-/* Score row - centered panel */
-.bmm-score-row { display:flex; justify-content:center; margin: 18px 0 28px; }
-.bmm-score-card {
-  display:flex;
-  align-items:center;
-  gap:18px;
-  background: linear-gradient(180deg, #fff 0%, #fbfdff 100%);
-  padding: 14px 20px;
-  border-radius: 12px;
-  box-shadow: 0 18px 48px rgba(12,30,60,0.06);
-  border: 1px solid rgba(12,30,60,0.04);
+.bmm-title {
+  font-size: 2.2rem;
+  margin: 0;
+  color: var(--bmm-blue-dark);
+  font-weight: 800;
 }
-.bmm-score-left { display:flex; align-items:center; gap:14px; flex-direction:row; }
+
+.bmm-sub {
+  margin-top: 6px;
+  color: var(--bmm-text-muted);
+  font-weight: 600;
+}
+
+/* ================= SCORE ================= */
+.bmm-score-row {
+  display: flex;
+  justify-content: center;
+  margin: 22px 0 36px;
+}
+
+.bmm-score-card {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  background: #ffffff;
+  padding: 16px 22px;
+  border-radius: 14px;
+  border: 1px solid var(--bmm-border);
+  box-shadow: var(--bmm-shadow-soft);
+}
+
 .bmm-score-number {
   font-size: 2rem;
   font-weight: 800;
-  color: var(--bmm-navy);
+  color: var(--bmm-blue-dark);
 }
-.bmm-stars { display:flex; gap:6px; align-items:center; margin-top:6px; }
-.bmm-score-sub { color: var(--bmm-muted); font-size: .95rem; margin-top: 6px; }
 
-/* small ghost button */
+.bmm-stars {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.bmm-score-sub {
+  color: var(--bmm-text-muted);
+  font-size: 0.95rem;
+  margin-top: 6px;
+}
+
+/* ghost button */
 .bmm-btn-ghost {
-  background: linear-gradient(90deg, rgba(0,123,255,0.06), rgba(0,123,255,0.03));
-  border: none;
-  color: var(--bmm-navy);
+  background: transparent;
+  border: 1px solid var(--bmm-border);
+  color: var(--bmm-blue-dark);
   padding: 10px 14px;
   border-radius: 10px;
   font-weight: 700;
-  box-shadow: 0 8px 24px rgba(12,30,60,0.04);
   cursor: pointer;
+  transition: box-shadow 180ms var(--bmm-ease), transform 180ms var(--bmm-ease);
 }
 
-/* Carousel wrapper */
+.bmm-btn-ghost:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 36px rgba(11,53,88,0.14);
+}
+
+/* ================= CAROUSEL ================= */
 .bmm-carousel-wrap {
-  position: relative;
-  margin-top: 6px;
-  display:flex;
-  align-items:center;
-  gap: 12px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
-/* Arrows */
+/* arrows */
 .bmm-arrow {
-  width: 48px;
-  height: 48px;
+  width: 46px;
+  height: 46px;
   border-radius: 12px;
-  border: none;
-  background: linear-gradient(180deg, #ffffff, #f6f9ff);
-  box-shadow: 0 12px 32px rgba(12,30,60,0.06);
+  border: 1px solid var(--bmm-border);
+  background: #ffffff;
+  box-shadow: var(--bmm-shadow-soft);
   font-size: 22px;
-  color: var(--bmm-navy);
+  color: var(--bmm-blue-dark);
   cursor: pointer;
   transition: transform 180ms var(--bmm-ease), box-shadow 180ms var(--bmm-ease);
-  display:flex;
-  align-items:center;
-  justify-content:center;
 }
-.bmm-arrow:hover { transform: translateY(-3px); box-shadow: 0 22px 48px rgba(12,30,60,0.12); }
 
-/* Carousel list (scrolling area) */
+.bmm-arrow:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 48px rgba(11,53,88,0.18);
+}
+
+/* carousel list */
 .bmm-carousel {
   display: flex;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  gap: var(--bmm-gap);
-  padding: 12px 8px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none; /* firefox */
-  -ms-overflow-style: none; /* IE 10+ */
-  flex: 1 1 auto;
+  gap: 24px;
+  padding: 12px 6px;
+  scrollbar-width: none;
 }
 .bmm-carousel::-webkit-scrollbar { display: none; }
 
-/* Each review card */
+/* ================= REVIEW CARD ================= */
 .bmm-card {
   scroll-snap-align: start;
   min-width: 320px;
   width: 320px;
   background: var(--bmm-card-bg);
-  border-radius: var(--bmm-radius);
-  padding: 18px;
-  box-shadow: 0 18px 48px rgba(12,30,60,0.05);
-  border: 1px solid rgba(12,30,60,0.04);
-  display:flex;
-  flex-direction:column;
-  gap: 12px;
-  transition: transform 260ms var(--bmm-ease), box-shadow 260ms var(--bmm-ease), border-color 260ms var(--bmm-ease);
-  min-height: 200px;
+  border-radius: 16px;
+  padding: 20px;
+  border: 1px solid var(--bmm-border);
+  box-shadow: var(--bmm-shadow-soft);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: transform 260ms var(--bmm-ease), box-shadow 260ms var(--bmm-ease);
 }
 
-/* Active / focused card */
 .bmm-card.active {
-  transform: translateY(-8px) scale(1.02);
-  box-shadow: 0 34px 90px rgba(12,30,60,0.12);
-  border-color: rgba(0,123,255,0.10); /* subtle blue tint */
+  transform: translateY(-8px);
+  box-shadow: 0 28px 80px rgba(11,53,88,0.22);
 }
 
-/* Hover */
-.bmm-card:hover { transform: translateY(-6px); box-shadow: 0 28px 70px rgba(12,30,60,0.08); }
+.bmm-card:hover {
+  transform: translateY(-6px);
+}
 
-/* Card top row */
-.bmm-card-top { display:flex; gap:12px; align-items:center; }
+/* ================= CARD TOP ================= */
+.bmm-card-top {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
 .bmm-avatar {
-  width: 56px; height:56px; border-radius:50%; overflow:hidden;
-  flex: 0 0 56px; display:flex; align-items:center; justify-content:center;
-  background: linear-gradient(180deg,#fff,#f6f8fb);
-  box-shadow: 0 6px 18px rgba(12,30,60,0.04);
-  border: 1px solid rgba(12,30,60,0.04);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 1px solid var(--bmm-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fbff;
 }
-.bmm-avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+
+.bmm-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .bmm-initials {
-  font-weight:700;
-  color: var(--bmm-card-bg);
-  background: linear-gradient(90deg,var(--bmm-primary), #176fd7);
-  width:56px; height:56px; display:flex; align-items:center; justify-content:center; border-radius:50%;
-  font-size:0.98rem;
+  font-weight: 700;
+  color: #ffffff;
+  background: linear-gradient(
+    90deg,
+    var(--bmm-orange),
+    #ff9f1a
+  );
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
 }
 
-/* Meta */
-.bmm-card-meta { display:flex; flex-direction:column; }
-.bmm-name { font-weight:700; color: var(--bmm-navy); font-size: 1rem; }
-.bmm-rating { display:flex; gap:6px; margin-top:6px; }
+/* meta */
+.bmm-name {
+  font-weight: 700;
+  color: var(--bmm-blue-dark);
+}
 
-/* Review text */
+.bmm-rating {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* ================= TEXT ================= */
 .bmm-text {
-  color: #334155;
+  color: var(--bmm-text-dark);
   font-style: italic;
-  margin: 8px 0 0;
-  flex:1;
-  line-height:1.55;
-  font-size: .98rem;
+  line-height: 1.55;
+  font-size: 0.98rem;
 }
 
-/* Footer small meta */
-.bmm-card-footer { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size: .90rem; color: var(--bmm-muted); }
+/* footer */
+.bmm-card-footer {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  color: var(--bmm-text-muted);
+}
 
-/* Dots */
-.bmm-dots { display:flex; justify-content:center; gap:8px; margin-top: 18px; }
+/* ================= DOTS ================= */
+.bmm-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 20px;
+}
+
 .bmm-dot {
-  width:10px; height:10px; border-radius:50%; background: rgba(12,30,60,0.08); border:none; cursor:pointer;
-  transition: transform 180ms var(--bmm-ease), background-color 160ms var(--bmm-ease), box-shadow 160ms var(--bmm-ease);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(11,53,88,0.25);
+  border: none;
+  cursor: pointer;
+  transition: transform 160ms var(--bmm-ease), background-color 160ms var(--bmm-ease);
 }
-.bmm-dot.active { transform: scale(1.28); background: var(--bmm-primary); box-shadow: 0 10px 28px rgba(0,123,255,0.14); }
 
-/* Responsive rules */
-@media (min-width: 1200px) {
-  .bmm-card { min-width: 360px; width: 360px; min-height: 220px; }
-  .bmm-carousel { gap: 28px; }
+.bmm-dot.active {
+  transform: scale(1.3);
+  background: var(--bmm-orange);
 }
-@media (min-width: 1400px) {
-  .bmm-card { min-width: 380px; width: 380px; min-height: 230px; }
-}
+
+/* ================= RESPONSIVE ================= */
 @media (max-width: 980px) {
-  .bmm-card { min-width: 300px; width: 300px; min-height: 200px; }
-  .bmm-reviews { padding: 36px 3.5vw 56px; }
-  .bmm-title { font-size: 1.9rem; }
-}
-@media (max-width: 600px) {
-  .bmm-reviews { padding: 28px 4vw 40px; }
-  .bmm-card { min-width: 86%; width: 86%; }
-  .bmm-score-card { flex-direction: column; gap: 8px; align-items:flex-start; }
-  .bmm-arrow { display:none; }
-  .bmm-dots { gap:6px; }
+  .bmm-reviews {
+    padding: 60px 4vw;
+  }
+
+  .bmm-title {
+    font-size: 1.9rem;
+  }
+
+  .bmm-card {
+    min-width: 300px;
+  }
 }
 
-/* Reduced motion */
+@media (max-width: 600px) {
+  .bmm-card {
+    min-width: 86%;
+    width: 86%;
+  }
+
+  .bmm-arrow {
+    display: none;
+  }
+}
+
+/* ================= REDUCED MOTION ================= */
 @media (prefers-reduced-motion: reduce) {
-  .bmm-card, .bmm-carousel, .bmm-arrow, .bmm-dot { transition: none !important; transform: none !important; }
+  .bmm-card,
+  .bmm-arrow,
+  .bmm-dot {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+.bmm-title span {
+  color: var(--bmm-orange);
 }

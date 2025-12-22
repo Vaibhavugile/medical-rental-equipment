@@ -2,7 +2,9 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
+/* ================= FIREBASE CONFIG ================= */
 const firebaseConfig = {
   apiKey: "AIzaSyCBJcHWsUrZPDOji5d86td2e9ShrktcD48",
   authDomain: "medrent-5d771.firebaseapp.com",
@@ -13,7 +15,10 @@ const firebaseConfig = {
   measurementId: "G-CR7SZDPMPJ"
 };
 
-
+/* ================= INIT ================= */
 const app = initializeApp(firebaseConfig);
+
+/* ================= EXPORTS ================= */
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const storage = getStorage(app);

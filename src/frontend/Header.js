@@ -13,10 +13,11 @@ import "./Header.css";
 const NAV_ITEMS = [
   { id: "home", label: "Home" },
   { id: "services", label: "Services" },
-  // Providers goes to /our-team route instead of scrolling to section on the current page
+  { id: "blogs", label: "Blogs", route: "/blogs" }, // ✅ NEW
   { id: "providers", label: "Providers", route: "/our-team" },
   { id: "contact", label: "Contact" },
 ];
+
 
 function MenuIcon({ size = 20 }) {
   return (
@@ -40,12 +41,16 @@ export default function Header({ logo = "BookMyMedicare" }) {
   const headerRef = useRef(null);
 
   // On mount, set active based on current path (so /our-team highlights Providers)
-  useEffect(() => {
-    const path = window.location.pathname || "/";
-    if (path.startsWith("/our-team")) {
-      setActiveId("providers");
-    }
-  }, []);
+ useEffect(() => {
+  const path = window.location.pathname || "/";
+
+  if (path.startsWith("/our-team")) {
+    setActiveId("providers");
+  } else if (path.startsWith("/blogs")) {
+    setActiveId("blogs"); // ✅ highlight Blogs
+  }
+}, []);
+
 
   // Close mobile menu on resize > breakpoint, or on Escape key
   useEffect(() => {

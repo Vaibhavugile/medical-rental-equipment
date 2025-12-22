@@ -187,7 +187,10 @@ export default function ReviewsSection({
     <section className="bmm-reviews" aria-label="Patient reviews">
       <div className="bmm-reviews-inner">
         <header className="bmm-reviews-header">
-          <h2 className="bmm-title">What Our Patients Have To Say</h2>
+          <h2 className="bmm-title">
+  What Our <span>Patients</span> Have To Say
+</h2>
+
           <p className="bmm-sub">Trusted by families — real feedback from our patients</p>
         </header>
 
