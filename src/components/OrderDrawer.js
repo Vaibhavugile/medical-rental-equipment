@@ -26,6 +26,13 @@ export default function OrderDrawer({
   detailedStatusColor,
   createReturnDelivery,
 
+  // 🔹 ADD THESE
+  assetCompanyFilter,
+  setAssetCompanyFilter,
+  assetCompanies,
+  groupedAssets,
+  setAssetPicker,
+
   // actions
   closeOrder,
   changeOrderStatus,
@@ -992,104 +999,173 @@ useEffect(() => {
         </div>
 
         {/* Asset picker modal */}
-        {assetPicker.open && assetPicker.itemIndex !== null && (
+       {assetPicker.open && assetPicker.itemIndex !== null && (
+  <div
+    className="cp-modal"
+    onClick={() =>
+      confirmAssignAssetsFromPicker("__CLOSE_ONLY__")
+    }
+  >
+    <div className="cp-modal-card" onClick={(e) => e.stopPropagation()}>
+      <h4>Select assets for item #{assetPicker.itemIndex + 1}</h4>
+
+      {assetPicker.loading && <div className="muted">Loading…</div>}
+
+      {!assetPicker.loading && (
+        <>
+          {/* Header info */}
           <div
-            className="cp-modal"
-            onClick={() =>
-              confirmAssignAssetsFromPicker("__CLOSE_ONLY__" /* sentinel */)
-            }
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginTop: 8,
+              gap: 8,
+            }}
           >
-            <div className="cp-modal-card" onClick={(e) => e.stopPropagation()}>
-              <h4>Select assets for item #{assetPicker.itemIndex + 1}</h4>
+            <div className="muted">
+              Assets: {assetPicker.assets.length}
+            </div>
+            <div className="muted">
+              Product:{" "}
+              {productsMap[
+                selectedOrder.items?.[assetPicker.itemIndex]?.productId
+              ]?.name ||
+                selectedOrder.items?.[assetPicker.itemIndex]?.productId ||
+                "—"}
+            </div>
+          </div>
 
-              {assetPicker.loading && <div className="muted">Loading…</div>}
-              {!assetPicker.loading && (
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginTop: 8,
-                  }}
-                >
-                  <div className="muted">
-                    In stock: {assetPicker.assets.length}
-                  </div>
-                  <div className="muted">
-                    Product:{" "}
-                    {productsMap[
-                      selectedOrder.items?.[assetPicker.itemIndex]?.productId
-                    ]?.name ||
-                      selectedOrder.items?.[assetPicker.itemIndex]?.productId ||
-                      "—"}
-                  </div>
-                </div>
-              )}
+          {/* 🔹 Company filter */}
+          <div style={{ marginTop: 8 }}>
+            <select
+              className="cp-input"
+              value={assetCompanyFilter}
+              onChange={(e) => setAssetCompanyFilter(e.target.value)}
+            >
+              <option value="">All companies</option>
+              {assetCompanies.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+        </>
+      )}
 
-              <div style={{ maxHeight: 340, overflowY: "auto", marginTop: 10 }}>
-                {assetPicker.assets.map((a) => (
-                  <div
-                    key={a.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: 8,
-                      borderBottom: "1px solid #eef2f7",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!!assetPicker.selected[a.id]}
-                      onChange={() => togglePickerSelect(a.id)}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700 }}>
-                        {a.assetId || a.id}
-                      </div>
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        {a.metadata?.model || a.productId} ·{" "}
-                        {(branches.find((b) => b.id === a.branchId) || {}).name ||
-                          a.branchId ||
-                          "—"}
-                      </div>
-                    </div>
-                    <div className="muted" style={{ fontSize: 12 }}>
-                      Status:{" "}
-                      <strong style={{ textTransform: "capitalize" }}>
-                        {a.status}
-                      </strong>
-                    </div>
-                  </div>
-                ))}
-              </div>
+      {/* 🔹 Asset list grouped by company */}
+      <div style={{ maxHeight: 340, overflowY: "auto", marginTop: 10 }}>
+        {Object.keys(groupedAssets).length === 0 && (
+          <div className="muted">No assets found.</div>
+        )}
 
+        {Object.entries(groupedAssets).map(([company, assets]) => {
+          const allSelected = assets.every(
+            (a) => assetPicker.selected[a.id]
+          );
+
+          return (
+            <div key={company} style={{ marginBottom: 12 }}>
+              {/* Company header */}
               <div
                 style={{
                   display: "flex",
-                  gap: 8,
-                  justifyContent: "flex-end",
-                  marginTop: 12,
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 6,
                 }}
               >
+                <strong>🏢 {company}</strong>
                 <button
-                  className="cp-btn ghost"
-                  onClick={() =>
-                    confirmAssignAssetsFromPicker("__CLOSE_ONLY__")
-                  }
+                  className="cp-link"
+                  onClick={() => {
+                    setAssetPicker((s) => {
+                      const sel = { ...(s.selected || {}) };
+                      assets.forEach((a) => {
+                        if (allSelected) delete sel[a.id];
+                        else sel[a.id] = true;
+                      });
+                      return { ...s, selected: sel };
+                    });
+                  }}
                 >
-                  Cancel
-                </button>
-                <button
-                  className="cp-btn"
-                  onClick={confirmAssignAndReserve}
-                >
-                  Assign & Reserve
+                  {allSelected ? "Unselect all" : "Select all"}
                 </button>
               </div>
+
+              {/* Assets */}
+              {assets.map((a) => (
+                <div
+                  key={a.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: 8,
+                    borderBottom: "1px solid #eef2f7",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={!!assetPicker.selected[a.id]}
+                    onChange={() => togglePickerSelect(a.id)}
+                  />
+
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700 }}>
+                      {a.assetId || a.id}
+                    </div>
+                    <div className="muted" style={{ fontSize: 12 }}>
+                      {a.metadata?.model || a.productId} ·{" "}
+                      {(branches.find((b) => b.id === a.branchId) || {})
+                        .name ||
+                        a.branchId ||
+                        "—"}
+                    </div>
+                  </div>
+
+                  <div className="muted" style={{ fontSize: 12 }}>
+                    Status:{" "}
+                    <strong style={{ textTransform: "capitalize" }}>
+                      {a.status}
+                    </strong>
+                  </div>
+                </div>
+              ))}
             </div>
-          </div>
-        )}
+          );
+        })}
+      </div>
+
+      {/* Actions */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          justifyContent: "flex-end",
+          marginTop: 12,
+        }}
+      >
+        <button
+          className="cp-btn ghost"
+          onClick={() =>
+            confirmAssignAssetsFromPicker("__CLOSE_ONLY__")
+          }
+        >
+          Cancel
+        </button>
+        <button
+          className="cp-btn"
+          onClick={confirmAssignAndReserve}
+        >
+          Assign & Reserve
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
 
         {/* Payment modal */}
         {paymentModal.open && paymentModal.form && (

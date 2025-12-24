@@ -1,0 +1,211 @@
+/* -------- PAGE -------- */
+
+.report-page {
+  padding: 28px;
+  background: #f8fafc;
+  min-height: 100vh;
+}
+
+.report-page h1 {
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+/* -------- ACTION BAR -------- */
+
+.rebuild-btn {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(99,102,241,.25);
+  margin-bottom: 18px;
+}
+
+.rebuild-btn:hover {
+  transform: translateY(-1px);
+}
+
+/* -------- KPI -------- */
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.kpi-card {
+  background: white;
+  padding: 18px;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.06);
+  transition: all .2s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 40px rgba(0,0,0,.08);
+}
+
+.kpi-label {
+  font-size: 13px;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.kpi-value {
+  font-size: 26px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+/* -------- FILTER BAR -------- */
+
+.report-filters {
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+  background: white;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.05);
+  margin-bottom: 24px;
+  position: sticky;
+  top: 12px;
+  z-index: 5;
+}
+
+.report-filters input,
+.report-filters select {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+.report-filters button {
+  margin-left: auto;
+  background: #0f172a;
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* -------- CHARTS -------- */
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 18px;
+  margin-bottom: 28px;
+}
+
+.chart-card {
+  background: white;
+  padding: 18px;
+  border-radius: 18px;
+  box-shadow: 0 12px 34px rgba(0,0,0,.06);
+}
+
+.chart-card h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 12px;
+  color: #334155;
+}
+
+/* -------- TABLE -------- */
+
+.report-table {
+  background: white;
+  border-radius: 18px;
+  box-shadow: 0 12px 34px rgba(0,0,0,.06);
+  overflow: hidden;
+}
+
+.report-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.report-table thead {
+  background: #f1f5f9;
+}
+
+.report-table th {
+  text-align: left;
+  padding: 14px;
+  font-size: 13px;
+  color: #475569;
+  font-weight: 700;
+}
+
+.report-table td {
+  padding: 14px;
+  font-size: 14px;
+  border-top: 1px solid #eef2f7;
+}
+
+.clickable-row {
+  cursor: pointer;
+  transition: background .15s ease;
+}
+
+.clickable-row:hover {
+  background: #f8fafc;
+}
+
+/* -------- MODAL -------- */
+
+.report-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.modal-card {
+  background: white;
+  border-radius: 20px;
+  padding: 22px;
+  width: 90%;
+  max-width: 900px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.25);
+}
+
+.modal-card h3 {
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 14px;
+}
+
+.modal-card table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.modal-card th,
+.modal-card td {
+  padding: 12px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.modal-card button {
+  margin-top: 14px;
+  background: #0f172a;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+}

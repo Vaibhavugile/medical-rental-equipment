@@ -325,6 +325,7 @@ export default function Orders() {
   const [assetsById, setAssetsById] = useState({});
   const [drivers, setDrivers] = useState([]);
   const [createOpen, setCreateOpen] = useState(false);
+const [assetCompanyFilter, setAssetCompanyFilter] = useState("");
 
 
   // Payments
@@ -581,30 +582,61 @@ export default function Orders() {
       setSaving(false);
     }
   };
+  const assetCompanies = useMemo(() => {
+  const set = new Set();
+  (assetPicker.assets || []).forEach((a) => {
+    if (a.company) set.add(a.company);
+  });
+  return Array.from(set).sort();
+}, [assetPicker.assets]);
+
+const visibleAssets = useMemo(() => {
+  if (!assetCompanyFilter) return assetPicker.assets || [];
+  return (assetPicker.assets || []).filter(
+    (a) => a.company === assetCompanyFilter
+  );
+}, [assetPicker.assets, assetCompanyFilter]);
 
   // Asset picker
-  const openAssetPickerForItem = async (itemIndex) => {
-    setAssetPicker((s) => ({ ...s, open: true, itemIndex, loading: true }));
-    try {
-      const it = selectedOrder?.items?.[itemIndex];
-      const productId = it?.productId || "";
-      const branchId = it?.branchId || "";
-      const assets = await listAssets({ productId, branchId });
-      const selected = {};
-      (it?.assignedAssets || []).forEach((aid) => (selected[aid] = true));
-      setAssetPicker({
-        open: true,
-        itemIndex,
-        assets: assets || [],
-        selected,
-        loading: false,
-      });
-    } catch (err) {
-      console.error("openAssetPickerForItem", err);
-      setAssetPicker((s) => ({ ...s, loading: false }));
-      setError(err.message || "Failed to load assets");
-    }
-  };
+const openAssetPickerForItem = async (itemIndex) => {
+  // 🔹 reset company filter every time picker opens
+  setAssetCompanyFilter("");
+
+  setAssetPicker((s) => ({
+    ...s,
+    open: true,
+    itemIndex,
+    loading: true,
+  }));
+
+  try {
+    const it = selectedOrder?.items?.[itemIndex];
+    const productId = it?.productId || "";
+    const branchId = it?.branchId || "";
+
+    // 🔹 fetch assets for product + branch
+    const assets = await listAssets({ productId, branchId });
+
+    // 🔹 preselect already assigned assets
+    const selected = {};
+    (it?.assignedAssets || []).forEach((aid) => {
+      selected[aid] = true;
+    });
+
+    setAssetPicker({
+      open: true,
+      itemIndex,
+      assets: assets || [],
+      selected,
+      loading: false,
+    });
+  } catch (err) {
+    console.error("openAssetPickerForItem", err);
+    setAssetPicker((s) => ({ ...s, loading: false }));
+    setError(err.message || "Failed to load assets");
+  }
+};
+
 
   const togglePickerSelect = (assetId) => {
     setAssetPicker((s) => {
@@ -614,6 +646,15 @@ export default function Orders() {
       return { ...s, selected: sel };
     });
   };
+const groupedAssets = useMemo(() => {
+  const g = {};
+  (visibleAssets || []).forEach((a) => {
+    const key = a.company || "Unknown company";
+    if (!g[key]) g[key] = [];
+    g[key].push(a);
+  });
+  return g;
+}, [visibleAssets]);
 
   const confirmAssignAssetsFromPicker = async (alsoCheckout = false) => {
     if (assetPicker.itemIndex == null) return;
@@ -1646,6 +1687,11 @@ const createReturnDelivery = async () => {
             updateOrderItem={updateOrderItem}
             openAssetPickerForItem={openAssetPickerForItem}
             togglePickerSelect={togglePickerSelect}
+              assetCompanyFilter={assetCompanyFilter}
+  setAssetCompanyFilter={setAssetCompanyFilter}
+  assetCompanies={assetCompanies}
+  groupedAssets={groupedAssets}
+  setAssetPicker={setAssetPicker}
             confirmAssignAssetsFromPicker={(arg) => {
               if (arg === "__CLOSE_ONLY__") {
                 setAssetPicker({

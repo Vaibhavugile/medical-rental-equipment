@@ -1,0 +1,88 @@
+.reports-home {
+  padding: 32px;
+  background: #f8fafc;
+  min-height: 100vh;
+}
+
+.reports-home h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 6px;
+}
+
+.reports-home .muted {
+  font-size: 14px;
+  color: #64748b;
+  margin-bottom: 28px;
+}
+
+/* ---------- Grid ---------- */
+
+.reports-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 22px;
+}
+
+/* ---------- Card ---------- */
+
+.report-card {
+  background: white;
+  border-radius: 20px;
+  padding: 22px;
+  cursor: pointer;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.06);
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.report-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.08);
+}
+
+/* subtle gradient glow */
+.report-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(99, 102, 241, 0.12),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.report-card:hover::after {
+  opacity: 1;
+}
+
+/* ---------- Content ---------- */
+
+.report-icon {
+  font-size: 36px;
+  margin-bottom: 14px;
+}
+
+.report-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #020617;
+  margin-bottom: 6px;
+}
+
+.report-desc {
+  font-size: 14px;
+  color: #475569;
+  margin-bottom: 16px;
+}
+
+.report-link {
+  font-size: 14px;
+  font-weight: 600;
+  color: #4f46e5;
+}

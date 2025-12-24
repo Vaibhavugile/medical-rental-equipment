@@ -33,7 +33,12 @@ import TeamPage from "./pages/TeamPage";
 import BlogList from "./pages/BlogList";
 import BlogDetail from "./pages/BlogDetail";
 import AddBlog from "./pages/AddBlog";
-
+import EquipmentList from "./pages/medical-equipment/EquipmentList";
+import EquipmentDetail from "./pages/medical-equipment/EquipmentDetail";
+import ProductReport from "./pages/reports/ProductReport";
+import FinancialReport from "./pages/reports/FinancialReport";
+import AssetsReport from "./pages/reports/AssetsReport";
+import ReportsHome from "./pages/reports/ReportsHome";
 const TrackingPage = lazy(() => import("./pages/TrackingPage"));
 
 /* ---------------- Header for CRM ---------------- */
@@ -239,6 +244,21 @@ function CRMApp() {
               >
                 Visits
               </NavLink>
+                <NavLink
+                to="/reports"
+                style={({ isActive }) => ({
+                  padding: "8px 10px",
+                  borderRadius: 8,
+                  textDecoration: "none",
+                  color: isActive ? "#fff" : "#0b5cff",
+                  background: isActive
+                    ? "linear-gradient(90deg,#0b69ff,#00b4d8)"
+                    : "transparent",
+                  fontWeight: 700,
+                })}
+              >
+                Reports
+              </NavLink>
 
               <NavLink
                 to="/branches"
@@ -309,6 +329,7 @@ function CRMApp() {
           <Route path="/branches" element={<Branches />} />
           <Route path="/products" element={<Products />} />
           <Route path="/marketing" element={<Marketing />} />
+          <Route path="/reports" element={<ReportsHome />} />
           {/* Driver/testing routes inside CRM */}
           <Route path="/driver-app" element={<DriverApp />} />
           <Route path="/attendance" element={<AttendanceAdmin />} />
@@ -437,8 +458,25 @@ export default function App() {
         <Route path="/pharmacy-delivery" element={<PharmacyPage/>} />
         <Route path="/nursing-care" element={<NursingPage/>} />
         <Route path="/physiotherapy" element={<PhysiotherapyPage/>} />
+<Route
+        path="/equipment"
+        element={<EquipmentList />}
+      />
+      <Route
+        path="/equipment/:slug"
+        element={<EquipmentDetail />}
+      />
 
         <Route path="/respiratory-care" element={<RespiratoryPage/>} />
+        <Route
+  path="/reports/products"
+  element={<ProductReport />}
+/>
+<Route path="/reports/financial" element={<FinancialReport />} />
+<Route path="/reports/assets" element={<AssetsReport />} />
+
+
+
         <Route path="/our-team" element={<TeamPage/>} />
         <Route path="/blogs" element={<BlogList />} />
         <Route path="/blogs/:slug" element={<BlogDetail />} />

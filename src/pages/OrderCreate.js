@@ -220,6 +220,8 @@ export default function OrderCreate({
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(false);
+  const [pickerCompanyFilter, setPickerCompanyFilter] = useState("");
+
 
   // fetch products & branches when open
   useEffect(() => {
@@ -462,6 +464,29 @@ export default function OrderCreate({
   const updateDraft = (patch) => {
     setDraft((d) => (d ? { ...d, ...(patch || {}) } : { ...(patch || {}) }));
   };
+const pickerCompanies = React.useMemo(() => {
+  const set = new Set();
+  (pickerAssets || []).forEach((a) => {
+    if (a.company) set.add(a.company);
+  });
+  return Array.from(set).sort();
+}, [pickerAssets]);
+const visiblePickerAssets = React.useMemo(() => {
+  if (!pickerCompanyFilter) return pickerAssets || [];
+  return (pickerAssets || []).filter(
+    (a) => a.company === pickerCompanyFilter
+  );
+}, [pickerAssets, pickerCompanyFilter]);
+const groupedPickerAssets = React.useMemo(() => {
+  const g = {};
+  visiblePickerAssets.forEach((a) => {
+    const key = a.company || "Unknown company";
+    if (!g[key]) g[key] = [];
+    g[key].push(a);
+  });
+  return g;
+}, [visiblePickerAssets]);
+
 
   // --- discount & taxes helpers ---
   const updateDiscount = (patch) => {
@@ -507,6 +532,7 @@ export default function OrderCreate({
   // open asset picker for an item
   const openAssetPicker = async (itemIndex) => {
     if (!draft) return;
+      setPickerCompanyFilter("");
     const it = draft.items[itemIndex];
     if (!it.productId) {
       setError(
@@ -1357,72 +1383,123 @@ export default function OrderCreate({
         )}
 
         {/* Asset picker modal */}
-        {pickerOpen && pickerFor !== null && (
+       {pickerOpen && pickerFor !== null && (
+  <div
+    className="cp-modal"
+    onClick={() => {
+      setPickerOpen(false);
+      setPickerFor(null);
+      setPickerAssets([]);
+      setPickerSelected({});
+      setPickerCompanyFilter("");
+    }}
+  >
+    <div
+      className="cp-modal-card"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h4>Select assets for item #{pickerFor.itemIndex + 1}</h4>
+
+      {pickerLoading && <div className="muted">Loading…</div>}
+
+      {!pickerLoading && (
+        <>
+          {/* Header info */}
           <div
-            className="cp-modal"
-            onClick={() => {
-              setPickerOpen(false);
-              setPickerFor(null);
-              setPickerAssets([]);
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginTop: 8,
             }}
           >
-            <div
-              className="cp-modal-card"
-              onClick={(e) => e.stopPropagation()}
+            <div className="muted">
+              In stock: {(pickerAssets || []).length}
+            </div>
+            <div style={{ fontSize: 13, color: "#6b7280" }}>
+              {(() => {
+                const it = draft?.items?.[pickerFor.itemIndex];
+                if (!it) return "";
+                const prod = products.find(
+                  (p) => p.id === it.productId
+                );
+                return prod ? `Product: ${prod.name}` : "Product: —";
+              })()}
+            </div>
+          </div>
+
+          {/* 🔹 Company filter */}
+          <div style={{ marginTop: 8 }}>
+            <select
+              className="cp-input"
+              value={pickerCompanyFilter}
+              onChange={(e) =>
+                setPickerCompanyFilter(e.target.value)
+              }
             >
-              <h4>Select assets for item #{pickerFor.itemIndex + 1}</h4>
+              <option value="">All companies</option>
+              {pickerCompanies.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </div>
+        </>
+      )}
 
-              {pickerLoading && (
-                <div className="muted">Loading…</div>
-              )}
+      {!pickerLoading &&
+        Object.keys(groupedPickerAssets).length === 0 && (
+          <div className="muted" style={{ marginTop: 8 }}>
+            No assets in stock for this product / branch.
+          </div>
+        )}
 
-              {!pickerLoading && (
+      {/* 🔹 Assets grouped by company */}
+      <div
+        style={{
+          maxHeight: 300,
+          overflowY: "auto",
+          marginTop: 10,
+        }}
+      >
+        {Object.entries(groupedPickerAssets).map(
+          ([company, assets]) => {
+            const allSelected = assets.every(
+              (a) => pickerSelected[a.id]
+            );
+
+            return (
+              <div key={company} style={{ marginBottom: 12 }}>
+                {/* Company header */}
                 <div
                   style={{
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "center",
-                    marginTop: 8,
+                    marginBottom: 6,
                   }}
                 >
-                  <div className="muted">
-                    In stock: {(pickerAssets || []).length}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: "#6b7280",
+                  <strong>🏢 {company}</strong>
+                  <button
+                    className="cp-link"
+                    onClick={() => {
+                      setPickerSelected((prev) => {
+                        const next = { ...(prev || {}) };
+                        assets.forEach((a) => {
+                          if (allSelected) delete next[a.id];
+                          else next[a.id] = true;
+                        });
+                        return next;
+                      });
                     }}
                   >
-                    {(() => {
-                      const it = draft?.items?.[pickerFor.itemIndex];
-                      if (!it) return "";
-                      const prod = products.find(
-                        (p) => p.id === it.productId
-                      );
-                      return prod ? `Product: ${prod.name}` : "Product: —";
-                    })()}
-                  </div>
+                    {allSelected ? "Unselect all" : "Select all"}
+                  </button>
                 </div>
-              )}
 
-              {!pickerLoading && pickerAssets.length === 0 && (
-                <div
-                  className="muted"
-                  style={{ marginTop: 8 }}
-                >
-                  No assets in stock for this product / branch.
-                </div>
-              )}
-
-              <div
-                style={{
-                  maxHeight: 300,
-                  overflowY: "auto",
-                  marginTop: 8,
-                }}
-              >
-                {pickerAssets.map((a) => (
+                {/* Assets */}
+                {assets.map((a) => (
                   <div
                     key={a.id}
                     style={{
@@ -1436,8 +1513,11 @@ export default function OrderCreate({
                     <input
                       type="checkbox"
                       checked={!!pickerSelected[a.id]}
-                      onChange={() => togglePickerSelect(a.id)}
+                      onChange={() =>
+                        togglePickerSelect(a.id)
+                      }
                     />
+
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 700 }}>
                         {a.assetId || a.id}
@@ -1447,22 +1527,23 @@ export default function OrderCreate({
                         style={{ fontSize: 12 }}
                       >
                         {a.metadata?.model || a.productId} ·{" "}
-                        {(
-                          branches.find(
-                            (b) => b.id === a.branchId
-                          ) || {}
-                        ).name ||
+                        {(branches.find(
+                          (b) => b.id === a.branchId
+                        ) || {}).name ||
                           a.branchId ||
                           "—"}
                       </div>
                     </div>
+
                     <div
                       className="muted"
                       style={{ fontSize: 12 }}
                     >
                       Status:{" "}
                       <strong
-                        style={{ textTransform: "capitalize" }}
+                        style={{
+                          textTransform: "capitalize",
+                        }}
                       >
                         {a.status}
                       </strong>
@@ -1470,36 +1551,43 @@ export default function OrderCreate({
                   </div>
                 ))}
               </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  justifyContent: "flex-end",
-                  marginTop: 12,
-                }}
-              >
-                <button
-                  className="cp-btn ghost"
-                  onClick={() => {
-                    setPickerOpen(false);
-                    setPickerFor(null);
-                    setPickerAssets([]);
-                    setPickerSelected({});
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="cp-btn"
-                  onClick={confirmPickerSelection}
-                >
-                  Assign selected
-                </button>
-              </div>
-            </div>
-          </div>
+            );
+          }
         )}
+      </div>
+
+      {/* Actions */}
+      <div
+        style={{
+          display: "flex",
+          gap: 8,
+          justifyContent: "flex-end",
+          marginTop: 12,
+        }}
+      >
+        <button
+          className="cp-btn ghost"
+          onClick={() => {
+            setPickerOpen(false);
+            setPickerFor(null);
+            setPickerAssets([]);
+            setPickerSelected({});
+            setPickerCompanyFilter("");
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          className="cp-btn"
+          onClick={confirmPickerSelection}
+        >
+          Assign selected
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
       </div>
     </div>
   );
