@@ -25,6 +25,8 @@
   --bmm2-ease: cubic-bezier(.16,.84,.24,1);
   --bmm-shadow-1: rgba(6,30,60,0.06);
   --bmm-shadow-2: rgba(6,30,60,0.12);
+  --topbar-height: 40px;
+  --header-height: 72px;
 }
 
 /* =========================

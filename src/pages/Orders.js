@@ -130,12 +130,28 @@ function getEndDate(order) {
   return dates[dates.length - 1] || null;
 }
 
+
 function todayYMD() {
   const now = new Date();
   const y = now.getFullYear();
   const m = String(now.getMonth() + 1).padStart(2, "0");
   const d = String(now.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+function isReturnOverdue(order) {
+  const base = (order?.status || "").toLowerCase();
+  if (base === "completed" || base === "cancelled") return false;
+
+  const end = getEndDate(order);
+  if (!end) return false;
+
+  const today = todayYMD();
+  if (end >= today) return false;
+
+  const dstat = (order?.deliveryStatus || "").toLowerCase();
+  if (dstat === "completed" || dstat === "delivered") return false;
+
+  return true;
 }
 
 function assetsAssignmentState(order) {
@@ -182,123 +198,112 @@ export function deriveDetailedStatus(order) {
   const end = getEndDate(order);
   const today = todayYMD();
 
-  if (start && start === today) return "starts_today";
   if (end && end === today) return "ending_today";
+  if (start && start === today) return "starts_today";
 
-  const dstat = (order?.deliveryStatus || order?.delivery?.status || "")
-    .toLowerCase();
-  if (dstat === "in_transit") return "in_transit";
+  const dstat = (order?.deliveryStatus || "").toLowerCase();
+  if (["picked_up", "in_transit"].includes(dstat)) return "in_transit";
   if (dstat === "delivered") return "delivered";
-  if (dstat === "picked_up") return "picked_up";
-  if (dstat === "accepted") return "driver_accepted";
 
   const astate = assetsAssignmentState(order);
   const driver = isDriverAssigned(order);
 
   if (astate === "full" && driver) return "ready_to_dispatch";
-  if (driver && astate !== "full") return "driver_assigned";
-  if (astate === "partial") return "assets_partial";
-  if (astate === "full") return "assets_assigned";
 
   if (base === "active") return "active";
   if (base === "created") return "created";
-  return base || "created";
+
+  return "created";
 }
 
 export const detailedStatusColor = (s) => {
-  switch ((s || "").toLowerCase()) {
-    case "created":
-      return "#6b7280";
-    case "assets_partial":
-      return "#2563eb";
-    case "assets_assigned":
-      return "#1d4ed8";
-    case "driver_assigned":
-      return "#7c3aed";
-    case "ready_to_dispatch":
-      return "#4f46e5";
-    case "starts_today":
-      return "#0ea5e9";
-    case "in_transit":
-      return "#f59e0b";
-    case "picked_up":
-      return "#fb923c";
-    case "delivered":
-      return "#10b981";
-    case "active":
-      return "#14b8a6";
+  switch (s) {
     case "ending_today":
-      return "#065f46";
+      return "#dc2626"; // red
+    case "starts_today":
+      return "#2563eb"; // blue
+    case "ready_to_dispatch":
+      return "#7c3aed"; // purple
+    case "in_transit":
+      return "#f59e0b"; // amber
+    case "delivered":
+      return "#10b981"; // green
     case "completed":
-      return "#047857";
+      return "#6b7280"; // gray
     case "cancelled":
-      return "#b91c1c";
+      return "#991b1b"; // dark red
     default:
-      return "#6b7280";
+      return "#64748b";
   }
 };
+
 
 // ---------- secondary resource badges under main badge ----------
-const getResourceBadges = (order) => {
-  const hints = [];
 
-  // assets
-  const items = order?.items || [];
-  let any = false;
-  let all = true;
-  for (const it of items) {
-    const qty = Number(it?.qty || 0);
-    const assigned = Array.isArray(it?.assignedAssets)
-      ? it.assignedAssets.length
-      : 0;
-    if (assigned > 0) any = true;
-    if (qty > 0 && assigned < qty) all = false;
-  }
-  if (all && any) hints.push({ key: "assets_assigned", label: "assets assigned" });
-  else if (any) hints.push({ key: "assets_partial", label: "assets partial" });
+export const getResourceBadges = (order) => {
+  const badges = [];
 
-  // driver
- const driverAssigned =
-  (order?.delivery?.assignedDrivers?.length ?? 0) > 0 ||
-  !!order?.delivery?.deliveryId ||
-  (order?.deliveryStatus || "").toLowerCase() === "assigned";
-
-  if (driverAssigned) hints.push({ key: "driver_assigned", label: "driver assigned" });
-
-  // delivery stages — include assigned too (you asked for this)
-  const d = (order?.deliveryStatus || order?.delivery?.status || "").toLowerCase();
-  if (d === "assigned") hints.push({ key: "delivery_assigned", label: "delivery assigned" });
-  if (["accepted", "picked_up", "in_transit", "delivered", "completed"].includes(d)) {
-    hints.push({ key: `delivery_${d}`, label: d.replaceAll("_", " ") });
+  /* 🔴 OVERDUE RETURN (highest priority secondary) */
+  if (isReturnOverdue(order)) {
+    badges.push({ key: "return_overdue", label: "Return Overdue" });
+    return badges; // ⛔ stop further badges — urgency wins
   }
 
-  return hints;
+  /* 💰 PAYMENT */
+  const total = Number(order?.totals?.total || 0);
+  const paid = (order?.payments || []).reduce(
+    (s, p) => s + Number(p.amount || 0),
+    0
+  );
+  if (total - paid > 0) {
+    badges.push({ key: "payment_due", label: "Payment Due" });
+  }
+
+  /* 📦 ASSETS */
+  const astate = assetsAssignmentState(order);
+  if (astate === "partial") {
+    badges.push({ key: "assets_pending", label: "Assets Pending" });
+  }
+
+  /* 🚚 PICKUP */
+  const dstat = (order?.deliveryStatus || "").toLowerCase();
+  if (dstat === "picked_up" || dstat === "in_transit") {
+    badges.push({ key: "pickup_done", label: "Pickup Done" });
+  }
+
+  /* ↩ RETURN PENDING */
+  if (order?.returnDeliveryId && dstat !== "completed") {
+    badges.push({ key: "return_pending", label: "Return Pending" });
+  }
+
+  return badges;
 };
-
-const hintColor = (key) => {
+export const hintColor = (key) => {
   switch (key) {
-    case "assets_assigned":
-      return { bg: "rgba(29,78,216,.10)", border: "#1d4ed8", text: "#1d4ed8" };
-    case "assets_partial":
-      return { bg: "rgba(37,99,235,.08)", border: "#2563eb", text: "#2563eb" };
-    case "driver_assigned":
-      return { bg: "rgba(124,58,237,.10)", border: "#7c3aed", text: "#7c3aed" };
-    case "delivery_assigned":
-      return { bg: "rgba(2,132,199,.10)", border: "#0284c7", text: "#0284c7" };
-    case "delivery_accepted":
-      return { bg: "rgba(2,132,199,.10)", border: "#0284c7", text: "#0284c7" };
-    case "delivery_picked_up":
-      return { bg: "rgba(245,158,11,.10)", border: "#f59e0b", text: "#b45309" };
-    case "delivery_in_transit":
-      return { bg: "rgba(250,204,21,.12)", border: "#ca8a04", text: "#a16207" };
-    case "delivery_delivered":
-      return { bg: "rgba(16,185,129,.12)", border: "#10b981", text: "#047857" };
-    case "delivery_completed":
-      return { bg: "rgba(34,197,94,.12)", border: "#22c55e", text: "#15803d" };
+    case "return_overdue":
+      return {
+        bg: "#fee2e2",
+        text: "#991b1b",
+      };
+
+    case "payment_due":
+      return { bg: "#fee2e2", text: "#b91c1c" };
+
+    case "assets_pending":
+      return { bg: "#e0e7ff", text: "#3730a3" };
+
+    case "pickup_done":
+      return { bg: "#ecfeff", text: "#155e75" };
+
+    case "return_pending":
+      return { bg: "#fff7ed", text: "#9a3412" };
+
     default:
-      return { bg: "rgba(107,114,128,.10)", border: "#6b7280", text: "#374151" };
+      return { bg: "#f1f5f9", text: "#334155" };
   }
 };
+
+
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);

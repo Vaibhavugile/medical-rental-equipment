@@ -39,6 +39,7 @@ import ProductReport from "./pages/reports/ProductReport";
 import FinancialReport from "./pages/reports/FinancialReport";
 import AssetsReport from "./pages/reports/AssetsReport";
 import ReportsHome from "./pages/reports/ReportsHome";
+import OutstandingOrdersReport from "./pages/reports/OutstandingOrdersReport";
 const TrackingPage = lazy(() => import("./pages/TrackingPage"));
 
 /* ---------------- Header for CRM ---------------- */
@@ -473,6 +474,11 @@ export default function App() {
   element={<ProductReport />}
 />
 <Route path="/reports/financial" element={<FinancialReport />} />
+<Route
+  path="/reports/financial/outstanding"
+  element={<OutstandingOrdersReport />}
+/>
+
 <Route path="/reports/assets" element={<AssetsReport />} />
 
 
