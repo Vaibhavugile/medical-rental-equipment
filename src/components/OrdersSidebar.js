@@ -19,18 +19,14 @@ export default function OrdersSidebar({
     ["all", "All Orders", derivedCounts.all],
     ["starts_today", "Starts Today", derivedCounts.starts_today],
     ["ending_today", "Ending Today", derivedCounts.ending_today],
-    ["ending_soon", "Ending Soon (5 days)", derivedCounts.ending_soon], // ✅ NEW
+    ["ending_soon", "Ending Soon (5 days)", derivedCounts.ending_soon],
     ["ready_to_dispatch", "Ready to Dispatch", derivedCounts.ready_to_dispatch],
     ["in_transit", "In Transit", derivedCounts.in_transit],
+    ["on_rent", "On Rent", derivedCounts.on_rent],
   ];
 
   /* ---------------- ADVANCED (LESS USED) ---------------- */
   const advancedDerived = [
-    ["created", "Created", derivedCounts.created],
-    ["assets_partial", "Assets Partial", derivedCounts.assets_partial],
-    ["assets_assigned", "Assets Assigned", derivedCounts.assets_assigned],
-    ["driver_assigned", "Driver Assigned", derivedCounts.driver_assigned],
-    ["active", "Active", derivedCounts.active],
     ["completed", "Completed", derivedCounts.completed],
     ["cancelled", "Cancelled", derivedCounts.cancelled],
   ];
@@ -38,7 +34,8 @@ export default function OrdersSidebar({
   const deliveryOptions = [
     ["assigned", "Assigned", deliveryCounts.assigned],
     ["accepted", "Accepted", deliveryCounts.accepted],
-    ["picked_up", "Picked up", deliveryCounts.picked_up],
+    ["picked_up", "Picked Up", deliveryCounts.picked_up],
+    ["in_transit", "In Transit", deliveryCounts.in_transit],
     ["delivered", "Delivered", deliveryCounts.delivered],
     ["completed", "Completed", deliveryCounts.completed],
   ];

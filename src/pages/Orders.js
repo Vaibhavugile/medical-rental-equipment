@@ -194,26 +194,48 @@ export function deriveDetailedStatus(order) {
   if (base === "cancelled") return "cancelled";
   if (base === "completed") return "completed";
 
+  const today = todayYMD();
   const start = getStartDate(order);
   const end = getEndDate(order);
-  const today = todayYMD();
 
+  // 1️⃣ Time-based urgency
   if (end && end === today) return "ending_today";
   if (start && start === today) return "starts_today";
 
+  // Ending soon = next 5 days (excluding today)
+  if (end) {
+    const endDate = new Date(end);
+    const todayDate = new Date(today);
+    const diffDays = Math.ceil(
+      (endDate - todayDate) / (1000 * 60 * 60 * 24)
+    );
+    if (diffDays > 0 && diffDays <= 5) {
+      return "ending_soon";
+    }
+  }
+
   const dstat = (order?.deliveryStatus || "").toLowerCase();
-  if (["picked_up", "in_transit"].includes(dstat)) return "in_transit";
-  if (dstat === "delivered") return "delivered";
 
+  // 2️⃣ Movement (pickup OR return)
+  if (dstat === "picked_up" || dstat === "in_transit") {
+    return "in_transit";
+  }
+
+  // 3️⃣ Ready to dispatch (pickup OR return)
   const astate = assetsAssignmentState(order);
-  const driver = isDriverAssigned(order);
+  if (
+    (dstat === "assigned" || dstat === "accepted") &&
+    astate === "full"
+  ) {
+    return "ready_to_dispatch";
+  }
 
-  if (astate === "full" && driver) return "ready_to_dispatch";
+  // 4️⃣ On rent (pickup delivered, return not started)
+  if (dstat === "delivered" && order.deliveryType !== "return") {
+    return "on_rent";
+  }
 
-  if (base === "active") return "active";
-  if (base === "created") return "created";
-
-  return "created";
+  return "all";
 }
 
 export const detailedStatusColor = (s) => {
@@ -222,12 +244,14 @@ export const detailedStatusColor = (s) => {
       return "#dc2626"; // red
     case "starts_today":
       return "#2563eb"; // blue
+    case "ending_soon":
+      return "#f97316"; // orange
     case "ready_to_dispatch":
       return "#7c3aed"; // purple
     case "in_transit":
       return "#f59e0b"; // amber
-    case "delivered":
-      return "#10b981"; // green
+    case "on_rent":
+      return "#0ea5e9"; // sky blue
     case "completed":
       return "#6b7280"; // gray
     case "cancelled":
@@ -236,20 +260,16 @@ export const detailedStatusColor = (s) => {
       return "#64748b";
   }
 };
-
-
-// ---------- secondary resource badges under main badge ----------
-
 export const getResourceBadges = (order) => {
   const badges = [];
 
-  /* 🔴 OVERDUE RETURN (highest priority secondary) */
+  /* 🔴 OVERDUE RETURN (highest priority) */
   if (isReturnOverdue(order)) {
-    badges.push({ key: "return_overdue", label: "Return Overdue" });
-    return badges; // ⛔ stop further badges — urgency wins
+    badges.push({ key: "return_overdue", label: "Overdue Return" });
+    return badges; // ⛔ urgency wins
   }
 
-  /* 💰 PAYMENT */
+  /* 💰 PAYMENT DUE */
   const total = Number(order?.totals?.total || 0);
   const paid = (order?.payments || []).reduce(
     (s, p) => s + Number(p.amount || 0),
@@ -265,10 +285,15 @@ export const getResourceBadges = (order) => {
     badges.push({ key: "assets_pending", label: "Assets Pending" });
   }
 
-  /* 🚚 PICKUP */
+  /* 🚚 IN TRANSIT (pickup OR return) */
   const dstat = (order?.deliveryStatus || "").toLowerCase();
   if (dstat === "picked_up" || dstat === "in_transit") {
-    badges.push({ key: "pickup_done", label: "Pickup Done" });
+    badges.push({ key: "in_transit", label: "In Transit" });
+  }
+
+  /* 🟦 ON RENT (pickup delivered, return not started) */
+  if (dstat === "delivered" && order.deliveryType !== "return") {
+    badges.push({ key: "on_rent", label: "On Rent" });
   }
 
   /* ↩ RETURN PENDING */
@@ -283,26 +308,46 @@ export const hintColor = (key) => {
     case "return_overdue":
       return {
         bg: "#fee2e2",
-        text: "#991b1b",
+        text: "#7f1d1d",
       };
 
     case "payment_due":
-      return { bg: "#fee2e2", text: "#b91c1c" };
+      return {
+        bg: "#fee2e2",
+        text: "#b91c1c",
+      };
 
     case "assets_pending":
-      return { bg: "#e0e7ff", text: "#3730a3" };
+      return {
+        bg: "#e0e7ff",
+        text: "#3730a3",
+      };
 
-    case "pickup_done":
-      return { bg: "#ecfeff", text: "#155e75" };
+    case "in_transit":
+      return {
+        bg: "#fff7ed",
+        text: "#9a3412",
+      };
+
+    case "on_rent":
+      return {
+        bg: "#e0f2fe",
+        text: "#075985",
+      };
 
     case "return_pending":
-      return { bg: "#fff7ed", text: "#9a3412" };
+      return {
+        bg: "#fef3c7",
+        text: "#92400e",
+      };
 
     default:
-      return { bg: "#f1f5f9", text: "#334155" };
+      return {
+        bg: "#f1f5f9",
+        text: "#334155",
+      };
   }
 };
-
 
 
 export default function Orders() {
@@ -311,6 +356,10 @@ export default function Orders() {
 
   // sidebar filters
   const [filterDerived, setFilterDerived] = useState("all");
+  useEffect(() => {
+  setFilterDerived("starts_today");
+}, []);
+
   const [filterDelivery, setFilterDelivery] = useState("all");
   const [search, setSearch] = useState("");
 
@@ -376,27 +425,28 @@ const [assetCompanyFilter, setAssetCompanyFilter] = useState("");
   }, []);
 
   const derivedCounts = useMemo(() => {
-    const m = {
-      all: orders.length,
-      created: 0,
-      assets_partial: 0,
-      assets_assigned: 0,
-      driver_assigned: 0,
-      ready_to_dispatch: 0,
-      starts_today: 0,
-      ending_today: 0,
-      in_transit: 0,
-      delivered: 0,
-      active: 0,
-      completed: 0,
-      cancelled: 0,
-    };
-    for (const o of orders) {
-      const k = deriveDetailedStatus(o) || "created";
-      if (m[k] != null) m[k] += 1;
-    }
-    return m;
-  }, [orders]);
+  const m = {
+    all: orders.length,
+    created: 0,
+    assets_partial: 0,
+    assets_assigned: 0,
+    driver_assigned: 0,
+    ready_to_dispatch: 0,
+    starts_today: 0,
+    ending_today: 0,
+    in_transit: 0,
+    delivered: 0,
+    active: 0,
+    completed: 0,
+    cancelled: 0,
+  };
+  for (const o of orders) {
+    const k = deriveDetailedStatus(o) || "created";
+    if (m[k] != null) m[k] += 1;
+  }
+  return m;
+}, [orders]);
+
 
   const deliveryCounts = useMemo(() => {
     const m = {
@@ -619,8 +669,13 @@ const openAssetPickerForItem = async (itemIndex) => {
     const productId = it?.productId || "";
     const branchId = it?.branchId || "";
 
-    // 🔹 fetch assets for product + branch
-    const assets = await listAssets({ productId, branchId });
+    // ✅ DATE-AWARE asset fetch
+    const assets = await listAssets({
+      productId,
+      branchId,
+      from: it?.expectedStartDate || null,
+      to: it?.expectedEndDate || null,
+    });
 
     // 🔹 preselect already assigned assets
     const selected = {};
@@ -641,6 +696,7 @@ const openAssetPickerForItem = async (itemIndex) => {
     setError(err.message || "Failed to load assets");
   }
 };
+
 
 
   const togglePickerSelect = (assetId) => {
@@ -1712,45 +1768,59 @@ const createReturnDelivery = async () => {
             }}
             checkoutAssignedAssetsForItem={checkoutAssignedAssetsForItem}
             autoAssignAssets={async (idx, qty, checkoutNow) =>
-              await (async () => {
-                setSaving(true);
-                setError("");
-                try {
-                  const it = selectedOrder.items?.[idx];
-                  const productId = it?.productId || "";
-                  const branchId = it?.branchId || "";
-                  const assets = await listAssets({ productId, branchId });
+  await (async () => {
+    setSaving(true);
+    setError("");
 
-                  const available = (assets || []).filter(
-                    (a) => (a.status || "").toLowerCase() === "available"
-                  );
-                  const pick = available
-                    .slice(0, Number(qty || 1))
-                    .map((a) => a.id);
-                  const clone = JSON.parse(JSON.stringify(selectedOrder));
-                  clone.items[idx] = {
-                    ...(clone.items[idx] || {}),
-                    assignedAssets: pick,
-                  };
+    try {
+      const it = selectedOrder.items?.[idx];
+      if (!it) return;
 
-                  await updateDoc(doc(db, "orders", selectedOrder.id), {
-                    items: clone.items,
-                    updatedAt: serverTimestamp(),
-                  });
+      const productId = it?.productId || "";
+      const branchId = it?.branchId || "";
 
-                  setSelectedOrder(clone);
+      // ✅ DATE-AWARE asset fetch
+      const assets = await listAssets({
+        productId,
+        branchId,
+        from: it?.expectedStartDate || null,
+        to: it?.expectedEndDate || null,
+      });
 
-                  if (checkoutNow && pick.length) {
-                    await checkoutAssignedAssetsForItem(idx);
-                  }
-                } catch (err) {
-                  console.error("autoAssignAssets", err);
-                  setError(err.message || "Failed to auto-assign");
-                } finally {
-                  setSaving(false);
-                }
-              })()
-            }
+      if (!assets?.length) {
+        setError("No assets available for selected dates");
+        return;
+      }
+
+      const pick = assets
+        .slice(0, Number(qty || 1))
+        .map((a) => a.id);
+
+      const clone = JSON.parse(JSON.stringify(selectedOrder));
+      clone.items[idx] = {
+        ...(clone.items[idx] || {}),
+        assignedAssets: pick,
+      };
+
+      await updateDoc(doc(db, "orders", selectedOrder.id), {
+        items: clone.items,
+        updatedAt: serverTimestamp(),
+      });
+
+      setSelectedOrder(clone);
+
+      if (checkoutNow && pick.length) {
+        await checkoutAssignedAssetsForItem(idx);
+      }
+    } catch (err) {
+      console.error("autoAssignAssets", err);
+      setError(err.message || "Failed to auto-assign");
+    } finally {
+      setSaving(false);
+    }
+  })()
+}
+
             unassignAsset={unassignAsset}
             checkinAssignedAsset={checkinAssignedAsset}
             assignDriverToOrder={(driverId) => assignDriversToOrder([driverId])}

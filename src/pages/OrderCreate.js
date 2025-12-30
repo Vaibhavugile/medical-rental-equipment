@@ -486,6 +486,18 @@ const groupedPickerAssets = React.useMemo(() => {
   });
   return g;
 }, [visiblePickerAssets]);
+const fmtDate = (d) => {
+  if (!d) return "";
+  try {
+    return new Date(d).toLocaleDateString(undefined, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return d;
+  }
+};
 
 
   // --- discount & taxes helpers ---
@@ -547,11 +559,13 @@ const groupedPickerAssets = React.useMemo(() => {
     setPickerLoading(true);
     setError("");
     try {
-      const assets = await listAssets({
-        productId: it.productId || null,
-        branchId: it.branchId || null,
-        status: "in_stock",
-      });
+     const assets = await listAssets({
+  productId: it.productId || null,
+  branchId: it.branchId || null,
+  from: it.expectedStartDate || null,
+  to: it.expectedEndDate || null,
+});
+
       setPickerAssets(assets || []);
 
       // local map so we can show assetId + model on chips
@@ -637,11 +651,13 @@ const groupedPickerAssets = React.useMemo(() => {
         return;
       }
 
-      const assets = await listAssets({
-        productId: it.productId || null,
-        branchId: it.branchId || null,
-        status: "in_stock",
-      });
+    const assets = await listAssets({
+  productId: it.productId || null,
+  branchId: it.branchId || null,
+  from: it.expectedStartDate || null,
+  to: it.expectedEndDate || null,
+});
+
 
       const available = (assets || []).filter(
         (a) => !existing.includes(a.id)
@@ -760,115 +776,161 @@ const groupedPickerAssets = React.useMemo(() => {
     );
   };
 
-  const createOrder = async () => {
-    setError("");
-    if (!draft) return;
-    setCreating(true);
-    try {
-      const user = auth.currentUser || {};
-      const totals = calcTotals(draft.items, draft.discount, draft.taxes);
+const createOrder = async () => {
+  setError("");
+  if (!draft) return;
 
-      const itemsPayload = draft.items.map((it) => ({
-        name: it.name,
-        qty: Number(it.qty || 0),
-        rate: Number(it.rate || 0),
-        amount: Number(it.amount || 0),
-        notes: it.notes || "",
-        days: it.days || 0,
-        expectedStartDate: it.expectedStartDate || "",
-        expectedEndDate: it.expectedEndDate || "",
-        productId: it.productId || "",
-        assignedAssets: it.assignedAssets || [],
-        branchId: it.branchId || "",
-      }));
+  // 🔒 VALIDATION: assets must be assigned before creating order
+  const missingAssets = draft.items
+    .map((it, idx) => ({
+      idx,
+      name: it.name || `Item ${idx + 1}`,
+      qty: Number(it.qty || 0),
+      assigned: Array.isArray(it.assignedAssets)
+        ? it.assignedAssets.length
+        : 0,
+      productId: it.productId,
+    }))
+    .filter(
+      (it) =>
+        it.productId &&
+        it.qty > 0 &&
+        it.assigned < it.qty
+    );
 
-      const orderPayload = {
-        quotationId: draft.quotationId,
-        requirementId: draft.requirementId || "",
-        orderNo: draft.orderNo,
-        customerName: draft.customerName || "",
-        customerPhone: draft.deliveryContact?.phone || "",
-        customerEmail: draft.deliveryContact?.email || "",
-        deliveryAddress: draft.deliveryAddress || "",
-        deliveryContact: draft.deliveryContact || null,
-        leadId: draft.leadId || null,
-        items: itemsPayload,
-        discount: draft.discount || { type: "percent", value: 0 },
-        taxes: draft.taxes || [],
-        totals,
-        status: "created",
-        createdAt: serverTimestamp(),
-        createdBy: user.uid || "",
-        createdByName: user.displayName || user.email || "",
-      };
+  if (missingAssets.length > 0) {
+    const msg = missingAssets
+      .map(
+        (it) =>
+          `• ${it.name}: ${it.assigned}/${it.qty} assets assigned`
+      )
+      .join("\n");
 
-      const ref = await addDoc(collection(db, "orders"), orderPayload);
+    setError(
+      `Please assign assets for all items before creating the order:\n${msg}`
+    );
+    return;
+  }
 
-      // reserve assigned assets
-      for (const it of itemsPayload) {
-        if (Array.isArray(it.assignedAssets) && it.assignedAssets.length) {
-          for (const assetDocId of it.assignedAssets) {
-            try {
-              await reserveAsset(assetDocId, {
-                reservationId: ref.id,
-                orderId: ref.id,
-                customer: orderPayload.customerName || "",
-                until: it.expectedEndDate || null,
-                note: `Reserved for order ${orderPayload.orderNo}`,
-              });
-            } catch (err) {
-              console.warn("reserveAsset failed", assetDocId, err);
-            }
-          }
+  setCreating(true);
+
+  try {
+    const user = auth.currentUser || {};
+    const totals = calcTotals(draft.items, draft.discount, draft.taxes);
+
+    const itemsPayload = draft.items.map((it) => ({
+      name: it.name,
+      qty: Number(it.qty || 0),
+      rate: Number(it.rate || 0),
+      amount: Number(it.amount || 0),
+      notes: it.notes || "",
+      days: it.days || 0,
+      expectedStartDate: it.expectedStartDate || "",
+      expectedEndDate: it.expectedEndDate || "",
+      productId: it.productId || "",
+      assignedAssets: it.assignedAssets || [],
+      branchId: it.branchId || "",
+    }));
+
+    const orderPayload = {
+      quotationId: draft.quotationId,
+      requirementId: draft.requirementId || "",
+      orderNo: draft.orderNo,
+      customerName: draft.customerName || "",
+      customerPhone: draft.deliveryContact?.phone || "",
+      customerEmail: draft.deliveryContact?.email || "",
+      deliveryAddress: draft.deliveryAddress || "",
+      deliveryContact: draft.deliveryContact || null,
+      leadId: draft.leadId || null,
+      items: itemsPayload,
+      discount: draft.discount || { type: "percent", value: 0 },
+      taxes: draft.taxes || [],
+      totals,
+      status: "created",
+      createdAt: serverTimestamp(),
+      createdBy: user.uid || "",
+      createdByName: user.displayName || user.email || "",
+    };
+
+    // 1️⃣ Create order
+    const ref = await addDoc(collection(db, "orders"), orderPayload);
+    const orderId = ref.id;
+
+    // 2️⃣ Reserve assigned assets WITH DATE RANGE
+    for (const it of itemsPayload) {
+      if (!Array.isArray(it.assignedAssets) || !it.assignedAssets.length) {
+        continue;
+      }
+
+      for (const assetDocId of it.assignedAssets) {
+        try {
+          await reserveAsset(assetDocId, {
+            reservationId: orderId,
+            orderId: orderId,
+            customer: draft.customerName || "",
+            from: it.expectedStartDate || null,
+            to: it.expectedEndDate || null,
+            note: `Reserved for order ${draft.orderNo}`,
+          });
+        } catch (err) {
+          console.warn("reserveAsset failed", assetDocId, err);
         }
       }
-
-      if (draft.quotationId) {
-        await updateDoc(doc(db, "quotations", draft.quotationId), {
-          orderId: ref.id,
-          status: "order_created",
-          updatedAt: serverTimestamp(),
-          updatedBy: user.uid || "",
-          updatedByName: user.displayName || user.email || "",
-        });
-      }
-
-      if (draft.requirementId) {
-        const entry = makeHistoryEntry(user, {
-          type: "order",
-          field: "status",
-          oldValue: "",
-          newValue: "order_created",
-          note: `Order ${orderPayload.orderNo} created from quotation ${
-            draft.quotationId || draft.quotationNo
-          }`,
-        });
-        await updateDoc(doc(db, "requirements", draft.requirementId), {
-          status: "order_created",
-          updatedAt: serverTimestamp(),
-          updatedBy: user.uid || "",
-          updatedByName: user.displayName || user.email || "",
-          history: arrayUnion(entry),
-        });
-        propagateToLead(
-          draft.requirementId,
-          "order",
-          "",
-          "order_created",
-          entry.note
-        );
-      }
-
-      if (onCreated) onCreated(ref.id);
-      if (onClose) onClose();
-      navigate("/orders");
-    } catch (err) {
-      console.error("createOrder error", err);
-      setError(err.message || "Failed to create order");
-    } finally {
-      setCreating(false);
     }
-  };
+
+    // 3️⃣ Update quotation
+    if (draft.quotationId) {
+      await updateDoc(doc(db, "quotations", draft.quotationId), {
+        orderId: orderId,
+        status: "order_created",
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid || "",
+        updatedByName: user.displayName || user.email || "",
+      });
+    }
+
+    // 4️⃣ Update requirement + propagate
+    if (draft.requirementId) {
+      const entry = makeHistoryEntry(user, {
+        type: "order",
+        field: "status",
+        oldValue: "",
+        newValue: "order_created",
+        note: `Order ${orderPayload.orderNo} created from quotation ${
+          draft.quotationId || draft.quotationNo
+        }`,
+      });
+
+      await updateDoc(doc(db, "requirements", draft.requirementId), {
+        status: "order_created",
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid || "",
+        updatedByName: user.displayName || user.email || "",
+        history: arrayUnion(entry),
+      });
+
+      propagateToLead(
+        draft.requirementId,
+        "order",
+        "",
+        "order_created",
+        entry.note
+      );
+    }
+
+    if (onCreated) onCreated(orderId);
+    if (onClose) onClose();
+    navigate("/orders");
+
+  } catch (err) {
+    console.error("createOrder error", err);
+    setError(err.message || "Failed to create order");
+  } finally {
+    setCreating(false);
+  }
+};
+
+
 
   if (!open) return null;
 
@@ -1499,57 +1561,64 @@ const groupedPickerAssets = React.useMemo(() => {
                 </div>
 
                 {/* Assets */}
-                {assets.map((a) => (
-                  <div
-                    key={a.id}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: 8,
-                      borderBottom: "1px solid #eef2f7",
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={!!pickerSelected[a.id]}
-                      onChange={() =>
-                        togglePickerSelect(a.id)
-                      }
-                    />
+               {assets.map((a) => (
+  <div
+    key={a.id}
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: 8,
+      borderBottom: "1px solid #eef2f7",
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={!!pickerSelected[a.id]}
+      onChange={() => togglePickerSelect(a.id)}
+    />
 
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 700 }}>
-                        {a.assetId || a.id}
-                      </div>
-                      <div
-                        className="muted"
-                        style={{ fontSize: 12 }}
-                      >
-                        {a.metadata?.model || a.productId} ·{" "}
-                        {(branches.find(
-                          (b) => b.id === a.branchId
-                        ) || {}).name ||
-                          a.branchId ||
-                          "—"}
-                      </div>
-                    </div>
+    <div style={{ flex: 1 }}>
+      <div style={{ fontWeight: 700 }}>
+        {a.assetId || a.id}
+      </div>
 
-                    <div
-                      className="muted"
-                      style={{ fontSize: 12 }}
-                    >
-                      Status:{" "}
-                      <strong
-                        style={{
-                          textTransform: "capitalize",
-                        }}
-                      >
-                        {a.status}
-                      </strong>
-                    </div>
-                  </div>
-                ))}
+      <div className="muted" style={{ fontSize: 12 }}>
+        {a.metadata?.model || a.productId} ·{" "}
+        {(branches.find((b) => b.id === a.branchId) || {}).name ||
+          a.branchId ||
+          "—"}
+      </div>
+
+      {/* 🔶 Reservation date range */}
+      {a.status === "reserved" &&
+        a.reservation?.from &&
+        a.reservation?.to && (
+          <div
+            style={{
+              marginTop: 4,
+              fontSize: 12,
+              color: "#92400e",
+              background: "#fff7ed",
+              padding: "2px 6px",
+              borderRadius: 6,
+              display: "inline-block",
+            }}
+          >
+            Reserved: {fmtDate(a.reservation.from)} →{" "}
+            {fmtDate(a.reservation.to)}
+          </div>
+        )}
+    </div>
+
+    <div className="muted" style={{ fontSize: 12 }}>
+      <strong style={{ textTransform: "capitalize" }}>
+        {a.status}
+      </strong>
+    </div>
+  </div>
+))}
+
               </div>
             );
           }

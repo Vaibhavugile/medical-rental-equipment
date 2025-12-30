@@ -27,6 +27,10 @@ function makeUniqueAssetId(productId) {
   const rnd = Math.random().toString(36).slice(2, 8);
   return `${productId}-${ts}-${rnd}`;
 }
+function datesOverlap(aStart, aEnd, bStart, bEnd) {
+  if (!aStart || !aEnd || !bStart || !bEnd) return false;
+  return aStart <= bEnd && aEnd >= bStart;
+}
 
 /**
  * makeInventoryHistoryEntry(user, opts)
@@ -205,10 +209,24 @@ export async function changeAssetStatus(assetDocId, newStatus, note = "", extra 
 // --- replace your reserveAsset with this version (logs + before/after) ---
 export async function reserveAsset(
   assetDocId,
-  { reservationId = null, orderId = null, customer = null, until = null, note = "Reserved for order" } = {}
+  {
+    reservationId = null,
+    orderId = null,
+    customer = null,
+    from = null,   // ✅ ADD
+    to = null,     // ✅ ADD
+    note = "Reserved for order",
+  } = {}
 ) {
   if (!assetDocId) throw new Error("assetDocId required");
-  console.log("🔵 reserveAsset() called", { assetDocId, orderId, customer, until });
+
+  console.log("🔵 reserveAsset() called", {
+    assetDocId,
+    orderId,
+    customer,
+    from,
+    to,
+  });
 
   const user = auth.currentUser || {};
   const assetRef = doc(db, "assets", assetDocId);
@@ -219,29 +237,47 @@ export async function reserveAsset(
     console.error("❌ reserveAsset: asset not found:", assetDocId);
     return;
   }
-  console.log("📦 Before reserve — status:", beforeSnap.data()?.status, "reservation:", beforeSnap.data()?.reservation);
+
+  console.log(
+    "📦 Before reserve — status:",
+    beforeSnap.data()?.status,
+    "reservation:",
+    beforeSnap.data()?.reservation
+  );
 
   const entry = makeInventoryHistoryEntry(user, {
     type: "reserve",
     note,
-    data: { reservationId, orderId, customer, until },
+    data: { reservationId, orderId, customer, from, to },
   });
 
   await updateDoc(assetRef, {
     status: "reserved",
-    reservation: { reservationId, orderId, customer, until },
+    reservation: {
+      reservationId,
+      orderId,
+      customer,
+      from,
+      to,
+    },
     updatedAt: serverTimestamp(),
     updatedBy: user.uid || "",
     updatedByName: user.displayName || user.email || "",
     history: arrayUnion(entry),
   });
 
-  // log after state (optional but useful)
+  // log after state
   const afterSnap = await getDoc(assetRef);
-  console.log("✅ After reserve — status:", afterSnap.data()?.status, "reservation:", afterSnap.data()?.reservation);
+  console.log(
+    "✅ After reserve — status:",
+    afterSnap.data()?.status,
+    "reservation:",
+    afterSnap.data()?.reservation
+  );
 
   return { ok: true, id: assetDocId, status: afterSnap.data()?.status };
 }
+
 
 
 /**
@@ -355,22 +391,49 @@ export async function listProducts() {
  * If no filters provided returns all assets (ordered by createdAt desc).
  * If filters provided, builds where clauses.
  */
-export async function listAssets({ productId = null, branchId = null, status = null } = {}) {
+export async function listAssets({
+  productId = null,
+  branchId = null,
+  from = null,
+  to = null,
+} = {}) {
   const clauses = [];
+
   if (productId) clauses.push(where("productId", "==", productId));
   if (branchId) clauses.push(where("branchId", "==", branchId));
-  if (status) clauses.push(where("status", "==", status));
 
-  let snap;
-  if (clauses.length) {
-    const q = query(collection(db, "assets"), ...clauses, orderBy("createdAt", "desc"));
-    snap = await getDocs(q);
-  } else {
-    const q = query(collection(db, "assets"), orderBy("createdAt", "desc"));
-    snap = await getDocs(q);
-  }
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+  const q = clauses.length
+    ? query(collection(db, "assets"), ...clauses)
+    : query(collection(db, "assets"));
+
+  const snap = await getDocs(q);
+
+  return snap.docs
+    .map((d) => ({ id: d.id, ...(d.data() || {}) }))
+    .filter((asset) => {
+      // ❌ Never available
+      if (asset.status === "out_for_rental") return false;
+
+      // ✅ No reservation → available
+      if (!asset.reservation) return true;
+
+      // backward compatibility (old data)
+      const rFrom = asset.reservation.from || null;
+      const rTo =
+        asset.reservation.to ||
+        asset.reservation.until ||
+        null;
+
+      // no date context → assume blocked
+      if (!from || !to) return false;
+
+      // ❌ Block ONLY if dates overlap
+      const overlap = datesOverlap(from, to, rFrom, rTo);
+
+      return !overlap;
+    });
 }
+
 
 export default {
   makeInventoryHistoryEntry,

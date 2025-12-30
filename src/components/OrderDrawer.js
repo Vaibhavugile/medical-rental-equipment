@@ -141,130 +141,168 @@ useEffect(() => {
 
   // Confirm from picker: add selected IDs then reserve each (no checkout)
   const confirmAssignAndReserve = async () => {
-    console.log("🔥 confirmAssignAndReserve() clicked");
+  console.log("🔥 confirmAssignAndReserve() clicked");
 
-    try {
-      const idx = assetPicker.itemIndex;
-      console.log("Item index:", idx);
+  try {
+    const idx = assetPicker.itemIndex;
+    console.log("Item index:", idx);
 
-      if (idx == null) {
-        console.log("No item index, closing modal.");
-        confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
-        return;
-      }
-
-      const picked = Object.keys(assetPicker.selected || {}).filter(
-        (id) => assetPicker.selected[id]
-      );
-
-      console.log("Picked assets:", picked);
-
-      if (!picked.length) {
-        console.log("No assets selected, closing modal.");
-        confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
-        return;
-      }
-
-      const item = selectedOrder.items?.[idx] || {};
-      const orderId = selectedOrder.id || selectedOrder.orderNo;
-      console.log("Order ID used for reservation:", orderId);
-      console.log("Item expectedEndDate:", item?.expectedEndDate);
-
-      // 1) Update assigned assets
-      const existing = Array.isArray(item.assignedAssets)
-        ? item.assignedAssets
-        : [];
-      const merged = Array.from(new Set([...existing, ...picked]));
-
-      console.log("Merged assignedAssets:", merged);
-
-      updateOrderItem?.(idx, { assignedAssets: merged });
-
-      // 2) Reserve each asset
-      for (const assetDocId of picked) {
-        console.log(`⚙️ Reserving asset ${assetDocId}...`);
-        try {
-          const result = await reserveAsset(assetDocId, {
-            reservationId: orderId,
-            orderId: orderId,
-            customer: selectedOrder.customerName || "",
-            until: item?.expectedEndDate || null,
-            note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
-          });
-          console.log(`✅ reserveAsset success for ${assetDocId}`, result);
-        } catch (err) {
-          console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
-        }
-      }
-
-      console.log("✅ All reserve attempts complete, closing picker.");
+    if (idx == null) {
+      console.log("No item index, closing modal.");
       confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
-
-    } catch (e) {
-      console.error("🔥 Assign & reserve error:", e);
-      alert(e?.message || "Failed to reserve selected assets");
+      return;
     }
-  };
+
+    const picked = Object.keys(assetPicker.selected || {}).filter(
+      (id) => assetPicker.selected[id]
+    );
+
+    console.log("Picked assets:", picked);
+
+    if (!picked.length) {
+      console.log("No assets selected, closing modal.");
+      confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
+      return;
+    }
+
+    const item = selectedOrder.items?.[idx];
+    if (!item) {
+      console.warn("Item not found for index:", idx);
+      return;
+    }
+
+    const orderId = selectedOrder.id || selectedOrder.orderNo;
+    console.log("Order ID used for reservation:", orderId);
+    console.log("Item expectedStartDate:", item?.expectedStartDate);
+    console.log("Item expectedEndDate:", item?.expectedEndDate);
+
+    // 1️⃣ Update assigned assets in order
+    const existing = Array.isArray(item.assignedAssets)
+      ? item.assignedAssets
+      : [];
+
+    const merged = Array.from(new Set([...existing, ...picked]));
+    console.log("Merged assignedAssets:", merged);
+
+    updateOrderItem?.(idx, { assignedAssets: merged });
+
+    // 2️⃣ Reserve each selected asset with DATE RANGE
+    for (const assetDocId of picked) {
+      console.log(`⚙️ Reserving asset ${assetDocId}...`);
+
+      try {
+        const result = await reserveAsset(assetDocId, {
+          reservationId: orderId,
+          orderId: orderId,
+          customer: selectedOrder.customerName || "",
+          from: item?.expectedStartDate || null,
+          to: item?.expectedEndDate || null,
+          note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
+        });
+
+        console.log(`✅ reserveAsset success for ${assetDocId}`, result);
+      } catch (err) {
+        console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
+      }
+    }
+
+    console.log("✅ All reserve attempts complete, closing picker.");
+    confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
+
+  } catch (e) {
+    console.error("🔥 Assign & reserve error:", e);
+    alert(e?.message || "Failed to reserve selected assets");
+  }
+};
+
+const fmtDate = (d) => {
+  if (!d) return "";
+  try {
+    return new Date(d).toLocaleDateString(undefined, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return d;
+  }
+};
 
 
   // Auto-assign N: pick in-stock assets for product+branch, set & reserve (no checkout)
   const autoAssignAndReserve = async (itemIndex, count = 1) => {
-    console.log("🔥 autoAssignAndReserve()", { itemIndex, count });
+  console.log("🔥 autoAssignAndReserve()", { itemIndex, count });
 
-    try {
-      const it = selectedOrder.items?.[itemIndex];
-      console.log("Item:", it);
+  try {
+    const it = selectedOrder.items?.[itemIndex];
+    console.log("Item:", it);
 
-      if (!it?.productId) {
-        alert("Select a product first");
-        return;
-      }
-
-      const assets = await listAssets({
-        productId: it.productId || null,
-        branchId: it.branchId || null,
-        status: "in_stock",
-      });
-
-      console.log("Available assets from listAssets:", assets);
-
-      if (!assets?.length) {
-        alert("No assets available to auto-assign");
-        return;
-      }
-
-      const pick = assets.slice(0, Number(count || 1)).map((a) => a.id);
-      console.log("Auto-picked assets:", pick);
-
-      const existing = Array.isArray(it.assignedAssets) ? it.assignedAssets : [];
-      const merged = Array.from(new Set([...existing, ...pick]));
-      console.log("Merged assignedAssets:", merged);
-
-      updateOrderItem?.(itemIndex, { assignedAssets: merged, autoAssigned: true });
-
-      const orderId = selectedOrder.id || selectedOrder.orderNo;
-
-      for (const assetDocId of pick) {
-        console.log(`⚙️ Reserving auto-picked asset ${assetDocId}`);
-        try {
-          const result = await reserveAsset(assetDocId, {
-            reservationId: orderId,
-            orderId: orderId,
-            customer: selectedOrder.customerName || "",
-            until: it?.expectedEndDate || null,
-            note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
-          });
-          console.log(`✅ reserveAsset success for ${assetDocId}`, result);
-        } catch (err) {
-          console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
-        }
-      }
-
-    } catch (e) {
-      console.error("🔥 autoAssignAndReserve error:", e);
-      alert(e?.message || "Auto-assign failed");
+    if (!it?.productId) {
+      alert("Select a product first");
+      return;
     }
-  };
+
+   const assets = await listAssets({
+  productId: it.productId || null,
+  branchId: it.branchId || null,
+  from: it.expectedStartDate || null,
+  to: it.expectedEndDate || null,
+});
+
+
+    console.log("Available assets from listAssets:", assets);
+
+    if (!assets?.length) {
+      alert("No assets available to auto-assign");
+      return;
+    }
+
+    const pick = assets
+      .slice(0, Number(count || 1))
+      .map((a) => a.id);
+
+    console.log("Auto-picked assets:", pick);
+
+    const existing = Array.isArray(it.assignedAssets)
+      ? it.assignedAssets
+      : [];
+
+    const merged = Array.from(new Set([...existing, ...pick]));
+    console.log("Merged assignedAssets:", merged);
+
+    // 1️⃣ Update order item
+    updateOrderItem?.(itemIndex, {
+      assignedAssets: merged,
+      autoAssigned: true,
+    });
+
+    const orderId = selectedOrder.id || selectedOrder.orderNo;
+
+    // 2️⃣ Reserve each asset with DATE RANGE
+    for (const assetDocId of pick) {
+      console.log(`⚙️ Reserving auto-picked asset ${assetDocId}`);
+
+      try {
+        const result = await reserveAsset(assetDocId, {
+          reservationId: orderId,
+          orderId: orderId,
+          customer: selectedOrder.customerName || "",
+          from: it?.expectedStartDate || null, // ✅ FIXED
+          to: it?.expectedEndDate || null,     // ✅ FIXED
+          note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
+        });
+
+        console.log(`✅ reserveAsset success for ${assetDocId}`, result);
+      } catch (err) {
+        console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
+      }
+    }
+  } catch (e) {
+    console.error("🔥 autoAssignAndReserve error:", e);
+    alert(e?.message || "Auto-assign failed");
+  }
+};
+
 
 
   // Unassign chip: remove from item + unreserve (return to in_stock)
@@ -1096,43 +1134,63 @@ useEffect(() => {
 
               {/* Assets */}
               {assets.map((a) => (
-                <div
-                  key={a.id}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: 8,
-                    borderBottom: "1px solid #eef2f7",
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={!!assetPicker.selected[a.id]}
-                    onChange={() => togglePickerSelect(a.id)}
-                  />
+  <div
+    key={a.id}
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+      padding: 8,
+      borderBottom: "1px solid #eef2f7",
+    }}
+  >
+    <input
+      type="checkbox"
+      checked={!!assetPicker.selected[a.id]}
+      onChange={() => togglePickerSelect(a.id)}
+    />
 
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700 }}>
-                      {a.assetId || a.id}
-                    </div>
-                    <div className="muted" style={{ fontSize: 12 }}>
-                      {a.metadata?.model || a.productId} ·{" "}
-                      {(branches.find((b) => b.id === a.branchId) || {})
-                        .name ||
-                        a.branchId ||
-                        "—"}
-                    </div>
-                  </div>
+    <div style={{ flex: 1 }}>
+      <div style={{ fontWeight: 700 }}>
+        {a.assetId || a.id}
+      </div>
 
-                  <div className="muted" style={{ fontSize: 12 }}>
-                    Status:{" "}
-                    <strong style={{ textTransform: "capitalize" }}>
-                      {a.status}
-                    </strong>
-                  </div>
-                </div>
-              ))}
+      <div className="muted" style={{ fontSize: 12 }}>
+        {a.metadata?.model || a.productId} ·{" "}
+        {(branches.find((b) => b.id === a.branchId) || {}).name ||
+          a.branchId ||
+          "—"}
+      </div>
+
+      {/* 🔶 Show reservation date range if reserved */}
+      {a.status === "reserved" &&
+        a.reservation?.from &&
+        a.reservation?.to && (
+          <div
+            style={{
+              marginTop: 4,
+              fontSize: 12,
+              color: "#92400e",
+              background: "#fff7ed",
+              padding: "2px 6px",
+              borderRadius: 6,
+              display: "inline-block",
+            }}
+          >
+            Reserved: {fmtDate(a.reservation.from)} →{" "}
+            {fmtDate(a.reservation.to)}
+          </div>
+        )}
+    </div>
+
+    <div className="muted" style={{ fontSize: 12 }}>
+      <strong style={{ textTransform: "capitalize" }}>
+        {a.status}
+      </strong>
+    </div>
+  </div>
+))}
+
             </div>
           );
         })}
