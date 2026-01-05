@@ -22,9 +22,34 @@ export default function Hero() {
             </span>
           </div>
 
-          <a href="#booking" className="hero-cta">
-            Request a Callback →
-          </a>
+          <a
+  href="/#contact"
+  className="hero-cta"
+  onClick={(e) => {
+    const isOnLanding = window.location.pathname === "/";
+    if (isOnLanding) {
+      e.preventDefault();
+
+      const el = document.getElementById("contact");
+      if (el) {
+        const header = document.querySelector("header");
+        const headerOffset = header?.offsetHeight || 0;
+        const elTop = el.getBoundingClientRect().top + window.pageYOffset;
+
+        window.scrollTo({
+          top: elTop - headerOffset - 12,
+          behavior: "smooth",
+        });
+      } else {
+        window.location.hash = "contact";
+      }
+    }
+    // else → allow default navigation to /#contact
+  }}
+>
+  Request a Callback →
+</a>
+
         </div>
 
         {/* RIGHT IMAGE */}

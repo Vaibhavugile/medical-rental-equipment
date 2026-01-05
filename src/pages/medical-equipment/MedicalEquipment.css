@@ -1,13 +1,46 @@
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap");
 
-/* GLOBAL */
+/* =====================================================
+   GLOBAL
+===================================================== */
 .me-page {
   font-family: "Poppins", system-ui, sans-serif;
   background: #ffffff;
   color: #0e2a3a;
 }
 
-/* HERO */
+/* =====================================================
+   HERO – LIST PAGE
+===================================================== */
+.me-hero {
+  background: linear-gradient(180deg, #ffffff 0%, #f4f9ff 100%);
+  padding: 90px 20px 70px;
+  text-align: center;
+}
+
+.me-hero-inner {
+  max-width: 1100px;
+  margin: auto;
+}
+
+.me-hero h1 {
+  font-size: 2.8rem;
+  font-weight: 800;
+  color: #0e3f66;
+  margin-bottom: 12px;
+}
+
+.me-hero p {
+  max-width: 760px;
+  margin: auto;
+  font-size: 1.05rem;
+  color: #6b7e8c;
+  line-height: 1.6;
+}
+
+/* =====================================================
+   HERO – DETAIL PAGE
+===================================================== */
 .me-detail-hero {
   background: #0e3f66;
   padding: 60px 20px;
@@ -35,7 +68,9 @@
   font-weight: 600;
 }
 
-/* INTRO SECTION */
+/* =====================================================
+   INTRO SECTION
+===================================================== */
 .me-intro {
   background: linear-gradient(180deg, #ffffff 0%, #fde7d3 100%);
   padding: 80px 20px;
@@ -51,7 +86,7 @@
 }
 
 .me-intro-title {
-  font-size: 2.6rem;
+  font-size: 2.4rem;
   font-weight: 800;
   color: #0e3f66;
 }
@@ -111,7 +146,9 @@
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
 }
 
-/* SECTIONS */
+/* =====================================================
+   SECTIONS
+===================================================== */
 .me-section {
   max-width: 1100px;
   margin: 70px auto;
@@ -122,7 +159,6 @@
   font-size: 2rem;
   color: #0e3f66;
   margin-bottom: 14px;
-  position: relative;
 }
 
 .me-section h2::after {
@@ -134,17 +170,34 @@
   margin-top: 8px;
 }
 
-.me-section ul {
-  padding-left: 22px;
-  line-height: 1.8;
+/* =====================================================
+   USAGE GRID
+===================================================== */
+.me-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 18px;
+  margin-top: 24px;
 }
 
-/* FEATURES */
+.me-usage-item {
+  background: #ffffff;
+  padding: 18px 20px;
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.06);
+  line-height: 1.6;
+}
+
+/* =====================================================
+   FEATURES
+===================================================== */
 .me-feature-list li {
   margin-bottom: 10px;
 }
 
-/* BENEFITS */
+/* =====================================================
+   BENEFITS
+===================================================== */
 .me-benefits {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
@@ -169,7 +222,37 @@
   margin-bottom: 10px;
 }
 
-/* SUMMARY */
+/* =====================================================
+   HOW IT WORKS
+===================================================== */
+.me-steps {
+  list-style: none;
+  padding: 0;
+  margin-top: 24px;
+}
+
+.me-steps li {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 14px;
+  line-height: 1.6;
+}
+
+.me-steps span {
+  min-width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f28c28;
+  color: #ffffff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* =====================================================
+   SUMMARY
+===================================================== */
 .me-summary {
   max-width: 900px;
   margin: 90px auto;
@@ -177,16 +260,14 @@
   padding: 0 20px;
 }
 
-.me-summary h2 {
-  color: #0e3f66;
-}
-
 .me-summary p {
   margin-top: 14px;
   line-height: 1.7;
 }
 
-/* CTA */
+/* =====================================================
+   CTA + BUTTON
+===================================================== */
 .me-cta {
   text-align: center;
   margin-bottom: 80px;
@@ -202,6 +283,13 @@
   cursor: pointer;
   box-shadow: 0 14px 44px rgba(242, 140, 40, 0.25);
   position: relative;
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.me-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 24px 70px rgba(242, 140, 40, 0.4);
 }
 
 .me-btn::after {
@@ -213,63 +301,13 @@
 }
 
 @keyframes pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(242, 140, 40, 0.45);
-  }
-  70% {
-    box-shadow: 0 0 0 18px rgba(242, 140, 40, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(242, 140, 40, 0);
-  }
-}
-
-/* RESPONSIVE */
-@media (max-width: 900px) {
-  .me-intro-inner {
-    grid-template-columns: 1fr;
-  }
-  .me-intro-title {
-    font-size: 2.1rem;
-  }
-}
-/* =====================================================
-   EQUIPMENT LIST PAGE – PREMIUM THEME
-===================================================== */
-
-/* PAGE BASE */
-.me-page {
-  font-family: "Poppins", system-ui, -apple-system, BlinkMacSystemFont;
-  background: #ffffff;
-  color: #0e2a3a;
+  0% { box-shadow: 0 0 0 0 rgba(242, 140, 40, 0.45); }
+  70% { box-shadow: 0 0 0 18px rgba(242, 140, 40, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(242, 140, 40, 0); }
 }
 
 /* =====================================================
-   HERO SECTION
-===================================================== */
-.me-hero {
-  background: linear-gradient(180deg, #ffffff 0%, #f4f9ff 100%);
-  padding: 90px 20px 70px;
-  text-align: center;
-}
-
-.me-hero h1 {
-  font-size: 2.8rem;
-  font-weight: 800;
-  color: #0e3f66;
-  margin-bottom: 12px;
-}
-
-.me-hero p {
-  max-width: 760px;
-  margin: auto;
-  font-size: 1.05rem;
-  color: #6b7e8c;
-  line-height: 1.6;
-}
-
-/* =====================================================
-   GRID LAYOUT
+   GRID – LIST PAGE
 ===================================================== */
 .me-grid {
   width: 95%;
@@ -281,23 +319,16 @@
   gap: 34px;
 }
 
-/* =====================================================
-   CARD
-===================================================== */
 .me-card {
   background: #ffffff;
   border-radius: 22px;
-  padding: 22px 22px 26px;
+  padding: 22px;
   display: flex;
   flex-direction: column;
   cursor: pointer;
-
   border: 1px solid rgba(14, 63, 102, 0.08);
   box-shadow: 0 18px 50px rgba(14, 63, 102, 0.1);
-
-  transition:
-    transform 0.45s ease,
-    box-shadow 0.45s ease;
+  transition: transform 0.45s ease, box-shadow 0.45s ease;
 }
 
 .me-card:hover {
@@ -305,9 +336,6 @@
   box-shadow: 0 30px 80px rgba(14, 63, 102, 0.18);
 }
 
-/* =====================================================
-   CARD IMAGE
-===================================================== */
 .me-card img {
   width: 100%;
   height: 190px;
@@ -316,32 +344,288 @@
   border-radius: 16px;
   padding: 14px;
   margin-bottom: 16px;
-
-  transition: transform 0.5s ease;
-}
-
-.me-card:hover img {
-  transform: scale(1.06);
 }
 
 /* =====================================================
-   CARD CONTENT
+   RESPONSIVE
 ===================================================== */
-.me-card h3 {
-  font-size: 1.15rem;
-  font-weight: 800;
-  color: #0e3f66;
-  margin-bottom: 6px;
+@media (max-width: 900px) {
+  .me-intro-inner {
+    grid-template-columns: 1fr;
+  }
+  .me-intro-title {
+    font-size: 2.1rem;
+  }
 }
 
+@media (max-width: 768px) {
+  .me-hero h1 {
+    font-size: 2.2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .me-hero {
+    padding: 70px 16px 50px;
+  }
+  .me-card img {
+    height: 170px;
+  }
+}
+
+/* =====================================================
+   ACCESSIBILITY
+===================================================== */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+/* Make list page compact & mobile-friendly */
 .me-card p {
-  font-size: 0.95rem;
-  color: #6b7280;
-  line-height: 1.6;
-  margin-bottom: 16px;
+  font-size: 0.9rem;
+  line-height: 1.5;
 
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2; /* ONLY 2 LINES */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Mobile optimization */
+@media (max-width: 480px) {
+  .me-card {
+    padding: 16px;
+  }
+
+  .me-card img {
+    height: 140px;
+  }
+
+  .me-btn {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+  }
+}
+
+/* Ultra-clean small screens */
+@media (max-width: 380px) {
+  .me-card p {
+    display: none;
+  }
+}
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap");
+
+/* =====================================================
+   GLOBAL
+===================================================== */
+.me-page {
+  font-family: "Poppins", system-ui, sans-serif;
+  background: #ffffff;
+  color: #0e2a3a;
+}
+
+/* =====================================================
+   HERO – BOOKMYMEDICARE STYLE (LIST PAGE TOP)
+===================================================== */
+.me-hero-alt {
+  background: #ffffff;
+  padding: 90px 20px 80px;
+}
+
+.me-hero-alt-inner {
+  max-width: 1200px;
+  margin: auto;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 60px;
+  align-items: center;
+}
+
+/* IMAGE */
+.me-hero-alt-img img {
+  width: 100%;
+  border-radius: 18px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.12);
+}
+
+/* CONTENT */
+.me-hero-alt-content h1 {
+  font-size: 2.7rem;
+  font-weight: 800;
+  color: #0e3f66;
+  margin-bottom: 16px;
+}
+
+.me-hero-alt-content p {
+  font-size: 1.05rem;
+  color: #6b7e8c;
+  line-height: 1.7;
+  max-width: 520px;
+  margin-bottom: 28px;
+}
+
+/* TAG */
+.me-hero-tag {
+  display: inline-block;
+  background: #0e3f66;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  margin-bottom: 16px;
+}
+
+/* =====================================================
+   HERO – DETAIL PAGE
+===================================================== */
+.me-detail-hero {
+  background: #0e3f66;
+  padding: 60px 20px;
+  text-align: center;
+  color: #ffffff;
+}
+
+.me-detail-hero h1 {
+  font-size: 2.4rem;
+  font-weight: 800;
+}
+
+.me-breadcrumb {
+  margin-top: 8px;
+}
+
+.me-breadcrumb a {
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.me-breadcrumb span {
+  color: #ff9f43;
+  font-weight: 600;
+}
+
+/* =====================================================
+   INTRO SECTION (DETAIL PAGE)
+===================================================== */
+.me-intro {
+  background: linear-gradient(180deg, #ffffff 0%, #fde7d3 100%);
+  padding: 80px 20px;
+}
+
+.me-intro-inner {
+  max-width: 1200px;
+  margin: auto;
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 50px;
+  align-items: center;
+}
+
+.me-intro-title {
+  font-size: 2.4rem;
+  font-weight: 800;
+  color: #0e3f66;
+}
+
+.me-intro-subtitle {
+  margin-top: 10px;
+  color: #f97316;
+  font-size: 1.1rem;
+}
+
+.me-intro-text {
+  margin-top: 14px;
+  color: #374151;
+  line-height: 1.7;
+}
+
+.me-intro-list {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0;
+}
+
+.me-intro-list li {
+  position: relative;
+  padding-left: 24px;
+  margin-bottom: 10px;
+}
+
+.me-intro-list li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: #f97316;
+  font-size: 1.5rem;
+}
+
+.me-intro-image {
+  background: linear-gradient(135deg, #ffffff, #f9d7b8);
+  padding: 30px;
+  border-radius: 22px;
+  display: flex;
+  justify-content: center;
+}
+
+.me-intro-image img {
+  width: 100%;
+  max-width: 420px;
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.12);
+}
+
+/* =====================================================
+   GRID – LIST PAGE
+===================================================== */
+.me-grid {
+  width: 95%;
+  max-width: 1320px;
+  margin: auto;
+  padding: 60px 0 90px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 34px;
+}
+
+.me-card {
+  background: #ffffff;
+  border-radius: 22px;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  border: 1px solid rgba(14, 63, 102, 0.08);
+  box-shadow: 0 18px 50px rgba(14, 63, 102, 0.1);
+  transition: transform 0.45s ease, box-shadow 0.45s ease;
+}
+
+.me-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 28px 70px rgba(14, 63, 102, 0.18);
+}
+
+.me-card img {
+  width: 100%;
+  height: 180px;
+  object-fit: contain;
+  background: linear-gradient(135deg, #ffffff, #f5f0ea);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 14px;
+}
+
+/* Compact description */
+.me-card p {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: #6b7280;
+
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -350,27 +634,15 @@
    BUTTON
 ===================================================== */
 .me-btn {
-  margin-top: auto;
-  align-self: flex-start;
-
   background: linear-gradient(90deg, #f28c28, #ff9f45);
   color: #ffffff;
   border: none;
   border-radius: 10px;
-
-  padding: 10px 18px;
+  padding: 10px 20px;
   font-weight: 700;
-  font-size: 0.95rem;
-
   cursor: pointer;
-  box-shadow: 0 14px 40px rgba(242, 140, 40, 0.28);
-
-  position: relative;
-  overflow: hidden;
-
-  transition:
-    transform 0.3s ease,
-    box-shadow 0.3s ease;
+  box-shadow: 0 14px 44px rgba(242, 140, 40, 0.25);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .me-btn:hover {
@@ -378,52 +650,45 @@
   box-shadow: 0 24px 70px rgba(242, 140, 40, 0.4);
 }
 
-/* subtle shine */
-.me-btn::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    120deg,
-    transparent,
-    rgba(255, 255, 255, 0.35),
-    transparent
-  );
-  transition: left 0.6s ease;
-}
-
-.me-btn:hover::after {
-  left: 100%;
-}
-
 /* =====================================================
    RESPONSIVE
 ===================================================== */
-@media (max-width: 768px) {
-  .me-hero h1 {
-    font-size: 2.2rem;
+@media (max-width: 900px) {
+  .me-hero-alt-inner,
+  .me-intro-inner {
+    grid-template-columns: 1fr;
+    text-align: center;
   }
 
-  .me-grid {
-    padding: 50px 0 70px;
-    gap: 26px;
+  .me-hero-alt-content p {
+    margin-left: auto;
+    margin-right: auto;
   }
 }
 
 @media (max-width: 480px) {
-  .me-hero {
-    padding: 70px 16px 50px;
+  .me-hero-alt {
+    padding: 70px 16px 60px;
   }
 
-  .me-hero h1 {
-    font-size: 2rem;
+  .me-card {
+    padding: 16px;
   }
 
   .me-card img {
-    height: 170px;
+    height: 140px;
+  }
+
+  .me-btn {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+  }
+}
+
+/* Ultra-clean very small screens */
+@media (max-width: 380px) {
+  .me-card p {
+    display: none;
   }
 }
 

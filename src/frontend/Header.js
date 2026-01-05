@@ -11,12 +11,14 @@ import "./Header.css";
  */
 
 const NAV_ITEMS = [
-  { id: "home", label: "Home" },
-  { id: "services", label: "Services" },
-  { id: "blogs", label: "Blogs", route: "/blogs" }, // ✅ NEW
+  { id: "home", label: "Home", route: "/" },
+  { id: "services", label: "Services" },   // 👈 scroll target
+  { id: "blogs", label: "Blogs", route: "/blogs" },
   { id: "providers", label: "Providers", route: "/our-team" },
-  { id: "contact", label: "Contact" },
+  { id: "contact", label: "Contact" },     // 👈 scroll target
 ];
+
+
 
 
 function MenuIcon({ size = 20 }) {
@@ -41,15 +43,22 @@ export default function Header({ logo = "BookMyMedicare" }) {
   const headerRef = useRef(null);
 
   // On mount, set active based on current path (so /our-team highlights Providers)
- useEffect(() => {
+useEffect(() => {
   const path = window.location.pathname || "/";
+  const hash = window.location.hash.replace("#", "");
 
-  if (path.startsWith("/our-team")) {
-    setActiveId("providers");
+  if (path === "/" && hash) {
+    setActiveId(hash);
+  } else if (path === "/") {
+    setActiveId("home");
   } else if (path.startsWith("/blogs")) {
-    setActiveId("blogs"); // ✅ highlight Blogs
+    setActiveId("blogs");
+  } else if (path.startsWith("/our-team")) {
+    setActiveId("providers");
   }
 }, []);
+
+
 
 
   // Close mobile menu on resize > breakpoint, or on Escape key
@@ -124,33 +133,58 @@ export default function Header({ logo = "BookMyMedicare" }) {
   }, [activeId]);
 
   // Smooth scroll handler for nav links that use section ids
-  function handleNavClick(e, item) {
-    // item is the nav object { id, label, route? }
-    if (item.route) {
-      // route present: navigate to route instead of scrolling
-      e.preventDefault();
-      // Use full navigation so it works with/without react-router
-      window.location.href = item.route;
-      // close mobile menu if open
-      setMobileOpen(false);
-      return;
-    }
+function handleNavClick(e, item) {
+  e.preventDefault();
 
-    // Otherwise, smooth-scroll to hash-section
-    e.preventDefault();
-    setActiveId(item.id); // immediate visual feedback
-    const el = document.getElementById(item.id);
-    if (!el) {
-      // fallback: navigate to hash
-      window.location.hash = item.id;
-      setMobileOpen(false);
+  const isOnLanding = window.location.pathname === "/";
+  const hasRoute = Boolean(item.route);
+
+  // 1️⃣ HOME (special case)
+  if (item.id === "home") {
+    if (!isOnLanding) {
+      window.location.href = "/#home";
       return;
     }
-    const headerOffset = headerRef.current?.offsetHeight || 0;
-    const elTop = el.getBoundingClientRect().top + window.pageYOffset;
-    window.scrollTo({ top: elTop - headerOffset - 12, behavior: "smooth" });
-    setMobileOpen(false);
+    scrollToSection("home");
+    return;
   }
+
+  // 2️⃣ SERVICES / CONTACT (scroll sections)
+  if (!hasRoute) {
+    if (!isOnLanding) {
+      // Go to landing page + section
+      window.location.href = `/#${item.id}`;
+      return;
+    }
+    scrollToSection(item.id);
+    return;
+  }
+
+  // 3️⃣ ROUTE navigation (blogs, providers)
+  window.location.href = item.route;
+}
+function scrollToSection(id) {
+  setActiveId(id);
+
+  const el = document.getElementById(id);
+  if (!el) {
+    window.location.hash = id;
+    setMobileOpen(false);
+    return;
+  }
+
+  const headerOffset = headerRef.current?.offsetHeight || 0;
+  const elTop = el.getBoundingClientRect().top + window.pageYOffset;
+
+  window.scrollTo({
+    top: elTop - headerOffset - 12,
+    behavior: "smooth",
+  });
+
+  setMobileOpen(false);
+}
+
+
 
   return (
     <header className="header" role="banner" ref={headerRef}>

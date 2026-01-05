@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import Header from "../frontend/Header"; // adjust path if Header lives in a subfolder
 import TopBar from "../frontend/TopBar";
 import styles from "./LandingPage.module.css";
@@ -11,16 +11,45 @@ import HeroWithForm from "../frontend/HeroWithForm";
 import ReviewsSection from "../frontend/ReviewsSection";
 import Footer from "../frontend/Footer";
 export default function LandingPage() {
+  useEffect(() => {
+  if (!window.location.hash) return;
+
+  const id = window.location.hash.replace("#", "");
+  const el = document.getElementById(id);
+
+  if (!el) return;
+
+  // wait for layout to fully paint
+  setTimeout(() => {
+    const header = document.querySelector("header");
+    const headerOffset = header?.offsetHeight || 0;
+
+    const elTop = el.getBoundingClientRect().top + window.pageYOffset;
+
+    window.scrollTo({
+      top: elTop - headerOffset - 12,
+      behavior: "smooth",
+    });
+  }, 150);
+}, []);
+
   return (
     <div className={styles.page}>
      <TopBar />
       <Header />
-       <Hero />
+       <section id="home">
+        <Hero />
+      </section>
        <WhoWeAreUnique />
        <HowWeWorkUnique />
        <WhyChooseUsUnique />
-       <ServicesSection />
-       <HeroWithForm />
+        <section id="services">
+        <ServicesSection />
+      </section>
+
+      <section id="contact">
+        <HeroWithForm />
+      </section>
       
       <ReviewsSection  autoplay={true} autoplayDelay={3500} />
       <Footer />

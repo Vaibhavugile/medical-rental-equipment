@@ -4,6 +4,7 @@
 
 import React, { useEffect, useRef } from "react";
 import "./ServiceStepsAnimated.css";
+import { scrollToContact } from "../utils/scrollToContact";
 
 /* =========================
    ServiceTwoCol
@@ -20,8 +21,10 @@ export function ServiceTwoCol(props) {
     img = "",
     imgAlt = "",
     imageOnRight = true,
-    ctaPrimary = { text: "Talk to a specialist", onClick: () => {} },
-    ctaSecondary = { text: "Download brochure", onClick: () => {} },
+ctaPrimary = {
+  text: "Talk to a specialist",
+  onClick: scrollToContact,
+},
 
     // optional paddingTop value passed via props spread (e.g., from ICUPage.section1.paddingTop)
     paddingTop
@@ -83,7 +86,6 @@ export function ServiceTwoCol(props) {
 
           <div className="bmm2-cta">
             <button className="bmm2-btn" onClick={ctaPrimary.onClick}>{ctaPrimary.text}</button>
-            <button className="bmm2-btn-ghost" onClick={ctaSecondary.onClick}>{ctaSecondary.text}</button>
           </div>
         </div>
       </div>

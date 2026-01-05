@@ -118,7 +118,7 @@ function CRMApp() {
 
             <nav style={{ display: "flex", gap: 8, alignItems: "center" }}>
               <NavLink
-                to="/"
+                to="/leads"
                 end
                 style={({ isActive }) => ({
                   padding: "8px 10px",
@@ -322,7 +322,7 @@ function CRMApp() {
 
       <main>
         <Routes>
-          <Route path="/" element={<Leads />} />
+          <Route path="/leads" element={<Leads />} />
           <Route path="/requirements" element={<Requirements />} />
           <Route path="/quotations" element={<Quotations />} />
           <Route path="/orders" element={<Orders />} />
@@ -350,7 +350,7 @@ function DriverLayout() {
   const handleSignOut = async () => {
     try {
       await auth.signOut();
-      navigate("/landing");
+      navigate("/");
     } catch (err) {
       console.error("Signout error", err);
       alert("Signout failed");
@@ -450,7 +450,7 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* Auth */}
-        <Route path="/landing" element={<LandingPage/>} />
+        <Route path="/" element={<LandingPage/>} />
         <Route path="/icu" element={<ICUPage/>} />
         <Route path="/post-surgery-care" element={<SurgeryPage/>} />
         <Route path="/palliative-care" element={<PalliativePage/>} />

@@ -87,7 +87,9 @@ export default function PharmacyPage() {
         stepsSection={stepsSection}
       />
      <WhyChooseUsUnique />
-      <HeroWithForm />
+        <section id="contact">
+       <HeroWithForm />
+     </section>
            
            <ReviewsSection  autoplay={true} autoplayDelay={3500} />
            <Footer />

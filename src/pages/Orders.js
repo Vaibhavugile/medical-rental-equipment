@@ -362,6 +362,7 @@ export default function Orders() {
 
   const [filterDelivery, setFilterDelivery] = useState("all");
   const [search, setSearch] = useState("");
+const [deliveriesByOrder, setDeliveriesByOrder] = useState({});
 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [branches, setBranches] = useState([]);
@@ -423,8 +424,21 @@ const [assetCompanyFilter, setAssetCompanyFilter] = useState("");
       }
     })();
   }, []);
+useEffect(() => {
+  const q = query(collection(db, "deliveries"));
+  const unsub = onSnapshot(q, (snap) => {
+    const map = {};
+    snap.docs.forEach((d) => {
+      const data = d.data();
+      if (!map[data.orderId]) map[data.orderId] = [];
+      map[data.orderId].push({ id: d.id, ...data });
+    });
+    setDeliveriesByOrder(map);
+  });
+  return () => unsub();
+}, []);
 
-  const derivedCounts = useMemo(() => {
+const derivedCounts = useMemo(() => {
   const m = {
     all: orders.length,
     created: 0,
@@ -440,30 +454,53 @@ const [assetCompanyFilter, setAssetCompanyFilter] = useState("");
     completed: 0,
     cancelled: 0,
   };
+
   for (const o of orders) {
-    const k = deriveDetailedStatus(o) || "created";
+    const k =
+      deriveDetailedStatus(o, deliveriesByOrder) || "created";
     if (m[k] != null) m[k] += 1;
   }
+
   return m;
-}, [orders]);
+}, [orders, deliveriesByOrder]);
+
+
+function getDeliveryStates(order, deliveriesByOrder = {}) {
+  const list = deliveriesByOrder[order.id] || [];
+
+  const pickup = list.find(d => d.deliveryType === "pickup");
+  const ret = list.find(d => d.deliveryType === "return");
+
+  return {
+    pickupStatus: pickup?.status || null,
+    returnStatus: ret?.status || null,
+  };
+}
 
 
   const deliveryCounts = useMemo(() => {
-    const m = {
-      all: orders.length,
-      assigned: 0,
-      accepted: 0,
-      picked_up: 0,
-      in_transit: 0,
-      delivered: 0,
-      completed: 0,
-    };
-    for (const o of orders) {
-      const k = (o.deliveryStatus || o.delivery?.status || "").toLowerCase();
-      if (m[k] != null) m[k] += 1;
-    }
-    return m;
-  }, [orders]);
+  const m = {
+    assigned: 0,
+    accepted: 0,
+    in_transit: 0,
+    delivered: 0,
+    completed: 0,
+  };
+
+  orders.forEach((o) => {
+    const { pickupStatus, returnStatus } =
+      getDeliveryStates(o, deliveriesByOrder);
+
+    [pickupStatus, returnStatus].forEach((s) => {
+      if (s && m[s] != null) {
+        m[s] += 1;
+      }
+    });
+  });
+
+  return m;
+}, [orders, deliveriesByOrder]);
+
 
   // products & drivers
   useEffect(() => {
@@ -548,6 +585,7 @@ const [assetCompanyFilter, setAssetCompanyFilter] = useState("");
       setSelectedOrder(order);
     }
   };
+  
 
   const closeOrder = () => {
     setSelectedOrder(null);
@@ -567,34 +605,51 @@ const [assetCompanyFilter, setAssetCompanyFilter] = useState("");
       form: null,
     });
   };
+const filtered = useMemo(() => {
+  let arr = [...orders];
 
-  const filtered = useMemo(() => {
-    let arr = [...orders];
+  // 1️⃣ SEARCH
+  if (search && search.trim()) {
+    const q = search.trim().toLowerCase();
+    arr = arr.filter(
+      (o) =>
+        (o.orderNo || "").toLowerCase().includes(q) ||
+        (o.customerName || "").toLowerCase().includes(q) ||
+        (o.deliveryAddress || "").toLowerCase().includes(q)
+    );
+  }
 
-    if (filterDerived !== "all") {
-      arr = arr.filter((o) => deriveDetailedStatus(o) === filterDerived);
-    }
+  // 2️⃣ DELIVERY FILTER (pickup OR return)
+  if (filterDelivery !== "all") {
+    arr = arr.filter((o) => {
+      const { pickupStatus, returnStatus } =
+        getDeliveryStates(o, deliveriesByOrder);
 
-    if (filterDelivery !== "all") {
-      arr = arr.filter(
-        (o) =>
-          (o.deliveryStatus || o.delivery?.status || "").toLowerCase() ===
-          filterDelivery.toLowerCase()
+      return (
+        pickupStatus === filterDelivery ||
+        returnStatus === filterDelivery
       );
-    }
+    });
+  }
 
-    if (search && search.trim()) {
-      const q = search.trim().toLowerCase();
-      arr = arr.filter(
-        (o) =>
-          (o.orderNo || "").toLowerCase().includes(q) ||
-          (o.customerName || "").toLowerCase().includes(q) ||
-          (o.deliveryAddress || "").toLowerCase().includes(q)
-      );
-    }
+  // 3️⃣ DERIVED STATUS FILTER
+  if (filterDerived !== "all") {
+    arr = arr.filter(
+      (o) =>
+        deriveDetailedStatus(o, deliveriesByOrder) ===
+        filterDerived
+    );
+  }
 
-    return arr;
-  }, [orders, filterDerived, filterDelivery, search]);
+  return arr;
+}, [
+  orders,
+  search,
+  filterDelivery,
+  filterDerived,
+  deliveriesByOrder, // 🔴 REQUIRED
+]);
+
 
   // Item updates
   const updateOrderItem = async (index, patch) => {
@@ -1332,6 +1387,38 @@ const createReturnDelivery = async () => {
       setSaving(false);
     }
   };
+  function getDeliveryBadgeText(order, deliveriesByOrder = {}) {
+  const list = deliveriesByOrder[order.id] || [];
+
+  const pickup = list.find(d => d.deliveryType === "pickup");
+  const ret = list.find(d => d.deliveryType === "return");
+
+  // No delivery yet
+  if (!pickup && !ret) return "No Delivery";
+
+  // Pickup in progress
+  if (pickup && pickup.status !== "completed") {
+    return `Pickup ${pickup.status.replace("_", " ")}`;
+  }
+
+  // Pickup done, return not started
+  if (pickup?.status === "completed" && !ret) {
+    return "On Rent";
+  }
+
+  // Return in progress
+  if (ret && ret.status !== "completed") {
+    return `Return ${ret.status.replace("_", " ")}`;
+  }
+
+  // Both completed
+  if (pickup?.status === "completed" && ret?.status === "completed") {
+    return "Completed";
+  }
+
+  return "Active";
+}
+
 
   const driverAcceptDelivery = async () =>
     updateDeliveryStage("accepted", "Driver accepted");
@@ -1609,109 +1696,134 @@ const createReturnDelivery = async () => {
 
           <tbody>
             {filtered.map((o) => {
-              const derived = deriveDetailedStatus(o);
-              const badgeBg = detailedStatusColor(derived);
+              const derived = deriveDetailedStatus(o, deliveriesByOrder);
+const badgeBg = detailedStatusColor(derived);
+const badgeText = getDeliveryBadgeText(o, deliveriesByOrder);
+
               const hints = getResourceBadges(o);
 
               return (
-                <tr key={o.id}>
-                  <td className="strong">{o.orderNo || o.id}</td>
-                  <td>{o.customerName || "—"}</td>
+               <tr key={o.id}>
+  <td className="strong">{o.orderNo || o.id}</td>
+  <td>{o.customerName || "—"}</td>
 
-                  {/* Status + secondary resource hints */}
-                  <td style={{ minWidth: 240 }}>
-                    <div style={{ textTransform: "capitalize", marginBottom: 6 }}>
-                      <span
-                        title={`Base: ${o.status || "—"}`}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 8,
-                          padding: "2px 10px",
-                          borderRadius: 999,
-                          fontSize: 12,
-                          fontWeight: 700,
-                          background: badgeBg,
-                          color: "#fff",
-                        }}
-                      >
-                        <span
-                          style={{
-                            width: 8,
-                            height: 8,
-                            borderRadius: 999,
-                            background: "rgba(255,255,255,0.85)",
-                          }}
-                        />
-                        {derived.replaceAll("_", " ")}
-                      </span>
-                    </div>
+  {/* Status + secondary resource hints */}
+  <td style={{ minWidth: 240 }}>
+    <div style={{ textTransform: "capitalize", marginBottom: 6 }}>
+      <span
+        title={`Base: ${o.status || "—"}`}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "2px 10px",
+          borderRadius: 999,
+          fontSize: 12,
+          fontWeight: 700,
+          background: badgeBg,
+          color: "#fff",
+        }}
+      >
+        <span
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 999,
+            background: "rgba(255,255,255,0.85)",
+          }}
+        />
+        {/* ✅ USE DELIVERY-AWARE BADGE TEXT */}
+        {badgeText}
+      </span>
+    </div>
 
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {hints.map(({ key, label }) => {
-                        const c = hintColor(key);
-                        return (
-                          <span
-                            key={key}
-                            style={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              padding: "2px 8px",
-                              borderRadius: 999,
-                              fontSize: 11,
-                              fontWeight: 600,
-                              background: c.bg,
-                              border: `1px solid ${c.border}`,
-                              color: c.text,
-                              lineHeight: 1.4,
-                              textTransform: "capitalize",
-                            }}
-                          >
-                            {label}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  </td>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      {hints.map(({ key, label }) => {
+        const c = hintColor(key);
+        return (
+          <span
+            key={key}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              padding: "2px 8px",
+              borderRadius: 999,
+              fontSize: 11,
+              fontWeight: 600,
+              background: c.bg,
+              border: `1px solid ${c.border}`,
+              color: c.text,
+              lineHeight: 1.4,
+              textTransform: "capitalize",
+            }}
+          >
+            {label}
+          </span>
+        );
+      })}
+    </div>
+  </td>
 
-                  {/* Delivery status (raw) */}
-                  <td style={{ textTransform: "capitalize" }}>
-                    {o.deliveryStatus || o.delivery?.status || "—"}
-                  </td>
-                  <td>{formatYMDForDisplay(getStartDate(o))}</td>
+  {/* ❌ REMOVE raw delivery status column */}
+  <td style={{ fontSize: 12 }}>
+  {(() => {
+    const list = deliveriesByOrder[o.id] || [];
+    const pickup = list.find(d => d.deliveryType === "pickup");
+    const ret = list.find(d => d.deliveryType === "return");
+
+    if (!pickup && !ret) return "—";
+
+    return (
+      <>
+        {pickup && (
+          <div>Pickup: {pickup.status}</div>
+        )}
+        {ret && (
+          <div>Return: {ret.status}</div>
+        )}
+      </>
+    );
+  })()}
+</td>
 
 
-                  <td>
-                    {o.createdAt?.seconds
-                      ? new Date(o.createdAt.seconds * 1000).toLocaleString()
-                      : "—"}
-                  </td>
-                  <td>{(o.items || []).length}</td>
-                  <td>{fmtCurrency(o.totals?.total || 0)}</td>
+  <td>{formatYMDForDisplay(getStartDate(o))}</td>
 
-                  <td>
-                    <button className="cp-link" onClick={() => openOrder(o)}>
-                      View
-                    </button>
-                    {o.status !== "completed" && (
-                      <button
-                        className="cp-link"
-                        onClick={() => {
-                          setSelectedOrder(o);
-                          changeOrderStatus("completed");
-                        }}
-                      >
-                        Mark Completed
-                      </button>
-                    )}
-                    <button
-                      className="cp-link"
-                      onClick={() => navigate(`/orders/${o.id}`)}
-                    >
-                      Open
-                    </button>
-                  </td>
-                </tr>
+  <td>
+    {o.createdAt?.seconds
+      ? new Date(o.createdAt.seconds * 1000).toLocaleString()
+      : "—"}
+  </td>
+
+  <td>{(o.items || []).length}</td>
+  <td>{fmtCurrency(o.totals?.total || 0)}</td>
+
+  <td>
+    <button className="cp-link" onClick={() => openOrder(o)}>
+      View
+    </button>
+
+    {o.status !== "completed" && (
+      <button
+        className="cp-link"
+        onClick={() => {
+          setSelectedOrder(o);
+          changeOrderStatus("completed");
+        }}
+      >
+        Mark Completed
+      </button>
+    )}
+
+    <button
+      className="cp-link"
+      onClick={() => navigate(`/orders/${o.id}`)}
+    >
+      Open
+    </button>
+  </td>
+</tr>
+
               );
             })}
 
