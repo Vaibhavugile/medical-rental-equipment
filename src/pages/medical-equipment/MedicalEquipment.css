@@ -701,3 +701,130 @@
     animation: none !important;
   }
 }
+/* =====================================================
+   MOBILE OPTIMIZATION – SAFE OVERRIDES ONLY
+   (Does NOT remove or modify desktop styles)
+===================================================== */
+
+/* -------- Tablets & down -------- */
+@media (max-width: 768px) {
+  .me-hero h1,
+  .me-hero-alt-content h1,
+  .me-detail-hero h1 {
+    font-size: 2rem;
+  }
+
+  .me-hero p,
+  .me-hero-alt-content p {
+    font-size: 0.95rem;
+  }
+
+  .me-section {
+    margin: 50px auto;
+  }
+}
+
+/* -------- Mobile (MOST IMPORTANT) -------- */
+@media (max-width: 600px) {
+  /* HERO spacing */
+  .me-hero,
+  .me-hero-alt {
+    padding: 64px 16px 48px;
+  }
+
+  /* Intro section */
+  .me-intro {
+    padding: 56px 16px;
+  }
+
+  .me-intro-title {
+    font-size: 1.9rem;
+  }
+
+  .me-intro-subtitle {
+    font-size: 1rem;
+  }
+
+  /* FORCE 2x2 GRID ON MOBILE */
+  .me-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+    padding: 40px 0 60px;
+  }
+
+  .me-card {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .me-card img {
+    height: 120px;
+    padding: 8px;
+    margin-bottom: 10px;
+  }
+
+  .me-card h3 {
+    font-size: 0.9rem;
+  }
+
+  .me-card p {
+    font-size: 0.78rem;
+    line-height: 1.4;
+  }
+
+  /* Buttons */
+  .me-btn {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+  /* Lists */
+  .me-steps li {
+    gap: 10px;
+    font-size: 0.9rem;
+  }
+
+  .me-steps span {
+    min-width: 28px;
+    height: 28px;
+    font-size: 0.8rem;
+  }
+}
+
+/* -------- Very Small Phones -------- */
+@media (max-width: 380px) {
+  /* Switch to single column only on ultra-small screens */
+  .me-grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* Ultra-clean cards */
+  .me-card p {
+    display: none;
+  }
+
+  .me-card img {
+    height: 110px;
+  }
+}
+/* =========================================
+   FIX: HEADER OVERLAP (GLOBAL SAFE FIX)
+========================================= */
+
+/* Any page that comes after header */
+.page-with-header,
+.me-page,
+.equipment-page,
+.equipment-wrapper {
+  padding-top: 120px; /* header height */
+}
+
+/* Mobile adjustment */
+@media (max-width: 768px) {
+  .page-with-header,
+  .me-page,
+  .equipment-page,
+  .equipment-wrapper {
+    padding-top: 96px;
+  }
+}

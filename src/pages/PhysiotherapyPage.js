@@ -29,7 +29,7 @@ export default function PhysiotherapyPage() {
     ],
     img: "/Physiotherapy.jpg",
     imgAlt: "Physiotherapy at Home | BookMyMedicare",
-    imageOnRight: false,
+    imageOnRight: true,
 
     // <<< ADDED: top padding so section1 is offset below TopBar + Header
     paddingTop: "calc(var(--topbar-height) + var(--header-height) + 22px)"
@@ -47,7 +47,7 @@ export default function PhysiotherapyPage() {
     bullets: [],
     img: "/Physiotherapy2.jpg",
     imgAlt: "Physiotherapy at Home",
-    imageOnRight: true
+    imageOnRight: false
   };
 
   const stepsSection = {

@@ -34,7 +34,7 @@ export default function ICUPage() {
     ],
     img: "/icu_setup.png",
     imgAlt: "ICU setup at home",
-    imageOnRight: false,
+    imageOnRight: true,
 
     // <<< ADDED: top padding so section1 is offset below TopBar + Header
     paddingTop: "calc(var(--topbar-height) + var(--header-height) + 22px)"
@@ -53,7 +53,8 @@ export default function ICUPage() {
     ],
     img: "/icu2.png",
     imgAlt: "Patient receiving home ICU care",
-    imageOnRight: true
+    imageOnRight: false,
+    
   };
 
   const stepsSection = {

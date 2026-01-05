@@ -1,0 +1,133 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap");
+
+/* =====================================================
+   PAGE WRAPPER
+===================================================== */
+.notfound-page {
+  min-height: 100vh;
+  padding-top: 120px; /* FIX HEADER OVERLAP */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f9ff 100%);
+  font-family: "Poppins", system-ui, sans-serif;
+}
+
+/* =====================================================
+   CONTAINER
+===================================================== */
+.notfound-container {
+  text-align: center;
+  padding: 40px 24px;
+  max-width: 520px;
+}
+
+/* =====================================================
+   404 CODE
+===================================================== */
+.notfound-code {
+  font-size: 7rem;
+  font-weight: 900;
+  color: #f28c28;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+/* =====================================================
+   TEXT
+===================================================== */
+.notfound-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #0e3f66;
+  margin-bottom: 10px;
+}
+
+.notfound-text {
+  font-size: 1rem;
+  color: #6b7e8c;
+  line-height: 1.6;
+  margin-bottom: 28px;
+}
+
+/* =====================================================
+   ACTIONS
+===================================================== */
+.notfound-actions {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.notfound-btn {
+  background: linear-gradient(90deg, #f28c28, #ff9f45);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 22px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 14px 44px rgba(242, 140, 40, 0.25);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.notfound-btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 24px 70px rgba(242, 140, 40, 0.4);
+}
+
+/* Ghost button */
+.notfound-btn.ghost {
+  background: transparent;
+  color: #0e3f66;
+  border: 1px solid rgba(14, 63, 102, 0.15);
+  box-shadow: none;
+}
+
+.notfound-btn.ghost:hover {
+  background: rgba(14, 63, 102, 0.04);
+  transform: translateY(-2px);
+}
+
+/* =====================================================
+   MOBILE
+===================================================== */
+@media (max-width: 768px) {
+  .notfound-page {
+    padding-top: 96px;
+  }
+
+  .notfound-code {
+    font-size: 5.5rem;
+  }
+
+  .notfound-title {
+    font-size: 1.7rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .notfound-page {
+    padding-top: 88px;
+  }
+
+  .notfound-code {
+    font-size: 4.5rem;
+  }
+
+  .notfound-btn {
+    padding: 10px 18px;
+    font-size: 0.9rem;
+  }
+}
+
+/* =====================================================
+   ACCESSIBILITY
+===================================================== */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

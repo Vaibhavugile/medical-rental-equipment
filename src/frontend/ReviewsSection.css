@@ -1,6 +1,4 @@
-/* ReviewsSection.css — PREMIUM WHITE THEME
-   Layout & JS unchanged
-*/
+/* ReviewsSection.css — PREMIUM + MOBILE FRIENDLY */
 
 :root {
   /* ================= BRAND ================= */
@@ -25,8 +23,8 @@
 
 /* ================= SECTION ================= */
 .bmm-reviews {
-  background: #ffffff; /* FIXED: white section */
-  padding: 80px 4vw;
+  background: #ffffff;
+  padding: 90px 4vw;
   color: var(--bmm-text-dark);
   font-family: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
 }
@@ -40,7 +38,7 @@
 /* ================= HEADER ================= */
 .bmm-reviews-header {
   text-align: center;
-  margin-bottom: 26px;
+  margin-bottom: 32px;
 }
 
 .bmm-title {
@@ -50,17 +48,22 @@
   font-weight: 800;
 }
 
+.bmm-title span {
+  color: var(--bmm-orange);
+}
+
 .bmm-sub {
-  margin-top: 6px;
+  margin-top: 8px;
   color: var(--bmm-text-muted);
   font-weight: 600;
+  line-height: 1.4;
 }
 
 /* ================= SCORE ================= */
 .bmm-score-row {
   display: flex;
   justify-content: center;
-  margin: 22px 0 36px;
+  margin: 26px 0 42px;
 }
 
 .bmm-score-card {
@@ -68,14 +71,16 @@
   align-items: center;
   gap: 22px;
   background: #ffffff;
-  padding: 16px 22px;
-  border-radius: 14px;
+  padding: 18px 24px;
+  border-radius: 16px;
   border: 1px solid var(--bmm-border);
   box-shadow: var(--bmm-shadow-soft);
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .bmm-score-number {
-  font-size: 2rem;
+  font-size: 2.1rem;
   font-weight: 800;
   color: var(--bmm-blue-dark);
 }
@@ -92,13 +97,13 @@
   margin-top: 6px;
 }
 
-/* ghost button */
+/* ================= GHOST BUTTON ================= */
 .bmm-btn-ghost {
   background: transparent;
   border: 1px solid var(--bmm-border);
   color: var(--bmm-blue-dark);
-  padding: 10px 14px;
-  border-radius: 10px;
+  padding: 10px 16px;
+  border-radius: 12px;
   font-weight: 700;
   cursor: pointer;
   transition: box-shadow 180ms var(--bmm-ease), transform 180ms var(--bmm-ease);
@@ -113,7 +118,7 @@
 .bmm-carousel-wrap {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 16px;
 }
 
 /* arrows */
@@ -135,25 +140,28 @@
   box-shadow: 0 20px 48px rgba(11,53,88,0.18);
 }
 
-/* carousel list */
+/* ================= SCROLL AREA ================= */
 .bmm-carousel {
   display: flex;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
-  gap: 24px;
-  padding: 12px 6px;
+  gap: 26px;
+  padding: 16px 8px;
   scrollbar-width: none;
 }
-.bmm-carousel::-webkit-scrollbar { display: none; }
+
+.bmm-carousel::-webkit-scrollbar {
+  display: none;
+}
 
 /* ================= REVIEW CARD ================= */
 .bmm-card {
-  scroll-snap-align: start;
+  scroll-snap-align: center;
   min-width: 320px;
   width: 320px;
   background: var(--bmm-card-bg);
-  border-radius: 16px;
-  padding: 20px;
+  border-radius: 18px;
+  padding: 22px;
   border: 1px solid var(--bmm-border);
   box-shadow: var(--bmm-shadow-soft);
   display: flex;
@@ -165,10 +173,6 @@
 .bmm-card.active {
   transform: translateY(-8px);
   box-shadow: 0 28px 80px rgba(11,53,88,0.22);
-}
-
-.bmm-card:hover {
-  transform: translateY(-6px);
 }
 
 /* ================= CARD TOP ================= */
@@ -184,10 +188,10 @@
   border-radius: 50%;
   overflow: hidden;
   border: 1px solid var(--bmm-border);
+  background: #f8fbff;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #f8fbff;
 }
 
 .bmm-avatar img {
@@ -199,11 +203,7 @@
 .bmm-initials {
   font-weight: 700;
   color: #ffffff;
-  background: linear-gradient(
-    90deg,
-    var(--bmm-orange),
-    #ff9f1a
-  );
+  background: linear-gradient(90deg, var(--bmm-orange), #ff9f1a);
   width: 56px;
   height: 56px;
   display: flex;
@@ -212,7 +212,7 @@
   border-radius: 50%;
 }
 
-/* meta */
+/* ================= TEXT ================= */
 .bmm-name {
   font-weight: 700;
   color: var(--bmm-blue-dark);
@@ -224,7 +224,6 @@
   margin-top: 6px;
 }
 
-/* ================= TEXT ================= */
 .bmm-text {
   color: var(--bmm-text-dark);
   font-style: italic;
@@ -232,7 +231,6 @@
   font-size: 0.98rem;
 }
 
-/* footer */
 .bmm-card-footer {
   display: flex;
   justify-content: space-between;
@@ -244,8 +242,8 @@
 .bmm-dots {
   display: flex;
   justify-content: center;
-  gap: 8px;
-  margin-top: 20px;
+  gap: 10px;
+  margin-top: 26px;
 }
 
 .bmm-dot {
@@ -255,37 +253,49 @@
   background: rgba(11,53,88,0.25);
   border: none;
   cursor: pointer;
-  transition: transform 160ms var(--bmm-ease), background-color 160ms var(--bmm-ease);
 }
 
 .bmm-dot.active {
-  transform: scale(1.3);
+  transform: scale(1.35);
   background: var(--bmm-orange);
 }
 
-/* ================= RESPONSIVE ================= */
-@media (max-width: 980px) {
+/* ================= MOBILE ================= */
+@media (max-width: 768px) {
   .bmm-reviews {
-    padding: 60px 4vw;
+    padding: 70px 4vw;
   }
 
   .bmm-title {
-    font-size: 1.9rem;
+    font-size: 1.7rem;
   }
 
-  .bmm-card {
-    min-width: 300px;
+  .bmm-sub {
+    font-size: 0.95rem;
   }
-}
 
-@media (max-width: 600px) {
-  .bmm-card {
-    min-width: 86%;
-    width: 86%;
+  .bmm-score-card {
+    flex-direction: column;
+    gap: 14px;
+    text-align: center;
+  }
+
+  .bmm-carousel-wrap {
+    gap: 0;
   }
 
   .bmm-arrow {
     display: none;
+  }
+
+  .bmm-card {
+    min-width: 88%;
+    width: 88%;
+    padding: 20px;
+  }
+
+  .bmm-text {
+    font-size: 0.95rem;
   }
 }
 
@@ -297,7 +307,4 @@
     transition: none !important;
     transform: none !important;
   }
-}
-.bmm-title span {
-  color: var(--bmm-orange);
 }

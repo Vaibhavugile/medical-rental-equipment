@@ -5,69 +5,70 @@ import "./Header.css";
  * Header.jsx
  *
  * - Desktop nav scroll-to-section behavior preserved
- * - If a nav item has `route`, the click navigates to that route (desktop + mobile)
- * - No react-router dependency required (uses window.location.href fallback)
- * - Mobile menu accessible, trap-focus-ish behavior (basic)
+ * - Cross-page section navigation supported
+ * - Logo image instead of text
+ * - Mobile menu improved
+ * - No react-router dependency
  */
 
 const NAV_ITEMS = [
   { id: "home", label: "Home", route: "/" },
-  { id: "services", label: "Services" },   // 👈 scroll target
+  { id: "services", label: "Services" },
   { id: "blogs", label: "Blogs", route: "/blogs" },
   { id: "providers", label: "Providers", route: "/our-team" },
-  { id: "contact", label: "Contact" },     // 👈 scroll target
+  { id: "contact", label: "Contact" },
 ];
 
-
-
-
-function MenuIcon({ size = 20 }) {
+function MenuIcon({ size = 22 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M3 6h18M3 12h18M3 18h18" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none"/>
-    </svg>
-  );
-}
-function CloseIcon({ size = 20 }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      <path d="M6 6l12 12M6 18L18 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" fill="none"/>
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M3 6h18M3 12h18M3 18h18"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
 
-export default function Header({ logo = "BookMyMedicare" }) {
+function CloseIcon({ size = 22 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M6 6l12 12M6 18L18 6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeId, setActiveId] = useState("home");
   const firstMobileLinkRef = useRef(null);
   const headerRef = useRef(null);
 
-  // On mount, set active based on current path (so /our-team highlights Providers)
-useEffect(() => {
-  const path = window.location.pathname || "/";
-  const hash = window.location.hash.replace("#", "");
+  /* ================= SET ACTIVE ON LOAD ================= */
+  useEffect(() => {
+    const path = window.location.pathname || "/";
+    const hash = window.location.hash.replace("#", "");
 
-  if (path === "/" && hash) {
-    setActiveId(hash);
-  } else if (path === "/") {
-    setActiveId("home");
-  } else if (path.startsWith("/blogs")) {
-    setActiveId("blogs");
-  } else if (path.startsWith("/our-team")) {
-    setActiveId("providers");
-  }
-}, []);
+    if (path === "/" && hash) setActiveId(hash);
+    else if (path === "/") setActiveId("home");
+    else if (path.startsWith("/blogs")) setActiveId("blogs");
+    else if (path.startsWith("/our-team")) setActiveId("providers");
+  }, []);
 
-
-
-
-  // Close mobile menu on resize > breakpoint, or on Escape key
+  /* ================= CLOSE MOBILE MENU ================= */
   useEffect(() => {
     function onResize() {
       if (window.innerWidth > 900 && mobileOpen) setMobileOpen(false);
     }
     function onKey(e) {
-      if (e.key === "Escape" && mobileOpen) setMobileOpen(false);
+      if (e.key === "Escape") setMobileOpen(false);
     }
     window.addEventListener("resize", onResize);
     window.addEventListener("keydown", onKey);
@@ -77,122 +78,91 @@ useEffect(() => {
     };
   }, [mobileOpen]);
 
-  // Trap focus into mobile menu when open (simple)
+  /* ================= LOCK BODY SCROLL ================= */
   useEffect(() => {
+    document.body.style.overflow = mobileOpen ? "hidden" : "";
     if (mobileOpen) {
-      // focus first link after menu opens
       setTimeout(() => firstMobileLinkRef.current?.focus(), 80);
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
     }
-    return () => {
-      document.body.style.overflow = "";
-    };
+    return () => (document.body.style.overflow = "");
   }, [mobileOpen]);
 
-  // IntersectionObserver to set active link based on sections in view
+  /* ================= OBSERVE SECTIONS ================= */
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
           if (entry.isIntersecting) {
-            const id = entry.target.getAttribute("id");
-            if (id) {
-              // only set active for items that exist in NAV_ITEMS (hash-based)
-              const found = NAV_ITEMS.find((n) => n.id === id);
-              if (found) setActiveId(id);
+            const id = entry.target.id;
+            if (NAV_ITEMS.some((n) => n.id === id)) {
+              setActiveId(id);
             }
           }
         });
       },
-      { root: null, rootMargin: "-35% 0px -55% 0px", threshold: 0 }
+      { rootMargin: "-35% 0px -55% 0px" }
     );
 
-    NAV_ITEMS.forEach((it) => {
-      // only observe sections that exist on this page (hash sections)
-      const el = document.getElementById(it.id);
+    NAV_ITEMS.forEach((item) => {
+      const el = document.getElementById(item.id);
       if (el) observer.observe(el);
     });
-
-    // also observe booking if present (for CTA strong state)
-    const bookingEl = document.getElementById("booking");
-    if (bookingEl) observer.observe(bookingEl);
 
     return () => observer.disconnect();
   }, []);
 
-  // Toggle .strong class on CTA reliably (for visual emphasis)
-  useEffect(() => {
-    const btn = document.querySelector(".btn-primary");
-    if (!btn) return;
-    // Customize which sections make the CTA stronger:
-    const strongWhen = new Set(["booking", "home"]);
-    if (strongWhen.has(activeId)) btn.classList.add("strong");
-    else btn.classList.remove("strong");
-  }, [activeId]);
+  /* ================= SCROLL HELPERS ================= */
+  function scrollToSection(id) {
+    setActiveId(id);
+    const el = document.getElementById(id);
 
-  // Smooth scroll handler for nav links that use section ids
-function handleNavClick(e, item) {
-  e.preventDefault();
-
-  const isOnLanding = window.location.pathname === "/";
-  const hasRoute = Boolean(item.route);
-
-  // 1️⃣ HOME (special case)
-  if (item.id === "home") {
-    if (!isOnLanding) {
-      window.location.href = "/#home";
+    if (!el) {
+      window.location.hash = id;
+      setMobileOpen(false);
       return;
     }
-    scrollToSection("home");
-    return;
-  }
 
-  // 2️⃣ SERVICES / CONTACT (scroll sections)
-  if (!hasRoute) {
-    if (!isOnLanding) {
-      // Go to landing page + section
-      window.location.href = `/#${item.id}`;
-      return;
-    }
-    scrollToSection(item.id);
-    return;
-  }
+    const offset = headerRef.current?.offsetHeight || 0;
+    const top = el.getBoundingClientRect().top + window.pageYOffset;
 
-  // 3️⃣ ROUTE navigation (blogs, providers)
-  window.location.href = item.route;
-}
-function scrollToSection(id) {
-  setActiveId(id);
+    window.scrollTo({
+      top: top - offset - 12,
+      behavior: "smooth",
+    });
 
-  const el = document.getElementById(id);
-  if (!el) {
-    window.location.hash = id;
     setMobileOpen(false);
-    return;
   }
 
-  const headerOffset = headerRef.current?.offsetHeight || 0;
-  const elTop = el.getBoundingClientRect().top + window.pageYOffset;
+  function handleNavClick(e, item) {
+    e.preventDefault();
+    const isOnLanding = window.location.pathname === "/";
 
-  window.scrollTo({
-    top: elTop - headerOffset - 12,
-    behavior: "smooth",
-  });
+    // Scroll-only items
+    if (!item.route) {
+      if (!isOnLanding) {
+        window.location.href = `/#${item.id}`;
+        return;
+      }
+      scrollToSection(item.id);
+      return;
+    }
 
-  setMobileOpen(false);
-}
+    // Route items
+    window.location.href = item.route;
+  }
 
-
-
+  /* ================= RENDER ================= */
   return (
-    <header className="header" role="banner" ref={headerRef}>
+    <header className="header" ref={headerRef} role="banner">
       <nav className="nav" role="navigation" aria-label="Primary">
-        <div className="logo" tabIndex={0}>{logo}</div>
 
-        {/* Desktop nav */}
-        <ul className="navLinks" role="menubar" aria-label="Main">
+        {/* LOGO */}
+        <a href="/" className="logo" aria-label="BookMyMedicare Home">
+          <img src="/logo.png" alt="BookMyMedicare" />
+        </a>
+
+        {/* DESKTOP NAV */}
+        <ul className="navLinks" role="menubar">
           {NAV_ITEMS.map((item) => (
             <li key={item.id} role="none">
               <a
@@ -203,30 +173,15 @@ function scrollToSection(id) {
                 onClick={(e) => handleNavClick(e, item)}
               >
                 {item.label}
-                <span className="underline" aria-hidden></span>
               </a>
             </li>
           ))}
         </ul>
 
-        {/* Right actions */}
+        {/* RIGHT ACTIONS */}
         <div className="rightActions">
-          <a
-            href="#booking"
-            className="btn-primary"
-            onClick={(e) => {
-              e.preventDefault();
-              const el = document.getElementById("booking");
-              if (el) {
-                const headerOffset = headerRef.current?.offsetHeight || 0;
-                const elTop = el.getBoundingClientRect().top + window.pageYOffset;
-                window.scrollTo({ top: elTop - headerOffset - 12, behavior: "smooth" });
-              } else {
-                window.location.hash = "booking";
-              }
-            }}
-          >
-            Call Us Now
+          <a href="/#contact" className="btn-primary">
+            Talk to Specialist
           </a>
 
           <button
@@ -241,46 +196,28 @@ function scrollToSection(id) {
         </div>
       </nav>
 
-      {/* Mobile menu */}
+      {/* MOBILE MENU */}
       <div
         id="mobile-menu"
         className={`mobileMenu ${mobileOpen ? "open" : "closed"}`}
         role="dialog"
         aria-modal="true"
-        aria-hidden={!mobileOpen}
       >
-        <div className="mobileMenuInner" role="document">
-          {NAV_ITEMS.map((item, idx) => (
-            <a
-              key={item.id}
-              href={item.route ? item.route : `#${item.id}`}
-              onClick={(e) => handleNavClick(e, item)}
-              ref={idx === 0 ? firstMobileLinkRef : undefined}
-            >
-              {item.label}
-            </a>
-          ))}
+        {NAV_ITEMS.map((item, idx) => (
+          <a
+            key={item.id}
+            href={item.route ? item.route : `#${item.id}`}
+            onClick={(e) => handleNavClick(e, item)}
+            ref={idx === 0 ? firstMobileLinkRef : undefined}
+          >
+            {item.label}
+          </a>
+        ))}
 
-          <div className="mobileMenuCTA">
-            <a
-              href="#booking"
-              className="btn-primary"
-              onClick={(e) => {
-                e.preventDefault();
-                const el = document.getElementById("booking");
-                if (el) {
-                  const headerOffset = headerRef.current?.offsetHeight || 0;
-                  const elTop = el.getBoundingClientRect().top + window.pageYOffset;
-                  window.scrollTo({ top: elTop - headerOffset - 12, behavior: "smooth" });
-                } else {
-                  window.location.hash = "booking";
-                }
-                setMobileOpen(false);
-              }}
-            >
-              Call Us Now
-            </a>
-          </div>
+        <div className="mobileMenuCTA">
+          <a href="/#contact" className="btn-primary">
+            Talk to Specialist
+          </a>
         </div>
       </div>
     </header>

@@ -16,7 +16,7 @@ export default function EquipmentDetail() {
     return (
       <div className="me-not-found">
         <h2>Equipment Not Found</h2>
-        <Link to="/medical-equipment" className="me-btn">
+        <Link to="/equipment" className="me-btn">
           Back to Equipment
         </Link>
       </div>
@@ -34,7 +34,7 @@ export default function EquipmentDetail() {
           <h1>{detail.title}</h1>
           <div className="me-breadcrumb">
             <Link to="/">Home</Link> /{" "}
-            <Link to="/medical-equipment">Medical Equipment</Link> /{" "}
+            <Link to="/equipment">Medical Equipment</Link> /{" "}
             <span>{detail.title}</span>
           </div>
         </div>

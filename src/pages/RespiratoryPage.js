@@ -29,7 +29,7 @@ export default function RespiratoryPage() {
     ],
     img: "/respiratory.jpg",
     imgAlt: "Respiratory Care At Home | BookMyMedicare",
-    imageOnRight: false,
+    imageOnRight: true,
 
     // <<< ADDED: top padding so section1 is offset below TopBar + Header
     paddingTop: "calc(var(--topbar-height) + var(--header-height) + 22px)"
@@ -47,7 +47,7 @@ export default function RespiratoryPage() {
     bullets: [],
     img: "/respiratory2.jpg",
     imgAlt: "Respiratory Care At Home",
-    imageOnRight: true
+    imageOnRight: false
   };
 
   const stepsSection = {

@@ -1,0 +1,119 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap");
+
+/* =====================================================
+   PAGE WRAPPER
+===================================================== */
+.terms-page {
+  padding-top: 120px; /* FIX HEADER OVERLAP */
+  background: #ffffff;
+}
+
+/* =====================================================
+   CONTAINER
+===================================================== */
+.terms-container {
+  max-width: 900px;
+  margin: auto;
+  padding: 40px 20px 80px;
+  font-family: "Poppins", system-ui, sans-serif;
+  color: #0e2a3a;
+}
+
+/* =====================================================
+   TITLE
+===================================================== */
+.terms-title {
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: #0e3f66;
+  margin-bottom: 6px;
+}
+
+.terms-updated {
+  font-size: 0.9rem;
+  color: #6b7e8c;
+  margin-bottom: 32px;
+}
+
+/* =====================================================
+   SECTIONS
+===================================================== */
+.terms-container section {
+  margin-bottom: 36px;
+}
+
+/* =====================================================
+   HEADINGS
+===================================================== */
+.terms-container h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0e3f66;
+  margin-bottom: 10px;
+}
+
+/* =====================================================
+   TEXT
+===================================================== */
+.terms-container p {
+  font-size: 0.98rem;
+  line-height: 1.7;
+  color: #374151;
+  margin-bottom: 10px;
+}
+
+.terms-container strong {
+  color: #0e3f66;
+  font-weight: 700;
+}
+
+/* =====================================================
+   LISTS
+===================================================== */
+.terms-container ul {
+  padding-left: 20px;
+}
+
+.terms-container li {
+  font-size: 0.97rem;
+  line-height: 1.7;
+  margin-bottom: 8px;
+  color: #374151;
+}
+
+/* =====================================================
+   MOBILE
+===================================================== */
+@media (max-width: 768px) {
+  .terms-page {
+    padding-top: 96px;
+  }
+
+  .terms-title {
+    font-size: 2rem;
+  }
+
+  .terms-container h2 {
+    font-size: 1.3rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .terms-page {
+    padding-top: 88px;
+  }
+
+  .terms-title {
+    font-size: 1.8rem;
+  }
+}
+
+/* =====================================================
+   ACCESSIBILITY
+===================================================== */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

@@ -29,7 +29,7 @@ export default function PharmacyPage() {
     ],
     img: "/pharmacy-delivery.jpg",
     imgAlt: "Pharmacy Home Delivery | BookMyMedicare",
-    imageOnRight: false,
+    imageOnRight: true,
 
     // <<< ADDED: top padding so section1 is offset below TopBar + Header
     paddingTop: "calc(var(--topbar-height) + var(--header-height) + 22px)"
@@ -47,7 +47,7 @@ export default function PharmacyPage() {
     bullets: [],
     img: "/delivery.jpg",
     imgAlt: "Pharmacy Home Delivery | BookMyMedicare",
-    imageOnRight: true
+    imageOnRight: false
   };
 
   const stepsSection = {

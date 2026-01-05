@@ -12,8 +12,8 @@
 
 /* ================= SECTION ================= */
 .who {
-  padding: 80px 0;
-  background: #ffffff; /* FIXED: keep section white */
+  padding: 88px 0;
+  background: #ffffff;
   opacity: 0;
   transform: translateY(24px);
   transition: opacity 0.8s ease, transform 0.8s ease;
@@ -31,7 +31,7 @@
   padding: 0 4vw;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 48px;
+  gap: 56px;
   align-items: center;
 }
 
@@ -49,10 +49,10 @@
 }
 
 .who-title {
-  font-size: 2rem;
+  font-size: 2.1rem;
   font-weight: 900;
   color: var(--bm-blue-dark);
-  margin-bottom: 26px;
+  margin-bottom: 28px;
   letter-spacing: 0.4px;
 }
 
@@ -66,46 +66,87 @@
   padding: 0;
   margin: 0;
   display: grid;
-  gap: 20px;
+  gap: 22px;
 }
 
 .who-list li {
   position: relative;
-  padding-left: 28px;
+  padding-left: 30px;
   font-size: 1.05rem;
   font-weight: 600;
   color: var(--text-dark);
-  line-height: 1.65;
+  line-height: 1.7;
 }
 
-/* premium medical checkmark */
 .who-list li::before {
   content: "✔";
   position: absolute;
   left: 0;
-  top: 2px;
+  top: 4px;
   color: var(--bm-orange);
   font-weight: 900;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
-/* ================= RESPONSIVE ================= */
+/* ================= MOBILE ================= */
 @media (max-width: 900px) {
+  .who {
+    padding: 64px 0;
+  }
+
   .who-inner {
     grid-template-columns: 1fr;
+    gap: 40px;
     text-align: center;
+  }
+
+  .who-media img {
+    max-width: 420px;
+    margin: 0 auto;
   }
 
   .who-content {
     margin: 0 auto;
+    max-width: 560px;
+  }
+
+  .who-title {
+    font-size: 1.8rem;
+    margin-bottom: 22px;
+  }
+
+  .who-list {
+    gap: 18px;
   }
 
   .who-list li {
     padding-left: 0;
+    font-size: 0.95rem;
+    line-height: 1.65;
   }
 
+  /* Replace checkmarks with subtle dots on mobile */
   .who-list li::before {
-    display: none;
+    content: "•";
+    position: static;
+    margin-right: 6px;
+    color: var(--bm-orange);
+    font-size: 1.1rem;
+  }
+}
+
+/* ================= SMALL MOBILE ================= */
+@media (max-width: 480px) {
+  .who {
+    padding: 56px 0;
+  }
+
+  .who-title {
+    font-size: 1.65rem;
+  }
+
+  .who-list li {
+    font-size: 0.9rem;
   }
 }
 

@@ -1,31 +1,23 @@
-/* WhyChooseUsUnique.css – PREMIUM BookMyMedicare THEME
-   Layout & structure unchanged
-*/
-
 /* ================= THEME ================= */
 :root {
-  /* Brand */
-  --wcu-primary: #f28c28;          /* orange accent */
+  --wcu-primary: #f28c28;
   --wcu-primary-dark: #e07000;
   --wcu-accent: #fff1e0;
 
-  /* Trust blues */
   --wcu-navy: #0b3558;
   --wcu-muted: #556b7a;
 
-  /* Surfaces */
   --wcu-card-bg: #ffffff;
   --wcu-section-bg: #ffffff;
 
-  /* Borders & shadows */
   --wcu-border: rgba(11,53,88,0.08);
   --wcu-shadow: 0 18px 60px rgba(11,53,88,0.10);
+  --wcu-shadow-soft: 0 8px 22px rgba(11,53,88,0.06);
 
-  /* Motion */
   --wcu-ease: cubic-bezier(.16,.84,.24,1);
 }
 
-/* ================= OUTER SECTION ================= */
+/* ================= SECTION ================= */
 .wcu-section {
   padding: 80px 0;
   display: flex;
@@ -33,7 +25,6 @@
   background: var(--wcu-section-bg);
 }
 
-/* ================= WRAPPER ================= */
 .wcu-inner {
   width: 94%;
   max-width: 1280px;
@@ -45,15 +36,14 @@
   font-weight: 900;
   color: var(--wcu-navy);
   margin-bottom: 42px;
-  letter-spacing: 0.6px;
-  line-height: 1.05;
+  line-height: 1.1;
 }
 
 .wcu-accent {
   color: var(--wcu-primary);
 }
 
-/* ================= GRID (UNCHANGED) ================= */
+/* ================= GRID ================= */
 .wcu-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -69,7 +59,6 @@
 
   background: var(--wcu-card-bg);
   border-radius: 28px;
-
   border: 1px solid var(--wcu-border);
   box-shadow: var(--wcu-shadow);
 
@@ -83,35 +72,44 @@
     border-color 240ms var(--wcu-ease);
 }
 
-/* visible */
-.wcu-card.wcu-card-visible {
+.wcu-card-visible {
   transform: translateY(0);
   opacity: 1;
 }
 
-/* hover (premium, subtle) */
 .wcu-card:hover {
   transform: translateY(-6px);
   border-color: rgba(242,140,40,0.35);
   box-shadow: 0 28px 90px rgba(11,53,88,0.18);
 }
 
-/* ================= TOP CARDS ================= */
+/* ================= CARD TYPES ================= */
 .wcu-top-card {
   grid-column: span 2;
 }
 
-/* ================= ICON LEFT ================= */
-.wcu-card-icon-left {
-  width: 96px;
-  height: 96px;
-  flex: 0 0 96px;
+.wcu-wide-card {
+  grid-column: span 3;
+  padding: 30px;
+  border-radius: 32px;
+}
+
+/* ================= ICONS ================= */
+.wcu-card-icon-left,
+.wcu-card-icon-right {
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* icon tile */
+.wcu-card-icon-left {
+  width: 96px;
+}
+
+.wcu-card-icon-right {
+  width: 160px;
+}
+
 .wcu-icon-tile {
   width: 76px;
   height: 76px;
@@ -119,24 +117,11 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(
-    180deg,
-    #ffffff,
-    #f8fbff
-  );
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
   box-shadow: 0 14px 40px rgba(11,53,88,0.12);
-
-  transition: transform 320ms var(--wcu-ease),
-              box-shadow 320ms var(--wcu-ease);
 }
 
-/* icon lift */
-.wcu-card:hover .wcu-icon-tile {
-  transform: translateY(-6px) scale(1.04);
-  box-shadow: 0 22px 60px rgba(242,140,40,0.28);
-}
-
-/* ================= CARD TEXT ================= */
+/* ================= TEXT ================= */
 .wcu-card-body {
   flex: 1;
 }
@@ -155,21 +140,6 @@
   line-height: 1.6;
 }
 
-/* ================= WIDE CARDS ================= */
-.wcu-wide-card {
-  grid-column: span 3;
-  padding: 30px;
-  border-radius: 32px;
-}
-
-/* ================= ICON RIGHT ================= */
-.wcu-card-icon-right {
-  width: 160px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 /* ================= RESPONSIVE ================= */
 @media (max-width: 1100px) {
   .wcu-grid {
@@ -180,19 +150,62 @@
   .wcu-wide-card { grid-column: span 4; }
 }
 
+/* ================= MOBILE ================= */
 @media (max-width: 720px) {
-  .wcu-grid {
-    grid-template-columns: 1fr;
+  .wcu-section {
+    padding: 64px 0;
   }
 
-  .wcu-card {
+  .wcu-title {
+    font-size: 1.7rem;
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  .wcu-grid {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+
+  .wcu-card,
+  .wcu-wide-card {
+    grid-column: span 1;
+    flex-direction: column;
+    text-align: center;
     padding: 20px;
     border-radius: 18px;
+    box-shadow: var(--wcu-shadow-soft);
   }
 
   .wcu-card-icon-left,
   .wcu-card-icon-right {
-    display: none;
+    width: auto;
+    margin-bottom: 10px;
+  }
+
+  .wcu-icon-tile {
+    width: 58px;
+    height: 58px;
+  }
+
+  .wcu-card-title {
+    font-size: 1.02rem;
+  }
+
+  .wcu-card-desc {
+    font-size: 0.92rem;
+    line-height: 1.6;
+  }
+}
+
+/* ================= SMALL MOBILE ================= */
+@media (max-width: 480px) {
+  .wcu-section {
+    padding: 56px 0;
+  }
+
+  .wcu-title {
+    font-size: 1.55rem;
   }
 }
 

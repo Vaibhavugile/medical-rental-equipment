@@ -29,7 +29,7 @@ export default function PalliativePage() {
     ],
     img: "/palliative.jpg",
     imgAlt: "Palliative Care At Home | BookMyMedicare",
-    imageOnRight: false,
+    imageOnRight: true,
 
     // <<< ADDED: top padding so section1 is offset below TopBar + Header
     paddingTop: "calc(var(--topbar-height) + var(--header-height) + 22px)"
@@ -47,7 +47,7 @@ export default function PalliativePage() {
     bullets: [],
     img: "/palliative2.jpg",
     imgAlt: "Patient receiving palliative care at home",
-    imageOnRight: true
+    imageOnRight: false
   };
 
   const stepsSection = {

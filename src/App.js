@@ -40,6 +40,9 @@ import FinancialReport from "./pages/reports/FinancialReport";
 import AssetsReport from "./pages/reports/AssetsReport";
 import ReportsHome from "./pages/reports/ReportsHome";
 import OutstandingOrdersReport from "./pages/reports/OutstandingOrdersReport";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsAndConditions from "./pages/TermsAndConditions";
+import NotFound from "./pages/NotFound";
 const TrackingPage = lazy(() => import("./pages/TrackingPage"));
 
 /* ---------------- Header for CRM ---------------- */
@@ -489,13 +492,15 @@ export default function App() {
         <Route path="/add-blog" element={<AddBlog />} />
 
         <Route path="/signup" element={<Signup />} />
+        <Route path="/privacy"element={<PrivacyPolicy />} />
+        <Route path="/terms"element={<TermsAndConditions />} />
 
         {/* Driver-only experience */}
         {user && userProfile?.role === "driver" ? (
           <Route path="/*" element={<DriverLayout />} />
         ) : (
           // CRM for admins/others
-          <Route path="/*" element={<CRMApp />} />
+        <Route path="*" element={<NotFound />} />
         )}
       </Routes>
     </BrowserRouter>

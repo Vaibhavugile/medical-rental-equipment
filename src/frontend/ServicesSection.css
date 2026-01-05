@@ -1,5 +1,5 @@
-/* ServicesSection.css – PREMIUM BookMyMedicare THEME (FIXED ICONS)
-   Layout, grid, animations unchanged
+/* ServicesSection.css – PREMIUM BookMyMedicare THEME (MOBILE 2x2 FIXED)
+   Icons, animations, desktop layout preserved
 */
 
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap');
@@ -10,33 +10,32 @@
   --bmm-blue: #0e3f66;
   --bmm-orange: #f28c28;
 
-  /* ✅ REQUIRED FOR SVG ICON GRADIENTS (FIX) */
-  --bmm-blue-grad-1: #3b82f6; /* light blue */
-  --bmm-blue-grad-2: #0e3f66; /* brand blue */
+  /* SVG GRADIENTS */
+  --bmm-blue-grad-1: #3b82f6;
+  --bmm-blue-grad-2: #0e3f66;
 
-  /* ================= TEXT ================= */
+  /* TEXT */
   --bmm-text-dark: #0e2a3a;
   --bmm-text-muted: #546b7a;
 
-  /* ================= SURFACES ================= */
+  /* SURFACES */
   --bmm-card-bg: #ffffff;
   --bmm-border: rgba(11,53,88,0.08);
 
-  /* ================= SHADOWS ================= */
+  /* SHADOWS */
   --bmm-shadow-soft: 0 18px 60px rgba(11,53,88,0.10);
 
-  /* ================= MOTION ================= */
+  /* MOTION */
   --bmm-ease: cubic-bezier(.16,.84,.24,1);
   --bmm-focus: rgba(242,140,40,0.28);
 }
 
 /* ================= SECTION ================= */
 .bmm-services-section {
-  background: #ffffff; /* keep section white */
+  background: #ffffff;
   padding: 80px 0;
   display: flex;
   justify-content: center;
-  box-sizing: border-box;
 }
 
 /* ================= INNER ================= */
@@ -60,11 +59,14 @@
   margin: 0;
 }
 
+.bmm-services-title span {
+  color: var(--bmm-orange);
+}
+
 .bmm-services-sub {
   margin-top: 6px;
   color: var(--bmm-text-muted);
   font-weight: 600;
-  letter-spacing: 0.3px;
 }
 
 /* ================= GRID ================= */
@@ -72,7 +74,6 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 28px;
-  align-items: stretch;
 }
 
 /* ================= CARD ================= */
@@ -98,7 +99,6 @@
 
   cursor: pointer;
   min-height: 160px;
-  position: relative;
 }
 
 /* reveal */
@@ -107,14 +107,14 @@
   opacity: 1;
 }
 
-/* hover – subtle premium */
+/* hover */
 .bmm-service-card:hover {
   transform: translate3d(var(--tx), var(--ty), 0) translateY(-6px);
   box-shadow: 0 26px 80px rgba(11,53,88,0.18);
   border-color: rgba(242,140,40,0.35);
 }
 
-/* stagger delay */
+/* stagger */
 .bmm-service-card {
   transition-delay: calc(var(--i) * 60ms);
 }
@@ -125,12 +125,10 @@
   flex-direction: column;
   align-items: center;
   height: 100%;
-  color: inherit;
   text-decoration: none;
-  outline: none;
+  color: inherit;
 }
 
-/* focus-visible */
 .bmm-service-link:focus-visible {
   outline: 3px solid var(--bmm-focus);
   outline-offset: 4px;
@@ -138,8 +136,7 @@
 
 /* ================= ICON ================= */
 .bmm-service-icon {
-  margin-bottom: 14px;
-  pointer-events: none;
+  margin-bottom: 12px;
 }
 
 .bmm-icon-circle {
@@ -149,20 +146,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-
   background: linear-gradient(180deg, #f3f8ff, #ffffff);
   box-shadow: 0 14px 40px rgba(11,53,88,0.14);
-
-  transition:
-    transform 360ms var(--bmm-ease),
-    box-shadow 360ms var(--bmm-ease);
+  transition: transform 360ms var(--bmm-ease), box-shadow 360ms var(--bmm-ease);
 }
 
-/* svg */
 .bmm-svg-icon {
   width: 56px;
   height: 56px;
-  display: block;
 }
 
 /* icon hover */
@@ -174,7 +165,6 @@
 /* ================= TEXT ================= */
 .bmm-service-body {
   text-align: center;
-  pointer-events: none;
 }
 
 .bmm-service-title {
@@ -187,7 +177,6 @@
 .bmm-service-subtitle {
   color: var(--bmm-text-muted);
   font-size: 0.95rem;
-  font-weight: 500;
 }
 
 .bmm-service-cta {
@@ -197,7 +186,7 @@
   font-size: 0.95rem;
 }
 
-/* ================= RESPONSIVE ================= */
+/* ================= TABLET ================= */
 @media (max-width: 1100px) {
   .bmm-services-grid {
     grid-template-columns: repeat(2, 1fr);
@@ -213,25 +202,53 @@
   }
 }
 
+/* ================= MOBILE (2 x 2 GRID) ================= */
 @media (max-width: 720px) {
+  .bmm-services-section {
+    padding: 56px 0;
+  }
+
   .bmm-services-grid {
-    grid-template-columns: 1fr;
-    gap: 18px;
+    grid-template-columns: repeat(2, 1fr); /* ✅ 2x2 */
+    gap: 14px;
   }
 
   .bmm-service-card {
-    padding: 20px;
-    border-radius: 14px;
+    padding: 16px 14px;
+    border-radius: 12px;
+    min-height: 140px;
   }
 
   .bmm-icon-circle {
-    width: 64px;
-    height: 64px;
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
   }
 
   .bmm-svg-icon {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .bmm-service-title {
+    font-size: 0.9rem;
+    margin: 8px 0 2px;
+  }
+
+  .bmm-service-subtitle {
+    font-size: 0.78rem;
+  }
+
+  .bmm-service-cta {
+    font-size: 0.8rem;
+    margin-top: 4px;
+  }
+}
+
+/* ================= VERY SMALL MOBILE ================= */
+@media (max-width: 380px) {
+  .bmm-services-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -244,7 +261,3 @@
     opacity: 1 !important;
   }
 }
-.bmm-services-title span {
-  color: var(--bmm-orange);
-}
-

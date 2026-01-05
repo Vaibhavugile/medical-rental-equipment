@@ -1,6 +1,6 @@
 // ServiceStepsAnimated.js
-// Full merged React components: ServiceTwoCol (same DOM structure as earlier) + ServiceStepsAnimated (unchanged structure, premium styling).
-// Import this file and the CSS above in your app.
+// Full merged React components: ServiceTwoCol + ServiceStepsAnimated.
+// FIXED: Centered badges using Flexbox for perfect card-level alignment on Desktop and Mobile.
 
 import React, { useEffect, useRef } from "react";
 import "./ServiceStepsAnimated.css";
@@ -8,9 +8,9 @@ import { scrollToContact } from "../utils/scrollToContact";
 
 /* =========================
    ServiceTwoCol
-   - Keeps your previous DOM structure and logic, only adds a reveal class for nicer animation.
+   - Premium two-column section for service details.
+   - Automatically stacks on mobile via CSS.
    ========================= */
-/* === Updated ServiceTwoCol (applies optional paddingTop prop) === */
 export function ServiceTwoCol(props) {
   const {
     eyebrow = "Services",
@@ -21,12 +21,10 @@ export function ServiceTwoCol(props) {
     img = "",
     imgAlt = "",
     imageOnRight = true,
-ctaPrimary = {
-  text: "Talk to a specialist",
-  onClick: scrollToContact,
-},
-
-    // optional paddingTop value passed via props spread (e.g., from ICUPage.section1.paddingTop)
+    ctaPrimary = {
+      text: "Talk to a specialist",
+      onClick: scrollToContact,
+    },
     paddingTop
   } = props;
 
@@ -40,12 +38,11 @@ ctaPrimary = {
         el.classList.add("bmm-visible");
         io.disconnect();
       }
-    }, { threshold: 0.15 });
+    }, { threshold: 0.1 }); 
     io.observe(el);
     return () => io.disconnect();
   }, []);
 
-  // apply inline style only if paddingTop is provided
   const sectionStyle = {};
   if (paddingTop) sectionStyle.paddingTop = paddingTop;
 
@@ -53,7 +50,7 @@ ctaPrimary = {
     <section className="bmm2-twocol" ref={sectionRef} aria-labelledby="bmm2-twocol-title" style={sectionStyle}>
       <div className={`bmm2-twocol-inner ${imageOnRight ? "" : "flip"}`}>
         {/* MEDIA side */}
-        <div className="bmm2-media" aria-hidden>
+        <div className="bmm2-media" aria-hidden="true">
           <div className="bmm2-media-card">
             {img ? (
               <img src={img} alt={imgAlt} className="bmm2-img" />
@@ -74,7 +71,7 @@ ctaPrimary = {
           {paragraphs.map((p, i) => <p key={i} className="bmm2-par">{p}</p>)}
 
           {bullets && bullets.length > 0 && (
-            <ul className="bmm2-list" aria-label="List">
+            <ul className="bmm2-list" aria-label="Key features">
               {bullets.map((b, idx) => (
                 <li key={idx} className="bmm2-list-item">
                   <span className="bmm2-bullet">✓</span>
@@ -96,70 +93,36 @@ ctaPrimary = {
 
 /* =========================
    ServiceStepsAnimated
-   - Preserves your earlier structure and behavior (badges anchored to cards, reveal)
-   - No SVG glows (removed earlier per your request)
+   - Timeline/Process section.
+   - FIXED: Badge logic moved to CSS Flex for guaranteed centering.
    ========================= */
 export function ServiceStepsAnimated({
   title = "How BookMyMedicare Team Works",
   subtitle = "Clinical + technical workflow to bring hospital-grade ICU care to your home.",
   steps = [
-    { title: "Medical assessment of patient", text: "Medical assessment of patient by doctor to understand patient need at home." },
-    { title: "Technical home survey", text: "Technical Team visit patient residence to understand the requirement at home for installing the medical equipment." },
-    { title: "Installation & testing", text: "Installation of required medical equipment at patient residence and running trials." },
-    { title: "Shift & stabilize", text: "Shift patient to home under supervision and stabilize with treatment plan." },
-    { title: "Daily monitoring & follow-up", text: "Virtual monitoring daily and on-demand physical visits for treatment planning." },
+    { title: "Medical assessment", text: "Medical assessment of patient by doctor to understand patient need at home." },
+    { title: "Technical survey", text: "Technical Team visit patient residence to understand equipment installation requirements." },
+    { title: "Installation", text: "Installation of required medical equipment at residence and running trials." },
+    { title: "Shift & stabilize", text: "Shift patient home under supervision and stabilize with treatment plan." },
+    { title: "Monitoring", text: "Virtual monitoring daily and on-demand physical visits for treatment planning." },
   ],
 }) {
   const rootRef = useRef(null);
 
-  // Reveal cards when section enters viewport
+  // Reveal animation logic
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
     const io = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting) {
         const cards = root.querySelectorAll(".bmm2-card-vertical");
-        cards.forEach((c, idx) => setTimeout(() => c.setAttribute("data-visible", "true"), idx * 110 + 120));
+        cards.forEach((c, idx) => setTimeout(() => c.setAttribute("data-visible", "true"), idx * 150));
         io.disconnect();
       }
-    }, { threshold: 0.12 });
+    }, { threshold: 0.1 });
     io.observe(root);
     return () => io.disconnect();
   }, [steps.length]);
-
-  // Position badges anchored to each card's top-center. Robust to resizes.
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return;
-
-    const badges = Array.from(root.querySelectorAll(".bmm2-badge-vertical"));
-    const cards = Array.from(root.querySelectorAll(".bmm2-card-vertical"));
-
-    function positionBadges() {
-      const containerRect = root.getBoundingClientRect();
-      badges.forEach((b, i) => {
-        const card = cards[i];
-        if (!card) return;
-        const rect = card.getBoundingClientRect();
-        const anchorX = rect.left + rect.width / 2;
-        const anchorY = rect.top + rect.height * 0.12; // slightly above top center
-        const left = Math.round(anchorX - containerRect.left);
-        const top = Math.round(anchorY - containerRect.top);
-        b.style.left = `${left}px`;
-        b.style.top = `${top}px`;
-        b.setAttribute("aria-label", `Step ${i + 1}: ${steps[i] && steps[i].title ? steps[i].title : "Step"}`);
-      });
-    }
-
-    const ro = new ResizeObserver(positionBadges);
-    ro.observe(root);
-    const cardsArr = root.querySelectorAll(".bmm2-card-vertical");
-    cardsArr.forEach((c) => ro.observe(c));
-    window.addEventListener("resize", positionBadges);
-    const t = setTimeout(positionBadges, 60);
-
-    return () => { ro.disconnect(); window.removeEventListener("resize", positionBadges); clearTimeout(t); };
-  }, [steps]);
 
   return (
     <section className="bmm2-steps-vertical" aria-labelledby="bmm2-steps-title">
@@ -169,36 +132,27 @@ export function ServiceStepsAnimated({
           {subtitle && <p className="bmm2-steps-sub">{subtitle}</p>}
         </header>
 
-        <div className="bmm2-timeline-vertical" role="region" aria-label={`${title} timeline`}>
-          {/* badges (positioned by JS) */}
-          {steps.map((s, i) => (
-            <button
-              key={`badge-${i}`}
-              className="bmm2-badge-vertical"
-              aria-describedby={`step-${i}-title`}
-              tabIndex={0}
-              title={s.title}
-              onClick={() => {
-                const el = document.getElementById(`step-card-${i}`);
-                if (el) { el.scrollIntoView({ behavior: "smooth", block: "center" }); el.focus(); }
-              }}
-            >
-              <span className="bmm2-badge-num">{i + 1}</span>
-            </button>
-          ))}
-
+        <div className="bmm2-timeline-vertical">
           <ol className="bmm2-steps-list-vertical" role="list">
-            {steps.map((s, i) => {
-              const alignLeft = i % 2 === 0;
-              return (
-                <li key={i} className={`bmm2-step-vertical ${alignLeft ? "left" : "right"}`}>
-                  <article id={`step-card-${i}`} className="bmm2-card-vertical" data-visible="false" tabIndex={-1} aria-labelledby={`step-${i}-title`} role="article">
-                    <h3 id={`step-${i}-title`} className="bmm2-card-title">{s.title}</h3>
-                    <p className="bmm2-card-text">{s.text}</p>
-                  </article>
-                </li>
-              );
-            })}
+            {steps.map((s, i) => (
+              <li key={i} className={`bmm2-step-vertical ${i % 2 === 0 ? "left" : "right"}`}>
+                
+                {/* Badge Number: Centered via CSS translate on desktop */}
+                <div className="bmm2-badge-vertical">
+                   <span className="bmm2-badge-num">{i + 1}</span>
+                </div>
+
+                <article 
+                  id={`step-card-${i}`} 
+                  className="bmm2-card-vertical" 
+                  data-visible="false" 
+                  tabIndex="-1"
+                >
+                  <h3 className="bmm2-card-title">{s.title}</h3>
+                  <p className="bmm2-card-text">{s.text}</p>
+                </article>
+              </li>
+            ))}
           </ol>
         </div>
       </div>
@@ -206,7 +160,7 @@ export function ServiceStepsAnimated({
   );
 }
 
-/* Full page export (optional wrapper) */
+/* Full page export */
 export default function ServicePageFull({ section1, section2, stepsSection }) {
   return (
     <main className="bmm2-service-page">

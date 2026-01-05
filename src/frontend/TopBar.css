@@ -1,5 +1,5 @@
 :root {
-  /* Brand Colors – BookMyMedicare */
+  /* Brand Colors */
   --bm-blue-dark: #0b3558;
   --bm-blue: #0e3f66;
   --bm-orange: #f28c28;
@@ -12,25 +12,23 @@
   --ease: cubic-bezier(.17,.67,.31,1);
 }
 
-/* ------------------------------------------------------------------
-   TOPBAR
-------------------------------------------------------------------- */
+/* ===============================
+   TOPBAR BASE
+================================ */
 .topbar {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  height: var(--topbar-height);
-  z-index: 1002;
   background: var(--bm-blue-dark);
   box-shadow: var(--shadow);
+  z-index: 1002;
 }
 
-/* Inner container */
 .topbar-inner {
   max-width: 1300px;
   margin: 0 auto;
-  height: 100%;
+  min-height: var(--topbar-height);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -39,19 +37,18 @@
 }
 
 /* Left / Right */
-.topbar .left {
+.left {
   display: flex;
   align-items: center;
   gap: 16px;
-  min-width: 0;
 }
 
-.topbar .right {
+.right {
   display: flex;
   align-items: center;
 }
 
-/* Welcome text */
+/* Welcome */
 .welcome {
   color: var(--bm-white);
   font-size: 0.9rem;
@@ -59,15 +56,14 @@
   white-space: nowrap;
 }
 
-/* Contact row */
+/* Contact Row */
 .contact-row {
   display: flex;
   align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 14px;
 }
 
-/* Contact items (flat inline style) */
+/* Contact Item */
 .contact-item {
   display: inline-flex;
   align-items: center;
@@ -75,12 +71,27 @@
   text-decoration: none;
   color: var(--bm-muted);
   font-size: 0.88rem;
-  transition: color 180ms var(--ease);
+  font-weight: 500;
   white-space: nowrap;
+  transition: color 180ms var(--ease), background 180ms var(--ease);
 }
 
 .contact-item:hover {
   color: var(--bm-orange);
+}
+
+/* Primary Call Button */
+.primary-call {
+  background: var(--bm-orange);
+  color: var(--bm-white);
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.primary-call:hover {
+  color: var(--bm-white);
+  background: #e07e1f;
 }
 
 /* Icons */
@@ -88,7 +99,6 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--bm-white);
 }
 
 .icon svg {
@@ -97,13 +107,7 @@
   display: block;
 }
 
-/* Contact text */
-.contact-text {
-  color: inherit;
-  font-weight: 500;
-}
-
-/* 24/7 Support badge */
+/* Badge */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -117,48 +121,44 @@
   white-space: nowrap;
 }
 
-/* Static dot */
 .badge .pulse {
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--bm-white);
-  display: inline-block;
 }
 
-/* ------------------------------------------------------------------
-   RESPONSIVE
-------------------------------------------------------------------- */
+/* ===============================
+   MOBILE OPTIMIZATION
+================================ */
 @media (max-width: 900px) {
-  :root {
-    --topbar-height: 56px;
+
+  .hide-mobile {
+    display: none !important;
   }
 
   .topbar-inner {
-    flex-direction: column;
-    justify-content: center;
-    padding: 6px 4vw;
-    gap: 6px;
-  }
-
-  .welcome {
-    font-size: 0.92rem;
+    padding: 6px 12px;
   }
 
   .contact-row {
-    justify-content: center;
-    gap: 12px;
+    gap: 8px;
+  }
+
+  .primary-call {
+    padding: 9px 16px;
+    font-size: 0.9rem;
   }
 
   .badge {
-    font-size: 0.82rem;
-    padding: 5px 10px;
+    font-size: 0.8rem;
+    padding: 6px 10px;
   }
 }
 
-/* ------------------------------------------------------------------
+/* ===============================
    ACCESSIBILITY
-------------------------------------------------------------------- */
+================================ */
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;

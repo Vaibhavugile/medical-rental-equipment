@@ -17,39 +17,38 @@ export default function Hero() {
           </p>
 
           <div className="hero-pill">
-            <span>
-              Homecare <strong>You Need And Deserve</strong> With your Loved Ones
-            </span>
+            Homecare <strong>You Need And Deserve</strong> With Your Loved Ones
           </div>
 
+          {/* CTA */}
           <a
-  href="/#contact"
-  className="hero-cta"
-  onClick={(e) => {
-    const isOnLanding = window.location.pathname === "/";
-    if (isOnLanding) {
-      e.preventDefault();
+            href="/#contact"
+            className="hero-cta"
+            onClick={(e) => {
+              const isOnLanding = window.location.pathname === "/";
+              if (isOnLanding) {
+                e.preventDefault();
 
-      const el = document.getElementById("contact");
-      if (el) {
-        const header = document.querySelector("header");
-        const headerOffset = header?.offsetHeight || 0;
-        const elTop = el.getBoundingClientRect().top + window.pageYOffset;
+                const el = document.getElementById("contact");
+                if (el) {
+                  const header = document.querySelector("header");
+                  const headerOffset = header?.offsetHeight || 0;
+                  const elTop =
+                    el.getBoundingClientRect().top + window.pageYOffset;
 
-        window.scrollTo({
-          top: elTop - headerOffset - 12,
-          behavior: "smooth",
-        });
-      } else {
-        window.location.hash = "contact";
-      }
-    }
-    // else → allow default navigation to /#contact
-  }}
->
-  Request a Callback →
-</a>
-
+                  window.scrollTo({
+                    top: elTop - headerOffset - 12,
+                    behavior: "smooth",
+                  });
+                } else {
+                  window.location.hash = "contact";
+                }
+              }
+              // else → allow default navigation to /#contact
+            }}
+          >
+            Request a Callback →
+          </a>
         </div>
 
         {/* RIGHT IMAGE */}
@@ -58,12 +57,8 @@ export default function Hero() {
             <img
               src="/hero-right.png"
               alt="Caregiver assisting an elderly patient"
+              loading="eager"
             />
-
-
-           
-
-            
           </div>
         </div>
 

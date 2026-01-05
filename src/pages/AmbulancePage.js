@@ -30,7 +30,7 @@ export default function AmbulancePage() {
     ],
     img: "/ambulance.jpg",
     imgAlt: "Ambulance Services | BookMyMedicare",
-    imageOnRight: false,
+    imageOnRight: true,
 
     // <<< ADDED: top padding so section1 is offset below TopBar + Header
     paddingTop: "calc(var(--topbar-height) + var(--header-height) + 22px)"
@@ -48,7 +48,7 @@ export default function AmbulancePage() {
     bullets: [],
     img: "/ambulance_img.png",
     imgAlt: "Ambulance Services | BookMyMedicare",
-    imageOnRight: true
+    imageOnRight: false,
   };
 
   const stepsSection = {

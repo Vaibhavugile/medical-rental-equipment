@@ -29,7 +29,7 @@ export default function NursingPage() {
     ],
     img: "/nursary-care.jpg",
     imgAlt: "Nursing Care at Home | BookMyMedicare",
-    imageOnRight: false,
+    imageOnRight: true,
 
     // <<< ADDED: top padding so section1 is offset below TopBar + Header
     paddingTop: "calc(var(--topbar-height) + var(--header-height) + 22px)"
@@ -47,7 +47,7 @@ export default function NursingPage() {
     bullets: [],
     img: "/nurse-2.jpg",
     imgAlt: "Nursing Care at Home",
-    imageOnRight: true
+    imageOnRight: false
   };
 
   const stepsSection = {

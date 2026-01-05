@@ -29,7 +29,7 @@ export default function SurgeryPage() {
     ],
     img: "/post_surgery.jpg",
     imgAlt: "Post Surgery Care at Home | BookMyMedicare",
-    imageOnRight: false,
+    imageOnRight: true,
 
     // <<< ADDED: top padding so section1 is offset below TopBar + Header
     paddingTop: "calc(var(--topbar-height) + var(--header-height) + 22px)"
@@ -47,7 +47,7 @@ export default function SurgeryPage() {
     bullets: [],
     img: "/post_surgery2.jpg",
     imgAlt: "Patient receiving post surgery care at home",
-    imageOnRight: true
+    imageOnRight: false
   };
 
   const stepsSection = {
