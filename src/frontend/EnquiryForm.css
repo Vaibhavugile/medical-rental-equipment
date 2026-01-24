@@ -1,0 +1,114 @@
+/* ================= FORM BASE ================= */
+.hp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  font-family: "Poppins", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+}
+
+/* ================= INPUTS ================= */
+.hp-form input,
+.hp-form select,
+.hp-form textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(11, 53, 88, 0.15);
+  font-size: 0.95rem;
+  color: #0e2a3a;
+  background: #ffffff;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+/* placeholders */
+.hp-form input::placeholder,
+.hp-form textarea::placeholder {
+  color: #94a3b8;
+}
+
+/* focus */
+.hp-form input:focus,
+.hp-form select:focus,
+.hp-form textarea:focus {
+  border-color: #0e3f66;
+  box-shadow: 0 0 0 3px rgba(14, 63, 102, 0.15);
+}
+
+/* textarea */
+.hp-form textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+
+/* ================= BUTTON ================= */
+.hp-form button {
+  margin-top: 8px;
+  background: linear-gradient(135deg, #0e3f66, #0b3558);
+  color: #ffffff;
+  border: none;
+  padding: 14px 16px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 180ms ease, box-shadow 180ms ease;
+  box-shadow: 0 10px 30px rgba(14, 63, 102, 0.35);
+}
+
+/* hover */
+.hp-form button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 42px rgba(14, 63, 102, 0.45);
+}
+
+/* disabled (sending) */
+.hp-form button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ================= STATUS MESSAGES ================= */
+.hp-form p {
+  margin-top: 6px;
+  font-size: 0.9rem;
+  text-align: center;
+  font-weight: 600;
+}
+
+/* success */
+.hp-form p.success {
+  color: #15803d;
+}
+
+/* error */
+.hp-form p.error {
+  color: #b91c1c;
+}
+
+/* sending / info */
+.hp-form p.info {
+  color: #475569;
+}
+
+/* ================= MOBILE ================= */
+@media (max-width: 480px) {
+  .hp-form {
+    gap: 12px;
+  }
+
+  .hp-form input,
+  .hp-form select,
+  .hp-form textarea {
+    font-size: 0.9rem;
+    padding: 11px 13px;
+  }
+
+  .hp-form button {
+    padding: 13px;
+    font-size: 0.9rem;
+  }
+}

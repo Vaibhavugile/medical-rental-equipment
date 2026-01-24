@@ -1,0 +1,247 @@
+/* ================= ROOT ================= */
+
+.tp-section {
+  position: relative;
+  padding: 160px 20px;
+  background: linear-gradient(
+    180deg,
+    var(--bm-white) 0%,
+    #f5f8fb 100%
+  );
+  overflow: hidden;
+}
+
+/* ================= BRAND GLOW ================= */
+
+.tp-section::before {
+  content: "";
+  position: absolute;
+  inset: -35%;
+  background:
+    radial-gradient(
+      600px 320px at 25% 20%,
+      rgba(14, 63, 102, 0.18),
+      transparent 65%
+    ),
+    radial-gradient(
+      520px 300px at 75% 30%,
+      rgba(242, 140, 40, 0.14),
+      transparent 70%
+    );
+  filter: blur(120px);
+  z-index: 0;
+}
+
+.tp-inner {
+  position: relative;
+  max-width: 1200px;
+  margin: auto;
+  z-index: 1;
+}
+
+/* ================= HEADER ================= */
+
+.tp-header {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 110px;
+  opacity: 0;
+  transform: translateY(22px);
+  transition: all 0.9s var(--ease);
+}
+
+.tp-visible .tp-header {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tp-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: var(--bm-orange);
+}
+
+.tp-header h2 {
+  margin-top: 16px;
+  font-size: 46px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: var(--bm-blue-dark);
+}
+
+.tp-header h2 span {
+  color: var(--bm-blue);
+}
+
+.tp-header p {
+  margin-top: 14px;
+  font-size: 17px;
+  color: #5b6f82;
+}
+
+/* ================= GRID ================= */
+
+.tp-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  justify-items: center;
+  gap: 40px;
+}
+
+/* ================= CARD ================= */
+
+.tp-card {
+  width: 100%;
+  max-width: 260px;
+  height: 320px;
+
+  background: rgba(255,255,255,0.82);
+  backdrop-filter: blur(14px) saturate(140%);
+  border-radius: 28px;
+
+  padding: 42px 28px;
+  text-align: center;
+
+  box-shadow:
+    0 24px 50px rgba(11, 53, 88, 0.18),
+    inset 0 0 0 1px rgba(255,255,255,0.55);
+
+  opacity: 0;
+  transform: translateY(36px) scale(0.94);
+  filter: blur(8px);
+
+  transition:
+    opacity 0.8s var(--ease),
+    transform 0.8s var(--ease),
+    filter 0.8s var(--ease),
+    box-shadow 0.45s var(--ease);
+  transition-delay: var(--delay);
+}
+
+.tp-visible .tp-card {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  filter: blur(0);
+}
+
+/* ================= HOVER ================= */
+
+.tp-card:hover {
+  transform: translateY(-14px) scale(1.04);
+  box-shadow:
+    0 42px 96px rgba(11, 53, 88, 0.28),
+    inset 0 0 0 1px rgba(255,255,255,0.7);
+}
+
+/* ================= ICON ================= */
+
+.tp-icon {
+  font-size: 48px;
+  margin-bottom: 24px;
+}
+
+/* ================= TEXT ================= */
+
+.tp-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--bm-blue-dark);
+}
+
+.tp-divider {
+  display: block;
+  width: 36px;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--bm-blue),
+    var(--bm-orange)
+  );
+  margin: 18px auto;
+  border-radius: 2px;
+}
+
+.tp-sub {
+  font-size: 14.5px;
+  color: #6b7f91;
+}
+
+/* ================= TABLET ================= */
+
+@media (max-width: 1100px) {
+  .tp-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 32px;
+  }
+
+  .tp-card {
+    max-width: 100%;
+    height: 280px;
+    padding: 36px 24px;
+  }
+
+  .tp-icon {
+    font-size: 42px;
+    margin-bottom: 18px;
+  }
+}
+
+/* ================= MOBILE (2x2 ONE VIEW) ================= */
+
+@media (max-width: 520px) {
+  .tp-section {
+    padding: 110px 16px;
+  }
+
+  .tp-header {
+    margin-bottom: 70px;
+  }
+
+  .tp-header h2 {
+    font-size: 30px;
+  }
+
+  .tp-header p {
+    font-size: 15px;
+  }
+
+  .tp-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 18px;
+  }
+
+  .tp-card {
+    height: 220px;
+    padding: 26px 16px;
+    border-radius: 22px;
+  }
+
+  .tp-icon {
+    font-size: 36px;
+    margin-bottom: 14px;
+  }
+
+  .tp-title {
+    font-size: 14.5px;
+  }
+
+  .tp-divider {
+    width: 26px;
+    margin: 12px auto;
+  }
+
+  .tp-sub {
+    font-size: 13px;
+  }
+}
+
+/* ================= ACCESSIBILITY ================= */
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    transform: none !important;
+    filter: none !important;
+  }
+}

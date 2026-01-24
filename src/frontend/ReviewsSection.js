@@ -27,8 +27,6 @@ export default function ReviewsSection({
     {
       id: 2,
       name: "Udaybhan Singh",
-      avatar:
-        "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=200&q=80&auto=format&fit=crop",
       rating: 5,
       text: `Good company and experience to all staff`,
       date: "Feb 2025",
@@ -36,7 +34,6 @@ export default function ReviewsSection({
     {
       id: 3,
       name: "Anas Khan",
-      avatar: "AK",
       rating: 5,
       text: `Excellent Healthcare services at home`,
       date: "Mar 2025",
@@ -44,8 +41,6 @@ export default function ReviewsSection({
     {
       id: 4,
       name: "Dinesh",
-      avatar:
-        "https://images.unsplash.com/photo-1547425260-76bcadfb4f2c?w=200&q=80&auto=format&fit=crop",
       rating: 5,
       text: `Really helpful staff and timely service.`,
       date: "Apr 2025",

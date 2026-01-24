@@ -11,22 +11,100 @@ import "./ServicesSection.css";
  *   { key: "icu", title: "ICU Setup", subtitle: "critical bed & monitoring", icon: "icu", link: "/icu" }
  */
 
-export default function ServicesSection() {
+export default function ServicesGrid() {
   const rootRef = useRef(null);
 
   // Add `link` to each object to make it navigable
-  const services = [
-    { key: "equip", title: "Medical Equipment", subtitle: "on Rental / Purchase", icon: "equip", link: "/equipment" },
-    { key: "icu", title: "ICU Setup", subtitle: "critical bed & monitoring", icon: "icu", link: "/icu" },
-    { key: "post", title: "Post Surgery Care", subtitle: "recovery at home", icon: "post", link: "/post-surgery-care" },
-    { key: "pall", title: "Palliative Care", subtitle: "elderly & comfort care", icon: "pall", link: "/palliative-care" },
-    { key: "ambulance", title: "Ambulance Services", subtitle: "24/7 transport", icon: "ambulance", link: "/ambulance" },
-    { key: "lab", title: "Lab Services", subtitle: "home sample collection", icon: "lab", link: "/lab-services" },
-    { key: "pharmacy", title: "Pharmacy Delivery", subtitle: "medicines at doorstep", icon: "pharmacy", link: "/pharmacy-delivery" },
-    { key: "nursing", title: "Nursing Care", subtitle: "trained medical staff", icon: "nursing", link: "/nursing-care" },
-    { key: "physio", title: "Physiotherapy Support", subtitle: "rehab & exercises", icon: "physio", link: "/physiotherapy" },
-    { key: "resp", title: "Respiratory Care", subtitle: "oxygen & ventilator support", icon: "resp", link: "/respiratory-care" },
-  ];
+const services = [
+  {
+    key: "equip",
+    title: "Medical Equipment",
+    subtitle: "Hospital-grade equipment at home",
+    icon: "equip",
+    link: "/equipment",
+    enquire: true
+  },
+  {
+    key: "icu",
+    title: "ICU Setup",
+    subtitle: "Advanced critical care at home",
+    icon: "icu",
+    link: "/icu",
+    enquire: true
+  },
+  {
+    key: "post",
+    title: "Post Surgery Care",
+    subtitle: "Safe recovery after surgery",
+    icon: "post",
+    link: "/post-surgery-care",
+    enquire: false
+  },
+  {
+    key: "pall",
+    title: "Palliative Care",
+    subtitle: "Comfort-focused compassionate care",
+    icon: "pall",
+    link: "/palliative-care",
+    enquire: true
+  },
+  {
+    key: "ambulance",
+    title: "Ambulance Services",
+    subtitle: "24/7 emergency medical transport",
+    icon: "ambulance",
+    link: "/ambulance",
+    enquire: true
+  },
+  {
+    key: "lab",
+    title: "Lab Services",
+    subtitle: "Home sample collection & reports",
+    icon: "lab",
+    link: "/lab-services",
+    enquire: false
+  },
+  {
+    key: "pharmacy",
+    title: "Pharmacy Delivery",
+    subtitle: "Medicines delivered at doorstep",
+    icon: "pharmacy",
+    link: "/pharmacy-delivery",
+    enquire: true
+  },
+  {
+    key: "nursing",
+    title: "Nursing Care",
+    subtitle: "Trained nurses for home care",
+    icon: "nursing",
+    link: "/nursing-care",
+    enquire: true
+  },
+  {
+    key: "physio",
+    title: "Physiotherapy Support",
+    subtitle: "Rehabilitation & mobility therapy",
+    icon: "physio",
+    link: "/physiotherapy",
+    enquire: false
+  },
+  {
+    key: "resp",
+    title: "Respiratory Care",
+    subtitle: "Oxygen & ventilator support",
+    icon: "resp",
+    link: "/respiratory-care",
+    enquire: true
+  }
+];
+
+
+const openWhatsApp = (serviceName) => {
+  const phone = "917777066885"; // country code without +
+  const message = `Hello BookMyMedicare, I would like to enquire about ${serviceName}.`;
+  const url = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  window.open(url, "_blank");
+};
 
   useEffect(() => {
     const root = rootRef.current;
@@ -193,16 +271,33 @@ export default function ServicesSection() {
               >
                 <a href={target || "#"} className="bmm-service-link" aria-label={`${s.title} — ${s.subtitle}`}>
                   <div className="bmm-service-icon" aria-hidden>
-                    <div className="bmm-icon-circle">
-                      <Icon name={s.icon} />
-                    </div>
+                    <div className="bmm-icon-circle bmm-icon-glass">
+  <Icon name={s.icon} />
+</div>
+
                   </div>
 
-                  <div className="bmm-service-body">
-                    <h3 className="bmm-service-title">{s.title}</h3>
-                    <div className="bmm-service-subtitle">{s.subtitle}</div>
-                    <div className="bmm-service-cta">know more →</div>
-                  </div>
+      <div className="bmm-service-body">
+  <h3 className="bmm-service-title">{s.title}</h3>
+  <div className="bmm-service-subtitle">{s.subtitle}</div>
+
+  <div className="bmm-service-actions">
+    <div className="bmm-service-cta">know more →</div>
+
+    <button
+      className="bmm-enquire-btn"
+      onClick={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openWhatsApp(s.title);
+      }}
+    >
+      Enquiry Now
+    </button>
+  </div>
+</div>
+
+
                 </a>
               </article>
             );

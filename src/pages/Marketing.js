@@ -297,13 +297,13 @@ export default function Marketing() {
   {/* NEW: Attendance + Track (marketing) */}
   <button
     className="cp-btn ghost"
-    onClick={() => window.location.href = `/attendance?role=marketing&driverId=${r.id}`}
+    onClick={() => window.location.href = `/crm/attendance?role=marketing&driverId=${r.id}`}
   >
     Attendance
   </button>
   <button
     className="cp-btn ghost"
-    onClick={() => window.location.href = `/tracking?role=marketing&driverId=${r.id}`}
+    onClick={() => window.location.href = `/crm/tracking?role=marketing&driverId=${r.id}`}
   >
     Track
   </button>

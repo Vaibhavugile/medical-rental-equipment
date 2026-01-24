@@ -1,0 +1,157 @@
+/* ================= ABOUT US – PREMIUM MEDICAL (CLEAN BG) ================= */
+
+.about-us {
+  position: relative;
+  padding: 100px 20px;
+  background: #ffffff; /* ✅ clean white like other sections */
+}
+
+/* subtle medical depth (very light, optional) */
+.about-us::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(14,63,102,0.03),
+    transparent 65%
+  );
+  pointer-events: none;
+}
+
+/* ================= LAYOUT ================= */
+
+.about-container {
+  max-width: 1280px;
+  margin: auto;
+  padding: 0 24px;
+
+  display: grid;
+  grid-template-columns: 1fr 1.15fr;
+  gap: 64px;
+  align-items: center;
+
+  position: relative;
+  z-index: 1;
+}
+
+/* ================= IMAGE ================= */
+
+.about-image {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.about-image img {
+  width: 100%;
+  height: auto;        /* ✅ no crop */
+  display: block;
+
+  border-radius: 22px;
+  background: #ffffff;
+
+  box-shadow: 0 18px 48px rgba(11, 53, 88, 0.16);
+}
+
+/* ================= IMAGE CTA ================= */
+
+.about-image-cta {
+  position: absolute;
+  bottom: 18px;
+  left: 18px;
+
+  background: #25D366;
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 12px 18px;
+
+  font-weight: 700;
+  text-decoration: none;
+
+  box-shadow: 0 14px 36px rgba(37, 211, 102, 0.35);
+  transition: transform 200ms ease, box-shadow 200ms ease;
+}
+
+.about-image-cta span {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.about-image-cta strong {
+  font-size: 15px;
+}
+
+.about-image-cta:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 46px rgba(37, 211, 102, 0.45);
+}
+
+/* ================= CONTENT ================= */
+
+.about-content h2 {
+  font-size: clamp(2.2rem, 3.8vw, 2.8rem);
+  font-weight: 800;
+  color: var(--bm-blue-dark);
+  margin-bottom: 22px;
+}
+
+.about-content h2 span {
+  color: var(--bm-orange);
+}
+
+.about-content p {
+  font-size: 16.5px;
+  line-height: 1.75;
+  color: var(--text-muted);
+  margin-bottom: 18px;
+}
+
+.about-content strong {
+  color: var(--bm-blue-dark);
+  font-weight: 700;
+}
+
+/* trust badge */
+.about-trust {
+  display: inline-block;
+  margin-top: 20px;
+  padding: 10px 18px;
+  background: #f1f6fb;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--bm-blue-dark);
+}
+
+/* tagline */
+.about-tagline {
+  margin-top: 26px;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--bm-orange);
+}
+
+/* ================= MOBILE ================= */
+
+@media (max-width: 900px) {
+  .about-container {
+    grid-template-columns: 1fr;
+    gap: 36px;
+    text-align: center;
+  }
+
+  .about-image {
+    max-width: 420px;
+  }
+
+  .about-image-cta {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .about-content h2 {
+    font-size: 2rem;
+  }
+}

@@ -1,0 +1,85 @@
+/* ================= BACKDROP ================= */
+.enq-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+/* dim background */
+.enq-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+/* click outside layer */
+.enq-clickaway {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+/* ================= MODAL ================= */
+.enq-modal {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 420px;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 24px 22px 26px;
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.35);
+  animation: enqPop 0.28s cubic-bezier(.16,.84,.24,1);
+}
+
+/* ================= ANIMATION ================= */
+@keyframes enqPop {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* ================= CLOSE BUTTON ================= */
+.enq-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: #f1f5f9;
+  color: #0e2a3a;
+  font-size: 22px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.enq-close:hover {
+  background: #e2e8f0;
+  transform: scale(1.08);
+}
+
+/* ================= MOBILE ================= */
+@media (max-width: 480px) {
+  .enq-modal {
+    max-width: 100%;
+    padding: 20px 18px 22px;
+    border-radius: 16px;
+  }
+}

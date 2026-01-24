@@ -22,9 +22,9 @@ export default function MapProvider({ children }) {
   }
 
   if (!isLoaded) {
-    console.log("⏳ Google Maps: loading…");
-    return <div>Loading map…</div>;
-  }
+  return null;
+}
+
 
   console.log("✅ Google Maps loaded. window.google?", !!window.google);
   return children;

@@ -9,7 +9,7 @@ import WhyChooseUsUnique from "../frontend/WhyChooseUsUnique";
 import HeroWithForm from "../frontend/HeroWithForm";
 import ReviewsSection from "../frontend/ReviewsSection";
 import Footer from "../frontend/Footer";
-
+import SEO from "../components/SEO";
 
 
 export default function ICUPage() {
@@ -54,7 +54,7 @@ export default function ICUPage() {
     img: "/icu2.png",
     imgAlt: "Patient receiving home ICU care",
     imageOnRight: false,
-    
+
   };
 
   const stepsSection = {
@@ -85,7 +85,14 @@ export default function ICUPage() {
   };
 
   return (
+
     <div>
+            <SEO
+        title="ICU Setup at Home | 24x7 Critical Care by Experts | BookMyMedicCare"
+        description="Get ICU setup at home with ventilator, oxygen, cardiac monitors and trained ICU nurses. Trusted home ICU care service by BookMyMedicCare."
+        keywords="ICU setup at home, home ICU care, ventilator at home, critical care at home"
+        canonical="https://www.bookmymediccare.com/icu"
+      />
       <TopBar />
       <Header />
       <ServicePageFull

@@ -1,5 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./HeroWithForm.css";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../firebase"; // adjust path if needed
+
 
 export default function HeroWithForm({ imgSrc = "/banner.jpg" }) {
   const rootRef = useRef(null);
@@ -51,22 +54,92 @@ export default function HeroWithForm({ imgSrc = "/banner.jpg" }) {
     const digits = p.replace(/\D/g, "");
     return digits.length === 10;
   }
+async function handleSubmit(e) {
+  e.preventDefault();
+  setStatus(null);
 
-  function handleSubmit(e) {
-    e.preventDefault();
-    setStatus(null);
-    if (!form.name.trim()) return setStatus({ type: "error", message: "Please enter your name." });
-    if (!validatePhone(form.phone)) return setStatus({ type: "error", message: "Please enter a valid 10-digit phone number." });
-    if (!form.city) return setStatus({ type: "error", message: "Please select your city." });
-    if (!form.service) return setStatus({ type: "error", message: "Please select a service." });
+  if (!form.name.trim())
+    return setStatus({ type: "error", message: "Please enter your name." });
 
+  if (!validatePhone(form.phone))
+    return setStatus({ type: "error", message: "Please enter a valid 10-digit phone number." });
+
+  if (!form.city)
+    return setStatus({ type: "error", message: "Please select your city." });
+
+  if (!form.service)
+    return setStatus({ type: "error", message: "Please select a service." });
+
+  try {
     setStatus({ type: "sending", message: "Sending..." });
-    // replace with actual API call
-    setTimeout(() => {
-      setStatus({ type: "success", message: "Thanks — we will call you shortly." });
-      setForm({ name: "", phone: "", city: "", service: "", requirements: "" });
-    }, 800);
+
+    const nowIso = new Date().toISOString();
+
+    const leadPayload = {
+      // core
+      customerName: form.name.trim(),
+      contactPerson: form.name.trim(),
+      phone: form.phone.replace(/\D/g, ""),
+      email: "",
+      city: form.city,
+      type: form.service,
+      notes: form.requirements || "",
+      address: "",
+
+      // status
+      status: "new",
+      leadSource: "website",
+
+      // audit
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      createdBy: "website",
+      createdByName: "Website",
+      updatedBy: "website",
+      updatedByName: "Website",
+
+      // history init
+      history: [
+        {
+          type: "create",
+          field: null,
+          oldValue: null,
+          newValue: JSON.stringify({
+            customerName: form.name.trim(),
+            contactPerson: form.name.trim(),
+            phone: form.phone.replace(/\D/g, "")
+          }),
+          note: "Lead created from website form",
+          changedBy: "website",
+          changedByName: "Website",
+          ts: nowIso
+        }
+      ]
+    };
+
+    await addDoc(collection(db, "leads"), leadPayload);
+
+    setStatus({
+      type: "success",
+      message: "Thanks — we will call you shortly."
+    });
+
+    setForm({
+      name: "",
+      phone: "",
+      city: "",
+      service: "",
+      requirements: ""
+    });
+  } catch (err) {
+    console.error("Lead save failed:", err);
+    setStatus({
+      type: "error",
+      message: "Something went wrong. Please try again."
+    });
   }
+}
+
 
   return (
     <section className="hp-fixed" ref={rootRef} aria-labelledby="hp-title-fixed">
@@ -127,23 +200,29 @@ export default function HeroWithForm({ imgSrc = "/banner.jpg" }) {
                 <span className="hp-label">City *</span>
                 <select name="city" value={form.city} onChange={handleChange} className="hp-select" aria-required="true">
                   <option value="">Select City</option>
-                  <option value="delhi">Delhi</option>
+                  <option value="navimumbai">Navi Mumbai</option>
                   <option value="mumbai">Mumbai</option>
-                  <option value="bangalore">Bangalore</option>
-                  <option value="hyderabad">Hyderabad</option>
-                  <option value="chennai">Chennai</option>
+                  <option value="palghar">Palghar</option>
+                  <option value="thane">Thane</option>
                 </select>
               </label>
 
               <label className="hp-field hp-half">
                 <span className="hp-label">Service *</span>
                 <select name="service" value={form.service} onChange={handleChange} className="hp-select" aria-required="true">
-                  <option value="">Select Service</option>
-                  <option value="nursing">Nursing Care</option>
-                  <option value="icu">ICU Setup</option>
-                  <option value="ambulance">Ambulance</option>
-                  <option value="equipment">Equipment</option>
-                  <option value="lab">Lab Services</option>
+                   <option value="">Select Service</option>
+
+  <option value="general_inquiry">General Inquiry</option>
+  <option value="diagnostic_home">Diagnostic Services at Home</option>
+  <option value="icu_setup">ICU Setup</option>
+  <option value="post_surgery_care">Post Surgery Care</option>
+  <option value="palliative_care">Palliative Care at Home</option>
+  <option value="ambulance_care">Ambulance Care</option>
+  <option value="medical_equipment">Medical Equipment</option>
+  <option value="nursing_care">Nursing Care</option>
+  <option value="physiotherapy">Physiotherapy Support</option>
+  <option value="respiratory_care">Respiratory Care</option>
+  <option value="pharmacy_delivery">Pharmacy Delivery</option>
                 </select>
               </label>
             </div>

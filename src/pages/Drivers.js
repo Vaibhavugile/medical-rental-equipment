@@ -344,12 +344,12 @@ export default function Drivers() {
                   <td>
                     <button className="cp-btn ghost" onClick={() => editDriver(d)}>Edit</button>
                     <button className="cp-btn ghost" onClick={() => deleteDriverById(d.id)}>Delete</button>
-                    <button className="cp-btn ghost" onClick={() => navigate(`/attendance?driverId=${d.id}`)}>
+                    <button className="cp-btn ghost" onClick={() => navigate(`/crm/attendance?driverId=${d.id}`)}>
   Attendance
 </button>
 <button
   className="cp-btn ghost"
-  onClick={() => navigate(`/tracking?driverId=${d.id}`)}
+  onClick={() => navigate(`/crm/tracking?driverId=${d.id}`)}
 >
   Track
 </button>

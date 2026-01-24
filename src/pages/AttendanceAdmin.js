@@ -299,7 +299,7 @@ export default function AttendanceAdmin() {
                   <td>
                     <button
                       className="cp-btn ghost"
-                      onClick={() => navigate(`/tracking?role=${role}&driverId=${r.personId}&date=${r.dayId}`)}
+                      onClick={() => navigate(`/crm/tracking?role=${role}&driverId=${r.personId}&date=${r.dayId}`)}
                     >
                       Track
                     </button>

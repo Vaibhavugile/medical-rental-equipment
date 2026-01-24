@@ -16,8 +16,8 @@ export default function TopBar() {
             {/* Primary Call (always visible) */}
             <a
               className="contact-item primary-call"
-              href="tel:+918080310240"
-              aria-label="Call BookMyMedicare at 8080310240"
+              href="tel:+917777066885"
+              aria-label="Call BookMyMedicare at 7777066885 "
             >
               <span className="icon icon-phone" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none">
@@ -35,11 +35,18 @@ export default function TopBar() {
 
             {/* Secondary Phone (desktop only) */}
             <a
-              className="contact-item hide-mobile"
+              className="contact-item "
               href="tel:+917777066885"
               aria-label="Call BookMyMedicare at 7777066885"
             >
               <span className="contact-text">+91 7777066885</span>
+            </a>
+             <a
+              className="contact-item hide-mobile"
+              href="tel:+917400244335"
+              aria-label="Call BookMyMedicare at 7400244335"
+            >
+              <span className="contact-text">+91 7400244335</span>
             </a>
 
             {/* Email (desktop only) */}

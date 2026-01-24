@@ -1,0 +1,247 @@
+/* ============================
+   Staff Management (Nursing)
+   Drawer-based Admin UI
+============================ */
+
+.staff-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, sans-serif;
+  color: #0f172a;
+}
+
+.staff-page h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0b5cff;
+  margin-bottom: 14px;
+}
+
+/* ================= Toolbar ================= */
+.staff-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 10px;
+  margin-bottom: 16px;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+}
+
+.staff-toolbar input,
+.staff-toolbar select {
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  outline: none;
+}
+
+.staff-toolbar input {
+  flex: 1;
+  min-width: 200px;
+}
+
+/* ================= Buttons ================= */
+.cp-btn {
+  background: linear-gradient(90deg, #0b69ff, #00b4d8);
+  border: none;
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: opacity 0.2s ease, transform 0.1s ease;
+}
+
+.cp-btn:hover {
+  opacity: 0.92;
+}
+
+.cp-btn:active {
+  transform: scale(0.97);
+}
+
+.cp-btn.ghost {
+  background: transparent;
+  color: #0b5cff;
+  border: 1px solid rgba(11, 92, 255, 0.15);
+}
+
+.cp-btn.ghost:hover {
+  background: rgba(11, 92, 255, 0.05);
+}
+
+/* ================= Drawer Overlay ================= */
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(1px);
+  z-index: 49;
+}
+
+/* ================= Drawer Panel ================= */
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  height: 100vh;
+  width: min(560px, 100%);
+  background: #ffffff;
+  border-left: 1px solid #e5e7eb;
+  box-shadow: -10px 0 30px rgba(15, 23, 42, 0.15);
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer.open {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid #eef2f7;
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  z-index: 2;
+}
+
+.drawer-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+/* ================= Staff Form ================= */
+.staff-form {
+  padding: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.staff-form input,
+.staff-form select,
+.staff-form textarea {
+  padding: 8px 10px;
+  font-size: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.2s ease;
+}
+
+.staff-form textarea {
+  min-height: 60px;
+  resize: vertical;
+}
+
+.staff-form input:focus,
+.staff-form select:focus,
+.staff-form textarea:focus {
+  border-color: #0b5cff;
+}
+
+/* Full width rows */
+.staff-form textarea,
+.staff-form .full-row {
+  grid-column: 1 / -1;
+}
+
+/* Switch rows */
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+/* ================= Actions ================= */
+.actions-row {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+/* ================= Errors ================= */
+.error {
+  grid-column: 1 / -1;
+  color: #dc2626;
+  background: #fef2f2;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* ================= Table ================= */
+.staff-table {
+  overflow-x: auto;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+}
+
+.staff-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.staff-table th,
+.staff-table td {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.staff-table th {
+  background: #f9fafb;
+  font-weight: 700;
+  color: #334155;
+}
+
+.staff-table tr:hover td {
+  background: #f8fafc;
+}
+
+.staff-table td button {
+  margin-right: 6px;
+  font-size: 13px;
+}
+
+/* ================= Responsive ================= */
+@media (max-width: 700px) {
+  .staff-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .staff-form {
+    grid-template-columns: 1fr;
+  }
+
+  .drawer {
+    width: 100%;
+  }
+
+  .staff-table th,
+  .staff-table td {
+    font-size: 13px;
+    padding: 8px;
+  }
+}

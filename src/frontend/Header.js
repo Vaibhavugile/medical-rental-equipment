@@ -11,13 +11,19 @@ import "./Header.css";
  * - No react-router dependency
  */
 
-const NAV_ITEMS = [
+const BASE_NAV_ITEMS = [
   { id: "home", label: "Home", route: "/" },
-  { id: "services", label: "Services" },
+  { id: "services", label: "Services", dropdown: true },
   { id: "blogs", label: "Blogs", route: "/blogs" },
   { id: "providers", label: "Providers", route: "/our-team" },
   { id: "contact", label: "Contact" },
 ];
+
+const LANDING_ONLY_ITEMS = [
+  { id: "about-us", label: "About" },
+  { id: "reviews", label: "Reviews" },
+];
+
 
 function MenuIcon({ size = 22 }) {
   return (
@@ -44,12 +50,38 @@ function CloseIcon({ size = 22 }) {
     </svg>
   );
 }
+const SERVICES_LIST = [
+  { label: "Medical Equipment", link: "/equipment" },
+  { label: "ICU Setup", link: "/icu" },
+  { label: "Post Surgery Care", link: "/post-surgery-care" },
+  { label: "Palliative Care", link: "/palliative-care" },
+  { label: "Ambulance Services", link: "/ambulance" },
+  { label: "Lab Services", link: "/lab-services" },
+  { label: "Pharmacy Delivery", link: "/pharmacy-delivery" },
+  { label: "Nursing Care", link: "/nursing-care" },
+  { label: "Physiotherapy", link: "/physiotherapy" },
+  { label: "Respiratory Care", link: "/respiratory-care" },
+];
+
 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeId, setActiveId] = useState("home");
   const firstMobileLinkRef = useRef(null);
   const headerRef = useRef(null);
+const [servicesOpen, setServicesOpen] = useState(false);
+const isLandingPage = window.location.pathname === "/landing";
+
+useEffect(() => {
+  function close() {
+    setServicesOpen(false);
+  }
+  window.addEventListener("click", close);
+  return () => window.removeEventListener("click", close);
+}, []);
+const WHATSAPP_NUMBER = "917777066885"; // country code + number
+const WHATSAPP_LINK =
+  "https://wa.me/917777066885?text=Hi%20BookMyMedicare%2C%20I%20need%20home%20healthcare%20assistance.";
 
   /* ================= SET ACTIVE ON LOAD ================= */
   useEffect(() => {
@@ -61,6 +93,17 @@ export default function Header() {
     else if (path.startsWith("/blogs")) setActiveId("blogs");
     else if (path.startsWith("/our-team")) setActiveId("providers");
   }, []);
+const NAV_ITEMS = isLandingPage
+  ? [
+      { id: "home", label: "Home", route: "/" },
+      { id: "about-us", label: "About" },
+      { id: "services", label: "Services", dropdown: true },
+      { id: "reviews", label: "Reviews" },
+      { id: "blogs", label: "Blogs", route: "/blogs" },
+      { id: "providers", label: "Providers", route: "/our-team" },
+      { id: "contact", label: "Contact" },
+    ]
+  : BASE_NAV_ITEMS;
 
   /* ================= CLOSE MOBILE MENU ================= */
   useEffect(() => {
@@ -134,22 +177,36 @@ export default function Header() {
   }
 
   function handleNavClick(e, item) {
-    e.preventDefault();
-    const isOnLanding = window.location.pathname === "/";
+  e.preventDefault();
 
-    // Scroll-only items
-    if (!item.route) {
-      if (!isOnLanding) {
-        window.location.href = `/#${item.id}`;
-        return;
-      }
-      scrollToSection(item.id);
+  // Scroll-only items (About, Reviews, Contact, etc.)
+  if (!item.route) {
+    const el = document.getElementById(item.id);
+
+    // If section exists on CURRENT page → smooth scroll
+    if (el) {
+      const offset = headerRef.current?.offsetHeight || 0;
+      const top = el.getBoundingClientRect().top + window.pageYOffset;
+
+      window.scrollTo({
+        top: top - offset - 12,
+        behavior: "smooth",
+      });
+
+      setMobileOpen(false);
       return;
     }
 
-    // Route items
-    window.location.href = item.route;
+    // If section NOT present → stay on same page, just update hash
+    window.location.hash = item.id;
+    setMobileOpen(false);
+    return;
   }
+
+  // Route-based navigation
+  window.location.href = item.route;
+}
+
 
   /* ================= RENDER ================= */
   return (
@@ -162,27 +219,72 @@ export default function Header() {
         </a>
 
         {/* DESKTOP NAV */}
-        <ul className="navLinks" role="menubar">
-          {NAV_ITEMS.map((item) => (
-            <li key={item.id} role="none">
-              <a
-                role="menuitem"
-                href={item.route ? item.route : `#${item.id}`}
-                className={activeId === item.id ? "active" : ""}
-                aria-current={activeId === item.id ? "page" : undefined}
-                onClick={(e) => handleNavClick(e, item)}
-              >
-                {item.label}
-              </a>
-            </li>
-          ))}
-        </ul>
+     <ul className="navLinks" role="menubar">
+  {NAV_ITEMS.map((item) => (
+    <li
+      key={item.id}
+      role="none"
+      style={{ position: "relative" }}
+    >
+      {/* NORMAL LINKS */}
+      {!item.dropdown && (
+        <a
+          role="menuitem"
+          href={item.route ? item.route : `#${item.id}`}
+          className={activeId === item.id ? "active" : ""}
+          onClick={(e) => handleNavClick(e, item)}
+        >
+          {item.label}
+        </a>
+      )}
+
+      {/* SERVICES MEGA DROPDOWN */}
+      {item.dropdown && (
+        <div
+          className="servicesHoverWrap"
+          onMouseEnter={() => setServicesOpen(true)}
+          onMouseLeave={() => setServicesOpen(false)}
+        >
+          <button
+            type="button"
+            className="navServicesBtn"
+            aria-haspopup="true"
+            aria-expanded={servicesOpen}
+          >
+            {item.label} ▾
+          </button>
+
+          {servicesOpen && (
+            <div className="servicesDropdown">
+              <div className="servicesDropdownTitle">
+                Home Healthcare Services
+              </div>
+
+              {SERVICES_LIST.map((s) => (
+                <a key={s.link} href={s.link}>
+                  {s.label}
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </li>
+  ))}
+</ul>
+
 
         {/* RIGHT ACTIONS */}
         <div className="rightActions">
-          <a href="/#contact" className="btn-primary">
-            Talk to Specialist
-          </a>
+        <a
+  href={WHATSAPP_LINK}
+  className="btn-primary"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  Talk to Specialist
+</a>
+
 
           <button
             className="mobileToggle"
@@ -215,9 +317,15 @@ export default function Header() {
         ))}
 
         <div className="mobileMenuCTA">
-          <a href="/#contact" className="btn-primary">
-            Talk to Specialist
-          </a>
+          <a
+  href={WHATSAPP_LINK}
+  className="btn-primary"
+  target="_blank"
+  rel="noopener noreferrer"
+>
+  Talk to Specialist
+</a>
+
         </div>
       </div>
     </header>

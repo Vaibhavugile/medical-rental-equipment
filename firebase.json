@@ -23,24 +23,58 @@
     }
   ],
   "hosting": {
-    "public": "build",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      { "source": "**", "destination": "/index.html" }
-    ],
-    "headers": [
-      {
-        "source": "**/*.@(js|css)",
-        "headers": [
-          { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-        ]
-      }
-    ]
-  },
+  "public": "build",
+  "ignore": [
+    "firebase.json",
+    "**/.*",
+    "**/node_modules/**"
+  ],
+
+  "redirects": [
+    {
+      "source": "/palliative.php",
+      "destination": "/palliative-care",
+      "type": 301
+    },
+    {
+      "source": "/surgery.php",
+      "destination": "/post-surgery-care",
+      "type": 301
+    },
+    {
+      "source": "/pharmacy-delivery.php",
+      "destination": "/pharmacy-delivery",
+      "type": 301
+    },
+    {
+      "source": "/our-team.php",
+      "destination": "/our-team",
+      "type": 301
+    },
+    {
+      "source": "/contact.php",
+      "destination": "/#contact",
+      "type": 301
+    }
+  ],
+
+  "rewrites": [
+    { "source": "**", "destination": "/index.html" }
+  ],
+
+  "headers": [
+    {
+      "source": "**/*.@(js|css)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ]
+},
+
   "storage": {
     "rules": "storage.rules"
   }

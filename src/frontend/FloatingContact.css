@@ -1,0 +1,51 @@
+.bmm-float {
+  position: fixed;
+  bottom: 22px;
+  right: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9999;
+}
+
+.bmm-float-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 20px; /* ICON SIZE */
+  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.bmm-float-icon:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 24px rgba(0,0,0,0.35);
+}
+
+/* WhatsApp */
+.bmm-float-icon.whatsapp {
+  background: #25d366;
+}
+
+/* Call */
+.bmm-float-icon.call {
+  background: #0e3f66;
+}
+
+/* Mobile */
+@media (max-width: 600px) {
+  .bmm-float {
+    bottom: 16px;
+    right: 14px;
+  }
+
+  .bmm-float-icon {
+    width: 42px;
+    height: 42px;
+    font-size: 18px;
+  }
+}
