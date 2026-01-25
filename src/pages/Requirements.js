@@ -119,6 +119,7 @@ export default function Requirements() {
 
   // Track last focused item index for "+ Add Item below current"
   const [activeItemIdx, setActiveItemIdx] = useState(null);
+const isNursingReq = (r) => r?.serviceType === "nursing";
 
   useEffect(() => {
     setLoading(true);
@@ -143,31 +144,64 @@ export default function Requirements() {
   const closeDetails = () => setDetailsReq(null);
 
   /* Create Quotation drawer */
-  const openCreateQuotation = async (req) => {
-    setError("");
-    const user = auth.currentUser || {};
+const openCreateQuotation = async (req) => {
+  setError("");
+  const user = auth.currentUser || {};
 
-    // Optional: auto-assign to current user when opening
-    if (req && !req.assignedTo && user?.uid) {
-      try {
-        const reqDoc = doc(db, "requirements", req.id);
-        const entry = makeHistoryEntry(user, {
-          type: "assign",
-          field: "assignedTo",
-          oldValue: req.assignedTo || "",
-          newValue: user.uid,
-          note: "Assigned when opening quotation",
-        });
-        updateDoc(reqDoc, {
-          assignedTo: user.uid,
-          assignedToName: user.displayName || user.email || user.uid || "",
-          updatedAt: serverTimestamp(),
-          updatedBy: user.uid || "",
-          updatedByName: user.displayName || user.email || user.uid || "",
-          history: arrayUnion(entry),
-        }).catch(() => {});
-      } catch {}
-    }
+  // Optional: auto-assign to current user when opening
+  if (req && !req.assignedTo && user?.uid) {
+    try {
+      const reqDoc = doc(db, "requirements", req.id);
+      const entry = makeHistoryEntry(user, {
+        type: "assign",
+        field: "assignedTo",
+        oldValue: req.assignedTo || "",
+        newValue: user.uid,
+        note: "Assigned when opening quotation",
+      });
+
+      updateDoc(reqDoc, {
+        assignedTo: user.uid,
+        assignedToName: user.displayName || user.email || user.uid || "",
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid || "",
+        updatedByName: user.displayName || user.email || user.uid || "",
+        history: arrayUnion(entry),
+      }).catch(() => {});
+    } catch {}
+  }
+
+  // ===============================
+  // 🧠 BUILD QUOTATION ITEMS
+  // ===============================
+  let items = [];
+
+  if (isNursingReq(req)) {
+    // 🩺 NURSING / CARETAKER (FINAL FIXED LOGIC)
+
+    const days = Number(req.expectedDurationDays) || 1;
+    const count = Number(req.nursing?.count || 1);
+    const rate = Number(req.dailyRate || 0);
+
+    const staffType = req.nursing?.staffType || "Care Staff";
+    const shift = req.nursing?.shift || "day";
+
+    items = [
+      {
+        id: Date.now() + "-nursing",
+        name: `${staffType} (${shift})`,
+        qty: count,                    // ✅ STAFF COUNT (FIXED)
+        rate: rate,                    // per staff per day
+        amount: count * days * rate,   // ✅ correct total
+        notes: req.nursing?.notes || "",
+        days: days,                    // ✅ duration shown separately
+        expectedStartDate: req.expectedStartDate || "",
+        expectedEndDate: req.expectedEndDate || "",
+        productId: "",                 // ❌ no product for nursing
+      },
+    ];
+  } else {
+    // 📦 RENTAL (UNCHANGED)
 
     const sourceItems =
       req?.equipment && Array.isArray(req.equipment) && req.equipment.length
@@ -176,7 +210,7 @@ export default function Requirements() {
         ? req.requirementItems
         : [];
 
-    const items = (sourceItems.length
+    items = (sourceItems.length
       ? sourceItems
       : [{ name: "", qty: 1, expectedDurationDays: 0 }]
     ).map((it, idx) => {
@@ -184,14 +218,19 @@ export default function Requirements() {
       const qty = Number(it.qty || it.quantity || 1);
       const rate = Number(it.rate || 0);
       const amount = Number(qty * rate);
-      const notes = it.unitNotes || it.notes || it.specialInstructions || "";
+      const notes =
+        it.unitNotes || it.notes || it.specialInstructions || "";
       const days =
-        it.expectedDurationDays ?? it.days ?? req?.expectedDurationDays ?? 0;
+        it.expectedDurationDays ??
+        it.days ??
+        req?.expectedDurationDays ??
+        0;
       const expectedStartDate =
         it.expectedStartDate || it.startDate || req?.expectedStartDate || "";
       const expectedEndDate =
         it.expectedEndDate || it.endDate || req?.expectedEndDate || "";
       const productId = it.productId || "";
+
       return {
         id: Date.now() + "-" + idx,
         name,
@@ -205,24 +244,29 @@ export default function Requirements() {
         productId,
       };
     });
+  }
 
-    const base = {
-      ...defaultQuotation,
-      requirementId: req?.id || "",
-      quoNo: `Q-${Date.now()}`,
-      quotationId: `QT-${Math.floor(Date.now() / 1000)}`,
-      items,
-      notes: `Quotation for requirement ${req?.reqNo || req?.id || ""}`,
-      status: "sent",
-      createdAt: null,
-      createdBy: user.uid || "",
-      createdByName: user.displayName || user.email || "",
-    };
-
-    setQuotation(base);
-    setActiveItemIdx(null);
-    setOpenQuotation(true);
+  // ===============================
+  // 📄 FINAL QUOTATION OBJECT
+  // ===============================
+  const base = {
+    ...defaultQuotation,
+    requirementId: req?.id || "",
+    quoNo: `Q-${Date.now()}`,
+    quotationId: `QT-${Math.floor(Date.now() / 1000)}`,
+    items,
+    notes: `Quotation for requirement ${req?.reqNo || req?.id || ""}`,
+    status: "sent",
+    createdAt: null,
+    createdBy: user.uid || "",
+    createdByName: user.displayName || user.email || "",
   };
+
+  setQuotation(base);
+  setActiveItemIdx(null);
+  setOpenQuotation(true);
+};
+
 
   const closeQuotation = () => {
     setOpenQuotation(false);
@@ -288,6 +332,7 @@ export default function Requirements() {
       const user = auth.currentUser || {};
       const payload = {
         requirementId: quotation.requirementId || "",
+         serviceType: detailsReq?.serviceType || "rental",
         quoNo: quotation.quoNo || `Q-${Date.now()}`,
         quotationId:
           quotation.quotationId || `QT-${Math.floor(Date.now() / 1000)}`,
@@ -505,13 +550,15 @@ export default function Requirements() {
           <table className="cp-table">
             <thead>
               <tr>
-                <th>Req No</th>
-                <th>Customer</th>
-                <th>Contact</th>
-                <th>Phone</th>
-                <th>Status</th>
-                <th>Created</th>
-                <th>Actions</th>
+               <th>Req No</th>
+<th>Service</th>
+<th>Customer</th>
+<th>Contact</th>
+<th>Phone</th>
+<th>Status</th>
+<th>Created</th>
+<th>Actions</th>
+
               </tr>
             </thead>
             <tbody>
@@ -525,6 +572,14 @@ export default function Requirements() {
                 return (
                   <tr key={r.id}>
                     <td className="strong">{r.reqNo || r.requirementId || r.id}</td>
+                    <td>
+  {isNursingReq(r) ? (
+    <span className="chip">🩺 Nursing</span>
+  ) : (
+    <span className="chip">📦 Rental</span>
+  )}
+</td>
+
                     <td className="muted">{customer}</td>
                     <td className="muted">{contact}</td>
                     <td>{phone}</td>
@@ -626,6 +681,64 @@ export default function Requirements() {
                       "—"}
                   </div>
                 </div>
+{isNursingReq(detailsReq) && (
+  <div style={{ marginTop: 12 }}>
+    <h3>Nursing Details</h3>
+
+    <div className="details-row">
+      <div className="label muted">Staff Type</div>
+      <div className="value">
+        {detailsReq.nursing?.staffType || "—"}
+      </div>
+    </div>
+
+    <div className="details-row">
+      <div className="label muted">Staff Count</div>
+      <div className="value">
+        {detailsReq.nursing?.count || "—"}
+      </div>
+    </div>
+
+    <div className="details-row">
+      <div className="label muted">Shift</div>
+      <div className="value">
+        {detailsReq.nursing?.shift || "—"}
+      </div>
+    </div>
+
+    <div className="details-row">
+      <div className="label muted">Duration</div>
+      <div className="value">
+        {detailsReq.expectedDurationDays || "—"} days
+      </div>
+    </div>
+
+    <div className="details-row">
+      <div className="label muted">Start Date</div>
+      <div className="value">
+        {parseDateForDisplay(detailsReq.expectedStartDate)}
+      </div>
+    </div>
+
+    <div className="details-row">
+      <div className="label muted">End Date</div>
+      <div className="value">
+        {parseDateForDisplay(detailsReq.expectedEndDate)}
+      </div>
+    </div>
+
+    {detailsReq.nursing?.notes && (
+      <div style={{ marginTop: 8 }}>
+        <strong>Notes</strong>
+        <div className="details-notes">
+          {detailsReq.nursing.notes}
+        </div>
+      </div>
+    )}
+  </div>
+)}
+
+{!isNursingReq(detailsReq) && (
 
                 <div style={{ marginTop: 12 }}>
                   <h3 style={{ margin: "8px 0" }}>Items Requested</h3>
@@ -692,6 +805,7 @@ export default function Requirements() {
                     </tbody>
                   </table>
                 </div>
+                )}
 
                 <div style={{ marginTop: 12 }}>
                   <div className="details-row">
@@ -938,16 +1052,16 @@ export default function Requirements() {
                           </div>
 
                           {/* Remove */}
-                          <div className="req-quote-actions">
-                            <button
-                              type="button"
-                              className="cp-btn danger"
-                              onClick={() => removeQuotationItem(idx)}
-                              title="Remove item"
-                            >
-                              ✕
-                            </button>
-                          </div>
+                      {!isNursingReq(detailsReq) && (
+  <button
+    type="button"
+    className="cp-btn danger"
+    onClick={() => removeQuotationItem(idx)}
+  >
+    ✕
+  </button>
+)}
+
                         </div>
 
                         {/* Extra details remain below */}
@@ -960,17 +1074,21 @@ export default function Requirements() {
                           {it.expectedEndDate
                             ? parseDateForDisplay(it.expectedEndDate)
                             : "—"}{" "}
-                          • Notes: {it.notes || "—"} • Product ID:{" "}
-                          {it.productId || "—"}
+                         • Notes: {it.notes || "—"}
+{!isNursingReq(detailsReq) && <> • Product ID: {it.productId || "—"}</>}
+
                         </div>
                       </div>
                     ))}
 
-                    <div>
-                      <button type="button" className="cp-btn" onClick={addQuotationItem}>
-                        + Add Item
-                      </button>
-                    </div>
+                   {!isNursingReq(detailsReq) && (
+  <div>
+    <button type="button" className="cp-btn" onClick={addQuotationItem}>
+      + Add Item
+    </button>
+  </div>
+)}
+
                   </div>
                 </div>
 

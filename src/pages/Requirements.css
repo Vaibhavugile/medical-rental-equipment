@@ -16,6 +16,15 @@ body{margin:0;font-family:Inter, "Segoe UI", Roboto, "Helvetica Neue", Arial, sa
 .cp-btn.primary{background:linear-gradient(90deg,#0b69ff,#00b4d8)}
 .cp-btn.ghost{background:transparent;border:1px solid #e6eef8;color:#0f172a}
 .cp-btn.danger{background:linear-gradient(90deg,#ef4444,#e11d48)}
+.chip.nursing {
+  background: #ecfeff;
+  color: #155e75;
+}
+
+.chip.rental {
+  background: #ecfdf5;
+  color: #065f46;
+}
 
 /* Toolbar */
 .coupons-toolbar{display:flex;gap:12px;align-items:center;margin-bottom:12px;flex-wrap:wrap}

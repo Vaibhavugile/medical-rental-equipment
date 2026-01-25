@@ -17,7 +17,16 @@ const emptyLine = () => ({ productId: "", name: "", qty: 1, unitNotes: "" });
 export default function RequirementForm({ lead, requirement = null, templateRequirement = null, onSaved, onCancel }) {
   const [form, setForm] = useState({
     requirementId: null,
+    serviceType: "rental", // rental | nursing
+
     leadId: lead?.id || "",
+    nursing: {
+  staffType: "nurse",     // nurse | caretaker
+  count: 1,
+  shift: "day",           // day | night | full_day
+  notes: "",
+},
+
     leadSnapshot: {
       customerName: lead?.customerName || "",
       contactPerson: lead?.contactPerson || "",
@@ -189,15 +198,31 @@ export default function RequirementForm({ lead, requirement = null, templateRequ
     });
 
   // Validation
-  const validate = () => {
-    if (!form.equipment || !form.equipment.length) return "Add at least one equipment line.";
+ const validate = () => {
+  // Rental validation
+  if (form.serviceType === "rental") {
+    if (!form.equipment || !form.equipment.length)
+      return "Add at least one equipment line.";
     for (const l of form.equipment) {
-      if (!l.name || !l.qty || Number(l.qty) < 1) return "Each equipment line needs a name and qty >= 1.";
+      if (!l.name || !l.qty || Number(l.qty) < 1)
+        return "Each equipment line needs a name and qty >= 1.";
     }
-    if (!form.expectedStartDate) return "Expected start date is required.";
-    if (!form.deliveryAddress) return "Delivery address is required.";
-    return null;
-  };
+  }
+
+  // Nursing validation (no equipment required)
+  if (form.serviceType === "nursing") {
+    // future nursing-specific checks will go here
+  }
+
+  if (!form.expectedStartDate)
+    return "Expected start date is required.";
+
+  if (!form.deliveryAddress)
+    return "Delivery address is required.";
+
+  return null;
+};
+
 
   // Save (create/update)
   async function save(nextStatus = "draft", silent = false) {
@@ -211,23 +236,52 @@ export default function RequirementForm({ lead, requirement = null, templateRequ
     try {
       const user = auth.currentUser || {};
       const payload = {
-        leadId: form.leadId || "",
-        leadSnapshot: form.leadSnapshot || {},
-        equipment: form.equipment,
-        expectedStartDate: form.expectedStartDate || "",
-        expectedDurationDays: Number(form.expectedDurationDays) || 0,
-        expectedEndDate: form.expectedEndDate || "",
-        deliveryAddress: form.deliveryAddress || "",
-        deliveryCity: form.deliveryCity || "",
-        deliveryContact: form.deliveryContact || {},
-        urgency: form.urgency || "normal",
-        specialInstructions: form.specialInstructions || "",
-        status: nextStatus || "draft",
-        assignedTo: form.assignedTo || "",
-        updatedAt: serverTimestamp(),
-        updatedBy: user.uid || "",
-        updatedByName: user.displayName || user.email || "",
-      };
+  // 🔹 Lead linkage
+  leadId: form.leadId || "",
+  leadSnapshot: form.leadSnapshot || {},
+
+  // 🔹 Service type (NEW – very important)
+  serviceType: form.serviceType || "rental",
+
+  // 🔹 Nursing data (ONLY when serviceType = nursing)
+  nursing:
+    form.serviceType === "nursing"
+      ? {
+          staffType: form.nursing?.staffType || "nurse",
+          count: Number(form.nursing?.count || 1),
+          shift: form.nursing?.shift || "day",
+          notes: form.nursing?.notes || "",
+        }
+      : null,
+
+  // 🔹 Equipment (ONLY when serviceType = rental)
+  equipment:
+    form.serviceType === "rental"
+      ? form.equipment || []
+      : [],
+
+  // 🔹 Common timing fields (used by BOTH)
+  expectedStartDate: form.expectedStartDate || "",
+  expectedDurationDays: Number(form.expectedDurationDays) || 0,
+  expectedEndDate: form.expectedEndDate || "",
+
+  // 🔹 Address & contact
+  deliveryAddress: form.deliveryAddress || "",
+  deliveryCity: form.deliveryCity || "",
+  deliveryContact: form.deliveryContact || {},
+
+  // 🔹 Meta
+  urgency: form.urgency || "normal",
+  specialInstructions: form.specialInstructions || "",
+  status: nextStatus || "draft",
+  assignedTo: form.assignedTo || "",
+
+  // 🔹 Audit
+  updatedAt: serverTimestamp(),
+  updatedBy: user.uid || "",
+  updatedByName: user.displayName || user.email || "",
+};
+
 
       if (form.requirementId) {
         // UPDATE existing
@@ -381,8 +435,102 @@ export default function RequirementForm({ lead, requirement = null, templateRequ
             React.createElement("option", { value: "immediate" }, "Immediate")
           )
         ),
+        // Service Type (Rental / Nursing)
+React.createElement(
+  "div",
+  { className: "card" },
+  React.createElement("h3", null, "Service Type"),
+  React.createElement(
+    "select",
+    {
+      className: "input",
+      value: form.serviceType,
+      onChange: (e) =>
+        setForm((f) => ({
+          ...f,
+          serviceType: e.target.value,
+        })),
+    },
+    React.createElement("option", { value: "rental" }, "Equipment Rental"),
+    React.createElement("option", { value: "nursing" }, "Nursing / Caretaker")
+  )
+),
+form.serviceType === "nursing" &&
+React.createElement(
+  "div",
+  { className: "card", style: { gridColumn: "1 / -1" } },
+  React.createElement("h3", null, "Nursing / Caretaker Details"),
+
+  // Staff Type
+  React.createElement("label", null, "Staff Type"),
+  React.createElement(
+    "select",
+    {
+      className: "input",
+      value: form.nursing.staffType,
+      onChange: (e) =>
+        setForm((f) => ({
+          ...f,
+          nursing: { ...f.nursing, staffType: e.target.value },
+        })),
+    },
+    React.createElement("option", { value: "nurse" }, "Nurse"),
+    React.createElement("option", { value: "caretaker" }, "Caretaker")
+  ),
+
+  // Count
+  React.createElement("label", null, "Number of Staff"),
+  React.createElement("input", {
+    className: "input",
+    type: "number",
+    min: 1,
+    value: form.nursing.count,
+    onChange: (e) =>
+      setForm((f) => ({
+        ...f,
+        nursing: {
+          ...f.nursing,
+          count: Number(e.target.value || 1),
+        },
+      })),
+  }),
+
+  // Shift
+  React.createElement("label", null, "Shift"),
+  React.createElement(
+    "select",
+    {
+      className: "input",
+      value: form.nursing.shift,
+      onChange: (e) =>
+        setForm((f) => ({
+          ...f,
+          nursing: { ...f.nursing, shift: e.target.value },
+        })),
+    },
+    React.createElement("option", { value: "day" }, "Day"),
+    React.createElement("option", { value: "night" }, "Night"),
+    React.createElement("option", { value: "full_day" }, "24 × 7")
+  ),
+
+  // Notes
+  React.createElement("label", null, "Care Notes"),
+  React.createElement("textarea", {
+    className: "input textarea",
+    placeholder: "Patient condition, special care, etc.",
+    value: form.nursing.notes,
+    onChange: (e) =>
+      setForm((f) => ({
+        ...f,
+        nursing: { ...f.nursing, notes: e.target.value },
+      })),
+  })
+),
+
+
 
         // Equipment (full width) with right-aligned Add button
+        form.serviceType === "rental" &&
         React.createElement(
           "div",
           { className: "card card-equip", style: { gridColumn: "1 / -1" } },

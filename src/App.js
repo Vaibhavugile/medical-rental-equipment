@@ -61,6 +61,12 @@ import AssetsReport from "./pages/reports/AssetsReport";
 import TrackingPage from "./pages/TrackingPage";
 import LandingNew from "./pages/Landingnew";
 import Staff from "./pages/Staff";
+import NursingOrders from "./pages/NursingOrders";
+import NursingOrderDetails from "./pages/NursingOrderDetails";
+import StaffDetails from "./pages/StaffDetails";
+import PayrollGenerate from "./pages/PayrollGenerate";
+import Sidebar from "./pages/Sidebar";
+
 
 /* ============================================================
    PRIVATE ROUTE (AUTH ONLY, SILENT)
@@ -108,93 +114,64 @@ function HeaderRight() {
 ============================================================ */
 function CRMApp() {
   return (
-    <>
-      <header style={{ background: "#fff", borderBottom: "1px solid #eee" }}>
-        <div
-          style={{
-            maxWidth: 1200,
-            margin: "0 auto",
-            padding: "12px 20px",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-          }}
-        >
-          <strong style={{ color: "#0b5cff" }}>MedRent CRM</strong>
+    <div className="app-shell">
+      {/* SIDEBAR */}
+      <Sidebar />
 
-          <nav style={{ display: "flex", gap: 8 }}>
-            {[
-              ["Leads", "/crm/leads"],
-              ["Requirements", "/crm/requirements"],
-              ["Quotations", "/crm/quotations"],
-              ["Orders", "/crm/orders"],
-              ["Inventory", "/crm/products"],
-              ["Runners", "/crm/drivers"],
-              ["Marketing", "/crm/marketing"],
-              ["Nursing","/crm/staff"],
-              ["Visits", "/crm/visits"],
-              ["Reports", "/crm/reports"],
-              ["Branches", "/crm/branches"],
-              ["Tracking", "/crm/tracking"],
-
-            ].map(([label, path]) => (
-              <NavLink
-                key={path}
-                to={path}
-                style={({ isActive }) => ({
-                  padding: "6px 10px",
-                  borderRadius: 6,
-                  textDecoration: "none",
-                  fontWeight: 600,
-                  color: isActive ? "#fff" : "#0b5cff",
-                  background: isActive
-                    ? "linear-gradient(90deg,#0b69ff,#00b4d8)"
-                    : "transparent",
-                })}
-              >
-                {label}
-              </NavLink>
-            ))}
-          </nav>
-
+      {/* MAIN */}
+      <div className="app-main">
+        {/* HEADER */}
+        <header className="app-header">
           <HeaderRight />
-        </div>
-      </header>
+        </header>
 
-      <main style={{ padding: 20 }}>
-        <Routes>
-          <Route path="leads" element={<Leads />} />
-          <Route path="requirements" element={<Requirements />} />
-          <Route path="quotations" element={<Quotations />} />
-          <Route path="orders" element={<Orders />} />
-          <Route path="products" element={<Products />} />
-          <Route path="drivers" element={<Drivers />} />
-          <Route path="branches" element={<Branches />} />
-          <Route path="marketing" element={<Marketing />} />
-          <Route path="staff" element={<Staff />} />
-          <Route path="visits" element={<Visits />} />
-          <Route path="reports" element={<ReportsHome />} />
-          <Route path="attendance" element={<AttendanceAdmin />} />
+        {/* CONTENT */}
+        <main className="app-content">
+          <Routes>
+            <Route path="leads" element={<Leads />} />
+            <Route path="requirements" element={<Requirements />} />
+            <Route path="quotations" element={<Quotations />} />
+            <Route path="orders" element={<Orders />} />
 
+            <Route path="nursing-orders" element={<NursingOrders />} />
+            <Route
+              path="nursing-orders/:id"
+              element={<NursingOrderDetails />}
+            />
 
-          {/* ✅ RESTORED WRAPPER (FIXES ROLE ISSUE) */}
-          <Route path="tracking" element={<TrackingPageWithParams />} />
+            <Route path="products" element={<Products />} />
+            <Route path="drivers" element={<Drivers />} />
+            <Route path="branches" element={<Branches />} />
+            <Route path="marketing" element={<Marketing />} />
 
-          <Route path="reports/products" element={<ProductReport />} />
-          <Route path="reports/financial" element={<FinancialReport />} />
-          <Route
-            path="reports/financial/outstanding"
-            element={<OutstandingOrdersReport />}
-          />
-          <Route path="reports/assets" element={<AssetsReport />} />
+            <Route path="staff" element={<Staff />} />
+            <Route path="staff/:id" element={<StaffDetails />} />
 
-          {/* 🔴 PRIVATE NOT FOUND */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </main>
-    </>
+            <Route path="visits" element={<Visits />} />
+            <Route path="reports" element={<ReportsHome />} />
+            <Route path="attendance" element={<AttendanceAdmin />} />
+            <Route path="payroll" element={<PayrollGenerate />} />
+
+            <Route path="tracking" element={<TrackingPageWithParams />} />
+
+            <Route path="reports/products" element={<ProductReport />} />
+            <Route path="reports/financial" element={<FinancialReport />} />
+            <Route
+              path="reports/financial/outstanding"
+              element={<OutstandingOrdersReport />}
+            />
+            <Route path="reports/assets" element={<AssetsReport />} />
+
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </main>
+      </div>
+    </div>
   );
 }
+
+
+
 
 /* ============================================================
    TRACKING PAGE WITH PARAMS (URL IS SOURCE OF TRUTH)

@@ -1,0 +1,120 @@
+.no-wrap {
+  padding: 16px;
+}
+
+.no-head {
+  margin-bottom: 12px;
+}
+
+.no-head h2 {
+  margin: 0;
+  font-size: 22px;
+}
+
+/* Card */
+.no-table-card {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #eef2f7;
+  overflow: hidden;
+}
+
+/* Table */
+.no-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.no-table thead {
+  background: #f9fafb;
+}
+
+.no-table th {
+  text-align: left;
+  padding: 12px;
+  font-weight: 700;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.no-table td {
+  padding: 12px;
+  border-bottom: 1px solid #eef2f7;
+  vertical-align: top;
+}
+
+.no-table tr:hover {
+  background: #f9fafb;
+}
+
+.right {
+  text-align: right;
+}
+
+.mono {
+  font-family: monospace;
+}
+
+/* Customer */
+.cust .small {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Pills */
+.pill {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.pill.created {
+  background: #eef2ff;
+  color: #3730a3;
+}
+
+.pill.completed {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.pill.cancelled {
+  background: #fff1f2;
+  color: #9f1239;
+}
+
+.pill.blue {
+  background: #e0f2fe;
+  color: #075985;
+}
+
+/* Actions */
+.actions {
+  white-space: nowrap;
+}
+
+.link {
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  padding: 0;
+  margin-right: 10px;
+  font-weight: 600;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+/* Muted */
+.muted {
+  color: #6b7280;
+}
+
+.small {
+  font-size: 12px;
+}

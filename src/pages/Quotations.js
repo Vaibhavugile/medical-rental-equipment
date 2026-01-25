@@ -17,7 +17,7 @@ import { useNavigate } from "react-router-dom";
 import "./Quotations.css";
 import { makeHistoryEntry, propagateToLead } from "../utils/status";
 import OrderCreate from "./OrderCreate";
-
+import NursingOrderCreate from "./NursingOrderCreate";
 // NEW: PDF generation + Firebase Storage upload
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import jsPDF from "jspdf";
@@ -79,6 +79,10 @@ export default function Quotations() {
 
   const [orderModalQuote, setOrderModalQuote] = useState(null);
   const navigate = useNavigate();
+  const isNursingQuote = (q) =>
+    q?.meta?.serviceType === "nursing" ||
+    q?.serviceType === "nursing";
+
 
   useEffect(() => {
     setLoading(true);
@@ -210,7 +214,7 @@ export default function Quotations() {
 
   const closeDetails = () => {
     if (details && details.__unsubVersions) {
-      try { details.__unsubVersions(); } catch {}
+      try { details.__unsubVersions(); } catch { }
     }
     setDetails(null);
     setIsEditing(false);
@@ -546,10 +550,22 @@ export default function Quotations() {
     }
   };
 
-  const convertToOrder = (quote) => {
-    setError("");
-    setOrderModalQuote(quote);
-  };
+const convertToOrder = (quote) => {
+  setError("");
+
+  const isNursing =
+    quote?.items?.some((it) =>
+      /nurse|caretaker|care staff/i.test(it.name || "")
+    ) ||
+    quote?.serviceType === "nursing";
+
+  setOrderModalQuote({
+    ...quote,
+
+    // internal flag only for UI routing
+    __orderType: isNursing ? "nursing" : "rental",
+  });
+};
 
   const shareUpdated = async () => {
     if (!details) return;
@@ -742,53 +758,53 @@ export default function Quotations() {
               <th>Actions</th>
             </tr>
           </thead>
-        <tbody>
-          {filtered.map((q) => {
-            const sClass = (q.status || "draft")
-              .split(" ")
-              .map((s) => (s ? s[0].toUpperCase() + s.slice(1) : ""))
-              .join("");
-            return (
-              <tr key={q.id}>
-                <td className="strong">{q.quoNo || q.quotationId || q.id}</td>
-                <td>{q.requirementId || "—"}</td>
-                <td>{q.createdByName || q.createdBy || "—"}</td>
-                <td><span className={`chip ${sClass}`}>{q.status || "draft"}</span></td>
-                <td>{parseDate(q.createdAt)}</td>
-                <td>{fmtCurrency(q.totals?.total || 0)}</td>
-                <td>
-                  <div className="qp-actions">
-                    <button className="qp-link" onClick={() => openDetails(q)}>View</button>
+          <tbody>
+            {filtered.map((q) => {
+              const sClass = (q.status || "draft")
+                .split(" ")
+                .map((s) => (s ? s[0].toUpperCase() + s.slice(1) : ""))
+                .join("");
+              return (
+                <tr key={q.id}>
+                  <td className="strong">{q.quoNo || q.quotationId || q.id}</td>
+                  <td>{q.requirementId || "—"}</td>
+                  <td>{q.createdByName || q.createdBy || "—"}</td>
+                  <td><span className={`chip ${sClass}`}>{q.status || "draft"}</span></td>
+                  <td>{parseDate(q.createdAt)}</td>
+                  <td>{fmtCurrency(q.totals?.total || 0)}</td>
+                  <td>
+                    <div className="qp-actions">
+                      <button className="qp-link" onClick={() => openDetails(q)}>View</button>
 
-                    {(q.status || "").toLowerCase() === "draft" && (
-                      <button className="qp-link" onClick={() => updateQuotationStatus(q, "sent", "Sent to customer")}>
-                        Mark Sent
-                      </button>
-                    )}
+                      {(q.status || "").toLowerCase() === "draft" && (
+                        <button className="qp-link" onClick={() => updateQuotationStatus(q, "sent", "Sent to customer")}>
+                          Mark Sent
+                        </button>
+                      )}
 
-                    {(q.status || "").toLowerCase() === "sent" && (
-                      <>
-                        <button className="qp-link" onClick={() => updateQuotationStatus(q, "accepted", "Accepted by customer")}>Accept</button>
-                        <button className="qp-link" onClick={() => updateQuotationStatus(q, "rejected", "Rejected by customer")}>Reject</button>
-                      </>
-                    )}
+                      {(q.status || "").toLowerCase() === "sent" && (
+                        <>
+                          <button className="qp-link" onClick={() => updateQuotationStatus(q, "accepted", "Accepted by customer")}>Accept</button>
+                          <button className="qp-link" onClick={() => updateQuotationStatus(q, "rejected", "Rejected by customer")}>Reject</button>
+                        </>
+                      )}
 
-                    {(q.status || "").toLowerCase() === "accepted" && !q.orderId && (
-                      <button className="qp-link" onClick={() => convertToOrder(q)}>Convert to Order</button>
-                    )}
+                      {(q.status || "").toLowerCase() === "accepted" && !q.orderId && (
+                        <button className="qp-link" onClick={() => convertToOrder(q)}>Convert to Order</button>
+                      )}
 
-                    {(q.orderId || (q.status || "").toLowerCase() === "order_created") && (
-                      <button className="qp-link" onClick={() => navigate("/orders")}>View Orders</button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            );
-          })}
-          {filtered.length === 0 && (
-            <tr><td colSpan="7" className="qp-empty">No quotations found.</td></tr>
-          )}
-        </tbody>
+                      {(q.orderId || (q.status || "").toLowerCase() === "order_created") && (
+                        <button className="qp-link" onClick={() => navigate("/orders")}>View Orders</button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {filtered.length === 0 && (
+              <tr><td colSpan="7" className="qp-empty">No quotations found.</td></tr>
+            )}
+          </tbody>
         </table>
       </div>
 
@@ -816,108 +832,166 @@ export default function Quotations() {
                   <div className="label">Created</div>
                   <div className="value">{parseDate(details.createdAt)} · {details.createdByName || details.createdBy}</div>
                 </div>
+                {isNursingQuote(details) && (
+                  <div className="qp-nursing-summary" style={{ marginBottom: 12 }}>
+                    <div><strong>Service:</strong> {details.items?.[0]?.name || "Nursing"}</div>
+                    <div>
+                      <strong>Staff:</strong> {details.meta?.staffCount || details.nursing?.count || 1}
+                      {" · "}
+                      <strong>Shift:</strong> {details.meta?.shift || details.nursing?.shift || "—"}
+                      {" · "}
+                      <strong>Days:</strong> {details.meta?.days || details.expectedDurationDays || "—"}
+                    </div>
+                  </div>
+                )}
+
 
                 <div className="qp-section">
                   <div className="label">Items</div>
 
-       {isEditing ? (
-  <div style={{ marginTop: 8 }}>
-    {(editQuotation.items || []).map((it, i) => (
-      <div key={it.id || i} className="quotation-item">
+                  {isEditing ? (
+                    <div style={{ marginTop: 8 }}>
+                      {(editQuotation.items || []).map((it, i) => (
+                        <div key={it.id || i} className="quotation-item">
 
-        {/* ROW 1 → Name | Qty | Rate */}
-        <div className="row-1">
-          <input
-            className="cp-input"
-            placeholder="Item name"
-            value={it.name || it.itemName || it.productName || ""}
-            onChange={(e) => updateEditItem(i, { name: e.target.value })}
-          />
-          <input
-            className="cp-input"
-            type="number"
-            placeholder="Qty"
-            value={it.qty ?? it.quantity ?? 1}
-            onChange={(e) => updateEditItem(i, { qty: Number(e.target.value || 0) })}
-          />
-          <input
-            className="cp-input"
-            type="number"
-            placeholder="Rate"
-            value={it.rate ?? 0}
-            onChange={(e) => updateEditItem(i, { rate: Number(e.target.value || 0) })}
-          />
+                          {/* ROW 1 → Name | Qty | Rate */}
+                          <div className="row-1">
+                            <input
+                              className="cp-input"
+                              placeholder="Item name"
+                              value={it.name || it.itemName || it.productName || ""}
+                              onChange={(e) => updateEditItem(i, { name: e.target.value })}
+                            />
+                            <input
+                              className="cp-input"
+                              type="number"
+                              placeholder={isNursingQuote(editQuotation) ? "Auto (Days × Staff)" : "Qty"}
+                              value={it.qty ?? it.quantity ?? 1}
+                              disabled={isNursingQuote(editQuotation)}
+                              onChange={(e) =>
+                                !isNursingQuote(editQuotation) &&
+                                updateEditItem(i, { qty: Number(e.target.value || 0) })
+                              }
+                            />
+
+                            <input
+                              className="cp-input"
+                              type="number"
+                              placeholder="Rate"
+                              value={it.rate ?? 0}
+                              onChange={(e) => updateEditItem(i, { rate: Number(e.target.value || 0) })}
+                            />
+                          </div>
+
+                          {/* ROW 2 → Days | Start | End */}
+                          <div className="row-2">
+                            <input
+                              className="cp-input"
+                              type="number"
+                              placeholder="Days"
+                              value={it.days ?? it.expectedDurationDays ?? 0}
+                              onChange={(e) => updateEditItem(i, { days: Number(e.target.value || 0) })}
+                            />
+                            <input
+                              className="cp-input"
+                              type="date"
+                              placeholder="Start date"
+                              value={it.expectedStartDate || it.startDate || ""}
+                              onChange={(e) => updateEditItem(i, { expectedStartDate: e.target.value })}
+                            />
+                            <input
+                              className="cp-input"
+                              type="date"
+                              placeholder="End date"
+                              value={it.expectedEndDate || it.endDate || ""}
+                              onChange={(e) => updateEditItem(i, { expectedEndDate: e.target.value })}
+                            />
+                          </div>
+
+                          {/* ROW 3 → Product ID | Notes | Remove */}
+                          <div className="row-3">
+                            <input
+                              className="cp-input"
+                              placeholder="Product ID"
+                              value={it.productId || ""}
+                              onChange={(e) => updateEditItem(i, { productId: e.target.value })}
+                            />
+                            <input
+                              className="cp-input"
+                              placeholder="Notes"
+                              value={it.notes || it.unitNotes || ""}
+                              onChange={(e) => updateEditItem(i, { notes: e.target.value })}
+                            />
+                            <button className="cp-btn ghost" onClick={() => removeEditItem(i)}>Remove</button>
+                          </div>
+
+                          <div className="extra-details">
+                            Amount: {fmtCurrency((it.amount ?? ((it.qty ?? it.quantity ?? 0) * (it.rate ?? 0))) || 0)}
+                          </div>
+                        </div>
+                      ))}
+                      {isNursingQuote(editQuotation) && (
+      <div
+        className="qp-nursing-summary"
+        style={{
+          marginTop: 8,
+          padding: 8,
+          background: "#f8fafc",
+          borderRadius: 6,
+          fontSize: 13,
+        }}
+      >
+        <div>
+          <strong>Staff:</strong>{" "}
+          {editQuotation.meta?.staffCount ||
+            editQuotation.nursing?.count ||
+            1}
         </div>
-
-        {/* ROW 2 → Days | Start | End */}
-        <div className="row-2">
-          <input
-            className="cp-input"
-            type="number"
-            placeholder="Days"
-            value={it.days ?? it.expectedDurationDays ?? 0}
-            onChange={(e) => updateEditItem(i, { days: Number(e.target.value || 0) })}
-          />
-          <input
-            className="cp-input"
-            type="date"
-            placeholder="Start date"
-            value={it.expectedStartDate || it.startDate || ""}
-            onChange={(e) => updateEditItem(i, { expectedStartDate: e.target.value })}
-          />
-          <input
-            className="cp-input"
-            type="date"
-            placeholder="End date"
-            value={it.expectedEndDate || it.endDate || ""}
-            onChange={(e) => updateEditItem(i, { expectedEndDate: e.target.value })}
-          />
+        <div>
+          <strong>Shift:</strong>{" "}
+          {editQuotation.meta?.shift ||
+            editQuotation.nursing?.shift ||
+            "—"}
         </div>
-
-        {/* ROW 3 → Product ID | Notes | Remove */}
-        <div className="row-3">
-          <input
-            className="cp-input"
-            placeholder="Product ID"
-            value={it.productId || ""}
-            onChange={(e) => updateEditItem(i, { productId: e.target.value })}
-          />
-          <input
-            className="cp-input"
-            placeholder="Notes"
-            value={it.notes || it.unitNotes || ""}
-            onChange={(e) => updateEditItem(i, { notes: e.target.value })}
-          />
-          <button className="cp-btn ghost" onClick={() => removeEditItem(i)}>Remove</button>
+        <div>
+          <strong>Days:</strong>{" "}
+          {editQuotation.meta?.days ||
+            editQuotation.expectedDurationDays ||
+            "—"}
         </div>
-
-        <div className="extra-details">
-          Amount: {fmtCurrency((it.amount ?? ((it.qty ?? it.quantity ?? 0) * (it.rate ?? 0))) || 0)}
+        <div className="muted">
+          Qty is auto-calculated (days × staff)
         </div>
       </div>
-    ))}
+    )}
 
-    <div style={{ marginTop: 8 }}>
-      <button className="cp-btn" onClick={addEditItem}>+ Add item</button>
-    </div>
-  </div>
-) : (
-  /* keep your read-only block as-is */
-  <div style={{ marginTop: 8 }}>
-    {(details.items || []).map((it, idx) => (
-      <div key={idx} style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
-        <div style={{ fontWeight: 700 }}>
-          {it.name || it.itemName || it.productName || it.productId || "—"}
-        </div>
-        <div style={{ fontSize: 13, color: "#6b7280" }}>
-          {(it.qty ?? it.quantity ?? 0)} × {fmtCurrency(it.rate ?? 0)} =
-          {" "}{fmtCurrency(it.amount ?? ((it.qty ?? it.quantity ?? 0) * (it.rate ?? 0)))}
-        </div>
-        {(it.notes || it.unitNotes) ? <div style={{ marginTop: 6 }}>{it.notes || it.unitNotes}</div> : null}
-      </div>
-    ))}
-  </div>
-)}
+                      <div style={{ marginTop: 8 }}>
+                        <button className="cp-btn" onClick={addEditItem}>+ Add item</button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* keep your read-only block as-is */
+                    <div style={{ marginTop: 8 }}>
+                      {(details.items || []).map((it, idx) => (
+                        <div key={idx} style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
+                          <div style={{ fontWeight: 700 }}>
+                            {it.name || it.itemName || it.productName || it.productId || "—"}
+                          </div>
+                          <div style={{ fontSize: 13, color: "#6b7280" }}>
+                            {isNursingQuote(details)
+                              ? `(${details.meta?.staffCount || details.nursing?.count || 1} staff × ${details.meta?.days || details.expectedDurationDays || 1
+                              } days) × ${fmtCurrency(it.rate ?? 0)}`
+                              : `${it.qty ?? it.quantity ?? 0} × ${fmtCurrency(it.rate ?? 0)}`
+                            }
+                            {" = "}
+                            {fmtCurrency(it.amount ?? ((it.qty ?? it.quantity ?? 0) * (it.rate ?? 0)))}
+                          </div>
+
+                          {(it.notes || it.unitNotes) ? <div style={{ marginTop: 6 }}>{it.notes || it.unitNotes}</div> : null}
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                 </div>
 
@@ -975,7 +1049,7 @@ export default function Quotations() {
                         </select>
                       ) : (
                         <div className="value">
-                          <span className={`chip ${(details.status || "draft").split(" ").map(s => s ? s[0].toUpperCase()+s.slice(1) : "").join("")}`}>
+                          <span className={`chip ${(details.status || "draft").split(" ").map(s => s ? s[0].toUpperCase() + s.slice(1) : "").join("")}`}>
                             {details.status || "draft"}
                           </span>
                         </div>
@@ -1090,7 +1164,7 @@ export default function Quotations() {
                             {sendingWa ? "Preparing…" : (
                               <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                                  <path d="M20.52 3.48A11.86 11.86 0 0 0 12.07.02C5.5.02.18 5.33.18 11.9c0 2.1.55 4.15 1.6 5.96L.02 24l6.3-1.64a11.86 11.86 0 0 0 5.75 1.47h.01c6.57 0 11.89-5.31 11.89-11.88 0-3.18-1.24-6.17-3.45-8.47zM12.07 21.8h-.01a9.9 9.9 0 0 1-5.04-1.38l-.36-.21-3.74.97 1-3.64-.24-.37a9.89 9.89 0 0 1-1.53-5.27c0-5.46 4.45-9.9 9.92-9.9 2.65 0 5.14 1.03 7.02 2.9a9.86 9.86 0 0 1 2.9 7.02c0 5.47-4.45 9.88-9.92 9.88zm5.63-7.37c-.31-.15-1.83-.9-2.12-1-.28-.1-.49-.16-.7.16-.2.31-.8 1-.98 1.2-.18.2-.36.22-.66.07-.31-.15-1.3-.48-2.47-1.54-.9-.8-1.51-1.8-1.69-2.1-.18-.3-.02-.46.13-.6.14-.14.3-.37.45-.55.15-.18.2-.31.31-.52.1-.2.06-.38-.02-.54-.08-.16-.7-1.68-.96-2.3-.25-.6-.51-.52-.7-.53h-.6c-.2 0-.53.08-.8.38-.28.3-1.06 1.04-1.06 2.52s1.09 2.93 1.25 3.13c.15.2 2.14 3.26 5.2 4.57.73.31 1.3.49 1.74.63.73.23 1.4.2 1.92.12.59-.09 1.83-.74 2.09-1.46.26-.72.26-1.33.18-1.46-.07-.13-.28-.2-.59-.35z"/>
+                                  <path d="M20.52 3.48A11.86 11.86 0 0 0 12.07.02C5.5.02.18 5.33.18 11.9c0 2.1.55 4.15 1.6 5.96L.02 24l6.3-1.64a11.86 11.86 0 0 0 5.75 1.47h.01c6.57 0 11.89-5.31 11.89-11.88 0-3.18-1.24-6.17-3.45-8.47zM12.07 21.8h-.01a9.9 9.9 0 0 1-5.04-1.38l-.36-.21-3.74.97 1-3.64-.24-.37a9.89 9.89 0 0 1-1.53-5.27c0-5.46 4.45-9.9 9.92-9.9 2.65 0 5.14 1.03 7.02 2.9a9.86 9.86 0 0 1 2.9 7.02c0 5.47-4.45 9.88-9.92 9.88zm5.63-7.37c-.31-.15-1.83-.9-2.12-1-.28-.1-.49-.16-.7.16-.2.31-.8 1-.98 1.2-.18.2-.36.22-.66.07-.31-.15-1.3-.48-2.47-1.54-.9-.8-1.51-1.8-1.69-2.1-.18-.3-.02-.46.13-.6.14-.14.3-.37.45-.55.15-.18.2-.31.31-.52.1-.2.06-.38-.02-.54-.08-.16-.7-1.68-.96-2.3-.25-.6-.51-.52-.7-.53h-.6c-.2 0-.53.08-.8.38-.28.3-1.06 1.04-1.06 2.52s1.09 2.93 1.25 3.13c.15.2 2.14 3.26 5.2 4.57.73.31 1.3.49 1.74.63.73.23 1.4.2 1.92.12.59-.09 1.83-.74 2.09-1.46.26-.72.26-1.33.18-1.46-.07-.13-.28-.2-.59-.35z" />
                                 </svg>
                                 Send on WhatsApp
                               </span>
@@ -1129,19 +1203,44 @@ export default function Quotations() {
       )}
 
       {/* OrderCreate drawer/modal */}
-      {orderModalQuote && (
-        <OrderCreate
-          open={!!orderModalQuote}
-          quotation={orderModalQuote}
-          onClose={() => setOrderModalQuote(null)}
-          onCreated={(orderId) => {
-            if (details && details.id === orderModalQuote.id) {
-              setDetails((d) => ({ ...d, orderId, status: "order_created" }));
-            }
-            setOrderModalQuote(null);
-          }}
-        />
-      )}
+      {/* Rental Order */}
+{orderModalQuote?.__orderType === "rental" && (
+  <OrderCreate
+    open
+    quotation={orderModalQuote}
+    onClose={() => setOrderModalQuote(null)}
+    onCreated={(orderId) => {
+      if (details && details.id === orderModalQuote.id) {
+        setDetails((d) => ({
+          ...d,
+          orderId,
+          status: "order_created",
+        }));
+      }
+      setOrderModalQuote(null);
+    }}
+  />
+)}
+
+{/* Nursing Order */}
+{orderModalQuote?.__orderType === "nursing" && (
+  <NursingOrderCreate
+    open
+    quotation={orderModalQuote}
+    onClose={() => setOrderModalQuote(null)}
+    onCreated={(orderId) => {
+      if (details && details.id === orderModalQuote.id) {
+        setDetails((d) => ({
+          ...d,
+          orderId,
+          status: "order_created",
+        }));
+      }
+      setOrderModalQuote(null);
+    }}
+  />
+)}
+
     </div>
   );
 }

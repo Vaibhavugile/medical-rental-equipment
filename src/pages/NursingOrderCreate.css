@@ -1,0 +1,140 @@
+/* Drawer backdrop */
+.no-drawer {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Card */
+.no-card {
+  background: #fff;
+  width: 560px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.no-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 18px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.no-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.no-close {
+  border: none;
+  background: transparent;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+/* Error */
+.no-error {
+  background: #fee2e2;
+  color: #991b1b;
+  padding: 10px 14px;
+  margin: 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* Sections */
+.no-section {
+  padding: 16px 18px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.no-section h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* Fields */
+.no-section label {
+  display: block;
+  font-size: 13px;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.no-section input,
+.no-section select,
+.no-section textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+
+.no-section textarea {
+  resize: vertical;
+  min-height: 70px;
+}
+
+/* Pricing rows */
+.no-price-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.no-price-row.strong {
+  font-weight: 700;
+}
+
+/* Footer */
+.no-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 18px;
+  border-top: 1px solid #e5e7eb;
+  background: #f9fafb;
+}
+
+/* Buttons */
+.no-btn {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.no-btn.primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.no-btn.primary:hover {
+  background: #1d4ed8;
+}
+
+.no-btn.ghost {
+  background: transparent;
+  border: 1px solid #d1d5db;
+}
+
+.no-btn.ghost:hover {
+  background: #f1f5f9;
+}

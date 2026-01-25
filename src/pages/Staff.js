@@ -28,6 +28,7 @@ export default function Staff() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
+
   const empty = {
     name: "",
     loginEmail: "",
@@ -255,6 +256,10 @@ export default function Staff() {
         >
           Add Staff
         </button>
+        <button onClick={() => navigate("/crm/payroll")}>
+  Payroll
+</button>
+
       </div>
 
       {showForm && (
@@ -363,7 +368,13 @@ export default function Staff() {
             <tbody>
               {filtered.map((r) => (
                 <tr key={r.id}>
-                  <td>{r.name}</td>
+                  <td
+  className="staff-name-link"
+  onClick={() => navigate(`/crm/staff/${r.id}`)}
+>
+  {r.name}
+</td>
+
                   <td>{r.staffType}</td>
                   <td>{r.phone || "-"}</td>
                   <td>
@@ -378,21 +389,31 @@ export default function Staff() {
                       : "-"}
                   </td>
                   <td>
-                    <button className="cp-btn ghost" onClick={() => editRow(r)}>
-                      Edit
-                    </button>
-                    <button className="cp-btn ghost" onClick={() => remove(r.id)}>
-                      Delete
-                    </button>
-                    <button
-                      className="cp-btn ghost"
-                      onClick={() =>
-                        navigate(`/crm/attendance?role=staff&userId=${r.id}`)
-                      }
-                    >
-                      Attendance
-                    </button>
-                  </td>
+  <button
+    className="cp-btn ghost"
+    onClick={() => navigate(`/crm/staff/${r.id}`)}
+  >
+    View
+  </button>
+
+  <button className="cp-btn ghost" onClick={() => editRow(r)}>
+    Edit
+  </button>
+
+  <button className="cp-btn ghost" onClick={() => remove(r.id)}>
+    Delete
+  </button>
+
+  <button
+    className="cp-btn ghost"
+    onClick={() =>
+      navigate(`/crm/attendance?role=staff&userId=${r.id}`)
+    }
+  >
+    Attendance
+  </button>
+</td>
+
                 </tr>
               ))}
             </tbody>
