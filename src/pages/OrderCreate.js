@@ -920,7 +920,7 @@ const createOrder = async () => {
 
     if (onCreated) onCreated(orderId);
     if (onClose) onClose();
-    navigate("/orders");
+    navigate("/crm/orders");
 
   } catch (err) {
     console.error("createOrder error", err);

@@ -505,7 +505,7 @@ const createOrder = async () => {
 
     onCreated?.(orderId);
     onClose?.();
-    navigate("/orders");
+    navigate("/crm/nursing-orders");
 
   } catch (err) {
     console.error("Nursing createOrder error", err);

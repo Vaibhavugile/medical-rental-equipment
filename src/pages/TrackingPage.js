@@ -16,12 +16,19 @@ export default function TrackingPage({ presetDriverId = "", presetDate, presetRo
     presetDate || new Date().toISOString().slice(0, 10)
   );
 
+  const collectionByRole = (role) => {
+  if (role === "marketing") return "marketing";
+  if (role === "staff") return "staff";
+  return "drivers";
+};
+
+
   // Load people list for the selected role
   useEffect(() => {
     (async () => {
       try {
-        const base = role === "marketing" ? "marketing" : "drivers";
-        const snap = await getDocs(collection(db, base));
+const base = collectionByRole(role);
+const snap = await getDocs(collection(db, base));
         const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
         setPeople(rows);
 
@@ -52,13 +59,23 @@ export default function TrackingPage({ presetDriverId = "", presetDate, presetRo
     window.history.replaceState({}, "", url);
   }, [role, driverId, date]);
 
-  const label = role === "marketing" ? "Marketing User" : "Driver";
+const label =
+  role === "marketing"
+    ? "Marketing User"
+    : role === "staff"
+    ? "Staff"
+    : "Driver";
 
   return (
     <div style={{ padding: 16 }}>
-      <h1 style={{ marginBottom: 12 }}>
-        {role === "marketing" ? "Marketing Tracking" : "Driver Tracking"}
-      </h1>
+    <h1 style={{ marginBottom: 12 }}>
+  {role === "marketing"
+    ? "Marketing Tracking"
+    : role === "staff"
+    ? "Staff Tracking"
+    : "Driver Tracking"}
+</h1>
+
 
       <div
         style={{
@@ -78,6 +95,8 @@ export default function TrackingPage({ presetDriverId = "", presetDate, presetRo
           >
             <option value="drivers">Drivers</option>
             <option value="marketing">Marketing</option>
+            <option value="staff">Nursing</option>
+
           </select>
         </div>
 

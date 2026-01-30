@@ -13,6 +13,7 @@ import {
   MapPin,
   Wallet,
   Megaphone,
+  Menu,
 } from "lucide-react";
 import "./sidebar.css";
 
@@ -43,25 +44,20 @@ const SECTIONS = [
   {
     title: "Operations",
     items: [
-              { label: "Orders", path: "/crm/orders", icon: ShoppingCart },
+      { label: "Orders", path: "/crm/orders", icon: ShoppingCart },
       {
         label: "Nursing Orders",
         path: "/crm/nursing-orders",
         icon: Stethoscope,
       },
-
-
     ],
   },
-
   {
     title: "People",
     items: [
       { label: "Staff", path: "/crm/staff", icon: Users },
       { label: "Marketing", path: "/crm/marketing", icon: Megaphone },
       { label: "Runners", path: "/crm/drivers", icon: Truck },
-
-
     ],
   },
   {
@@ -76,9 +72,8 @@ const SECTIONS = [
     items: [
       { label: "Branches", path: "/crm/branches", icon: Building2 },
       { label: "Tracking", path: "/crm/tracking", icon: MapPin },
-     { label: "Inventory", path: "/crm/products", icon: Package },
+      { label: "Inventory", path: "/crm/products", icon: Package },
       { label: "Visits", path: "/crm/visits", icon: MapPin },
-
     ],
   },
 ];
@@ -87,22 +82,29 @@ const SECTIONS = [
    SIDEBAR COMPONENT
 ========================= */
 
-export default function Sidebar() {
+export default function Sidebar({ collapsed, onToggle }) {
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
       {/* BRAND */}
       <div className="sidebar-brand">
         <span className="logo-dot" />
-        <span className="brand-text">MedRent</span>
+        {!collapsed && <span className="brand-text">MedRent</span>}
+
+        {/* HAMBURGER */}
+        <button className="collapse-btn" onClick={onToggle}>
+          <Menu size={20} />
+        </button>
       </div>
 
       {/* NAV */}
       <div className="sidebar-scroll">
         {SECTIONS.map((section) => (
           <div key={section.title} className="sidebar-section">
-            <div className="sidebar-section-title">
-              {section.title}
-            </div>
+            {!collapsed && (
+              <div className="sidebar-section-title">
+                {section.title}
+              </div>
+            )}
 
             {section.items.map(({ label, path, icon: Icon, exact }) => (
               <NavLink
@@ -114,7 +116,9 @@ export default function Sidebar() {
                 }
               >
                 <Icon size={18} />
-                <span className="sidebar-link-label">{label}</span>
+                {!collapsed && (
+                  <span className="sidebar-link-label">{label}</span>
+                )}
                 <span className="active-indicator" />
               </NavLink>
             ))}

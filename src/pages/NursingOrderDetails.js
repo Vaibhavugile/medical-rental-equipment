@@ -1065,6 +1065,17 @@ const saveStaffSalary = async (assignment) => {
                         >
                             {a.paid ? "Paid" : "Unpaid"}
                         </span>
+                        <button
+  className="nod-btn nod-btn-secondary"
+  onClick={() =>
+    navigate(
+      `/crm/attendance?role=staff&userId=${a.staffId}&from=${a.startDate}&to=${a.endDate}`
+    )
+  }
+>
+  View Attendance
+</button>
+
 
                     </div>
 

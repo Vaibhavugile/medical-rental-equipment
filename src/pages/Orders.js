@@ -191,6 +191,8 @@ function isDriverAssigned(order) {
 ----------------------------------------------------------- */
 export function deriveDetailedStatus(order) {
   const base = (order?.status || "").toLowerCase();
+
+  // 1️⃣ HARD STATES (FINAL)
   if (base === "cancelled") return "cancelled";
   if (base === "completed") return "completed";
 
@@ -198,11 +200,10 @@ export function deriveDetailedStatus(order) {
   const start = getStartDate(order);
   const end = getEndDate(order);
 
-  // 1️⃣ Time-based urgency
+  // 2️⃣ TIME-BASED (HIGHEST PRIORITY)
   if (end && end === today) return "ending_today";
   if (start && start === today) return "starts_today";
 
-  // Ending soon = next 5 days (excluding today)
   if (end) {
     const endDate = new Date(end);
     const todayDate = new Date(today);
@@ -214,14 +215,21 @@ export function deriveDetailedStatus(order) {
     }
   }
 
+  // 3️⃣ 🚚 DELIVERY MOVEMENT
   const dstat = (order?.deliveryStatus || "").toLowerCase();
-
-  // 2️⃣ Movement (pickup OR return)
   if (dstat === "picked_up" || dstat === "in_transit") {
     return "in_transit";
   }
 
-  // 3️⃣ Ready to dispatch (pickup OR return)
+  // 4️⃣ 🟦 ON RENT (ADMIN OR DELIVERY)
+  if (
+    order.forceOnRent === true ||
+    (dstat === "delivered" && order.deliveryType !== "return")
+  ) {
+    return "on_rent";
+  }
+
+  // 5️⃣ READY TO DISPATCH
   const astate = assetsAssignmentState(order);
   if (
     (dstat === "assigned" || dstat === "accepted") &&
@@ -230,13 +238,9 @@ export function deriveDetailedStatus(order) {
     return "ready_to_dispatch";
   }
 
-  // 4️⃣ On rent (pickup delivered, return not started)
-  if (dstat === "delivered" && order.deliveryType !== "return") {
-    return "on_rent";
-  }
-
   return "all";
 }
+
 
 export const detailedStatusColor = (s) => {
   switch (s) {
@@ -292,9 +296,14 @@ export const getResourceBadges = (order) => {
   }
 
   /* 🟦 ON RENT (pickup delivered, return not started) */
-  if (dstat === "delivered" && order.deliveryType !== "return") {
-    badges.push({ key: "on_rent", label: "On Rent" });
-  }
+  /* 🟦 ON RENT */
+if (
+  order.forceOnRent === true ||
+  (dstat === "delivered" && order.deliveryType !== "return")
+) {
+  badges.push({ key: "on_rent", label: "On Rent" });
+}
+
 
   /* ↩ RETURN PENDING */
   if (order?.returnDeliveryId && dstat !== "completed") {
@@ -447,6 +456,7 @@ const derivedCounts = useMemo(() => {
     driver_assigned: 0,
     ready_to_dispatch: 0,
     starts_today: 0,
+    on_rent: 0,
     ending_today: 0,
     in_transit: 0,
     delivered: 0,
@@ -455,11 +465,11 @@ const derivedCounts = useMemo(() => {
     cancelled: 0,
   };
 
-  for (const o of orders) {
-    const k =
-      deriveDetailedStatus(o, deliveriesByOrder) || "created";
-    if (m[k] != null) m[k] += 1;
-  }
+ for (const o of orders) {
+  const k = deriveDetailedStatus(o, deliveriesByOrder) || "all";
+  if (m[k] != null) m[k] += 1;
+}
+
 
   return m;
 }, [orders, deliveriesByOrder]);
@@ -911,13 +921,21 @@ const groupedAssets = useMemo(() => {
     setSaving(true);
     setError("");
     try {
-      await updateDoc(doc(db, "orders", selectedOrder.id), {
-        status: newStatus,
-        updatedAt: serverTimestamp(),
-        updatedBy: auth.currentUser?.uid || "",
-        updatedByName:
-          auth.currentUser?.displayName || auth.currentUser?.email || "",
-      });
+     const patch = {
+  status: newStatus,
+  updatedAt: serverTimestamp(),
+  updatedBy: auth.currentUser?.uid || "",
+  updatedByName:
+    auth.currentUser?.displayName || auth.currentUser?.email || "",
+};
+
+// 🔴 IMPORTANT: clear On Rent when completed or cancelled
+if (newStatus === "completed" || newStatus === "cancelled") {
+  patch.forceOnRent = false;
+}
+
+await updateDoc(doc(db, "orders", selectedOrder.id), patch);
+
 
       if (selectedOrder.requirementId) {
         const entry = makeHistoryEntry(auth.currentUser || {}, {
@@ -1387,37 +1405,47 @@ const createReturnDelivery = async () => {
       setSaving(false);
     }
   };
-  function getDeliveryBadgeText(order, deliveriesByOrder = {}) {
+function getDeliveryBadgeText(order, deliveriesByOrder = {}) {
+  // 🔴 1️⃣ HARD STOP: COMPLETED / CANCELLED
+  const baseStatus = (order.status || "").toLowerCase();
+  if (baseStatus === "completed") return "Completed";
+  if (baseStatus === "cancelled") return "Cancelled";
+
+  // 🔵 2️⃣ MANUAL ON RENT (ADMIN OVERRIDE)
+  if (order.forceOnRent === true) return "On Rent";
+
   const list = deliveriesByOrder[order.id] || [];
 
   const pickup = list.find(d => d.deliveryType === "pickup");
   const ret = list.find(d => d.deliveryType === "return");
 
-  // No delivery yet
+  // 3️⃣ No delivery yet
   if (!pickup && !ret) return "No Delivery";
 
-  // Pickup in progress
+  // 4️⃣ Pickup in progress
   if (pickup && pickup.status !== "completed") {
     return `Pickup ${pickup.status.replace("_", " ")}`;
   }
 
-  // Pickup done, return not started
+  // 5️⃣ Pickup completed, return not started
   if (pickup?.status === "completed" && !ret) {
     return "On Rent";
   }
 
-  // Return in progress
+  // 6️⃣ Return in progress
   if (ret && ret.status !== "completed") {
     return `Return ${ret.status.replace("_", " ")}`;
   }
 
-  // Both completed
+  // 7️⃣ Both completed
   if (pickup?.status === "completed" && ret?.status === "completed") {
     return "Completed";
   }
 
   return "Active";
 }
+
+
 
 
   const driverAcceptDelivery = async () =>
@@ -1550,6 +1578,35 @@ const createReturnDelivery = async () => {
     return ymd;
   }
 }
+
+const markOnRent = async () => {
+  if (!selectedOrder) return;
+
+  setSaving(true);
+  setError("");
+
+  try {
+    await updateDoc(doc(db, "orders", selectedOrder.id), {
+      forceOnRent: true,
+      status: "active", // stays active while on rent
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser?.uid || "",
+      updatedByName:
+        auth.currentUser?.displayName || auth.currentUser?.email || "",
+    });
+
+    setSelectedOrder((o) => ({
+      ...o,
+      forceOnRent: true,
+      status: "active",
+    }));
+  } catch (err) {
+    setError(err.message || "Failed to mark On Rent");
+  } finally {
+    setSaving(false);
+  }
+};
+
 
 
   const removePayment = async (paymentId) => {
@@ -1803,24 +1860,30 @@ const badgeText = getDeliveryBadgeText(o, deliveriesByOrder);
       View
     </button>
 
-    {o.status !== "completed" && (
-      <button
-        className="cp-link"
-        onClick={() => {
-          setSelectedOrder(o);
-          changeOrderStatus("completed");
-        }}
-      >
-        Mark Completed
-      </button>
-    )}
+{o.forceOnRent !== true && o.status !== "completed" && o.status !== "cancelled" && (
+  <button
+    className="cp-link"
+    onClick={async () => {
+      if (!window.confirm("Mark this order as ON RENT?")) return;
 
-    <button
-      className="cp-link"
-      onClick={() => navigate(`/orders/${o.id}`)}
-    >
-      Open
-    </button>
+      try {
+        await updateDoc(doc(db, "orders", o.id), {
+          forceOnRent: true,
+          status: "active", // ensure stays active while on rent
+          updatedAt: serverTimestamp(),
+        });
+      } catch (e) {
+        alert(e.message || "Failed to mark On Rent");
+      }
+    }}
+  >
+    Mark On Rent
+  </button>
+)}
+
+
+
+   
   </td>
 </tr>
 

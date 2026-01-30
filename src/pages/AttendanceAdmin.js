@@ -61,7 +61,12 @@ export default function AttendanceAdmin() {
     (async () => {
       setError("");
       try {
-        const base = role === "marketing" ? "marketing" : "drivers";
+const base =
+  role === "marketing"
+    ? "marketing"
+    : role === "staff"
+    ? "staff"
+    : "drivers";
         log("people: fetching", base);
         const snap = await getDocs(collection(db, base));
         if (!mounted) return;
@@ -78,6 +83,7 @@ export default function AttendanceAdmin() {
     return () => { mounted = false; };
   }, [role]);
 
+  
   // Load attendance from subcollections when filters or people change
   useEffect(() => {
     let mounted = true;
@@ -87,7 +93,12 @@ export default function AttendanceAdmin() {
 
     (async () => {
       try {
-        const base = role === "marketing" ? "marketing" : "drivers";
+const base =
+  role === "marketing"
+    ? "marketing"
+    : role === "staff"
+    ? "staff"
+    : "drivers";
         const list = personId === "all" ? people : people.filter(p => p.id === personId);
         if (!list.length) { setRecords([]); setLoading(false); return; }
 
@@ -128,64 +139,92 @@ export default function AttendanceAdmin() {
   }, [role, people, personId, dateFrom, dateTo]);
 
   // Build per-user (Leads, Visits) for current range — using AUTH UID mapping
-  useEffect(() => {
-    let live = true;
-    (async () => {
-      try {
-        setPerUserLoading(true);
-        setPerUserError("");
+  // Build per-user (Leads, Visits) for current range — using AUTH UID mapping
+useEffect(() => {
+  let live = true;
 
-        const { from, to } = toTimestampRange(dateFrom, dateTo);
+  (async () => {
+    // ✅ STAFF DOES NOT HAVE LEADS / VISITS
+    if (role === "staff") {
+      if (!live) return;
+      setPerUser([]);
+      setPerUserLoading(false);
+      setPerUserError("");
+      return;
+    }
 
-        const peopleList = (personId === "all")
+    try {
+      setPerUserLoading(true);
+      setPerUserError("");
+
+      const { from, to } = toTimestampRange(dateFrom, dateTo);
+
+      const peopleList =
+        personId === "all"
           ? people
-          : people.filter(p => p.id === personId);
+          : people.filter((p) => p.id === personId);
 
-        if (!peopleList.length) {
-          if (live) { setPerUser([]); setPerUserLoading(false); }
-          return;
+      if (!peopleList.length) {
+        if (live) {
+          setPerUser([]);
+          setPerUserLoading(false);
         }
-
-        const leadsCol = collection(db, "leads");
-        const visitsCol = collection(db, "visits");
-
-        const rows = await Promise.all(
-          peopleList.map(async (p) => {
-            const key = userKey(p); // <-- authUid || uid || doc id
-
-            // Leads: union (ownerId==key OR createdBy==key), de-dup IDs
-            const leadsCount = await countLeadsForUser(leadsCol, from, to, key);
-
-            // Visits: union (assignedToId==key OR createdBy==key), de-dup IDs
-            const visitsCount = await countVisitsForUser(visitsCol, from, to, key);
-
-            return {
-              id: p.id,
-              name: p.name || p.loginEmail || p.email || p.id,
-              leads: leadsCount,
-              visits: visitsCount,
-              total: leadsCount + visitsCount,
-            };
-          })
-        );
-
-        rows.sort((a, b) => b.total - a.total);
-
-        if (!live) return;
-        setPerUser(rows);
-        setPerUserLoading(false);
-      } catch (e) {
-        if (!live) return;
-        console.error("[AttendanceAdmin] per-user stats error:", e);
-        setPerUser([]);
-        setPerUserLoading(false);
-        setPerUserError(e?.message || String(e));
+        return;
       }
-    })();
 
-    return () => { live = false; };
-  }, [people, personId, dateFrom, dateTo]);
+      const leadsCol = collection(db, "leads");
+      const visitsCol = collection(db, "visits");
 
+      const rows = await Promise.all(
+        peopleList.map(async (p) => {
+          const key = userKey(p); // authUid || uid || docId
+
+          // Leads: ownerId OR createdBy
+          const leadsCount = await countLeadsForUser(
+            leadsCol,
+            from,
+            to,
+            key
+          );
+
+          // Visits: assignedToId OR createdBy
+          const visitsCount = await countVisitsForUser(
+            visitsCol,
+            from,
+            to,
+            key
+          );
+
+          return {
+            id: p.id,
+            name: p.name || p.loginEmail || p.email || p.id,
+            leads: leadsCount,
+            visits: visitsCount,
+            total: leadsCount + visitsCount,
+          };
+        })
+      );
+
+      rows.sort((a, b) => b.total - a.total);
+
+      if (!live) return;
+      setPerUser(rows);
+      setPerUserLoading(false);
+    } catch (e) {
+      if (!live) return;
+      console.error("[AttendanceAdmin] per-user stats error:", e);
+      setPerUser([]);
+      setPerUserLoading(false);
+      setPerUserError(e?.message || String(e));
+    }
+  })();
+
+  return () => {
+    live = false;
+  };
+}, [role, people, personId, dateFrom, dateTo]);
+
+  
   const peopleById = useMemo(() => Object.fromEntries(people.map(p => [p.id, p])), [people]);
 
   // Aggregation per person (existing attendance summary)
@@ -236,15 +275,22 @@ export default function AttendanceAdmin() {
 
   return (
     <div className="attendance-page">
-      <h2>{role === "marketing" ? "Marketing Attendance" : "Driver Attendance"}</h2>
+<h2>
+  {role === "marketing"
+    ? "Marketing Attendance"
+    : role === "staff"
+    ? "Staff Attendance"
+    : "Driver Attendance"}
+</h2>
 
       {/* Toolbar */}
       <div className="toolbar">
         {/* Role switcher */}
         <select value={role} onChange={e => setRole(e.target.value)}>
-          <option value="drivers">Drivers</option>
-          <option value="marketing">Marketing</option>
-        </select>
+  <option value="drivers">Drivers</option>
+  <option value="marketing">Marketing</option>
+  <option value="staff">Staff (Nurses)</option>
+</select>
 
         <select value={personId} onChange={e => setPersonId(e.target.value)}>
           <option value="all">{role === "marketing" ? "All marketing" : "All drivers"}</option>
@@ -272,7 +318,14 @@ export default function AttendanceAdmin() {
           <table className="attendance-table">
             <thead>
               <tr>
-                <th>{role === "marketing" ? "Marketing User" : "Driver"}</th>
+                <th>
+  {role === "marketing"
+    ? "Marketing User"
+    : role === "staff"
+    ? "Staff"
+    : "Driver"}
+</th>
+
                 <th>Date</th>
                 <th>Check-in</th>
                 <th>Check-out</th>
@@ -407,7 +460,12 @@ function Info({ label, value, mono }) {
 
 // ---------- helpers ----------
 function daysAgo(n) { const d = new Date(); d.setDate(d.getDate() - n); return d; }
-function isoOf(d) { return d.toISOString().slice(0, 10); }
+function isoOf(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
 function daysBetween(fromIso, toIso) {
   const res = [];
   const from = new Date(fromIso + "T00:00:00");
@@ -421,6 +479,7 @@ function quickRange(daysBack, setFrom, setTo) {
   setFrom(isoOf(from));
   setTo(isoOf(now));
 }
+
 function fmtDT(v) {
   if (!v) return "";
   try {
@@ -488,22 +547,20 @@ function mapDayDoc({ id, personId, dayId, raw }) {
 }
 
 // ---- NEW: time range + counting helpers ----
-function toStartOfDayIso(iso) { return iso + "T00:00:00.000Z"; }
-function toEndOfDayIso(iso) { return iso + "T23:59:59.999Z"; }
 function toTimestampRange(fromIso, toIso) {
-  const from = Timestamp.fromDate(new Date(toStartOfDayIso(fromIso)));
-  const to = Timestamp.fromDate(new Date(toEndOfDayIso(toIso)));
-  return { from, to };
+  const start = new Date(fromIso);
+  start.setHours(0, 0, 0, 0);
+
+  const end = new Date(toIso);
+  end.setHours(23, 59, 59, 999);
+
+  return {
+    from: Timestamp.fromDate(start),
+    to: Timestamp.fromDate(end),
+  };
 }
-async function countWithFallback(q) {
-  try {
-    const snap = await getCountFromServer(q);
-    return snap.data().count || 0;
-  } catch {
-    const snap = await getDocs(q);
-    return snap.size;
-  }
-}
+
+
 
 // ---- NEW: ID mapping helpers ----
 function userKey(person) {

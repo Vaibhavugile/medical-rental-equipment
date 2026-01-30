@@ -36,11 +36,37 @@ const fmtDateTime = (ts) => {
   return `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
 };
 
+// ✅ normalize ANY date to YYYY-MM-DD
+function toYmd(value) {
+  if (!value) return null;
+
+  // Firestore Timestamp
+  if (value?.toDate) {
+    return value.toDate().toISOString().slice(0, 10);
+  }
+
+  // JS Date
+  if (value instanceof Date) {
+    return value.toISOString().slice(0, 10);
+  }
+
+  // ISO string or yyyy-mm-dd
+  if (typeof value === "string") {
+    return value.slice(0, 10);
+  }
+
+  return null;
+}
+
 export default function NursingOrders() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+const [search, setSearch] = useState("");
+const [statusFilter, setStatusFilter] = useState("all");
+const [fromDate, setFromDate] = useState("");
+const [toDate, setToDate] = useState("");
 
 
   /* =========================
@@ -63,12 +89,96 @@ export default function NursingOrders() {
 
     load();
   }, []);
+const filteredOrders = orders.filter((o) => {
+  // --- SEARCH ---
+  const q = search.toLowerCase();
+  const matchesSearch =
+    !q ||
+    o.orderNo?.toLowerCase().includes(q) ||
+    o.customerName?.toLowerCase().includes(q) ||
+    o.deliveryAddress?.toLowerCase().includes(q);
+
+  // --- STATUS ---
+  const matchesStatus =
+    statusFilter === "all" || o.status === statusFilter;
+
+  // --- DATE RANGE (SERVICE START DATE) ---
+  const serviceStartRaw = o.items?.[0]?.expectedStartDate;
+  const serviceStart = toYmd(serviceStartRaw);
+
+  let matchesDate = true;
+
+  if (fromDate && serviceStart) {
+    matchesDate = serviceStart >= fromDate;
+  }
+
+  if (toDate && serviceStart) {
+    matchesDate = matchesDate && serviceStart <= toDate;
+  }
+
+  return matchesSearch && matchesStatus && matchesDate;
+});
+
+
 
   return (
     <div className="no-wrap">
       {/* Header */}
      <div className="no-head">
   <h2>Nursing Orders</h2>
+  <div className="no-filters">
+  {/* SEARCH */}
+  <input
+    type="text"
+    className="no-input"
+    placeholder="Search order no, customer, address…"
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+  />
+
+  {/* STATUS */}
+  <select
+    className="no-input"
+    value={statusFilter}
+    onChange={(e) => setStatusFilter(e.target.value)}
+  >
+    <option value="all">All Status</option>
+    <option value="created">Created</option>
+    <option value="assigned">Assigned</option>
+    <option value="active">Active</option>
+    <option value="completed">Completed</option>
+  </select>
+
+  {/* DATE FROM */}
+  <input
+    type="date"
+    className="no-input"
+    value={fromDate}
+    onChange={(e) => setFromDate(e.target.value)}
+  />
+
+  {/* DATE TO */}
+  <input
+    type="date"
+    className="no-input"
+    value={toDate}
+    onChange={(e) => setToDate(e.target.value)}
+  />
+
+  {/* CLEAR */}
+  <button
+    className="cp-btn ghost"
+    onClick={() => {
+      setSearch("");
+      setStatusFilter("all");
+      setFromDate("");
+      setToDate("");
+    }}
+  >
+    Clear
+  </button>
+</div>
+
 
   <button
     className="cp-btn"
@@ -105,7 +215,8 @@ export default function NursingOrders() {
               </tr>
             )}
 
-            {!loading && orders.length === 0 && (
+           {!loading && filteredOrders.length === 0 && (
+
               <tr>
                 <td colSpan="9" className="no-muted">
                   No nursing orders found
@@ -114,7 +225,8 @@ export default function NursingOrders() {
             )}
 
             {!loading &&
-              orders.map((o) => {
+             filteredOrders.map((o) => {
+
                 const staffCount =
                   o.items?.reduce(
                     (s, it) => s + Number(it.qty || 0),

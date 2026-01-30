@@ -2,9 +2,10 @@
 
 .about-us {
   position: relative;
-  padding: 100px 20px;
-  background: #ffffff; /* ✅ clean white like other sections */
+  padding: 0 20px; /* horizontal only */
+  background: #ffffff;
 }
+
 
 /* subtle medical depth (very light, optional) */
 .about-us::before {

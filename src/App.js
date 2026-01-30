@@ -13,6 +13,7 @@ import {
 import useAuth from "./pages/useAuth";
 import { auth } from "./firebase";
 import "./App.css";
+import { useState } from "react";
 
 /* ======================= PUBLIC PAGES ======================= */
 import LandingPage from "./pages/LandingPage";
@@ -113,10 +114,21 @@ function HeaderRight() {
    CRM APP (PRIVATE AREA)
 ============================================================ */
 function CRMApp() {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
   return (
-    <div className="app-shell">
+    <div
+  className={`app-shell ${
+    sidebarCollapsed ? "sidebar-collapsed" : ""
+  }`}
+>
+
       {/* SIDEBAR */}
-      <Sidebar />
+      <Sidebar
+  collapsed={sidebarCollapsed}
+  onToggle={() => setSidebarCollapsed((v) => !v)}
+/>
+
 
       {/* MAIN */}
       <div className="app-main">

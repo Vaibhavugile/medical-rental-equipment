@@ -282,18 +282,28 @@ const openWhatsApp = (serviceName) => {
   <div className="bmm-service-subtitle">{s.subtitle}</div>
 
   <div className="bmm-service-actions">
-    <div className="bmm-service-cta">know more →</div>
 
-    <button
-      className="bmm-enquire-btn"
-      onClick={(e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        openWhatsApp(s.title);
-      }}
-    >
-      Enquiry Now
-    </button>
+   <button
+  onClick={(e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openWhatsApp(s.title);
+  }}
+  style={{
+    backgroundColor: "#25D366",
+    color: "#ffffff",
+    border: "none",
+    padding: "12px 22px",
+    borderRadius: "999px",
+    fontSize: "14px",
+    fontWeight: 700,
+    cursor: "pointer",
+    boxShadow: "0 10px 28px rgba(37, 211, 102, 0.35)",
+  }}
+>
+  Enquiry Now
+</button>
+
   </div>
 </div>
 

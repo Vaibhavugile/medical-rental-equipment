@@ -21,6 +21,11 @@ import { collection, doc, onSnapshot, orderBy, query } from "firebase/firestore"
  *   <base>/{userId}/attendance/{yyyy-MM-dd}/live/current
  * where <base> = "drivers" | "marketing"
  */
+const collectionByRole = (role) => {
+  if (role === "marketing") return "marketing";
+  if (role === "staff") return "staff";
+  return "drivers";
+};
 
 const DEBUG = false;
 const log  = (...a) => DEBUG && console.log("[Tracker]", ...a);
@@ -35,7 +40,7 @@ export default function AdminDriverTracker({
   height = "70vh",
   autoFit = true,
 }) {
-  const base = role === "marketing" ? "marketing" : "drivers"; // 👈 role-aware base collection
+const base = collectionByRole(role);
 
   const [date, setDate] = useState(() => initialDate ?? toYmd(new Date()));
   const [points, setPoints] = useState([]);        // raw points

@@ -65,6 +65,24 @@ export default function OrderDrawer({
       return v ?? "0.00";
     }
   };
+const confirmAndChangeStatus = async (newStatus) => {
+  let msg = "";
+
+  if (newStatus === "completed") {
+    msg = "Are you sure you want to mark this order as COMPLETED?\n\nThis action cannot be undone.";
+  }
+
+  if (newStatus === "cancelled") {
+    msg = "Are you sure you want to CANCEL this order?\n\nThis action cannot be undone.";
+  }
+
+  if (!msg) return;
+
+  const ok = window.confirm(msg);
+  if (!ok) return;
+
+  await changeOrderStatus(newStatus);
+};
 
   const isFullyAssigned = (item) => {
     if (!item) return false;
@@ -356,27 +374,29 @@ const fmtDate = (d) => {
               </div>
             </div>
 
-            <button
+            {/* <button
               className="cp-btn ghost"
               onClick={() => changeOrderStatus("active")}
               disabled={selectedOrder.status === "active"}
             >
               Activate
-            </button>
-            <button
-              className="cp-btn ghost"
-              onClick={() => changeOrderStatus("completed")}
-              disabled={selectedOrder.status === "completed"}
-            >
-              Complete
-            </button>
-            <button
-              className="cp-btn ghost"
-              onClick={() => changeOrderStatus("cancelled")}
-              disabled={selectedOrder.status === "cancelled"}
-            >
-              Cancel
-            </button>
+            </button> */}
+           <button
+  className="cp-btn ghost"
+  onClick={() => confirmAndChangeStatus("completed")}
+  disabled={selectedOrder.status === "completed"}
+>
+  Complete
+</button>
+
+<button
+  className="cp-btn ghost"
+  onClick={() => confirmAndChangeStatus("cancelled")}
+  disabled={selectedOrder.status === "cancelled"}
+>
+  Cancel
+</button>
+
             <button className="cp-btn" onClick={closeOrder}>
               Close
             </button>

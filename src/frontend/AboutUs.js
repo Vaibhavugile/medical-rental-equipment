@@ -10,7 +10,6 @@ const openWhatsApp = () => {
 
 const AboutUs = () => {
   return (
-    <section className="about-us" id="about-us">
       <div className="about-container">
 
         {/* Image Section */}
@@ -70,7 +69,6 @@ const AboutUs = () => {
         </div>
 
       </div>
-    </section>
   );
 };
 

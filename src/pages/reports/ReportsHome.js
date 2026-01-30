@@ -18,7 +18,7 @@ export default function ReportsHome() {
           icon="📦"
           title="Product Report"
           description="Revenue, quantity, and order performance by product"
-          onClick={() => navigate("/reports/products")}
+          onClick={() => navigate("/crm/reports/products")}
         />
 
         {/* Financial Report */}
@@ -26,7 +26,7 @@ export default function ReportsHome() {
           icon="💰"
           title="Financial Report"
           description="Revenue, payments, taxes, and outstanding analysis"
-          onClick={() => navigate("/reports/financial")}
+          onClick={() => navigate("/crm/reports/financial")}
         />
 
         {/* Asset Report */}
@@ -34,7 +34,7 @@ export default function ReportsHome() {
           icon="🏗"
           title="Asset Report"
           description="Asset utilization, revenue attribution, and downtime"
-          onClick={() => navigate("/reports/assets")}
+          onClick={() => navigate("/crm/reports/assets")}
         />
       </div>
     </div>
