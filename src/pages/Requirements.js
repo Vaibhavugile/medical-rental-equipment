@@ -889,48 +889,58 @@ const openCreateQuotation = async (req) => {
 
             <hr className="hr" />
 
-            <div>
-              <h3>Full History</h3>
-              <div className="history-list" style={{ marginTop: 8 }}>
-                {(detailsReq.history && detailsReq.history.length
-                  ? detailsReq.history.slice().reverse()
-                  : []
-                ).map((h, i) => (
-                  <div key={i} className="history-item">
-                    <div className="meta">
-                      <div className="who">
-                        <span className="type">{h.type?.toUpperCase()}</span>{" "}
-                        {h.field ? `— ${h.field}` : ""}
-                      </div>
-                      <div className="time muted">{parseDateForDisplay(h.ts)}</div>
-                    </div>
-                    <div style={{ marginTop: 8 }}>
-                      <div style={{ fontWeight: 700 }}>
-                        {h.changedByName || h.changedBy}
-                      </div>
-                      {h.note ? <div className="note">{h.note}</div> : null}
-                      {h.oldValue || h.newValue ? (
-                        <div className="changes" style={{ marginTop: 10 }}>
-                          <div className="change-pill">
-                            <div className="k">From</div>
-                            <div className="v">{h.oldValue ?? "—"}</div>
-                          </div>
-                          <div className="change-pill">
-                            <div className="k">To</div>
-                            <div className="v">{h.newValue ?? "—"}</div>
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-                {(!detailsReq.history || !detailsReq.history.length) && (
-                  <div className="muted" style={{ padding: 8 }}>
-                    No history available.
-                  </div>
-                )}
-              </div>
-            </div>
+            <div style={{ marginTop: 8 }}>
+  <h3>Full History</h3>
+
+  <div className="history-list compact">
+    {(detailsReq.history && detailsReq.history.length
+      ? detailsReq.history.slice().reverse()
+      : []
+    ).map((h, i) => (
+      <div key={i} className="history-item compact">
+        {/* Top row */}
+        <div className="history-top">
+          <span className="history-title">
+            {h.type?.toUpperCase()}
+            {h.field ? ` · ${h.field}` : ""}
+          </span>
+
+          <span className="history-time">
+            {parseDateForDisplay(h.ts)}
+          </span>
+        </div>
+
+        {/* User */}
+        <div className="history-user">
+          {h.changedByName || h.changedBy}
+        </div>
+
+        {/* Note */}
+        {h.note && (
+          <div className="history-note">
+            {h.note}
+          </div>
+        )}
+
+        {/* Change */}
+        {(h.oldValue || h.newValue) && (
+          <div className="history-change">
+            <span className="from">{h.oldValue ?? "—"}</span>
+            <span className="arrow">→</span>
+            <span className="to">{h.newValue ?? "—"}</span>
+          </div>
+        )}
+      </div>
+    ))}
+
+    {(!detailsReq.history || !detailsReq.history.length) && (
+      <div className="muted" style={{ padding: 6 }}>
+        No history available.
+      </div>
+    )}
+  </div>
+</div>
+
 
             <div
               className="details-footer"

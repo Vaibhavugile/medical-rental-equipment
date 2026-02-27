@@ -394,9 +394,33 @@ export async function listProducts() {
 export async function listAssets({
   productId = null,
   branchId = null,
-  from = null,
-  to = null,
 } = {}) {
+  const clauses = [];
+
+  if (productId) clauses.push(where("productId", "==", productId));
+  if (branchId) clauses.push(where("branchId", "==", branchId));
+
+  const q = clauses.length
+    ? query(collection(db, "assets"), ...clauses)
+    : query(collection(db, "assets"));
+
+  const snap = await getDocs(q);
+
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...(d.data() || {}),
+  }));
+}
+export async function listAvailableAssetsForRange({
+  productId = null,
+  branchId = null,
+  from,
+  to,
+} = {}) {
+  if (!from || !to) {
+    throw new Error("from and to dates are required");
+  }
+
   const clauses = [];
 
   if (productId) clauses.push(where("productId", "==", productId));
@@ -411,23 +435,28 @@ export async function listAssets({
   return snap.docs
     .map((d) => ({ id: d.id, ...(d.data() || {}) }))
     .filter((asset) => {
-      // ❌ Never available
-      if (asset.status === "out_for_rental") return false;
+      // ❌ never rentable
+      if (
+        asset.status === "out_for_rental" ||
+        asset.status === "maintenance"
+      ) {
+        return false;
+      }
 
-      // ✅ No reservation → available
+      // ✅ no reservation → available
       if (!asset.reservation) return true;
 
-      // backward compatibility (old data)
+      // backward compatibility
       const rFrom = asset.reservation.from || null;
       const rTo =
         asset.reservation.to ||
         asset.reservation.until ||
         null;
 
-      // no date context → assume blocked
-      if (!from || !to) return false;
+      // ❌ missing reservation dates → block
+      if (!rFrom || !rTo) return false;
 
-      // ❌ Block ONLY if dates overlap
+      // ❌ block ONLY if overlapping
       const overlap = datesOverlap(from, to, rFrom, rTo);
 
       return !overlap;
@@ -446,6 +475,7 @@ export default {
   listBranches,
   listProducts,
   listAssets,
+  listAvailableAssetsForRange,
   reserveAsset,
   unreserveAsset,
 };

@@ -1001,12 +1001,12 @@ const saveStaffSalary = async (assignment) => {
             {/* ASSIGNED STAFF HEADER */}
             <div className="nod-card">
                 <div className="nod-row">
-                    <h3>Assigned Staff</h3>
+                    <h3>Assigned Nurse</h3>
                     <button
                         className="nod-btn nod-btn-primary"
                         onClick={() => setAssignOpen(true)}
                     >
-                        + Assign Staff
+                        + Assign Nurse
                     </button>
                 </div>
 
@@ -1015,7 +1015,7 @@ const saveStaffSalary = async (assignment) => {
                 )}
 
                 {!loadingAssignments && assignments.length === 0 && (
-                    <div className="nod-muted">No staff assigned yet</div>
+                    <div className="nod-muted">No Nurse assigned yet</div>
                 )}
             </div>
 
@@ -1059,22 +1059,27 @@ const saveStaffSalary = async (assignment) => {
                             {a.startDate} → {a.endDate} · {a.days} days
                         </div>
 
-                        <span
-                            className={`nod-badge ${a.paid ? "nod-badge-green" : "nod-badge-orange"
-                                }`}
-                        >
-                            {a.paid ? "Paid" : "Unpaid"}
-                        </span>
-                        <button
-  className="nod-btn nod-btn-secondary"
-  onClick={() =>
-    navigate(
-      `/crm/attendance?role=staff&userId=${a.staffId}&from=${a.startDate}&to=${a.endDate}`
-    )
-  }
->
-  View Attendance
-</button>
+                       <div className="nod-staff-meta">
+  <span
+    className={`nod-badge ${
+      a.paid ? "nod-badge-green" : "nod-badge-orange"
+    }`}
+  >
+    {a.paid ? "Paid" : "Unpaid"}
+  </span>
+
+  <button
+    className="nod-btn nod-btn-secondary nod-attendance-btn"
+    onClick={() =>
+      navigate(
+        `/crm/attendance?role=staff&userId=${a.staffId}&from=${a.startDate}&to=${a.endDate}`
+      )
+    }
+  >
+    View Attendance
+  </button>
+</div>
+
 
 
                     </div>
@@ -1210,7 +1215,7 @@ const saveStaffSalary = async (assignment) => {
             {assignOpen && (
                 <div className="nod-modal">
                     <div className="nod-modal-card">
-                        <h4>Assign Staff</h4>
+                        <h4>Assign Nurse</h4>
 
                         <div className="nod-staff-grid">
                             {staffList.map((s) => (

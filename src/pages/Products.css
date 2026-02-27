@@ -1,132 +1,193 @@
-/* ---- keep your existing Products.css, then add: ---- */
+/* =========================================================
+   PRODUCT DRAWER — ABSOLUTE HARD OVERRIDE VERSION
+   This overrides EVERYTHING inside the drawer.
+========================================================= */
 
-/* Page scaffolding */
-.products-wrap { position: relative; }
+/* ===== DRAWER BASE ===== */
 
-/* Toast */
-.toast {
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: #111827;
-  color: #fff;
-  font-weight: 700;
-  box-shadow: 0 12px 30px rgba(0,0,0,0.2);
-  z-index: 50;
-}
-.toast.success { background: #065f46; }
-.toast.error { background: #b91c1c; }
-.toast.info { background: #111827; }
-
-/* Form field errors */
-.modal-form .field-error {
-  color: #b91c1c;
-  font-size: 12px;
-  margin-top: 4px;
-}
-.modal-form .cp-input.error {
-  border-color: #fecaca !important;
-  background: #fff7f7;
+.cp-drawer {
+  position: fixed !important;
+  inset: 0 !important;
+  background: rgba(0,0,0,0.45) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  z-index: 999999 !important;
 }
 
-/* Buttons in asset cards */
-.asset-actions .btn {
-  padding: 6px 10px;
-  border-radius: 8px;
-  border: 1px solid #e6eef8;
-  background: #111827;
-  color: #fff;
-  font-weight: 700;
-  cursor: pointer;
-}
-.asset-actions .btn.ghost {
-  background: #fff;
-  color: #111827;
-}
-.asset-actions select {
-  padding: 6px 10px;
-  border: 1px solid #e6eef8;
-  border-radius: 8px;
+/* ===== FORM CONTAINER ===== */
+
+.cp-drawer .cp-form.details {
+  width: 95% !important;
+  max-width: 1100px !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+  background: #ffffff !important;
+  border-radius: 14px !important;
+  padding: 20px !important;
+  box-sizing: border-box !important;
 }
 
-/* Status pill colors */
-.status.in_stock { background:#ecfdf5; color:#065f46; padding:3px 8px; border-radius:999px; font-weight:700; }
-.status.out_for_rental { background:#fef3c7; color:#92400e; padding:3px 8px; border-radius:999px; font-weight:700; }
-.status.maintenance { background:#e0e7ff; color:#3730a3; padding:3px 8px; border-radius:999px; font-weight:700; }
-.status.reserved { background:#fee2e2; color:#991b1b; padding:3px 8px; border-radius:999px; font-weight:700; }
+/* ===== GRID ===== */
 
-/* Modal tweaks */
-.cp-modal-card h3 { margin-bottom: 6px; }
-/* History table */
-.history-wrap {
-  max-height: 360px;
-  overflow: auto;
-  border: 1px solid #eef2f7;
-  border-radius: 10px;
+.cp-drawer .assets-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)) !important;
+  gap: 16px !important;
 }
 
-.history-table {
-  width: 100%;
-  border-collapse: collapse;
-  background: #fff;
+/* ===== CARD ===== */
+
+.cp-drawer .asset-card {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  padding: 14px !important;
+  background: #f9fafb !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 12px !important;
+  box-sizing: border-box !important;
 }
 
-.history-table thead th {
-  position: sticky;
-  top: 0;
-  background: #f9fafb;
-  font-size: 12px;
-  color: #6b7280;
-  text-align: left;
-  padding: 8px 10px;
-  border-bottom: 1px solid #eef2f7;
-  z-index: 1;
+/* ===== TOP ROW ===== */
+
+.cp-drawer .asset-top {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
 }
 
-.history-table tbody td {
-  padding: 8px 10px;
-  border-top: 1px solid #f3f4f6;
-  vertical-align: top;
-  font-size: 13px;
+/* ===== STATUS BADGES ===== */
+
+.cp-drawer .status {
+  padding: 4px 10px !important;
+  border-radius: 999px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: capitalize !important;
 }
 
-.history-table tbody tr:hover {
-  background: #fbfdff;
+.cp-drawer .status.in_stock {
+  background: #dcfce7 !important;
+  color: #065f46 !important;
 }
 
-/* Event pill */
-.ev {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-  background: #eef2ff;
-  color: #3730a3;
-  text-transform: capitalize;
+.cp-drawer .status.out_for_rental {
+  background: #fef3c7 !important;
+  color: #92400e !important;
 }
-.ev-checkout { background:#fef3c7; color:#92400e; }
-.ev-checkin { background:#ecfdf5; color:#065f46; }
-.ev-maintenance { background:#e0e7ff; color:#3730a3; }
-.ev-reserved { background:#fee2e2; color:#991b1b; }
-.ev-update { background:#eef2ff; color:#3730a3; }
 
-/* JSON expander */
-.history-view-json {
-  cursor: pointer;
-  user-select: none;
-  color: #2563eb;
+.cp-drawer .status.maintenance {
+  background: #e0e7ff !important;
+  color: #3730a3 !important;
 }
-.history-json {
-  margin: 8px 0 0;
-  padding: 8px;
-  background: #0b1020;
-  color: #e5e7eb;
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.4;
-  max-height: 240px;
-  overflow: auto;
+
+.cp-drawer .status.reserved {
+  background: #fee2e2 !important;
+  color: #991b1b !important;
+}
+
+/* ===== ACTIONS CONTAINER ===== */
+
+.cp-drawer .asset-actions {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin-top: 8px !important;
+  align-items: center !important;
+}
+
+/* ===== FORCE RESET ONLY INSIDE BUTTONS ===== */
+
+.cp-drawer .asset-actions button {
+  all: unset !important;
+
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  padding: 6px 12px !important;
+  border-radius: 8px !important;
+
+  font-size: 12px !important;
+  font-weight: 600 !important;
+
+  background: #1f2937 !important;
+  color: #ffffff !important;
+
+  cursor: pointer !important;
+  transition: 0.2s ease !important;
+}
+
+/* HOVER */
+.cp-drawer .asset-actions button:hover {
+  opacity: 0.85 !important;
+}
+
+/* GHOST */
+.cp-drawer .asset-actions button.ghost {
+  background: #e5e7eb !important;
+  color: #111827 !important;
+}
+
+/* DANGER */
+.cp-drawer .asset-actions button.danger {
+  background: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+/* ===== SELECT FIX ===== */
+
+.cp-drawer .asset-actions select {
+  all: unset !important;
+
+  display: inline-block !important;
+  padding: 6px 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid #d1d5db !important;
+  background: #ffffff !important;
+  font-size: 12px !important;
+  cursor: pointer !important;
+}
+
+/* ===== CHECKBOX ===== */
+
+.cp-drawer input[type="checkbox"] {
+  accent-color: #2563eb !important;
+}
+
+/* ===== INPUTS ===== */
+
+.cp-drawer .cp-input {
+  border: 1px solid #d1d5db !important;
+  border-radius: 8px !important;
+  padding: 6px 8px !important;
+  font-size: 13px !important;
+  background: #ffffff !important;
+}
+
+/* ===== HISTORY TABLE ===== */
+
+.cp-drawer .history-wrap {
+  max-height: 360px !important;
+  overflow: auto !important;
+  border: 1px solid #e5e7eb !important;
+  border-radius: 10px !important;
+}
+
+.cp-drawer .history-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  background: #ffffff !important;
+}
+
+.cp-drawer .history-table th,
+.cp-drawer .history-table td {
+  padding: 8px !important;
+  font-size: 13px !important;
+}
+
+.cp-drawer .history-table tbody tr:hover {
+  background: #f9fafb !important;
 }

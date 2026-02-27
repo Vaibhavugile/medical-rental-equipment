@@ -1,0 +1,332 @@
+/* =========================
+   PAGE
+========================= */
+.page {
+  padding: 24px 28px;
+  background: #f8fafc;
+  min-height: 100%;
+}
+
+.page h1 {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: #0f172a;
+}
+
+.page h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 24px 0 12px;
+  color: #1e293b;
+}
+
+/* =========================
+   SUMMARY CARDS
+========================= */
+.ru-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ru-card {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+}
+
+.ru-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.ru-label {
+  font-size: 13px;
+  margin-top: 4px;
+  color: #64748b;
+}
+
+/* =========================
+   HEADER ROW
+========================= */
+.ru-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+/* =========================
+   TOOLBAR
+========================= */
+.ru-toolbar {
+  margin-bottom: 12px;
+}
+
+.ru-toolbar .cp-input {
+  max-width: 320px;
+}
+
+/* =========================
+   TABLE
+========================= */
+.cp-table {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 6px 22px rgba(15, 23, 42, 0.06);
+}
+
+.cp-table thead {
+  background: #f1f5f9;
+}
+
+.cp-table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  padding: 12px 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cp-table td {
+  padding: 14px;
+  font-size: 14px;
+  color: #0f172a;
+  border-top: 1px solid #e2e8f0;
+}
+
+.cp-table tr:hover td {
+  background: #f8fafc;
+}
+
+/* =========================
+   BADGES
+========================= */
+.ru-badge {
+  display: inline-block;
+  background: #e0f2fe;
+  color: #0369a1;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* =========================
+   ACTIONS
+========================= */
+.ru-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.cp-link {
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cp-link:hover {
+  text-decoration: underline;
+}
+
+.cp-link.danger {
+  color: #dc2626;
+}
+
+.cp-link.danger:hover {
+  text-decoration: underline;
+}
+
+/* =========================
+   INPUTS
+========================= */
+.cp-input,
+select {
+  width: 100%;
+  border: 1px solid #cbd5f5;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 14px;
+  background: #ffffff;
+  color: #0f172a;
+  transition: all 0.15s ease;
+}
+
+.cp-input:focus,
+select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* =========================
+   BUTTONS
+========================= */
+.cp-btn {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 9px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.cp-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(79, 70, 229, 0.25);
+}
+
+.cp-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cp-btn.ghost {
+  background: #ffffff;
+  color: #475569;
+  border: 1px solid #cbd5f5;
+}
+
+.cp-btn.ghost:hover {
+  background: #f1f5f9;
+  box-shadow: none;
+}
+
+/* =========================
+   DRAWER
+========================= */
+.cp-drawer {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 200;
+}
+
+.cp-form {
+  background: #ffffff;
+  height: 100%;
+  padding: 24px;
+  box-shadow: -10px 0 30px rgba(15, 23, 42, 0.15);
+  animation: slideIn 0.25s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.cp-form h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  color: #0f172a;
+}
+
+/* =========================
+   CHECKBOX GRID
+========================= */
+.ru-checkbox-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.ru-checkbox-grid label {
+  font-size: 13px;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* =========================
+   LABELS
+========================= */
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 10px 0 4px;
+  color: #475569;
+}
+/* =========================
+   CUSTOM CHECKBOX (ALIGNED)
+========================= */
+.ru-checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.ru-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ru-check:hover {
+  background: #f8fafc;
+}
+
+.ru-check input {
+  display: none;
+}
+
+.ru-check-box {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 2px solid #cbd5f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.ru-check input:checked + .ru-check-box {
+  background: #6366f1;
+  border-color: #6366f1;
+}
+
+.ru-check input:checked + .ru-check-box::after {
+  content: "✓";
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ru-check-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+  line-height: 1;
+}

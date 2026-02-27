@@ -1,0 +1,242 @@
+/* =====================================
+   PREMIUM ABOUT — FINAL COMPACT VERSION
+===================================== */
+
+/* ================= BASE (Mobile First) ================= */
+
+.about-premium {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 35px;
+
+  /* Top | Left-Right | Bottom */
+  padding: 30px 6% 60px;
+
+  background: linear-gradient(180deg,#ffffff,#f4f9ff);
+}
+
+/* ================= IMAGE ================= */
+
+.about-premium-image {
+  position: relative;
+  width: 100%;
+}
+
+.about-premium-image img {
+  width: 100%;
+  height: auto;
+  border-radius: 18px;
+  object-fit: cover;
+
+  box-shadow: 0 12px 35px rgba(11,53,88,0.15);
+  transition: 0.3s ease;
+}
+
+.about-premium-image:hover img {
+  transform: scale(1.02);
+}
+
+/* Floating Badge */
+
+.floating-badge {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+
+  background: linear-gradient(
+    135deg,
+    var(--bmm-blue),
+    var(--bmm-blue-dark)
+  );
+
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 12px;
+  text-align: center;
+
+  box-shadow: 0 8px 20px rgba(11,53,88,0.25);
+}
+
+.floating-badge h3 {
+  font-size: 18px;
+  margin: 0;
+  font-weight: 700;
+}
+
+.floating-badge p {
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+/* ================= CONTENT ================= */
+
+.about-premium-content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Small Title */
+
+.premium-small-title {
+  letter-spacing: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--bmm-orange);
+  margin-bottom: 6px;
+}
+
+/* Heading */
+
+.about-premium-content h2 {
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 800;
+  margin-bottom: 12px;
+  color: var(--bmm-blue-dark);
+}
+
+.about-premium-content h2 span {
+  color: var(--bmm-blue);
+}
+
+/* Description */
+
+.premium-description {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--bmm-text-muted);
+  margin-bottom: 10px;
+}
+
+/* ================= SERVICES ================= */
+
+.services-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.services-grid div {
+  background: #ffffff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--bmm-border);
+}
+
+/* ================= MISSION ================= */
+
+.mission-card {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #eef5ff;
+  border: 1px solid var(--bmm-border);
+}
+
+.mission-card h4 {
+  font-size: 14px;
+  margin-bottom: 4px;
+  color: var(--bmm-blue);
+}
+
+.mission-card p {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--bmm-text-muted);
+}
+
+/* =====================================
+   📱 SMALL DEVICES (480px+)
+===================================== */
+
+@media (min-width: 480px) {
+
+  .about-premium-content h2 {
+    font-size: 24px;
+  }
+
+  .floating-badge h3 {
+    font-size: 20px;
+  }
+
+  .services-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* =====================================
+   📱 TABLET (768px+)
+===================================== */
+
+@media (min-width: 768px) {
+
+  .about-premium {
+    padding: 40px 8% 70px;
+    gap: 50px;
+  }
+
+  .about-premium-content h2 {
+    font-size: 28px;
+  }
+
+  .premium-description {
+    font-size: 15px;
+  }
+
+  .about-premium-image img {
+    max-height: 380px;
+  }
+}
+
+/* =====================================
+   💻 DESKTOP (992px+)
+===================================== */
+
+@media (min-width: 992px) {
+
+  .about-premium {
+    grid-template-columns: 1fr 1fr;
+    padding: 50px 8% 80px;
+    gap: 70px;
+    align-items: center;
+  }
+
+  .about-premium-image img {
+    height: 440px;
+  }
+
+  .floating-badge {
+    padding: 14px 18px;
+  }
+
+  .floating-badge h3 {
+    font-size: 24px;
+  }
+
+  .about-premium-content h2 {
+    font-size: 32px;
+  }
+}
+
+/* =====================================
+   🖥 LARGE DESKTOP (1200px+)
+===================================== */
+
+@media (min-width: 1200px) {
+
+  .about-premium {
+    padding: 60px 10% 90px;
+    gap: 90px;
+  }
+
+  .about-premium-image img {
+    height: 480px;
+  }
+
+  .about-premium-content h2 {
+    font-size: 36px;
+  }
+}

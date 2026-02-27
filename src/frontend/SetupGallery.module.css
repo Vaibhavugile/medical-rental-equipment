@@ -1,0 +1,416 @@
+/* ================= ROOT VARIABLES ================= */
+:root {
+  --bm-blue-dark: #0b3558;
+  --bm-blue: #0e3f66;
+  --bm-orange: #f28c28;
+  --bm-orange-soft: #fff1e0;
+
+  --text-dark: #0e2a3a;
+  --text-muted: #556b7a;
+
+  --radius: 22px;
+  --shadow: 0 20px 70px rgba(0,0,0,0.08);
+  --shadow-soft: 0 10px 28px rgba(0,0,0,0.06);
+}
+
+/* ================= SECTION ================= */
+.gallery {
+  padding: 0 4vw 90px;
+
+
+  background: #ffffff;
+  width: 100%;
+  overflow: hidden;
+
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.8s ease, transform 0.8s ease;
+}
+
+.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ================= INNER ================= */
+.galleryInner {
+  width: 100%;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 0 24px;
+  text-align: center;
+}
+
+/* ================= TITLES ================= */
+.title {
+  font-size: 2rem;
+  font-weight: 900;
+  color: var(--bm-blue-dark);
+  margin-bottom: 14px;
+}
+
+.title span {
+  color: var(--bm-orange);
+}
+
+.subtitle {
+  color: var(--text-muted);
+  font-size: 1rem;
+  margin-bottom: 48px;
+}
+
+/* ================= SWIPER ================= */
+:global(.swiper) {
+  position: relative;
+  padding: 6px 26px 46px;
+  overflow: visible;
+}
+
+/* ================= CARD ================= */
+.card {
+  width: 100%;
+
+  /* Fluid responsive height */
+  height: clamp(180px, 42vw, 260px);
+
+  background: #f4f7fb;
+  border-radius: var(--radius);
+  overflow: hidden;
+
+  box-shadow: var(--shadow-soft);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+  position: relative;
+}
+
+.card:hover {
+  transform: translateY(-6px);
+  box-shadow: var(--shadow);
+}
+
+/* ================= MEDIA BASE ================= */
+.card img,
+.card video {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+}
+
+/* ================= ORIENTATION ================= */
+
+/* Portrait */
+.card img.portrait,
+.card video.portrait {
+  height: 100%;
+  width: auto;
+  object-fit: contain;
+}
+
+/* Landscape */
+.card img.landscape,
+.card video.landscape {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ================= HOVER ZOOM ================= */
+.card:hover img,
+.card:hover video {
+  transform: scale(1.03);
+}
+
+/* ================= NAVIGATION ================= */
+:global(.swiper-button-prev),
+:global(.swiper-button-next) {
+  width: 22px;
+  height: 22px;
+  background: #ffffff;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.14);
+
+  top: 50%;
+  transform: translateY(-50%);
+  transition: all 0.25s ease;
+}
+
+:global(.swiper-button-prev::after),
+:global(.swiper-button-next::after) {
+  font-size: 8px;
+  font-weight: 900;
+  color: var(--bm-blue);
+}
+
+:global(.swiper-button-prev:hover),
+:global(.swiper-button-next:hover) {
+  background: var(--bm-orange);
+}
+
+:global(.swiper-button-prev:hover::after),
+:global(.swiper-button-next:hover::after) {
+  color: #ffffff;
+}
+
+:global(.swiper-button-prev) {
+  left: 4px;
+}
+
+:global(.swiper-button-next) {
+  right: 4px;
+}
+
+/* ================= PAGINATION ================= */
+:global(.swiper-pagination) {
+  bottom: 0px !important;
+}
+
+:global(.swiper-pagination-bullet) {
+  width: 6px;
+  height: 6px;
+  background: #d5e2ff;
+  opacity: 1;
+  transition: all 0.25s ease;
+}
+
+:global(.swiper-pagination-bullet-active) {
+  width: 14px;
+  background: var(--bm-blue);
+  border-radius: 6px;
+}
+
+/* ================= SEE ALL BUTTON ================= */
+
+.seeAllWrap {
+  margin-top: 18px;
+
+  display: flex;              /* prevent stretch */
+  justify-content: center;   /* center button */
+  align-items: center;
+}
+
+/* BUTTON */
+
+.seeAllBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  /* Compact sizing */
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1;
+
+  /* Prevent full width stretch */
+  width: auto;
+  min-width: unset;
+  max-width: fit-content;
+
+  /* Style */
+  color: var(--bm-blue);
+  background: transparent;
+  border: 1.5px solid var(--bm-blue);
+  border-radius: 999px;
+
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+/* HOVER */
+
+.seeAllBtn:hover {
+  background: var(--bm-blue);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* ================= MOBILE ================= */
+
+@media (max-width: 600px) {
+
+  .seeAllBtn {
+    padding: 5px 14px;
+    font-size: 0.8rem;
+  }
+
+}
+
+
+
+/* ================= FULLSCREEN LIGHTBOX ================= */
+/* ================= FULLSCREEN MODAL ================= */
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+
+  background: rgba(0,0,0,0.94);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 9999999; /* above header */
+
+  padding: 30px;
+}
+
+/* Content */
+
+.lightboxContent {
+  position: relative;
+
+  max-width: 96vw;
+  max-height: 92vh;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Media */
+
+.lightboxContent img,
+.lightboxContent video {
+  max-width: 100%;
+  max-height: 92vh;
+
+  border-radius: 16px;
+  box-shadow: 0 40px 120px rgba(0,0,0,0.7);
+}
+
+/* Close button */
+
+.closeBtn {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+
+  width: 42px;
+  height: 42px;
+
+  border-radius: 50%;
+  border: none;
+
+  background: #fff;
+  color: #000;
+
+  font-size: 20px;
+  font-weight: 700;
+
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+
+  transition: 0.2s ease;
+}
+
+.closeBtn:hover {
+  background: #f28c28;
+  color: #fff;
+}
+
+.seeAllBtn:hover {
+  background: var(--bm-blue);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
+
+/* ================= TABLET ================= */
+@media (max-width: 900px) {
+
+  .gallery {
+    padding: 64px 0;
+  }
+
+  .title {
+    font-size: 1.75rem;
+  }
+
+  .subtitle {
+    margin-bottom: 36px;
+  }
+
+  /* Hide arrows on touch devices */
+  :global(.swiper-button-prev),
+  :global(.swiper-button-next) {
+    display: none;
+  }
+}
+
+/* ================= MOBILE ================= */
+@media (max-width: 600px) {
+
+  .gallery {
+    padding: 54px 0;
+  }
+
+  .galleryInner {
+    padding: 0 16px;
+  }
+
+  .title {
+    font-size: 1.55rem;
+  }
+
+  .subtitle {
+    font-size: 0.92rem;
+    margin-bottom: 30px;
+  }
+
+  /* Full-bleed swiper feel */
+  :global(.swiper) {
+    margin-left: -16px;
+    margin-right: -16px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  /* Bigger pagination taps */
+  :global(.swiper-pagination-bullet) {
+    width: 8px;
+    height: 8px;
+  }
+
+  :global(.swiper-pagination-bullet-active) {
+    width: 18px;
+  }
+
+  /* Better button tap size */
+  .seeAllBtn {
+    padding: 10px 22px;
+    font-size: 0.9rem;
+  }
+}
+
+/* ================= SMALL PHONES ================= */
+@media (max-width: 380px) {
+
+  .card {
+    height: 170px;
+  }
+
+  .title {
+    font-size: 1.4rem;
+  }
+}
+
+/* ================= REDUCED MOTION ================= */
+@media (prefers-reduced-motion: reduce) {
+
+  .gallery {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .card,
+  .card img,
+  .card video {
+    transition: none;
+  }
+}

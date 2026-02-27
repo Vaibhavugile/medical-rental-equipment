@@ -1,6 +1,7 @@
 import React from "react";
 import { doc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
+import "./ProductDrawer.css";
 
 export default function ProductDrawer({
   selectedProduct,

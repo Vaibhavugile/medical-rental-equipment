@@ -1,0 +1,273 @@
+/* ================= PAGE ================= */
+
+.adminAddDoctorPage{
+  padding:140px 6% 60px;
+  background:linear-gradient(180deg,#f4f8fc 0%,#eef5ff 100%);
+  min-height:100vh;
+  font-family:Arial, Helvetica, sans-serif;
+
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
+}
+
+
+
+/* ================= CARD WRAPPER ================= */
+
+.adminAddDoctorCard{
+  width:100%;
+  max-width:720px;
+}
+
+
+
+/* ================= TITLE ================= */
+
+.adminAddDoctorTitle{
+  text-align:center;
+  color:#1a6fb3;
+  margin-bottom:28px;
+  font-size:30px;
+  font-weight:700;
+  letter-spacing:.4px;
+}
+
+
+
+/* ================= FORM CARD ================= */
+
+.adminAddDoctorForm{
+  background:#fff;
+  padding:32px;
+  border-radius:20px;
+  box-shadow:0 20px 50px rgba(0,0,0,.08);
+
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+
+
+
+/* ================= LABEL ================= */
+
+.adminAddDoctorLabel{
+  font-size:14px;
+  font-weight:600;
+  color:#444;
+  margin-top:6px;
+}
+
+
+
+/* ================= INPUT ================= */
+
+.adminAddDoctorInput{
+  height:46px;                 /* FIXED HEIGHT */
+  padding:0 15px;
+  border-radius:12px;
+  border:1px solid #d9e1ec;
+  font-size:14px;
+  background:#fff;
+  transition:.25s;
+
+  display:flex;
+  align-items:center;
+}
+
+.adminAddDoctorInput:focus{
+  outline:none;
+  border-color:#1a6fb3;
+  box-shadow:0 0 0 3px rgba(26,111,179,.15);
+}
+
+
+
+/* ================= FILE INPUT ================= */
+
+.adminAddDoctorFile{
+  padding:12px;
+  background:#f7fbff;
+  border:2px dashed #cfe0ff;
+  border-radius:12px;
+  cursor:pointer;
+  transition:.2s;
+}
+
+.adminAddDoctorFile:hover{
+  background:#eef5ff;
+}
+
+
+
+/* ================= IMAGE PREVIEW ================= */
+
+.adminAddDoctorPreview{
+  width:130px;
+  height:130px;
+  object-fit:cover;
+  border-radius:50%;
+  margin:12px auto 6px;
+  border:5px solid #eef5ff;
+  box-shadow:0 10px 22px rgba(0,0,0,.15);
+}
+
+
+
+/* ================= POINT ROW ================= */
+
+.adminAddDoctorPointRow{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  width:100%;
+}
+
+
+
+/* ================= POINT INPUT ================= */
+
+.adminAddDoctorPointInput{
+  flex:1;
+
+  height:44px;               /* LOCK HEIGHT */
+  padding:0 14px;
+
+  border-radius:12px;
+  border:1px solid #d9e1ec;
+  font-size:14px;
+  background:#fff;
+
+  display:flex;
+  align-items:center;
+
+  transition:.25s;
+}
+
+.adminAddDoctorPointInput:focus{
+  outline:none;
+  border-color:#1a6fb3;
+  box-shadow:0 0 0 3px rgba(26,111,179,.15);
+}
+
+
+
+/* ================= REMOVE BUTTON ================= */
+
+.adminAddDoctorRemoveBtn{
+  width:44px;          /* FIX SIZE */
+  height:44px;
+
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  background:#ff4d4f;
+  color:#fff;
+  border:none;
+  border-radius:12px;
+
+  cursor:pointer;
+  font-size:18px;
+  font-weight:700;
+
+  flex-shrink:0;       /* PREVENT STRETCH */
+  transition:.2s;
+}
+
+.adminAddDoctorRemoveBtn:hover{
+  background:#e03131;
+  transform:scale(1.08);
+}
+
+
+
+/* ================= ADD POINT ================= */
+
+.adminAddDoctorAddBtn{
+  background:linear-gradient(135deg,#f28c28,#ffb347);
+  color:#fff;
+  border:none;
+  padding:12px 18px;
+  border-radius:12px;
+  cursor:pointer;
+  font-weight:600;
+  font-size:14px;
+  box-shadow:0 8px 20px rgba(242,140,40,.35);
+  width:fit-content;
+  margin-top:6px;
+  transition:.25s;
+}
+
+.adminAddDoctorAddBtn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 14px 28px rgba(242,140,40,.45);
+}
+
+
+
+/* ================= SUBMIT ================= */
+
+.adminAddDoctorSubmitBtn{
+  background:linear-gradient(135deg,#1a6fb3,#2c8be6);
+  color:#fff;
+  border:none;
+
+  height:52px;          /* FIX HEIGHT */
+  border-radius:14px;
+
+  font-weight:600;
+  font-size:15px;
+  cursor:pointer;
+
+  box-shadow:0 12px 26px rgba(26,111,179,.35);
+  margin-top:10px;
+  transition:.25s;
+}
+
+.adminAddDoctorSubmitBtn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 18px 34px rgba(26,111,179,.45);
+}
+
+.adminAddDoctorSubmitBtn:disabled{
+  opacity:.7;
+  cursor:not-allowed;
+}
+
+
+
+/* ================= RESPONSIVE ================= */
+
+@media(max-width:768px){
+
+  .adminAddDoctorPage{
+    padding:120px 4% 50px;
+  }
+
+  .adminAddDoctorForm{
+    padding:22px;
+  }
+
+  .adminAddDoctorPreview{
+    width:110px;
+    height:110px;
+  }
+}
+
+@media(max-width:480px){
+
+  .adminAddDoctorTitle{
+    font-size:22px;
+  }
+
+  .adminAddDoctorAddBtn,
+  .adminAddDoctorSubmitBtn{
+    width:100%;
+    text-align:center;
+  }
+}
+.adminAddDoctorRemoveBtn{
+  width:44px !important;
+}

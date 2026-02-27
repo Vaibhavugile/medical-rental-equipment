@@ -12,7 +12,7 @@ import {
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
-import { listBranches, listAssets, reserveAsset } from "../utils/inventory";
+import { listBranches, listAvailableAssetsForRange, reserveAsset } from "../utils/inventory";
 import { makeHistoryEntry, propagateToLead } from "../utils/status";
 import "./OrderCreate.css";
 
@@ -559,7 +559,7 @@ const fmtDate = (d) => {
     setPickerLoading(true);
     setError("");
     try {
-     const assets = await listAssets({
+     const assets = await listAvailableAssetsForRange({
   productId: it.productId || null,
   branchId: it.branchId || null,
   from: it.expectedStartDate || null,
@@ -651,7 +651,7 @@ const fmtDate = (d) => {
         return;
       }
 
-    const assets = await listAssets({
+    const assets = await listAvailableAssetsForRange({
   productId: it.productId || null,
   branchId: it.branchId || null,
   from: it.expectedStartDate || null,

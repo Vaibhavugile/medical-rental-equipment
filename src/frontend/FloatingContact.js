@@ -1,16 +1,37 @@
 import React from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
-import { faPhone } from "@fortawesome/free-solid-svg-icons";
+import {
+  faWhatsapp,
+} from "@fortawesome/free-brands-svg-icons";
+import {
+  faPhone,
+  faCalendarCheck,
+} from "@fortawesome/free-solid-svg-icons";
+
+import { useNavigate } from "react-router-dom";
 import "./FloatingContact.css";
 
 const FloatingContact = () => {
+
+  const navigate = useNavigate();
+
   const phone = "917777066885";
-  const message = "Hello BookMyMedicare, I would like to enquire about your services.";
+  const message =
+    "Hello BookMyMedicare, I would like to enquire about your services.";
 
   return (
     <div className="bmm-float">
-      {/* WhatsApp */}
+
+      {/* ================= WHATSAPP ================= */}
+       <button
+        className="bmm-float-appointment"
+        onClick={() => navigate("/doctors")}
+        aria-label="Book Appointment"
+      >
+        <FontAwesomeIcon icon={faCalendarCheck} />
+        <span>Book an Appointment</span>
+      </button>
+
       <a
         href={`https://wa.me/${phone}?text=${encodeURIComponent(message)}`}
         target="_blank"
@@ -21,7 +42,8 @@ const FloatingContact = () => {
         <FontAwesomeIcon icon={faWhatsapp} />
       </a>
 
-      {/* Call */}
+      {/* ================= CALL ================= */}
+
       <a
         href="tel:+917777066885"
         className="bmm-float-icon call"
@@ -29,6 +51,11 @@ const FloatingContact = () => {
       >
         <FontAwesomeIcon icon={faPhone} />
       </a>
+
+      {/* ================= BOOK APPOINTMENT ================= */}
+
+     
+
     </div>
   );
 };

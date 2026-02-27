@@ -1,0 +1,300 @@
+/* ================= PAGE ================= */
+
+.videosPage {
+  padding: 100px 4vw;
+  background: #ffffff;
+}
+
+/* ================= HEADER ================= */
+
+.videosHeader {
+  text-align: center;
+  margin-top: 50px;
+  margin-bottom: 50px;
+}
+
+
+.videosHeader h1 {
+  font-size: 2.3rem;
+  font-weight: 900;
+  color: #0b3558;
+  line-height: 1.2;
+}
+
+.videosHeader span {
+  color: #f28c28;
+}
+
+.videosHeader p {
+  margin-top: 12px;
+  color: #556b7a;
+  font-size: 1.02rem;
+}
+
+/* ================= GRID ================= */
+
+.videosGrid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(280px, 1fr)
+  );
+  gap: 28px;
+}
+
+/* ================= CARD ================= */
+
+.videoCard {
+  position: relative;
+  border-radius: 18px;
+  overflow: hidden;
+  cursor: pointer;
+
+  background: #f4f7fb;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+
+  transition: transform 0.3s ease,
+              box-shadow 0.3s ease;
+}
+
+.videoCard:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+}
+
+/* ================= THUMBNAIL ================= */
+
+.videoCard img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  display: block;
+}
+
+/* ================= PLAY OVERLAY ================= */
+
+.playOverlay {
+  position: absolute;
+  inset: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 48px;
+  color: #ffffff;
+
+  background: rgba(0,0,0,0.35);
+  transition: background 0.25s ease,
+              transform 0.25s ease;
+}
+
+/* Hover effect */
+
+.videoCard:hover .playOverlay {
+  background: rgba(0,0,0,0.55);
+  transform: scale(1.05);
+}
+
+/* ================= TITLE ================= */
+
+.videoTitle {
+  padding: 14px 16px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #0b3558;
+  line-height: 1.4;
+}
+
+/* ================= VIDEO MODAL ================= */
+
+.videoModal {
+  position: fixed;
+  inset: 0;
+
+  background: rgba(0,0,0,0.94);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  z-index: 999999;
+  padding: 24px;
+
+  animation: fadeIn 0.25s ease;
+}
+
+/* Fade animation */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ================= MODAL CONTENT ================= */
+
+.videoModalContent {
+  position: relative;
+  width: 92vw;
+  max-width: 960px;
+  aspect-ratio: 16 / 9;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ================= IFRAME ================= */
+
+.videoModalContent iframe {
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6);
+}
+
+/* ================= CLOSE BUTTON ================= */
+
+.videoClose {
+  position: absolute;
+  top: -46px;
+  right: -8px;
+
+  width: 42px;
+  height: 42px;
+
+  border-radius: 50%;
+  border: none;
+
+  font-size: 18px;
+  font-weight: 700;
+
+  background: #000;
+  color: #fff;
+
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+
+  transition: transform 0.2s ease,
+              background 0.2s ease;
+}
+
+.videoClose:hover {
+  background: #f28c28;
+  transform: scale(1.05);
+}
+
+/* ================= TABLET ================= */
+
+@media (max-width: 1024px) {
+
+  .videosPage {
+    padding: 90px 4vw;
+  }
+
+  .videosHeader h1 {
+    font-size: 2rem;
+  }
+
+}
+
+/* ================= MOBILE ================= */
+
+@media (max-width: 768px) {
+
+  .videosPage {
+    padding: 80px 5vw;
+  }
+
+  .videosGrid {
+    gap: 22px;
+  }
+
+  .videoCard img {
+    height: 180px;
+  }
+
+}
+
+/* ================= SMALL MOBILE ================= */
+
+@media (max-width: 480px) {
+
+  .videosHeader h1 {
+    font-size: 1.7rem;
+  }
+
+  .videoCard img {
+    height: 160px;
+  }
+
+  .videoTitle {
+    font-size: 0.88rem;
+  }
+
+}
+/* ================= YOUTUBE CTA ================= */
+
+.youtubeCtaWrap {
+  margin-top: 60px;
+  text-align: center;
+}
+
+.youtubeCtaBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 12px 26px;
+  font-size: 0.95rem;
+  font-weight: 700;
+
+  color: #ffffff;
+  background: #ff0000; /* YouTube red */
+
+  border-radius: 999px;
+  text-decoration: none;
+
+  box-shadow: 0 8px 22px rgba(0,0,0,0.18);
+  transition: 0.25s ease;
+}
+
+.youtubeCtaBtn:hover {
+  background: #cc0000;
+  transform: translateY(-2px);
+}
+/* ================= EXPLORE CHANNEL BUTTON ================= */
+
+.youtubeExploreWrap {
+  margin-top: 60px;
+  display: flex;
+  justify-content: center;
+}
+
+/* BUTTON */
+
+.youtubeExploreBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 10px 22px;
+  font-size: 0.9rem;
+  font-weight: 700;
+
+  color: #ffffff;
+  background: #ff0000; /* YouTube red */
+
+  border-radius: 999px;
+  text-decoration: none;
+
+  box-shadow: 0 10px 26px rgba(0,0,0,0.18);
+  transition: 0.25s ease;
+}
+
+/* Hover */
+
+.youtubeExploreBtn:hover {
+  background: #cc0000;
+  transform: translateY(-2px);
+}

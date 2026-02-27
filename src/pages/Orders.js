@@ -20,7 +20,7 @@ import "./Orders.css";
 import OrdersSidebar from "../components/OrdersSidebar";
 
 import {
-  listAssets,
+  listAvailableAssetsForRange,
   listBranches,
   checkoutAsset,
   checkinAsset,
@@ -273,13 +273,19 @@ export const getResourceBadges = (order) => {
     return badges; // ⛔ urgency wins
   }
 
-  /* 💰 PAYMENT DUE */
+  /* 💰 PAYMENT DUE (robust & accurate) */
   const total = Number(order?.totals?.total || 0);
-  const paid = (order?.payments || []).reduce(
-    (s, p) => s + Number(p.amount || 0),
-    0
-  );
-  if (total - paid > 0) {
+
+  // ✅ Only count completed payments
+  const completedPaid = (order?.payments || [])
+    .filter((p) => (p.status || "completed") === "completed")
+    .reduce((s, p) => s + Number(p.amount || 0), 0);
+
+  // Clamp + fix float precision
+  const balance = Math.max(0, total - completedPaid);
+  const roundedBalance = Number(balance.toFixed(2));
+
+  if (roundedBalance > 0) {
     badges.push({ key: "payment_due", label: "Payment Due" });
   }
 
@@ -295,15 +301,13 @@ export const getResourceBadges = (order) => {
     badges.push({ key: "in_transit", label: "In Transit" });
   }
 
-  /* 🟦 ON RENT (pickup delivered, return not started) */
   /* 🟦 ON RENT */
-if (
-  order.forceOnRent === true ||
-  (dstat === "delivered" && order.deliveryType !== "return")
-) {
-  badges.push({ key: "on_rent", label: "On Rent" });
-}
-
+  if (
+    order.forceOnRent === true ||
+    (dstat === "delivered" && order.deliveryType !== "return")
+  ) {
+    badges.push({ key: "on_rent", label: "On Rent" });
+  }
 
   /* ↩ RETURN PENDING */
   if (order?.returnDeliveryId && dstat !== "completed") {
@@ -735,7 +739,7 @@ const openAssetPickerForItem = async (itemIndex) => {
     const branchId = it?.branchId || "";
 
     // ✅ DATE-AWARE asset fetch
-    const assets = await listAssets({
+    const assets = await listAvailableAssetsForRange({
       productId,
       branchId,
       from: it?.expectedStartDate || null,
@@ -1744,6 +1748,7 @@ const markOnRent = async () => {
               <th>Status</th>
               <th>Delivery</th>
               <th>Start Date</th> 
+              <th>End Date</th>
               <th>Created</th>
               <th>Items</th>
               <th>Total</th>
@@ -1845,6 +1850,7 @@ const badgeText = getDeliveryBadgeText(o, deliveriesByOrder);
 
 
   <td>{formatYMDForDisplay(getStartDate(o))}</td>
+  <td>{formatYMDForDisplay(getEndDate(o))}</td>
 
   <td>
     {o.createdAt?.seconds
@@ -1955,7 +1961,7 @@ const badgeText = getDeliveryBadgeText(o, deliveriesByOrder);
       const branchId = it?.branchId || "";
 
       // ✅ DATE-AWARE asset fetch
-      const assets = await listAssets({
+      const assets = await listAvailableAssetsForRange({
         productId,
         branchId,
         from: it?.expectedStartDate || null,

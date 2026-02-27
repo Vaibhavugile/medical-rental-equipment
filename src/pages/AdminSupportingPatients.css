@@ -1,0 +1,124 @@
+.adminSupporting {
+  padding: 40px;
+}
+
+/* ===== TITLE ===== */
+
+.adminSupporting h1 {
+  font-size: 1.8rem;
+  margin-bottom: 25px;
+}
+
+/* ===== UPLOAD ===== */
+
+.uploadBox {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 25px;
+}
+
+.uploadBox input {
+  padding: 8px;
+}
+
+.uploadBox button {
+  background: #0e3f66;
+  color: white;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+/* ===== PROGRESS ===== */
+
+.progressWrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 25px;
+}
+
+.progressBar {
+  width: 220px;
+  height: 8px;
+  background: #e5e5e5;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: #f28c28;
+}
+
+/* ===== GRID ===== */
+
+.hospitalsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 180px);
+  gap: 20px;
+}
+
+/* ===== CARD ===== */
+
+.hospitalCard {
+  background: white;
+  border-radius: 14px;
+  padding: 14px;
+  text-align: center;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+}
+
+.hospitalCard img {
+  width: 100%;
+  height: 70px;
+  object-fit: contain;
+}
+
+/* ===== STATUS ===== */
+
+.status {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.published {
+  background: #e6f7ee;
+  color: #1a7f4b;
+}
+
+.hidden {
+  background: #fdeaea;
+  color: #c0392b;
+}
+
+/* ===== ACTIONS ===== */
+
+.actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+}
+
+.actions button {
+  border: none;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.toggle {
+  background: #0e3f66;
+  color: white;
+}
+
+.delete {
+  background: #c0392b;
+  color: white;
+}

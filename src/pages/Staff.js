@@ -254,7 +254,7 @@ export default function Staff() {
             setShowForm(true);
           }}
         >
-          Add Staff
+          Add Nurse
         </button>
         <button onClick={() => navigate("/crm/payroll")}>
   Payroll
@@ -267,7 +267,7 @@ export default function Staff() {
       )}
       <div className={`drawer ${showForm ? "open" : ""}`}>
         <div className="drawer-header">
-          <h3>{editingId ? "Edit Staff" : "Add Staff"}</h3>
+          <h3>{editingId ? "Edit Nurse" : "Add Nurse"}</h3>
           <button className="cp-btn ghost" onClick={() => setShowForm(false)}>
             Close
           </button>
@@ -337,7 +337,7 @@ export default function Staff() {
 
           <div className="actions-row">
             <button className="cp-btn">
-              {editingId ? "Update Staff" : "Add Staff"}
+              {editingId ? "Update Nurse" : "Add Nurse"}
             </button>
             <button type="button" className="cp-btn ghost"
               onClick={() => setShowForm(false)}>

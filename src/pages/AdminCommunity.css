@@ -1,0 +1,46 @@
+.adminPage {
+  padding: 80px 4vw;
+}
+
+/* FORM */
+
+.adminForm {
+  display: grid;
+  gap: 12px;
+  max-width: 400px;
+  margin-bottom: 40px;
+}
+
+.adminForm input,
+.adminForm select {
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+.adminForm button {
+  padding: 10px;
+  background: #0b3558;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+}
+
+/* GRID */
+
+.adminGrid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(200px, 1fr)
+  );
+  gap: 20px;
+}
+
+.adminCard img,
+.adminCard video {
+  width: 100%;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 12px;
+}

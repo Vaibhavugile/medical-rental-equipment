@@ -12,7 +12,7 @@
 
 /* ================= SECTION ================= */
 .who {
-  padding: 88px 0;
+  padding: 56px 0 88px;
   background: #ffffff;
   opacity: 0;
   transform: translateY(24px);

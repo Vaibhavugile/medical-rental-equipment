@@ -8,6 +8,11 @@
   overflow: hidden;
 }
 
+/* allow tooltips to escape */
+.sidebar.collapsed {
+  overflow: visible;
+}
+
 /* MAIN AREA */
 .app-main {
   flex: 1;
@@ -113,6 +118,7 @@
   flex: 1;
   padding: 14px 10px 18px;
   overflow-y: auto;
+  overflow-x: visible; /* ✅ CRITICAL */
 }
 
 /* Hide scrollbar (premium feel) */
@@ -149,6 +155,7 @@
 ================================ */
 .sidebar-link {
   position: relative;
+  z-index: 1; /* ✅ above sidebar background */
   display: flex;
   align-items: center;
   gap: 12px;
@@ -159,7 +166,7 @@
   text-decoration: none;
   font-weight: 600;
   font-size: 14px;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease;
 }
 
 /* ICON-ONLY CENTERING (COLLAPSED) */
@@ -167,10 +174,15 @@
   justify-content: center;
 }
 
-/* HOVER */
+/* HOVER — ❌ NO TRANSFORM HERE */
 .sidebar-link:hover {
   background: rgba(255, 255, 255, 0.18);
+}
+
+/* OPTIONAL: icon motion instead (safe) */
+.sidebar-link:hover svg {
   transform: translateX(2px);
+  transition: transform 0.25s ease;
 }
 
 /* ACTIVE */
@@ -199,4 +211,32 @@
 /* LABEL */
 .sidebar-link-label {
   white-space: nowrap;
+}
+
+/* ===============================
+   TOOLTIP (COLLAPSED SIDEBAR)
+================================ */
+.sidebar-tooltip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(15, 23, 42, 0.95);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  z-index: 100; /* ✅ ABOVE SIDEBAR */
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+/* Show tooltip on hover */
+.sidebar.collapsed .sidebar-link:hover .sidebar-tooltip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(4px);
 }

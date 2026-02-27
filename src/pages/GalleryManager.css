@@ -1,0 +1,312 @@
+/* ================= ROOT ================= */
+
+:root {
+  --admin-blue: #0b3558;
+  --admin-orange: #f28c28;
+  --admin-bg: #f7f9fc;
+  --admin-border: #e3e8ef;
+  --admin-text: #0e2a3a;
+  --admin-muted: #6b7c8f;
+
+  --radius: 14px;
+  --shadow-soft: 0 8px 22px rgba(0,0,0,0.06);
+}
+
+/* ================= PAGE ================= */
+
+.admin-gallery {
+  min-height: 100vh;
+  padding: 40px 32px;
+  background: var(--admin-bg);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.admin-gallery h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--admin-blue);
+  margin-bottom: 28px;
+}
+
+/* ================= UPLOAD BOX ================= */
+
+.upload-box {
+  background: #ffffff;
+  padding: 22px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+
+  margin-bottom: 36px;
+}
+
+/* TEXT INPUT */
+
+.upload-box input[type="text"] {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--admin-border);
+  min-width: 220px;
+  font-size: 0.95rem;
+}
+
+/* SELECT */
+
+.upload-box select {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--admin-border);
+  font-size: 0.95rem;
+}
+
+/* FILE INPUT */
+
+.upload-box input[type="file"] {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--admin-border);
+  background: #fff;
+}
+
+/* UPLOAD BUTTON */
+
+.upload-box button {
+  background: var(--admin-orange);
+  color: #ffffff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.upload-box button:hover {
+  transform: translateY(-1px);
+}
+
+.upload-box button:disabled,
+.upload-box button.uploading {
+  background: #94a3b8;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ================= PROGRESS ================= */
+
+.progress-row {
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  color: var(--admin-text);
+}
+
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e6ecf5;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--admin-blue);
+  transition: width 0.3s ease;
+}
+
+/* ================= GRID ================= */
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(220px, 1fr)
+  );
+  gap: 24px;
+}
+
+/* ================= CARD ================= */
+
+.gallery-card {
+  background: #ffffff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  padding: 12px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* MEDIA */
+
+.gallery-card img,
+.gallery-card video {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #000;
+}
+
+/* =========================================================
+   CATEGORY VIEW MODE
+========================================================= */
+
+.category-view-box {
+  display: flex;
+  flex-direction: column;     /* ⭐ stacked */
+  gap: 6px;
+  background: #f1f5fb;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--admin-border);
+}
+
+/* TEXT */
+
+.category-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--admin-text);
+}
+
+/* EDIT BUTTON BELOW */
+
+.edit-category {
+  width: 100%;                 /* ⭐ full width */
+  padding: 7px 10px;
+  font-size: 12px;
+  border: none;
+  background: var(--admin-blue);
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.edit-category:hover {
+  background: var(--admin-orange);
+  transform: translateY(-1px);
+}
+
+/* =========================================================
+   CATEGORY EDIT MODE
+========================================================= */
+
+.category-edit-box {
+  display: flex;
+  flex-direction: column;   /* ⭐ stacked */
+  gap: 6px;
+  width: 100%;
+}
+
+/* INPUT */
+
+.category-edit-box input {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  border-radius: 8px;
+  border: 1px solid var(--admin-border);
+  outline: none;
+  transition: border 0.2s ease;
+}
+
+.category-edit-box input:focus {
+  border-color: var(--admin-blue);
+}
+
+/* SAVE BUTTON BELOW */
+
+.save-category {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  background: var(--admin-blue);
+  color: #fff;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.save-category:hover {
+  background: var(--admin-orange);
+  transform: translateY(-1px);
+}
+
+/* ================= STATUS ================= */
+
+.status {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.status.published {
+  color: #1f9d55;
+}
+
+.status.hidden {
+  color: #c53030;
+}
+
+/* ================= ACTIONS ================= */
+
+.card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.card-actions button {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.card-actions .toggle {
+  background: var(--admin-blue);
+  color: #ffffff;
+}
+
+.card-actions .delete {
+  background: #e53e3e;
+  color: #ffffff;
+}
+
+.card-actions button:hover {
+  transform: translateY(-1px);
+}
+
+/* ================= MOBILE ================= */
+
+@media (max-width: 600px) {
+
+  .admin-gallery {
+    padding: 28px 16px;
+  }
+
+  .upload-box {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .gallery-card img,
+  .gallery-card video {
+    height: 140px;
+  }
+
+}

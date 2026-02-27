@@ -20,15 +20,17 @@ export default function OrdersSidebar({
     ["starts_today", "Starts Today", derivedCounts.starts_today],
     ["ending_today", "Ending Today", derivedCounts.ending_today],
     ["ending_soon", "Ending Soon (5 days)", derivedCounts.ending_soon],
-    ["ready_to_dispatch", "Ready to Dispatch", derivedCounts.ready_to_dispatch],
-    ["in_transit", "In Transit", derivedCounts.in_transit],
+    
     ["on_rent", "On Rent", derivedCounts.on_rent],
+        ["completed", "Completed", derivedCounts.completed],
+    ["cancelled", "Cancelled", derivedCounts.cancelled],
+
   ];
 
   /* ---------------- ADVANCED (LESS USED) ---------------- */
   const advancedDerived = [
-    ["completed", "Completed", derivedCounts.completed],
-    ["cancelled", "Cancelled", derivedCounts.cancelled],
+    ["ready_to_dispatch", "Ready to Dispatch", derivedCounts.ready_to_dispatch],
+    ["in_transit", "In Transit", derivedCounts.in_transit],
   ];
 
   const deliveryOptions = [

@@ -249,3 +249,220 @@ body {
 button.cp-icon{
   background-color: #2563eb;
 }
+/* ===============================
+   Compact History Log
+================================ */
+
+.history-item {
+  padding: 10px 12px;            /* ↓ reduced from 12–16 */
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #eef2f7;
+  box-shadow: none;              /* remove heavy card feel */
+}
+
+/* Header row: action + time */
+.history-item .meta {
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.history-item .meta .who {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.history-item .meta .time {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+/* Reduce spacing between sections */
+.history-item > div {
+  margin-top: 6px;
+}
+/* ===============================
+   Compact History Layout
+================================ */
+
+.history-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #eef2f7;
+  box-shadow: none;
+}
+
+.history-item + .history-item {
+  margin-top: 8px;
+}
+
+.history-item .meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.history-item .meta .who {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.history-item .meta .time {
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.history-body {
+  margin-top: 6px;
+}
+
+.history-user {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.history-change-inline {
+  margin-top: 6px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #334155;
+  flex-wrap: wrap;
+}
+
+.history-change-inline .from {
+  color: #64748b;
+}
+
+.history-change-inline .to {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.history-change-inline .arrow {
+  color: #94a3b8;
+}
+/* ======================================
+   HARD FIX: History Card Height Explosion
+====================================== */
+
+/* prevent parent stretching */
+.history-list.compact {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* force content-fit cards */
+.history-item.compact {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #eef2f7;
+
+  /* 🔑 THIS STOPS TALL CARDS */
+  height: auto !important;
+  min-height: unset !important;
+  align-self: flex-start;
+}
+
+/* header row */
+.history-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+/* title */
+.history-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+/* time */
+.history-time {
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+/* user */
+.history-user {
+  font-size: 12.5px;
+  font-weight: 600;
+  margin-top: 4px;
+  color: #0f172a;
+}
+
+/* note */
+.history-note {
+  font-size: 12.5px;
+  margin-top: 4px;
+  color: #334155;
+}
+
+/* inline change */
+.history-change {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12.5px;
+}
+
+.history-change .from {
+  color: #64748b;
+}
+
+.history-change .to {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.history-change .arrow {
+  color: #94a3b8;
+}
+/* ===============================
+   WhatsApp Button (Lead Details)
+================================ */
+
+.whatsapp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #dcfce7;
+
+  background: #f0fdf4;
+  color: #166534;
+
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+
+  transition: all 0.15s ease;
+}
+
+.whatsapp-btn:hover {
+  background: #dcfce7;
+  transform: translateY(-1px);
+}
+
+.whatsapp-btn .wa-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+.whatsapp-btn .wa-icon {
+  font-size: 15px;
+  color: #16a34a; /* WhatsApp green */
+}

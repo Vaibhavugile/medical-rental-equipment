@@ -16,6 +16,18 @@ import TrustPremium from "../frontend/TrustSignals";
 import ExperienceTrust from "../frontend/ExperienceTrust";
 import AboutUs from "../frontend/AboutUs";
 import FloatingContact from "../frontend/FloatingContact";
+import SetupGallery from "../frontend/SetupGallery";
+import TrustedProviders from "../frontend/TrustedProviders";
+import YoutubeVideos from "../frontend/YoutubeVideos";
+import HeroSlider from "../frontend/HeroSlider";
+import StatsBar from "../frontend/StatsBar";
+import AboutSection from "../frontend/AboutSection";
+import SupportingPatients from "../frontend/SupportingPatients";
+import Meet from "../frontend/Meet";
+import "./LandingPage.module.css";
+import SupportingSlider from "../frontend/SupportingSlider";
+import TrustedProviders1 from "../frontend/TrustedProviders1";
+
 
 export default function LandingPage() {
   useEffect(() => {
@@ -54,19 +66,44 @@ export default function LandingPage() {
      <TopBar />
       <Header />
        <section id="home">
-        <Hero />
+       <HeroSlider />
       </section>
+     
+      
          <section id="services">
         <ServicesSection />
       </section>
+    {/* <Doctors/> */}
+    {/* <Meet/> */}
        <WhoWeAreUnique />
        <HowWeWorkUnique />
+
        <WhyChooseUsUnique />
+       <TrustedProviders />
+       {/* <SupportingPatients /> */}
+       <SupportingSlider />
+       <TrustedProviders1 />
+       
+
+         <section
+  id="gallery"
+  aria-label="Completed Medical Setups Gallery"
+>
+  <SetupGallery id="gallery" />
+</section>
+
+<YoutubeVideos />
+ 
+      <AboutSection />
+      <StatsBar />
+      <Meet />
+
      
 
       <section id="contact">
         <HeroWithForm />
       </section>
+
             <TrustPremium />
 <ExperienceTrust /> 
 

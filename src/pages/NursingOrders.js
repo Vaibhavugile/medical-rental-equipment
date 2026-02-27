@@ -125,67 +125,31 @@ const filteredOrders = orders.filter((o) => {
     <div className="no-wrap">
       {/* Header */}
      <div className="no-head">
-  <h2>Nursing Orders</h2>
+  <div className="no-head-top">
+    <h2>Nursing Orders</h2>
+<button
+  className="cp-btn"
+  onClick={() => setCreateOpen(true)}
+>
+  + Add Nursing Order
+</button>  </div>
+
   <div className="no-filters">
-  {/* SEARCH */}
-  <input
-    type="text"
-    className="no-input"
-    placeholder="Search order no, customer, address…"
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-  />
+    <div className="no-filter-row-1">
+      <input
+        type="text"
+        className="no-input no-search"
+        placeholder="Search order no, customer, address…"
+      />
+    </div>
 
-  {/* STATUS */}
-  <select
-    className="no-input"
-    value={statusFilter}
-    onChange={(e) => setStatusFilter(e.target.value)}
-  >
-    <option value="all">All Status</option>
-    <option value="created">Created</option>
-    <option value="assigned">Assigned</option>
-    <option value="active">Active</option>
-    <option value="completed">Completed</option>
-  </select>
-
-  {/* DATE FROM */}
-  <input
-    type="date"
-    className="no-input"
-    value={fromDate}
-    onChange={(e) => setFromDate(e.target.value)}
-  />
-
-  {/* DATE TO */}
-  <input
-    type="date"
-    className="no-input"
-    value={toDate}
-    onChange={(e) => setToDate(e.target.value)}
-  />
-
-  {/* CLEAR */}
-  <button
-    className="cp-btn ghost"
-    onClick={() => {
-      setSearch("");
-      setStatusFilter("all");
-      setFromDate("");
-      setToDate("");
-    }}
-  >
-    Clear
-  </button>
-</div>
-
-
-  <button
-    className="cp-btn"
-    onClick={() => setCreateOpen(true)}
-  >
-    + Add Nursing Order
-  </button>
+    <div className="no-filter-row-2">
+      <select className="no-input no-compact">...</select>
+      <input type="date" className="no-input no-compact" />
+      <input type="date" className="no-input no-compact" />
+      <button className="cp-btn ghost">Clear</button>
+    </div>
+  </div>
 </div>
 
 
@@ -200,7 +164,7 @@ const filteredOrders = orders.filter((o) => {
               <th>Service</th>
               <th>Start Date</th>
               <th>Created</th>
-              <th>Staff</th>
+              <th>Nurse</th>
               <th>Total</th>
               <th>Actions</th>
             </tr>

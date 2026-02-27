@@ -4,6 +4,7 @@ import "./index.css";
 import App from "./App";
 import MapProvider from "./MapProvider";
 import { HelmetProvider } from "react-helmet-async";
+import '@fortawesome/fontawesome-free/css/all.min.css';
 
 // If you already have BrowserRouter here, keep it.
 // If BrowserRouter is inside App.js, that's fine too.

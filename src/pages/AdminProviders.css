@@ -1,0 +1,260 @@
+/* ================= ROOT ================= */
+
+:root {
+  --admin-blue: #0b3558;
+  --admin-orange: #f28c28;
+  --admin-bg: #f7f9fc;
+  --admin-border: #e3e8ef;
+  --admin-text: #0e2a3a;
+  --admin-muted: #6b7c8f;
+
+  --radius: 16px;
+  --shadow-soft: 0 10px 26px rgba(0,0,0,0.06);
+  --shadow-hover: 0 18px 40px rgba(0,0,0,0.10);
+}
+
+/* ================= PAGE ================= */
+
+.adminProviders {
+  min-height: 100vh;
+  padding: 40px 32px;
+  background: var(--admin-bg);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.adminProviders h1 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: var(--admin-blue);
+  margin-bottom: 28px;
+}
+
+/* ================= UPLOAD BOX ================= */
+
+.uploadBox {
+  background: #ffffff;
+  padding: 22px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+
+  margin-bottom: 28px;
+}
+
+/* FILE INPUT */
+
+.uploadBox input[type="file"] {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--admin-border);
+  background: #fff;
+  font-size: 0.9rem;
+  width: 260px;
+}
+
+/* UPLOAD BUTTON */
+
+.uploadBox button {
+  background: var(--admin-orange);
+  color: #ffffff;
+  border: none;
+  padding: 10px 22px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.uploadBox button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+}
+
+.uploadBox button:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ================= PROGRESS ================= */
+
+.progressWrapper {
+  background: #ffffff;
+  padding: 14px 16px;
+  border-radius: 12px;
+  box-shadow: var(--shadow-soft);
+  margin-bottom: 28px;
+  max-width: 420px;
+}
+
+.progressWrapper span {
+  font-size: 0.85rem;
+  color: var(--admin-text);
+  font-weight: 600;
+}
+
+.progressBar {
+  width: 100%;
+  height: 10px;
+  background: #e6ecf5;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--admin-blue),
+    #1c5a8f
+  );
+  transition: width 0.3s ease;
+}
+
+/* ================= GRID ================= */
+
+.providersGrid {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(180px, 1fr)
+  );
+  gap: 22px;
+}
+
+/* ================= CARD ================= */
+
+.providerCard {
+  background: #ffffff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  padding: 16px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+
+  transition: 0.25s ease;
+}
+
+.providerCard:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--shadow-hover);
+}
+
+/* ================= LOGO ================= */
+
+.providerCard img {
+  width: 100%;
+  height: 90px;
+  object-fit: contain;
+
+  background: #f4f7fb;
+  border-radius: 12px;
+  padding: 12px;
+
+  transition: 0.25s ease;
+}
+
+.providerCard:hover img {
+  transform: scale(1.05);
+}
+
+/* ================= STATUS ================= */
+
+.status {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.status.published {
+  color: #1f9d55;
+}
+
+.status.hidden {
+  color: #c53030;
+}
+
+/* ================= ACTION BUTTONS ================= */
+
+.actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.actions button {
+  flex: 1;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+/* TOGGLE */
+
+.actions .toggle {
+  background: var(--admin-blue);
+  color: #ffffff;
+}
+
+.actions .toggle:hover {
+  background: #0e4b7d;
+}
+
+/* DELETE */
+
+.actions .delete {
+  background: #e53e3e;
+  color: #ffffff;
+}
+
+.actions .delete:hover {
+  background: #c53030;
+}
+
+.actions button:hover {
+  transform: translateY(-1px);
+}
+
+/* ================= MOBILE ================= */
+
+@media (max-width: 600px) {
+
+  .adminProviders {
+    padding: 28px 16px;
+  }
+
+  .uploadBox {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .uploadBox input[type="file"] {
+    width: 100%;
+  }
+
+  .providersGrid {
+    grid-template-columns: repeat(
+      auto-fill,
+      minmax(140px, 1fr)
+    );
+  }
+
+  .providerCard img {
+    height: 70px;
+  }
+
+}

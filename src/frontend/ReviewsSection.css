@@ -308,3 +308,50 @@
     transform: none !important;
   }
 }
+/* ================= REVIEW BUTTON WRAP ================= */
+
+.bmm-score-action {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ================= VIEW ALL ================= */
+
+.bmm-reviews .bmm-btn-ghost {
+  background: transparent;
+  border: 1px solid rgba(0,0,0,0.15);
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.bmm-reviews .bmm-btn-ghost:hover {
+  background: rgba(0,0,0,0.04);
+  color: inherit;
+}
+
+/* ================= WRITE REVIEW ================= */
+
+.bmm-reviews .bmm-btn-primary {
+  background: linear-gradient(135deg, #f28c28, #ff9f43);
+  color: #fff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(242,140,40,0.35);
+  transition: transform 0.2s ease,
+              box-shadow 0.2s ease;
+}
+
+/* Hover — controlled */
+.bmm-reviews .bmm-btn-primary:hover {
+  background: linear-gradient(135deg, #f28c28, #ff9f43); /* same color */
+  color: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 26px rgba(242,140,40,0.45);
+}

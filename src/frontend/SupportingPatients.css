@@ -1,0 +1,137 @@
+/* ================= ROOT ================= */
+
+:root {
+  --bm-blue-dark: #0b3558;
+  --bm-orange: #f28c28;
+  --text-muted: #556b7a;
+
+  --radius: 22px;
+  --shadow-soft: 0 10px 28px rgba(0,0,0,0.06);
+}
+
+/* ================= SECTION ================= */
+
+.supportSection {
+  padding: 0 4vw 90px;
+  background: #ffffff;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ================= HEADER ================= */
+
+.supportHeader {
+  text-align: center;
+  max-width: 760px;
+  margin: 0 auto 50px;
+}
+
+.supportHeader h2 {
+  font-size: 2.1rem;
+  font-weight: 900;
+  color: var(--bm-blue-dark);
+}
+
+.supportHeader span {
+  color: var(--bm-orange);
+}
+
+.supportHeader p {
+  margin-top: 12px;
+  font-size: 1rem;
+  color: var(--text-muted);
+  line-height: 1.7;
+}
+
+/* ================= SLIDER ================= */
+
+.supportSlider {
+  padding: 10px 0 24px;
+}
+
+.supportSlider .swiper-wrapper {
+  transition-timing-function: linear !important;
+}
+
+/* ================= EDGE FADE ================= */
+
+.supportSection::before,
+.supportSection::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 80px;
+  z-index: 5;
+  pointer-events: none;
+}
+
+.supportSection::before {
+  left: 0;
+  background: linear-gradient(
+    to right,
+    #ffffff 0%,
+    rgba(255,255,255,0) 100%
+  );
+}
+
+.supportSection::after {
+  right: 0;
+  background: linear-gradient(
+    to left,
+    #ffffff 0%,
+    rgba(255,255,255,0) 100%
+  );
+}
+
+/* ================= LOGO CARD ================= */
+
+.supportLogoBox {
+  height: 110px;
+  background: #f7f9fc;
+
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 18px;
+
+  transition: 0.3s ease;
+}
+
+.supportLogoBox:hover {
+  transform: translateY(-6px);
+}
+
+.supportLogoBox img {
+  max-width: 100%;
+  max-height: 60px;
+  object-fit: contain;
+  opacity: 0.9;
+  transition: 0.3s ease;
+}
+
+.supportLogoBox:hover img {
+  opacity: 1;
+}
+
+/* ================= MOBILE ================= */
+
+@media (max-width: 768px) {
+
+  .supportHeader h2 {
+    font-size: 1.7rem;
+  }
+
+  .supportLogoBox {
+    height: 85px;
+  }
+
+  .supportLogoBox img {
+    max-height: 46px;
+  }
+
+}

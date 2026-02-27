@@ -1,7 +1,7 @@
 // src/components/OrderDrawer.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  listAssets,
+  listAvailableAssetsForRange,
   reserveAsset,
   unreserveAsset,
 } from "../utils/inventory";
@@ -260,7 +260,7 @@ const fmtDate = (d) => {
       return;
     }
 
-   const assets = await listAssets({
+   const assets = await listAvailableAssetsForRange({
   productId: it.productId || null,
   branchId: it.branchId || null,
   from: it.expectedStartDate || null,

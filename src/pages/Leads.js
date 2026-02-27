@@ -15,6 +15,8 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import "./Leads.css";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
 
 // Requirement form integration
 import RequirementForm from "../data/RequirementForm";
@@ -405,6 +407,26 @@ export default function Leads() {
   // ---------- Details drawer ----------
   const openDetails = (lead) => setDetailsLead(lead);
   const closeDetails = () => setDetailsLead(null);
+const openWhatsApp = (phone) => {
+  if (!phone) return;
+
+  // Remove spaces, dashes, brackets etc
+  let clean = phone.replace(/[^\d]/g, "");
+
+  // Force India country code (+91)
+  if (!clean.startsWith("91")) {
+    clean = "91" + clean;
+  }
+
+  // Prefilled message
+  const message = encodeURIComponent("Hi");
+
+  // Official WhatsApp API
+  const url = `https://wa.me/${clean}?text=${message}`;
+
+  window.open(url, "_blank");
+};
+
 
   // ---------- Delete ----------
   const handleDelete = async (l) => {
@@ -969,10 +991,35 @@ export default function Leads() {
                   </div>
                 </div>
 
-                <div className="details-row">
-                  <div className="label muted">Phone</div>
-                  <div className="value">{detailsLead.phone}</div>
-                </div>
+               <div className="details-row">
+  <div className="label muted">Phone</div>
+
+  <div
+    className="value"
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: 10,
+    }}
+  >
+    <span>{detailsLead.phone}</span>
+
+    {detailsLead.phone && (
+   <button
+  type="button"
+  className="whatsapp-btn"
+  title="Chat on WhatsApp"
+  onClick={() => openWhatsApp(detailsLead.phone)}
+>
+  <FontAwesomeIcon icon={faWhatsapp} className="wa-icon" />
+  WhatsApp
+</button>
+
+
+    )}
+  </div>
+</div>
+
 
                 <div className="details-row">
                   <div className="label muted">Address</div>
@@ -1030,50 +1077,54 @@ export default function Leads() {
 
             <hr className="hr" />
 
-            <div style={{ marginTop: 8 }}>
-              <h3>Full History</h3>
-              <div className="history-list" style={{ marginTop: 8 }}>
-                {(detailsLead.history && detailsLead.history.length
-                  ? detailsLead.history.slice().reverse()
-                  : []
-                ).map((h, i) => (
-                  <div key={i} className="history-item">
-                    <div className="meta">
-                      <div className="who">
-                        <span className="type">{h.type?.toUpperCase()}</span>
-                        {h.field ? `${h.field}` : ""}
-                      </div>
-                      <div className="time muted">{fmtDate(h.ts)}</div>
-                    </div>
+           <div style={{ marginTop: 8 }}>
+  <h3>Full History</h3>
 
-                    <div style={{ marginTop: 8 }}>
-                      <div style={{ fontWeight: 700 }}>
-                        {h.changedByName || h.changedBy}
-                      </div>
-                      {h.note ? <div className="note">{h.note}</div> : null}
+  <div className="history-list compact">
+    {(detailsLead.history && detailsLead.history.length
+      ? detailsLead.history.slice().reverse()
+      : []
+    ).map((h, i) => (
+      <div key={i} className="history-item compact">
+        <div className="history-top">
+          <span className="history-title">
+            {h.type?.toUpperCase()}
+            {h.field ? ` · ${h.field}` : ""}
+          </span>
 
-                      {h.oldValue || h.newValue ? (
-                        <div className="changes" style={{ marginTop: 10 }}>
-                          <div className="change-pill">
-                            <div className="k">From</div>
-                            <div className="v">{h.oldValue ?? "—"}</div>
-                          </div>
-                          <div className="change-pill">
-                            <div className="k">To</div>
-                            <div className="v">{h.newValue ?? "—"}</div>
-                          </div>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                ))}
-                {(!detailsLead.history || !detailsLead.history.length) && (
-                  <div className="muted" style={{ padding: 8 }}>
-                    No history available.
-                  </div>
-                )}
-              </div>
-            </div>
+          <span className="history-time">
+            {fmtDate(h.ts)}
+          </span>
+        </div>
+
+        <div className="history-user">
+          {h.changedByName || h.changedBy}
+        </div>
+
+        {h.note && (
+          <div className="history-note">
+            {h.note}
+          </div>
+        )}
+
+        {(h.oldValue || h.newValue) && (
+          <div className="history-change">
+            <span className="from">{h.oldValue ?? "—"}</span>
+            <span className="arrow">→</span>
+            <span className="to">{h.newValue ?? "—"}</span>
+          </div>
+        )}
+      </div>
+    ))}
+
+    {(!detailsLead.history || !detailsLead.history.length) && (
+      <div className="muted" style={{ padding: 6 }}>
+        No history available.
+      </div>
+    )}
+  </div>
+</div>
+
 
             <div
               className="details-footer"

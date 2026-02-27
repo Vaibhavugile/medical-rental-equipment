@@ -67,8 +67,17 @@ import NursingOrderDetails from "./pages/NursingOrderDetails";
 import StaffDetails from "./pages/StaffDetails";
 import PayrollGenerate from "./pages/PayrollGenerate";
 import Sidebar from "./pages/Sidebar";
-
-
+import RolesUsers from "./pages/RolesUsers";
+import GalleryManager from "./pages/GalleryManager";
+import GallerySetups from "./pages/GallerySetups";
+import AdminProviders from "./pages/ProvidersManager";
+import VideosPage from "./pages/videos";
+import CommunitySupport from "./pages/community-support";
+import AdminCommunity from "./pages/community-supportadmin";
+import AdminSupportingPatients from "./pages/AdminSupportingPatients";
+import Doctors from "./pages/Doctors";
+import AdminAppointments from "./pages/AdminAppointments";
+import AdminAddDoctor from "./pages/AdminAddDoctor";
 /* ============================================================
    PRIVATE ROUTE (AUTH ONLY, SILENT)
 ============================================================ */
@@ -173,6 +182,13 @@ function CRMApp() {
               element={<OutstandingOrdersReport />}
             />
             <Route path="reports/assets" element={<AssetsReport />} />
+<Route path="roles-users" element={<RolesUsers />} />
+<Route path="gallery" element={<GalleryManager />} />
+<Route path="Providerlogo" element={<AdminProviders />}/>
+<Route path="admincommunity" element={<AdminCommunity />}/>
+<Route path="adminsupport" element={<AdminSupportingPatients />}/>
+<Route path="adminappointment" element={<AdminAppointments />}/>
+<Route path="add-doctor" element={<AdminAddDoctor />}/>
 
             <Route path="*" element={<NotFound />} />
           </Routes>
@@ -249,6 +265,7 @@ export default function App() {
         <Route path="/nursing-care" element={<NursingPage />} />
         <Route path="/physiotherapy" element={<PhysiotherapyPage />} />
         <Route path="/respiratory-care" element={<RespiratoryPage />} />
+        <Route path="/doctors" element={<Doctors />} />
 
         <Route path="/equipment" element={<EquipmentList />} />
         <Route path="/equipment/:slug" element={<EquipmentDetail />} />
@@ -261,6 +278,14 @@ export default function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsAndConditions />} />
+         <Route path="/videos" element={<VideosPage />} />
+        <Route path="/community" element={<CommunitySupport />} />
+
+       
+<Route
+  path="/gallery-setups"
+  element={<GallerySetups />}
+/>
 
         {/* Legacy redirects */}
         <Route

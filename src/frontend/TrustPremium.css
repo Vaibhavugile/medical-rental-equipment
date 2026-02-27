@@ -2,7 +2,7 @@
 
 .tp-section {
   position: relative;
-  padding: 160px 20px;
+  padding: 80px 20px 60px;
   background: linear-gradient(
     180deg,
     var(--bm-white) 0%,
@@ -44,7 +44,7 @@
 .tp-header {
   text-align: center;
   max-width: 720px;
-  margin: 0 auto 110px;
+  margin: 0 auto 70px;
   opacity: 0;
   transform: translateY(22px);
   transition: all 0.9s var(--ease);

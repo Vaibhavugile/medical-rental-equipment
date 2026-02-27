@@ -173,10 +173,35 @@ export default function ReviewsSection({
   }, [items.length]);
 
   // helper for "read all reviews" (open page bottom etc.)
-  const readAll = () => {
-    // example: scroll to bottom or open a reviews modal
-    window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
-  };
+  /* ================= GOOGLE REVIEWS LINK ================= */
+
+/* ================= GOOGLE REVIEW LINKS ================= */
+
+const GOOGLE_REVIEWS_URL =
+  "https://search.google.com/local/reviews?placeid=ChIJmVsH4NakjkkRwjDSY6Jkq3E";
+
+const GOOGLE_WRITE_REVIEW_URL =
+  "https://search.google.com/local/writereview?placeid=ChIJmVsH4NakjkkRwjDSY6Jkq3E";
+
+/* View all reviews */
+const openGoogleReviews = () => {
+  window.open(
+    GOOGLE_REVIEWS_URL,
+    "_blank",
+    "noopener,noreferrer"
+  );
+};
+
+/* Write review */
+const writeReview = () => {
+  window.open(
+    GOOGLE_WRITE_REVIEW_URL,
+    "_blank",
+    "noopener,noreferrer"
+  );
+};
+
+
 
   return (
     <section className="bmm-reviews" aria-label="Patient reviews">
@@ -203,11 +228,28 @@ export default function ReviewsSection({
               <div className="bmm-score-sub">Based on {items.length * 5 - 3} reviews</div>
             </div>
 
-            <div className="bmm-score-action">
-              <button className="bmm-btn-ghost" onClick={readAll} aria-label="Read all reviews">
-                ★ Read all reviews
-              </button>
-            </div>
+           <div className="bmm-score-action">
+
+  {/* View All */}
+  <button
+    className="bmm-btn-ghost"
+    onClick={openGoogleReviews}
+    aria-label="View all reviews"
+  >
+    ★ View all reviews
+  </button>
+
+  {/* Write Review */}
+  <button
+    className="bmm-btn-primary"
+    onClick={writeReview}
+    aria-label="Write a review"
+  >
+    ✍️ Write a review
+  </button>
+
+</div>
+
           </div>
         </div>
 
