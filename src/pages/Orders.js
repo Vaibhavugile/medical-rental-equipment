@@ -270,23 +270,32 @@ export const getResourceBadges = (order) => {
   /* 🔴 OVERDUE RETURN (highest priority) */
   if (isReturnOverdue(order)) {
     badges.push({ key: "return_overdue", label: "Overdue Return" });
-    return badges; // ⛔ urgency wins
+    return badges;
   }
 
-  /* 💰 PAYMENT DUE (robust & accurate) */
+  const baseStatus = (order?.status || "").toLowerCase();
+  const dstat = (order?.deliveryStatus || "").toLowerCase();
+
+  /* ❌ No financial badges for cancelled */
+  if (baseStatus === "cancelled") {
+    return badges;
+  }
+
+  /* 💰 PAYMENT STATES */
   const total = Number(order?.totals?.total || 0);
+  const totalPaid = Number(order?.paymentSummary?.totalPaid || 0);
+  const balance = Number(order?.paymentSummary?.balance || 0);
 
-  // ✅ Only count completed payments
-  const completedPaid = (order?.payments || [])
-    .filter((p) => (p.status || "completed") === "completed")
-    .reduce((s, p) => s + Number(p.amount || 0), 0);
-
-  // Clamp + fix float precision
-  const balance = Math.max(0, total - completedPaid);
-  const roundedBalance = Number(balance.toFixed(2));
-
-  if (roundedBalance > 0) {
-    badges.push({ key: "payment_due", label: "Payment Due" });
+  if (total > 0) {
+    if (totalPaid === 0 && balance > 0) {
+      badges.push({ key: "payment_due", label: "Payment Due" });
+    } 
+    else if (totalPaid > 0 && balance > 0) {
+      badges.push({ key: "partially_paid", label: "Partially Paid" });
+    } 
+    else if (balance === 0) {
+      badges.push({ key: "fully_paid", label: "Fully Paid" });
+    }
   }
 
   /* 📦 ASSETS */
@@ -295,8 +304,7 @@ export const getResourceBadges = (order) => {
     badges.push({ key: "assets_pending", label: "Assets Pending" });
   }
 
-  /* 🚚 IN TRANSIT (pickup OR return) */
-  const dstat = (order?.deliveryStatus || "").toLowerCase();
+  /* 🚚 IN TRANSIT */
   if (dstat === "picked_up" || dstat === "in_transit") {
     badges.push({ key: "in_transit", label: "In Transit" });
   }
@@ -1257,7 +1265,35 @@ const assignDriversToOrder = async (driverIds = []) => {
   }
 };
 
+async function updateOrderPaymentSummary(orderId) {
+  const paymentsCol = collection(db, "orders", orderId, "payments");
+  const paymentsSnap = await getDocs(paymentsCol);
 
+  const payments = paymentsSnap.docs.map(d => d.data());
+
+  const orderSnap = await getDoc(doc(db, "orders", orderId));
+  if (!orderSnap.exists()) return;
+
+  const order = orderSnap.data();
+  const total = Number(order?.totals?.total || 0);
+
+  const totalPaid = payments
+    .filter(p => p.status === "completed")
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+  const balance = Math.max(
+    0,
+    Number((total - totalPaid).toFixed(2))
+  );
+
+  await updateDoc(doc(db, "orders", orderId), {
+    paymentSummary: {
+      totalPaid,
+      balance
+    },
+    updatedAt: serverTimestamp(),
+  });
+}
 
 
 
@@ -1559,6 +1595,7 @@ function getDeliveryBadgeText(order, deliveriesByOrder = {}) {
         fresh.payments = await fetchPaymentsForOrder(fresh.id);
         setSelectedOrder(fresh);
       }
+      await updateOrderPaymentSummary(selectedOrder.id);
 
       closePaymentModal();
     } catch (err) {
@@ -1612,69 +1649,83 @@ const markOnRent = async () => {
 };
 
 
+const removePayment = async (paymentId) => {
+  if (!selectedOrder) return;
+  if (!window.confirm("Remove this payment? This cannot be undone.")) return;
 
-  const removePayment = async (paymentId) => {
-    if (!selectedOrder) return;
-    if (!window.confirm("Remove this payment? This cannot be undone.")) return;
-    setSaving(true);
-    setError("");
-    try {
-      const paymentDocRef = doc(
-        db,
-        "orders",
-        selectedOrder.id,
-        "payments",
-        paymentId
-      );
-      await deleteDoc(paymentDocRef);
+  setSaving(true);
+  setError("");
 
-      const snap = await getDoc(doc(db, "orders", selectedOrder.id));
-      if (snap.exists()) {
-        const fresh = { id: snap.id, ...(snap.data() || {}) };
-        fresh.payments = await fetchPaymentsForOrder(fresh.id);
-        setSelectedOrder(fresh);
-      }
-    } catch (err) {
-      console.error("removePayment", err);
-      setError(err.message || "Failed to remove payment");
-    } finally {
-      setSaving(false);
+  try {
+    const paymentDocRef = doc(
+      db,
+      "orders",
+      selectedOrder.id,
+      "payments",
+      paymentId
+    );
+
+    await deleteDoc(paymentDocRef);
+
+    // 🔥 IMPORTANT: update summary immediately after deletion
+    await updateOrderPaymentSummary(selectedOrder.id);
+
+    // Refresh drawer data
+    const snap = await getDoc(doc(db, "orders", selectedOrder.id));
+    if (snap.exists()) {
+      const fresh = { id: snap.id, ...(snap.data() || {}) };
+      fresh.payments = await fetchPaymentsForOrder(fresh.id);
+      setSelectedOrder(fresh);
     }
-  };
 
-  const markPaymentStatus = async (paymentId, status) => {
-    if (!selectedOrder) return;
-    setSaving(true);
-    setError("");
-    try {
-      const paymentDocRef = doc(
-        db,
-        "orders",
-        selectedOrder.id,
-        "payments",
-        paymentId
-      );
-      await updateDoc(paymentDocRef, {
-        status,
-        updatedAt: serverTimestamp(),
-        updatedBy: auth.currentUser?.uid || "",
-        updatedByName:
-          auth.currentUser?.displayName || auth.currentUser?.email || "",
-      });
+  } catch (err) {
+    console.error("removePayment", err);
+    setError(err.message || "Failed to remove payment");
+  } finally {
+    setSaving(false);
+  }
+};
+const markPaymentStatus = async (paymentId, status) => {
+  if (!selectedOrder) return;
 
-      const snap = await getDoc(doc(db, "orders", selectedOrder.id));
-      if (snap.exists()) {
-        const fresh = { id: snap.id, ...(snap.data() || {}) };
-        fresh.payments = await fetchPaymentsForOrder(fresh.id);
-        setSelectedOrder(fresh);
-      }
-    } catch (err) {
-      console.error("markPaymentStatus", err);
-      setError(err.message || "Failed to update payment status");
-    } finally {
-      setSaving(false);
+  setSaving(true);
+  setError("");
+
+  try {
+    const paymentDocRef = doc(
+      db,
+      "orders",
+      selectedOrder.id,
+      "payments",
+      paymentId
+    );
+
+    await updateDoc(paymentDocRef, {
+      status,
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser?.uid || "",
+      updatedByName:
+        auth.currentUser?.displayName || auth.currentUser?.email || "",
+    });
+
+    // 🔥 IMPORTANT: update summary after status change
+    await updateOrderPaymentSummary(selectedOrder.id);
+
+    // Refresh drawer data
+    const snap = await getDoc(doc(db, "orders", selectedOrder.id));
+    if (snap.exists()) {
+      const fresh = { id: snap.id, ...(snap.data() || {}) };
+      fresh.payments = await fetchPaymentsForOrder(fresh.id);
+      setSelectedOrder(fresh);
     }
-  };
+
+  } catch (err) {
+    console.error("markPaymentStatus", err);
+    setError(err.message || "Failed to update payment status");
+  } finally {
+    setSaving(false);
+  }
+};
 
   if (loading)
     return (

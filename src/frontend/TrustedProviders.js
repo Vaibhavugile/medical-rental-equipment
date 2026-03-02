@@ -1,8 +1,7 @@
 "use client";
-import React, { useEffect, useState } from "react";
 
-import { Swiper, SwiperSlide } from "swiper/react";
-import { Autoplay } from "swiper/modules";
+import React, { useEffect, useState } from "react";
+import "./TrustedProviders.css";
 
 import {
   collection,
@@ -14,18 +13,44 @@ import {
 
 import { db } from "../firebase";
 
-import "swiper/css";
-import "./TrustedProviders.css";
+/* ================= ROTATING IMAGE COMPONENT ================= */
+const RotatingLogos = ({ items }) => {
+  const [current, setCurrent] = useState(0);
 
-export default function Providers() {
-
-  /* ================= STATE ================= */
-  const [providers, setProviders] = useState([]);
-
-  /* ================= FETCH FROM FIREBASE ================= */
   useEffect(() => {
+    if (!items || items.length === 0) return;
 
-    const fetchProviders = async () => {
+    const timer = setInterval(() => {
+      setCurrent((prev) => (prev + 1) % items.length);
+    }, 1200);
+
+    return () => clearInterval(timer);
+  }, [items]);
+
+  if (!items || items.length === 0) return null;
+
+  return (
+    <div className="logo-rotator">
+      {items.map((src, index) => (
+        <img
+          key={index}
+          src={src}
+          alt="trusted provider"
+          className={`logo-item ${index === current ? "visible" : "hidden"}`}
+        />
+      ))}
+    </div>
+  );
+};
+
+/* ================= MAIN SECTION ================= */
+const TrustedProviders = () => {
+  const [providerList, setProviderList] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  /* ===== FETCH PROVIDERS FROM FIRESTORE ===== */
+  useEffect(() => {
+    const loadProviders = async () => {
       try {
         const q = query(
           collection(db, "providers"),
@@ -35,115 +60,59 @@ export default function Providers() {
 
         const snapshot = await getDocs(q);
 
-        const data = snapshot.docs.map((doc) => ({
+        const results = snapshot.docs.map((doc) => ({
           id: doc.id,
           ...doc.data(),
         }));
 
-        console.log("Trusted Providers:", data);
-
-        setProviders(data);
-
-      } catch (err) {
-        console.error("Providers fetch error:", err);
+        setProviderList(results);
+      } catch (error) {
+        console.error("Error loading providers:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchProviders();
-
+    loadProviders();
   }, []);
 
-  /* ================= SPLIT INTO 2 ROWS ================= */
-  const half = Math.ceil(providers.length / 2);
-  const row1 = providers.slice(0, half);
-  const row2 = providers.slice(half);
+  /* ===== SPLIT INTO TWO GROUPS ===== */
+  const midpoint = Math.ceil(providerList.length / 2);
+  const topLogos = providerList.slice(0, midpoint).map((p) => p.logo);
+  const bottomLogos = providerList.slice(midpoint).map((p) => p.logo);
 
   return (
-    <section className="providersSection">
+    <section className="providers-wrapper">
+      <header className="providers-title-area">
+        <h1 className="providers-main-title">
+          Our <span>Trusted</span> Providers
+        </h1>
+      </header>
 
-      {/* ================= HEADER ================= */}
-      <div className="providersHeader">
-        <h2>
-          Our <span>Trusted Providers</span>
-        </h2>
+      <div className="providers-layout">
+        <div className="providers-left">
+          {!loading && (
+            <>
+              <RotatingLogos items={topLogos} />
+              <RotatingLogos items={bottomLogos} />
+            </>
+          )}
+        </div>
 
-        <p>
-          We proudly collaborate with leading hospitals,
-          healthcare brands and medical equipment providers.
-        </p>
+        <div className="providers-right">
+          <h2 className="providers-subtitle">
+            Carefully Selected Healthcare Partners
+          </h2>
+          <p className="providers-description">
+            We collaborate with top-tier hospitals, healthcare brands, and
+            certified medical equipment providers. Each partner undergoes
+            quality verification to ensure consistent excellence, reliability,
+            and patient-focused service delivery.
+          </p>
+        </div>
       </div>
-
-      {/* ================= ROW 1 ================= */}
-      {row1.length > 0 && (
-        <Swiper
-          modules={[Autoplay]}
-          spaceBetween={40}
-          slidesPerView={5}
-          loop={true}
-          speed={3000}
-          autoplay={{
-            delay: 0,
-            disableOnInteraction: false,
-            pauseOnMouseEnter: true,
-          }}
-          breakpoints={{
-            0: { slidesPerView: 2 },
-            480: { slidesPerView: 3 },
-            768: { slidesPerView: 4 },
-            1024: { slidesPerView: 5 },
-          }}
-          className="providersSlider row1"
-        >
-          {row1.map((item) => (
-            <SwiperSlide key={item.id}>
-              <div className="providerLogoBox">
-                <img
-                  src={item.logo}
-                  alt={item.name || "Provider Logo"}
-                  loading="lazy"
-                />
-              </div>
-            </SwiperSlide>
-          ))}
-        </Swiper>
-      )}
-
-      {/* ================= ROW 2 ================= */}
-      {row2.length > 0 && (
-        <Swiper
-          modules={[Autoplay]}
-          spaceBetween={40}
-          slidesPerView={5}
-          loop={true}
-          speed={3000}
-          dir="rtl"
-          autoplay={{
-            delay: 0,
-            disableOnInteraction: false,
-            pauseOnMouseEnter: true,
-          }}
-          breakpoints={{
-            0: { slidesPerView: 2 },
-            480: { slidesPerView: 3 },
-            768: { slidesPerView: 4 },
-            1024: { slidesPerView: 5 },
-          }}
-          className="providersSlider row2"
-        >
-          {row2.map((item) => (
-            <SwiperSlide key={item.id}>
-              <div className="providerLogoBox">
-                <img
-                  src={item.logo}
-                  alt={item.name || "Provider Logo"}
-                  loading="lazy"
-                />
-              </div>
-            </SwiperSlide>
-          ))}
-        </Swiper>
-      )}
-
     </section>
   );
-}
+};
+
+export default TrustedProviders;

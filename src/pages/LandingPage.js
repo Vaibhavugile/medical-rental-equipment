@@ -26,7 +26,6 @@ import SupportingPatients from "../frontend/SupportingPatients";
 import Meet from "../frontend/Meet";
 import "./LandingPage.module.css";
 import SupportingSlider from "../frontend/SupportingSlider";
-import TrustedProviders1 from "../frontend/TrustedProviders1";
 
 
 export default function LandingPage() {
@@ -79,10 +78,10 @@ export default function LandingPage() {
        <HowWeWorkUnique />
 
        <WhyChooseUsUnique />
-       <TrustedProviders />
        {/* <SupportingPatients /> */}
        <SupportingSlider />
-       <TrustedProviders1 />
+              <TrustedProviders />
+
        
 
          <section
