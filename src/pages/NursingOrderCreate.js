@@ -43,11 +43,12 @@ function calcTotals(
   taxes = []
 ) {
   const subtotal = (items || []).reduce(
-    (s, it) => s + safeNum(it.qty) * safeNum(it.rate),
+    (s, it) => s + safeNum(it.amount),
     0
   );
 
   let discountAmount = 0;
+
   if (discount) {
     if ((discount.type || "").toLowerCase() === "percent") {
       discountAmount = subtotal * (safeNum(discount.value) / 100);
@@ -61,8 +62,11 @@ function calcTotals(
   const taxBreakdown = (taxes || []).map((t) => {
     const type = (t.type || "percent").toLowerCase();
     const value = safeNum(t.rate ?? t.value);
+
     const amount =
-      type === "fixed" ? value : taxable * (value / 100);
+      type === "fixed"
+        ? value
+        : taxable * (value / 100);
 
     return {
       name: t.name || "",
@@ -79,7 +83,13 @@ function calcTotals(
 
   const total = Math.max(0, taxable + totalTax);
 
-  return { subtotal, discountAmount, taxBreakdown, totalTax, total };
+  return {
+    subtotal,
+    discountAmount,
+    taxBreakdown,
+    totalTax,
+    total,
+  };
 }
 
 // days between two dates (inclusive)
@@ -90,6 +100,31 @@ const diffDaysInclusive = (start, end) => {
   if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return 0;
   const msPerDay = 24 * 60 * 60 * 1000;
   return Math.max(0, Math.round((e - s) / msPerDay) + 1);
+};
+const calcDuration = (start, end, rateType) => {
+  if (!start || !end) return 0;
+
+  const s = new Date(start);
+  const e = new Date(end);
+
+  if (Number.isNaN(s.getTime()) || Number.isNaN(e.getTime())) return 0;
+
+  const diffMs = e - s;
+
+  if (rateType === "hourly") {
+    return Math.max(0, Math.round(diffMs / (1000 * 60 * 60)));
+  }
+
+  const days = Math.max(
+    0,
+    Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1
+  );
+
+  if (rateType === "monthly") {
+    return Math.max(1, Math.round(days / 30));
+  }
+
+  return days;
 };
 
 /* ============================
@@ -297,17 +332,23 @@ const updateDraftItem = (idx, patch) => {
     const nd = JSON.parse(JSON.stringify(d));
     let item = { ...(nd.items[idx] || {}), ...patch };
 
-    if (
-      Object.prototype.hasOwnProperty.call(patch, "expectedStartDate") ||
-      Object.prototype.hasOwnProperty.call(patch, "expectedEndDate")
-    ) {
+   if (
+  Object.prototype.hasOwnProperty.call(patch, "expectedStartDate") ||
+  Object.prototype.hasOwnProperty.call(patch, "expectedEndDate") ||
+  Object.prototype.hasOwnProperty.call(patch, "rateType")
+) {
       const start = patch.expectedStartDate ?? item.expectedStartDate;
-      const end = patch.expectedEndDate ?? item.expectedEndDate;
-      item.days = diffDaysInclusive(start, end);
+const end = patch.expectedEndDate ?? item.expectedEndDate;
+const type = patch.rateType ?? item.rateType ?? "daily";
+
+item.duration = calcDuration(start, end, type);
+
     }
 
-    item.amount = safeNum(item.qty) * safeNum(item.rate);
-    nd.items[idx] = item;
+item.amount =
+  safeNum(item.qty) *
+  safeNum(item.rate) *
+  safeNum(item.duration);    nd.items[idx] = item;
     nd.totals = calcTotals(nd.items, nd.discount, nd.taxes);
     return nd;
   });
@@ -323,10 +364,12 @@ const addItem = () => {
       id: `n-${Date.now()}`,
       name: "Nursing Service",
       qty: 1,                 // staff count
-      rate: "",                // daily rate
+      rate: "", 
+      rateType: "daily",   // NEW
+     duration: 0,               // daily rate
       amount: "",
+         // NEW
       notes: "",
-      days: "",
       expectedStartDate: "",
       expectedEndDate: "",
     });
@@ -353,7 +396,7 @@ const removeItem = (idx) => {
 const computeSubtotal = () => {
   if (!draft) return 0;
   return draft.items.reduce(
-    (s, it) => s + safeNum(it.qty) * safeNum(it.rate),
+    (s, it) => s + safeNum(it.amount),
     0
   );
 };
@@ -425,9 +468,11 @@ const createOrder = async () => {
 
     const itemsPayload = draft.items.map((it) => ({
       name: it.name,
-      qty: Number(it.qty || 0),       // staff count
-      rate: Number(it.rate || 0),     // daily rate
-      amount: Number(it.amount || 0),
+  qty: Number(it.qty || 0),
+  rate: Number(it.rate || 0),
+  rateType: it.rateType || "daily",
+  duration: Number(it.duration || 0),
+  amount: Number(it.amount || 0),
       notes: it.notes || "",
       days: it.days || 0,
       expectedStartDate: it.expectedStartDate || "",
@@ -744,21 +789,21 @@ return (
                         }
                         placeholder="rate"
                       />
+                      <select
+  className="cp-input"
+  style={{ width: 110 }}
+  value={it.rateType || "daily"}
+  onChange={(e) =>
+    updateDraftItem(idx, { rateType: e.target.value })
+  }
+>
+  <option value="hourly">Hourly</option>
+  <option value="daily">Daily</option>
+  <option value="monthly">Monthly</option>
+</select>
 
                       <input
-                        className="cp-input"
-                        style={{ width: 90 }}
-                        value={it.days}
-                        onChange={(e) =>
-                          updateDraftItem(idx, {
-                            days: parseNumberInput(e.target.value, 0),
-                          })
-                        }
-                        placeholder="Days"
-                      />
-
-                      <input
-                        type="date"
+                        type="datetime-local"
                         className="cp-input"
                         value={it.expectedStartDate || ""}
                         onChange={(e) =>
@@ -769,7 +814,7 @@ return (
                       />
 
                       <input
-                        type="date"
+                        type="datetime-local"
                         className="cp-input"
                         value={it.expectedEndDate || ""}
                         onChange={(e) =>
@@ -790,6 +835,9 @@ return (
                     >
                       Amount: {fmtCurrency(it.amount || 0)}
                     </div>
+                    <div className="muted" style={{ fontSize: 12 }}>
+  Duration: {it.duration || 0} {it.rateType}
+</div>
                   </div>
                 ))}
               </div>
@@ -961,4 +1009,4 @@ return (
   </div>
 );
 
-}
+}  
