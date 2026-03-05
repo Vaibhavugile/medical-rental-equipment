@@ -473,448 +473,538 @@ const openWhatsApp = (phone) => {
     <div className="coupons-wrap">
       {error && <div className="coupons-error">{error}</div>}
 
-      <header className="coupons-header">
-        <div>
-          <h1>📋 Leads</h1>
-          <p>Primary filter: <strong>Type</strong>. Then refine by <strong>Status</strong>.</p>
-        </div>
-        <div className="coupons-actions">
-          <button className="cp-btn" onClick={() => openDrawer(defaultForm)}>
-            + New Lead
-          </button>
-          <button
-            className="cp-btn primary"
-            onClick={() => {
-              setDetailsLead(null);
-              setReqLead(null);
-              setTemplateReq(null);
-              setOpenReq(true);
-            }}
-          >
-            + Create Requirement
-          </button>
-        </div>
-      </header>
+      <header className="leads-header">
+  <div className="leads-header-left">
+    <div className="leads-title-row">
+      <span className="leads-icon">📋</span>
+      <h1 className="leads-title">Leads</h1>
+    </div>
+
+    <p className="leads-subtitle">
+      Filter by <strong>Type</strong> and refine using <strong>Status</strong>.
+    </p>
+  </div>
+
+  <div className="leads-header-actions">
+    <button
+      className="cp-btn ghost"
+      onClick={() => openDrawer(defaultForm)}
+    >
+      + New Lead
+    </button>
+
+    <button
+      className="cp-btn primary"
+      onClick={() => {
+        setDetailsLead(null);
+        setReqLead(null);
+        setTemplateReq(null);
+        setOpenReq(true);
+      }}
+    >
+      + Create Requirement
+    </button>
+  </div>
+</header>
 
       {/* Toolbar: TYPE chips (server filter) + search + STATUS chips (client filter) */}
-      <section className="coupons-toolbar">
-        {/* NEW: Type chips row — drives Firestore query */}
-        <div className="visits-chip-row" style={{ flex: "1 1 100%" }}>
-          <span className="muted" style={{ marginRight: 8 }}>Type:</span>
-          <button
-            type="button"
-            className={`chip ${typeFilter === "all" ? "is-active" : ""}`}
-            onClick={() => {
-              setTypeFilter("all");
-              setStatusFilter("all");
-            }}
-          >
-            All
-          </button>
-          <button
-            type="button"
-            className={`chip ${typeFilter === "equipment" ? "is-active" : ""}`}
-            onClick={() => {
-              setTypeFilter("equipment");
-              setStatusFilter("all");
-            }}
-          >
-            equipment
-          </button>
-          <button
-            type="button"
-            className={`chip ${typeFilter === "nursing" ? "is-active" : ""}`}
-            onClick={() => {
-              setTypeFilter("nursing");
-              setStatusFilter("all");
-            }}
-          >
-            nursing
-          </button>
-        </div>
+    {/* ===== PREMIUM FILTER BAR ===== */}
+<section className="filter-bar">
 
-        <input
-          className="cp-input"
-          placeholder="Search by customer, contact, phone, source…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+  <div className="filter-left">
 
-        {/* Status chips row — counts are within current TYPE selection */}
-        <div className="visits-chip-row" style={{ flex: "1 1 100%" }}>
-          <span className="muted" style={{ marginRight: 8 }}>Status:</span>
-          <button
-            type="button"
-            className={`chip ${statusFilter === "all" ? "is-active" : ""}`}
-            onClick={() => setStatusFilter("all")}
-          >
-            All <span className="count">({statusCounts.all || 0})</span>
-          </button>
+    {/* TYPE SEGMENT */}
+    <div className="segmented type-segment">
+      <button
+        className={`seg-btn ${typeFilter === "all" ? "active" : ""}`}
+        onClick={() => {
+          setTypeFilter("all");
+          setStatusFilter("all");
+        }}
+      >
+        All
+      </button>
 
-          {STAGES.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={`chip ${statusClass(s)} ${
-                statusFilter === s ? "is-active" : ""
-              }`}
-              onClick={() => setStatusFilter(s)}
-            >
-              {s} <span className="count">({statusCounts[s] || 0})</span>
-            </button>
-          ))}
-        </div>
+      <button
+        className={`seg-btn equipment ${typeFilter === "equipment" ? "active" : ""}`}
+        onClick={() => {
+          setTypeFilter("equipment");
+          setStatusFilter("all");
+        }}
+      >
+        Equipment
+      </button>
 
-        <div className="muted">
-          Showing {filtered.length} of {leads.length}
-          {typeFilter !== "all" ? ` · Type: ${typeFilter}` : ""}
-          {statusFilter !== "all" ? ` · Status: ${statusFilter}` : ""}
-        </div>
-      </section>
+      <button
+        className={`seg-btn nursing ${typeFilter === "nursing" ? "active" : ""}`}
+        onClick={() => {
+          setTypeFilter("nursing");
+          setStatusFilter("all");
+        }}
+      >
+        Nursing
+      </button>
+    </div>
 
+    {/* STATUS SEGMENT */}
+    <div className="segmented status-segment">
+      <button
+        className={`seg-btn ${statusFilter === "all" ? "active" : ""}`}
+        onClick={() => setStatusFilter("all")}
+      >
+        All <span className="badge">{statusCounts.all || 0}</span>
+      </button>
+
+      {STAGES.map((s) => (
+        <button
+          key={s}
+          className={`seg-btn ${statusClass(s)} ${
+            statusFilter === s ? "active" : ""
+          }`}
+          onClick={() => setStatusFilter(s)}
+        >
+          {s}
+          <span className="badge">{statusCounts[s] || 0}</span>
+        </button>
+      ))}
+    </div>
+
+  </div>
+
+  {/* SEARCH */}
+  <div className="filter-search">
+    <input
+      className="search-input"
+      placeholder="Search customer, phone, source..."
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+    />
+  </div>
+
+  {/* SUMMARY */}
+  <div className="filter-summary">
+    {filtered.length} / {leads.length}
+  </div>
+
+</section>
       {/* Table */}
-      <section className="coupons-card">
-        <div className="tbl-wrap">
-          <table className="cp-table">
-            <thead>
-              <tr>
-                <th>Customer</th>
-                <th>Contact</th>
-                <th>Phone</th>
-                <th>Source</th>
-                <th>Type</th>
-                <th>Status</th>
-                <th>Created By</th>
-                <th>Updated</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((l) => {
-                const latestReq = reqByLead[l.id];
-                const canCreateReq = normStatus(l.status) === "req shared";
-                return (
-                  <tr key={l.id}>
-                    <td className="strong">{l.customerName}</td>
-                    <td className="muted">
-                      {l.contactPerson}
-                      {l.email ? ` · ${l.email}` : ""}
-                    </td>
-                    <td>{l.phone}</td>
-                    <td className="muted">{l.leadSource || "—"}</td>
-                    <td className="muted">{l.type || "equipment"}</td>
-                    <td>
-                      <span className={`chip ${statusClass(l.status)}`}>
-                        {l.status}
-                      </span>
-                    </td>
-                    <td className="muted">{l.createdByName || l.createdBy || "—"}</td>
-                    <td className="muted">
-                      {l.updatedAt
-                        ? fmtDate(l.updatedAt)
-                        : l.createdAt
-                        ? fmtDate(l.createdAt)
-                        : "—"}{" "}
-                      {l.updatedByName ? `· ${l.updatedByName}` : ""}
-                    </td>
-                    <td>
-                      <div
-                        className="row-actions"
-                        style={{ display: "flex", gap: 8, alignItems: "center" }}
-                      >
-                        <button
-                          title="Edit lead"
-                          className="row-action-icon"
-                          onClick={() => editLead(l)}
-                          style={{
-                            padding: 6,
-                            borderRadius: 6,
-                            border: "1px solid rgba(0,0,0,0.04)",
-                            background: "#fff",
-                            color:"black",
-                          }}
-                        >
-                          ✎
-                        </button>
+    <section className="leads-card">
+  <div className="leads-table-wrap">
+    <table className="leads-table">
 
-                        {latestReq ? (
-                          <button
-                            title="Add another requirement (prefilled)"
-                            className="cp-link"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setReqLead(l);
-                              setTemplateReq(latestReq);
-                              setDetailsLead(null);
-                              setOpenReq(true);
-                            }}
-                            style={{
-                              padding: "6px 8px",
-                              borderRadius: 6,
-                              background: "#eef2ff",
-                              border: "none",
-                              fontWeight: 700,
-                            }}
-                          >
-                            Add another req
-                          </button>
-                        ) : canCreateReq ? (
-                          <button
-                            title="Create Requirement"
-                            className="cp-link"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setReqLead(l);
-                              setTemplateReq(null);
-                              setDetailsLead(null);
-                              setOpenReq(true);
-                            }}
-                            style={{
-                              padding: "6px 8px",
-                              borderRadius: 6,
-                              background: "#f3f4f6",
-                              border: "none",
-                              fontWeight: 700,
-                            }}
-                          >
-                            + Req
-                          </button>
-                        ) : null}
+      <thead>
+        <tr>
+          <th>Customer</th>
+          {/* <th>Contact</th> */}
+          <th>Phone</th>
+          <th>Source</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Created By</th>
+          <th>Updated</th>
+          <th className="actions-col">Actions</th>
+        </tr>
+      </thead>
 
-                        <button className="cp-link" onClick={() => openDetails(l)}>
-                          View Details
-                        </button>
+      <tbody>
+        {filtered.map((l) => {
+          const latestReq = reqByLead[l.id];
+          const canCreateReq =
+            normStatus(l.status) === "req shared";
 
-                        <button
-                          className="cp-link next-stage"
-                          onClick={() => openStatusModal(l)}
-                        >
-                          Next Stage →
-                        </button>
+          return (
+            <tr key={l.id} className="leads-row">
 
-                        {/* <button
-                          title="Delete lead"
-                          className="row-action-icon"
-                          onClick={() => setConfirmDelete(l)}
-                          style={{
-                            padding: 6,
-                            borderRadius: 6,
-                            border: "1px solid rgba(0,0,0,0.04)",
-                            background: "#fff",
-                            color: "#b91c1c",
-                          }}
-                        >
-                          🗑
-                        </button> */}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {!filtered.length && (
-                <tr>
-                  <td colSpan="9">
-                    <div className="empty">No leads found.</div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              <td className="cell-strong">
+                {l.customerName}
+              </td>
+
+              {/* <td className="cell-muted">
+                {l.contactPerson}
+                {l.email ? ` · ${l.email}` : ""}
+              </td> */}
+
+              <td>{l.phone}</td>
+
+              <td className="cell-muted">
+                {l.leadSource || "—"}
+              </td>
+
+              <td className="cell-muted">
+                {l.type || "equipment"}
+              </td>
+
+              <td>
+                <span className={`chip ${statusClass(l.status)}`}>
+                  {l.status}
+                </span>
+              </td>
+
+              <td className="cell-muted">
+                {l.createdByName || l.createdBy || "—"}
+              </td>
+
+              <td className="cell-muted updated-cell">
+  <div className="updated-date">
+    {l.updatedAt
+      ? fmtDate(l.updatedAt)
+      : l.createdAt
+      ? fmtDate(l.createdAt)
+      : "—"}
+  </div>
+
+  {l.updatedByName && (
+    <div className="updated-user">
+      {l.updatedByName}
+    </div>
+  )}
+</td>
+
+              <td>
+                <div className="row-actions">
+
+  {/* Edit */}
+  <button
+    title="Edit lead"
+    className="row-btn icon"
+    onClick={() => editLead(l)}
+  >
+    ✎
+  </button>
+
+  {/* Requirement */}
+  {latestReq ? (
+    <button
+      className="row-btn req"
+      onClick={(e) => {
+        e.stopPropagation();
+        setReqLead(l);
+        setTemplateReq(latestReq);
+        setDetailsLead(null);
+        setOpenReq(true);
+      }}
+    >
+      Add Req
+    </button>
+  ) : canCreateReq ? (
+    <button
+      className="row-btn req"
+      onClick={(e) => {
+        e.stopPropagation();
+        setReqLead(l);
+        setTemplateReq(null);
+        setDetailsLead(null);
+        setOpenReq(true);
+      }}
+    >
+      + Req
+    </button>
+  ) : null}
+
+  {/* View */}
+  <button
+    className="row-btn view"
+    onClick={() => openDetails(l)}
+  >
+    View
+  </button>
+
+  {/* Next */}
+  <button
+    className="row-btn next"
+    onClick={() => openStatusModal(l)}
+  >
+    Next
+  </button>
+
+</div>
+              </td>
+
+            </tr>
+          );
+        })}
+
+        {!filtered.length && (
+          <tr>
+            <td colSpan="9">
+              <div className="table-empty">
+                No leads found.
+              </div>
+            </td>
+          </tr>
+        )}
+      </tbody>
+
+    </table>
+  </div>
+</section>
 
       {/* Edit drawer */}
-      {showForm && (
+    {showForm && (
+  <div
+    onClick={(e) => {
+      if (e.target === e.currentTarget) closeDrawer();
+    }}
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(15,23,42,0.45)",
+      backdropFilter: "blur(6px)",
+      display: "flex",
+      justifyContent: "flex-end",
+      zIndex: 1000,
+    }}
+  >
+    <form
+      onSubmit={handleSave}
+      style={{
+        width: "640px",
+        maxWidth: "100%",
+        height: "100%",
+        background: "#ffffff",
+        boxShadow: "-20px 0 60px rgba(0,0,0,0.18)",
+        padding: "28px 32px",
+        display: "flex",
+        flexDirection: "column",
+        overflowY: "auto",
+      }}
+    >
+      {/* HEADER */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: 28,
+        }}
+      >
+        <h2 style={{ fontSize: 22, fontWeight: 700 }}>
+          {form.id ? "Edit Lead" : "New Lead"}
+        </h2>
+
+     <button
+  type="button"
+  onClick={closeDrawer}
+  onMouseEnter={(e) => {
+    e.currentTarget.style.background = "#fee2e2";
+    e.currentTarget.style.color = "#dc2626";
+  }}
+  onMouseLeave={(e) => {
+    e.currentTarget.style.background = "#f1f5f9";
+    e.currentTarget.style.color = "#475569";
+  }}
+  style={{
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    border: "1px solid #e2e8f0",
+    background: "#f1f5f9",
+    color: "#475569",
+    cursor: "pointer",
+    fontSize: 18,
+    fontWeight: 600,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "all 0.2s ease",
+  }}
+>
+  ✕
+</button>
+      </div>
+
+      {/* GRID */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "22px 24px",
+          marginBottom: 28,
+        }}
+      >
+        {/* Field Template */}
+        {[
+          { label: "Customer / Hospital", key: "customerName", required: true },
+          { label: "Contact Person", key: "contactPerson", required: true },
+          { label: "Phone", key: "phone", required: true },
+          { label: "Email", key: "email" },
+          { label: "Address / City", key: "address" },
+          { label: "Lead Source", key: "leadSource" },
+        ].map((field) => (
+          <div key={field.key} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <label style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>
+              {field.label}
+            </label>
+            <input
+              value={form[field.key]}
+              required={field.required}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, [field.key]: e.target.value }))
+              }
+              style={{
+                height: 44,
+                padding: "0 14px",
+                borderRadius: 10,
+                border: "1px solid #e2e8f0",
+                background: "#f8fafc",
+                fontSize: 14,
+              }}
+            />
+          </div>
+        ))}
+
+        {/* TYPE */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <label style={{ fontSize: 13, fontWeight: 600 }}>Type</label>
+          <select
+            value={form.type}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, type: e.target.value }))
+            }
+            style={{
+              height: 44,
+              padding: "0 14px",
+              borderRadius: 10,
+              border: "1px solid #e2e8f0",
+              background: "#f8fafc",
+              fontSize: 14,
+            }}
+          >
+            <option value="equipment">equipment</option>
+            <option value="nursing">nursing</option>
+          </select>
+        </div>
+
+        {/* NOTES FULL WIDTH */}
         <div
-          className={`cp-drawer ${closing ? "closing" : ""}`}
-          onClick={(e) => {
-            if (e.target.classList.contains("cp-drawer")) closeDrawer();
+          style={{
+            gridColumn: "1 / -1",
+            display: "flex",
+            flexDirection: "column",
+            gap: 8,
           }}
         >
-          <form className="cp-form" onSubmit={handleSave}>
-            <div className="cp-form-head">
-              <h2>{form.id ? "Edit Lead" : "New Lead"}</h2>
-              <button type="button" className="cp-icon" onClick={closeDrawer}>
-                ✕
-              </button>
-            </div>
-
-            <div className="cp-grid">
-              <div className="cp-field">
-                <label>Customer / Hospital</label>
-                <input
-                  className="cp-input"
-                  value={form.customerName}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, customerName: e.target.value }))
-                  }
-                  required
-                />
-              </div>
-
-              <div className="cp-field">
-                <label>Contact Person</label>
-                <input
-                  className="cp-input"
-                  value={form.contactPerson}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, contactPerson: e.target.value }))
-                  }
-                  required
-                />
-              </div>
-
-              <div className="cp-field">
-                <label>Phone</label>
-                <input
-                  className="cp-input"
-                  value={form.phone}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, phone: e.target.value }))
-                  }
-                  required
-                />
-              </div>
-
-              <div className="cp-field">
-                <label>Email</label>
-                <input
-                  className="cp-input"
-                  value={form.email}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, email: e.target.value }))
-                  }
-                />
-              </div>
-
-              <div className="cp-field">
-                <label>Address / City</label>
-                <input
-                  className="cp-input"
-                  value={form.address}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, address: e.target.value }))
-                  }
-                />
-              </div>
-
-              <div className="cp-field">
-                <label>Lead Source</label>
-                <input
-                  className="cp-input"
-                  value={form.leadSource}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, leadSource: e.target.value }))
-                  }
-                />
-              </div>
-
-              {/* NEW: Type */}
-              <div className="cp-field">
-                <label>Type</label>
-                <select
-                  className="cp-input"
-                  value={form.type}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, type: e.target.value }))
-                  }
-                >
-                  <option value="equipment">equipment</option>
-                  <option value="nursing">nursing</option>
-                </select>
-              </div>
-
-              <div className="cp-field" style={{ gridColumn: "1 / -1" }}>
-                <label>Notes</label>
-                <textarea
-                  className="cp-input"
-                  value={form.notes}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, notes: e.target.value }))
-                  }
-                  rows={3}
-                />
-              </div>
-
-              <div className="cp-field">
-                <label>Status</label>
-                <select
-                  className="cp-input"
-                  value={form.status}
-                  onChange={(e) =>
-                    setForm((f) => ({ ...f, status: e.target.value }))
-                  }
-                >
-                  <option value="new">new</option>
-                  <option value="contacted">contacted</option>
-                  <option value="req shared">req shared</option>
-                  <option value="lost">lost</option>
-                </select>
-              </div>
-
-              <div className="cp-field">
-                <label>Created By</label>
-                <input
-                  className="cp-input"
-                  value={form.createdByName || form.createdBy || ""}
-                  readOnly
-                />
-                <small className="muted">Automatically recorded</small>
-              </div>
-            </div>
-
-            {/* Compact history preview */}
-            {form.id && (
-              <>
-                <hr />
-                <h3 style={{ marginTop: 4 }}>Recent history</h3>
-                <div
-                  style={{ maxHeight: 180, overflowY: "auto", padding: "8px 4px" }}
-                >
-                  {(form.history && form.history.length
-                    ? form.history
-                    : (leads.find((x) => x.id === form.id)?.history || [])
-                  )
-                    .slice()
-                    .reverse()
-                    .slice(0, 8)
-                    .map((h, i) => (
-                      <div key={i} style={{ padding: 8, borderBottom: "1px solid #f1f5f9" }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
-                          <div style={{ fontWeight: 700, fontSize: 13 }}>
-                            {(h.type || "update").toUpperCase()} {h.field ? `— ${h.field}` : ""}
-                          </div>
-                          <div className="muted" style={{ fontSize: 12 }}>
-                            {fmtDate(h.ts)}
-                          </div>
-                        </div>
-                        <div style={{ fontSize: 13, marginTop: 6 }}>
-                          <span className="muted" style={{ fontWeight: 600 }}>
-                            {h.changedByName || h.changedBy}
-                          </span>
-                          {h.note ? <div style={{ marginTop: 6 }}>{h.note}</div> : null}
-                        </div>
-                      </div>
-                    ))}
-                  {!(
-                    (form.history && form.history.length) ||
-                    (leads.find((x) => x.id === form.id)?.history || []).length
-                  ) && <div className="muted" style={{ padding: 8 }}>No history yet for this lead.</div>}
-                </div>
-              </>
-            )}
-
-            <div className="cp-form-actions">
-              <button type="button" className="cp-btn ghost" onClick={closeDrawer} disabled={saving}>
-                Cancel
-              </button>
-              <button className="cp-btn primary" disabled={saving}>
-                {saving ? "Saving…" : form.id ? "Update Lead" : "Create Lead"}
-              </button>
-            </div>
-          </form>
+          <label style={{ fontSize: 13, fontWeight: 600 }}>Notes</label>
+          <textarea
+            value={form.notes}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, notes: e.target.value }))
+            }
+            rows={4}
+            style={{
+              padding: "12px 14px",
+              borderRadius: 10,
+              border: "1px solid #e2e8f0",
+              background: "#f8fafc",
+              fontSize: 14,
+              resize: "vertical",
+            }}
+          />
         </div>
-      )}
+
+        {/* STATUS */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <label style={{ fontSize: 13, fontWeight: 600 }}>Status</label>
+          <select
+            value={form.status}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, status: e.target.value }))
+            }
+            style={{
+              height: 44,
+              padding: "0 14px",
+              borderRadius: 10,
+              border: "1px solid #e2e8f0",
+              background: "#f8fafc",
+              fontSize: 14,
+            }}
+          >
+            <option value="new">new</option>
+            <option value="contacted">contacted</option>
+            <option value="req shared">req shared</option>
+            <option value="lost">lost</option>
+          </select>
+        </div>
+
+        {/* CREATED BY */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <label style={{ fontSize: 13, fontWeight: 600 }}>Created By</label>
+          <input
+            value={form.createdByName || form.createdBy || ""}
+            readOnly
+            style={{
+              height: 44,
+              padding: "0 14px",
+              borderRadius: 10,
+              border: "1px solid #e2e8f0",
+              background: "#f1f5f9",
+              fontSize: 14,
+            }}
+          />
+          <small style={{ fontSize: 12, color: "#64748b" }}>
+            Automatically recorded
+          </small>
+        </div>
+      </div>
+
+      {/* ACTIONS */}
+      <div
+        style={{
+          marginTop: "auto",
+          paddingTop: 24,
+          borderTop: "1px solid #f1f5f9",
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 14,
+        }}
+      >
+        <button
+  type="button"
+  onClick={closeDrawer}
+  disabled={saving}
+  style={{
+    padding: "9px 20px",
+    borderRadius: 999,
+    border: "1px solid #e2e8f0",
+    background: "#f8fafc",
+    color: "#334155",
+    fontWeight: 600,
+    cursor: "pointer",
+    transition: "all 0.2s ease",
+  }}
+  onMouseEnter={(e) => {
+    e.target.style.background = "#e2e8f0";
+  }}
+  onMouseLeave={(e) => {
+    e.target.style.background = "#f8fafc";
+  }}
+>
+  Cancel
+</button>
+
+        <button
+          disabled={saving}
+          style={{
+            padding: "8px 22px",
+            borderRadius: 999,
+            border: "none",
+            background: "linear-gradient(135deg,#4f46e5,#6366f1)",
+            color: "#fff",
+            fontWeight: 600,
+            cursor: "pointer",
+            boxShadow: "0 6px 18px rgba(79,70,229,0.35)",
+          }}
+        >
+          {saving
+            ? "Saving…"
+            : form.id
+            ? "Update Lead"
+            : "Create Lead"}
+        </button>
+      </div>
+    </form>
+  </div>
+)}
 
       {/* Status modal */}
       {statusModal.open && statusModal.lead && (
@@ -991,35 +1081,10 @@ const openWhatsApp = (phone) => {
                   </div>
                 </div>
 
-               <div className="details-row">
-  <div className="label muted">Phone</div>
-
-  <div
-    className="value"
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 10,
-    }}
-  >
-    <span>{detailsLead.phone}</span>
-
-    {detailsLead.phone && (
-   <button
-  type="button"
-  className="whatsapp-btn"
-  title="Chat on WhatsApp"
-  onClick={() => openWhatsApp(detailsLead.phone)}
->
-  <FontAwesomeIcon icon={faWhatsapp} className="wa-icon" />
-  WhatsApp
-</button>
-
-
-    )}
-  </div>
-</div>
-
+                <div className="details-row">
+                  <div className="label muted">Phone</div>
+                  <div className="value">{detailsLead.phone}</div>
+                </div>
 
                 <div className="details-row">
                   <div className="label muted">Address</div>
@@ -1077,54 +1142,50 @@ const openWhatsApp = (phone) => {
 
             <hr className="hr" />
 
-           <div style={{ marginTop: 8 }}>
-  <h3>Full History</h3>
+            <div style={{ marginTop: 8 }}>
+              <h3>Full History</h3>
+              <div className="history-list" style={{ marginTop: 8 }}>
+                {(detailsLead.history && detailsLead.history.length
+                  ? detailsLead.history.slice().reverse()
+                  : []
+                ).map((h, i) => (
+                  <div key={i} className="history-item">
+                    <div className="meta">
+                      <div className="who">
+                        <span className="type">{h.type?.toUpperCase()}</span>
+                        {h.field ? `${h.field}` : ""}
+                      </div>
+                      <div className="time muted">{fmtDate(h.ts)}</div>
+                    </div>
 
-  <div className="history-list compact">
-    {(detailsLead.history && detailsLead.history.length
-      ? detailsLead.history.slice().reverse()
-      : []
-    ).map((h, i) => (
-      <div key={i} className="history-item compact">
-        <div className="history-top">
-          <span className="history-title">
-            {h.type?.toUpperCase()}
-            {h.field ? ` · ${h.field}` : ""}
-          </span>
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ fontWeight: 700 }}>
+                        {h.changedByName || h.changedBy}
+                      </div>
+                      {h.note ? <div className="note">{h.note}</div> : null}
 
-          <span className="history-time">
-            {fmtDate(h.ts)}
-          </span>
-        </div>
-
-        <div className="history-user">
-          {h.changedByName || h.changedBy}
-        </div>
-
-        {h.note && (
-          <div className="history-note">
-            {h.note}
-          </div>
-        )}
-
-        {(h.oldValue || h.newValue) && (
-          <div className="history-change">
-            <span className="from">{h.oldValue ?? "—"}</span>
-            <span className="arrow">→</span>
-            <span className="to">{h.newValue ?? "—"}</span>
-          </div>
-        )}
-      </div>
-    ))}
-
-    {(!detailsLead.history || !detailsLead.history.length) && (
-      <div className="muted" style={{ padding: 6 }}>
-        No history available.
-      </div>
-    )}
-  </div>
-</div>
-
+                      {h.oldValue || h.newValue ? (
+                        <div className="changes" style={{ marginTop: 10 }}>
+                          <div className="change-pill">
+                            <div className="k">From</div>
+                            <div className="v">{h.oldValue ?? "—"}</div>
+                          </div>
+                          <div className="change-pill">
+                            <div className="k">To</div>
+                            <div className="v">{h.newValue ?? "—"}</div>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+                {(!detailsLead.history || !detailsLead.history.length) && (
+                  <div className="muted" style={{ padding: 8 }}>
+                    No history available.
+                  </div>
+                )}
+              </div>
+            </div>
 
             <div
               className="details-footer"

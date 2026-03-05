@@ -323,10 +323,10 @@ const addItem = () => {
       id: `n-${Date.now()}`,
       name: "Nursing Service",
       qty: 1,                 // staff count
-      rate: 0,                // daily rate
-      amount: 0,
+      rate: "",                // daily rate
+      amount: "",
       notes: "",
-      days: 0,
+      days: "",
       expectedStartDate: "",
       expectedEndDate: "",
     });
@@ -708,15 +708,18 @@ return (
                         flexWrap: "wrap",
                       }}
                     >
-                      <input
-                        className="cp-input"
-                        style={{ width: 200 }}
-                        value={it.name}
-                        onChange={(e) =>
-                          updateDraftItem(idx, { name: e.target.value })
-                        }
-                        placeholder="Staff type (Nurse / Caretaker)"
-                      />
+                      <select
+  className="cp-input"
+  style={{ width: 200 }}
+  value={it.name}
+  onChange={(e) =>
+    updateDraftItem(idx, { name: e.target.value })
+  }
+>
+  <option value="">Select Service</option>
+  <option value="Nursing Service">Nursing Service</option>
+  <option value="Caretaker Service">Caretaker Service</option>
+</select>
 
                       <input
                         className="cp-input"
@@ -739,7 +742,7 @@ return (
                             rate: parseNumberInput(e.target.value, 0),
                           })
                         }
-                        placeholder="Daily rate"
+                        placeholder="rate"
                       />
 
                       <input

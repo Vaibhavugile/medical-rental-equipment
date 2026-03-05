@@ -1,103 +1,294 @@
-/* ============================
-   Staff Management (Nursing)
-   Drawer-based Admin UI
-============================ */
+/* =====================================================
+   STAFF MANAGEMENT — PREMIUM CRM UI
+===================================================== */
+
+/* ================= GLOBAL FIX ================= */
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+/* 🔥 Critical Flex Fix (DO NOT REMOVE) */
+.app-main,
+.app-content {
+  min-width: 0;
+}
+
+/* ===================================================== */
+
+:root {
+  --primary: #0b5cff;
+  --primary-light: #3b82f6;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #ea580c;
+  --text: #0f172a;
+  --border: #e5e7eb;
+  --bg: #f4f7fb;
+}
+
+/* =====================================================
+   PAGE
+===================================================== */
 
 .staff-page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px;
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    Roboto, sans-serif;
-  color: #0f172a;
+  padding: 28px 32px;
+  background: var(--bg);
+  min-height: 100vh;
+  font-family: Inter, system-ui, sans-serif;
+  color: var(--text);
 }
 
 .staff-page h2 {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
-  color: #0b5cff;
-  margin-bottom: 14px;
+  color: var(--primary);
+  margin-bottom: 18px;
 }
 
-/* ================= Toolbar ================= */
+/* =====================================================
+   TOOLBAR
+===================================================== */
+
 .staff-toolbar {
   display: flex;
-  gap: 10px;
+  gap: 14px;
   align-items: center;
+  flex-wrap: wrap;
   background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 10px;
-  margin-bottom: 16px;
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
-}
-
-.staff-toolbar input,
-.staff-toolbar select {
-  padding: 8px 10px;
-  font-size: 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  outline: none;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  border: 1px solid #eef2f7;
+  margin-bottom: 22px;
 }
 
 .staff-toolbar input {
   flex: 1;
-  min-width: 200px;
+  min-width: 240px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #f9fafc;
+  font-size: 14px;
 }
 
-/* ================= Buttons ================= */
+.staff-toolbar select {
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 14px;
+}
+
+/* =====================================================
+   PREMIUM BUTTON SYSTEM
+===================================================== */
+
 .cp-btn {
-  background: linear-gradient(90deg, #0b69ff, #00b4d8);
-  border: none;
-  color: #ffffff;
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 14px;
   font-weight: 600;
-  border-radius: 8px;
-  padding: 8px 14px;
+  border: none;
   cursor: pointer;
-  transition: opacity 0.2s ease, transform 0.1s ease;
+  transition: all 0.25s ease;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(11, 92, 255, 0.25);
 }
 
 .cp-btn:hover {
-  opacity: 0.92;
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(11, 92, 255, 0.35);
 }
 
 .cp-btn:active {
-  transform: scale(0.97);
+  transform: scale(0.98);
 }
 
 .cp-btn.ghost {
-  background: transparent;
-  color: #0b5cff;
-  border: 1px solid rgba(11, 92, 255, 0.15);
+  background: #fff;
+  color: var(--primary);
+  border: 1px solid rgba(11, 92, 255, 0.3);
+  box-shadow: none;
 }
 
 .cp-btn.ghost:hover {
   background: rgba(11, 92, 255, 0.05);
 }
 
-/* ================= Drawer Overlay ================= */
+/* =====================================================
+   TABLE — TRUE HORIZONTAL SCROLL
+===================================================== */
+
+.staff-table {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #eef2f7;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.06);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Scrollbar */
+.staff-table::-webkit-scrollbar {
+  height: 8px;
+}
+
+.staff-table::-webkit-scrollbar-thumb {
+  background: rgba(11, 92, 255, 0.4);
+  border-radius: 999px;
+}
+
+/* Important */
+.staff-table table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.staff-table th,
+.staff-table td {
+  white-space: nowrap;
+}
+
+/* Header */
+.staff-table thead {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+}
+
+.staff-table th {
+  padding: 14px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.staff-table td {
+  padding: 16px;
+  font-size: 14px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.staff-table tr:hover td {
+  background: #f8faff;
+}
+
+/* Clickable Name */
+.staff-name-link {
+  font-weight: 600;
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.staff-name-link:hover {
+  text-decoration: underline;
+}
+
+/* =====================================================
+   ACTION BUTTONS
+===================================================== */
+
+.staff-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 130px;
+}
+
+.st-btn {
+  height: 36px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* View */
+.st-btn.view {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.st-btn.view:hover {
+  background: #4f46e5;
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(79, 70, 229, 0.3);
+}
+
+/* Edit */
+.st-btn.edit {
+  background: #ecfeff;
+  color: #0891b2;
+}
+
+.st-btn.edit:hover {
+  background: #0891b2;
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(8, 145, 178, 0.3);
+}
+
+/* Delete */
+.st-btn.delete {
+  background: #fef2f2;
+  color: var(--danger);
+}
+
+.st-btn.delete:hover {
+  background: var(--danger);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(239, 68, 68, 0.3);
+}
+
+/* Attendance */
+.st-btn.attendance {
+  background: #ecfdf5;
+  color: var(--success);
+}
+
+.st-btn.attendance:hover {
+  background: var(--success);
+  color: #fff;
+  box-shadow: 0 6px 14px rgba(16, 185, 129, 0.3);
+}
+
+/* =====================================================
+   DRAWER
+===================================================== */
+
 .drawer-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(1px);
-  z-index: 49;
+  background: rgba(15, 23, 42, 0.4);
+  backdrop-filter: blur(4px);
+  z-index: 100;
 }
 
-/* ================= Drawer Panel ================= */
 .drawer {
   position: fixed;
   top: 0;
   right: 0;
+  width: min(600px, 100%);
   height: 100vh;
-  width: min(560px, 100%);
   background: #ffffff;
-  border-left: 1px solid #e5e7eb;
-  box-shadow: -10px 0 30px rgba(15, 23, 42, 0.15);
+  box-shadow: -30px 0 60px rgba(15, 23, 42, 0.15);
   transform: translateX(100%);
-  transition: transform 0.25s ease;
-  z-index: 50;
+  transition: transform 0.3s ease;
+  z-index: 101;
   display: flex;
   flex-direction: column;
 }
@@ -107,127 +298,57 @@
 }
 
 .drawer-header {
+  padding: 18px 20px;
+  border-bottom: 1px solid #eef2f7;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 14px 16px;
-  border-bottom: 1px solid #eef2f7;
-  position: sticky;
-  top: 0;
-  background: #ffffff;
-  z-index: 2;
 }
 
-.drawer-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-}
+/* =====================================================
+   FORM
+===================================================== */
 
-/* ================= Staff Form ================= */
 .staff-form {
-  padding: 16px;
+  padding: 20px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
   overflow-y: auto;
 }
 
 .staff-form input,
 .staff-form select,
 .staff-form textarea {
-  padding: 8px 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
   font-size: 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  outline: none;
-  width: 100%;
-  transition: border-color 0.2s ease;
 }
 
 .staff-form textarea {
-  min-height: 60px;
+  min-height: 80px;
   resize: vertical;
 }
 
-.staff-form input:focus,
-.staff-form select:focus,
-.staff-form textarea:focus {
-  border-color: #0b5cff;
-}
-
-/* Full width rows */
-.staff-form textarea,
-.staff-form .full-row {
-  grid-column: 1 / -1;
-}
-
-/* Switch rows */
-.switch-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-/* ================= Actions ================= */
 .actions-row {
   grid-column: 1 / -1;
   display: flex;
   gap: 10px;
-  margin-top: 6px;
+  margin-top: 10px;
 }
 
-/* ================= Errors ================= */
-.error {
-  grid-column: 1 / -1;
-  color: #dc2626;
-  background: #fef2f2;
-  padding: 8px;
-  border-radius: 6px;
-  font-size: 14px;
-}
+/* =====================================================
+   RESPONSIVE
+===================================================== */
 
-/* ================= Table ================= */
-.staff-table {
-  overflow-x: auto;
-  background: #ffffff;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
-}
+@media (max-width: 768px) {
+  .staff-page {
+    padding: 18px;
+  }
 
-.staff-table table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.staff-table th,
-.staff-table td {
-  padding: 10px 14px;
-  text-align: left;
-  font-size: 14px;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.staff-table th {
-  background: #f9fafb;
-  font-weight: 700;
-  color: #334155;
-}
-
-.staff-table tr:hover td {
-  background: #f8fafc;
-}
-
-.staff-table td button {
-  margin-right: 6px;
-  font-size: 13px;
-}
-
-/* ================= Responsive ================= */
-@media (max-width: 700px) {
-  .staff-toolbar {
+  .staff-actions {
+    flex-direction: row;
     flex-wrap: wrap;
   }
 
@@ -237,11 +358,5 @@
 
   .drawer {
     width: 100%;
-  }
-
-  .staff-table th,
-  .staff-table td {
-    font-size: 13px;
-    padding: 8px;
   }
 }

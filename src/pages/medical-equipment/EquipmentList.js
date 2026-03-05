@@ -9,7 +9,8 @@ import ReviewsSection from "../../frontend/ReviewsSection";
 import Footer from "../../frontend/Footer";
 export default function EquipmentList() {
   const navigate = useNavigate();
-
+const WHATSAPP_LINK =
+  "https://wa.me/917777066885?text=Hi%20BookMyMedicare%2C%20I%20need%20medical%20equipment%20assistance.";
   // Convert object → array for listing (SHORT DESCRIPTION ONLY)
   const equipmentList = Object.entries(EQUIPMENT_DETAILS).map(
     ([slug, data]) => ({
@@ -54,9 +55,14 @@ export default function EquipmentList() {
               and rehabilitation needs.
             </p>
 
-            <button className="me-btn">
-              Get a Callback
-            </button>
+       <a
+  href={WHATSAPP_LINK}
+  target="_blank"
+  rel="noopener noreferrer"
+  className="me-btn"
+>
+  Get a Callback
+</a>
           </div>
         </div>
       </section>

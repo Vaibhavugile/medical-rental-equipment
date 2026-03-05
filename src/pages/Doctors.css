@@ -300,3 +300,56 @@
     grid-template-columns:1fr; /* mobile single */
   }
 }
+/* ================= TOAST ================= */
+
+.toast {
+  position: fixed;
+  top: 30px;
+  right: 30px;
+  padding: 14px 20px;
+  border-radius: 12px;
+  font-weight: 600;
+  color: #fff;
+  z-index: 9999999;
+  animation: slideIn .3s ease;
+  box-shadow: 0 15px 40px rgba(0,0,0,.2);
+}
+
+.toast.success {
+  background: linear-gradient(135deg,#28c76f,#48da89);
+}
+
+.toast.error {
+  background: linear-gradient(135deg,#ea5455,#ff7676);
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity:0; }
+  to { transform: translateX(0); opacity:1; }
+}
+
+/* ================= MOBILE FORM FIX ================= */
+
+@media(max-width:600px){
+
+  .modal-box{
+    width:100%;
+    padding:18px;
+    max-height:90vh;
+    overflow-y:auto;   /* 🔥 allow scroll on mobile */
+  }
+
+  .modal-box form{
+    grid-template-columns:1fr;
+  }
+
+  .modal-box textarea{
+    height:100px;
+  }
+
+  .toast{
+    right:50%;
+    transform:translateX(50%);
+    top:20px;
+  }
+}

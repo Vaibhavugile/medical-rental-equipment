@@ -1,114 +1,241 @@
-/* Branches.css — restyled to match Quotations.css look & feel */
+/* =====================================================
+   BRANCH MANAGER — PREMIUM CRM UI
+===================================================== */
 
-.branches-wrap {
-  max-width: 1180px;
-  margin: 28px auto;
-  padding: 16px;
-  font-family: "Inter", sans-serif;
+/* FLEX SAFETY FIX (important if app layout uses flex) */
+.app-main,
+.app-content {
+  min-width: 0;
+}
+
+/* =====================================================
+   PAGE LAYOUT
+===================================================== */
+
+.branch-layout {
+  max-width: 1400px;
+  margin: 30px auto;
+  padding: 24px 32px;
+  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  background: #f4f7fb;
+  min-height: 100vh;
   color: #0f172a;
 }
 
-.branches-wrap h1 {
-  margin: 0 0 6px 0;
-  color: #0b5cff;
-  font-size: 1.4rem;
-}
-.branches-wrap p {
-  color: #6b7280;
-  margin-bottom: 12px;
-}
-
-/* Card style consistent with quotations */
-.card, .branch-card {
-  background: #fff;
-  border-radius: 12px;
-  padding: 14px;
-  border: 1px solid #eef2f7;
-  box-shadow: 0 8px 30px rgba(2,6,23,0.04);
-}
-
-/* Branch list cards */
-.branch-card {
-  transition: transform .12s ease, box-shadow .12s ease;
-}
-.branch-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 14px 40px rgba(2,6,23,0.06);
-}
-
-.branch-title {
+.branch-header h2 {
+  margin: 0;
+  font-size: 26px;
   font-weight: 700;
-  color: #0f172a;
-  font-size: 1rem;
-}
-.muted {
-  color: #6b7280;
-  font-size: 0.9rem;
+  color: #0b5cff;
 }
 
-/* Buttons — align with qp styles */
-.btn {
-  background-color: #2563eb;
-  color: #fff;
+.branch-subtext {
+  margin-top: 6px;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* =====================================================
+   GRID STRUCTURE
+===================================================== */
+
+.branch-grid {
+  display: flex;
+  gap: 28px;
+  margin-top: 26px;
+  align-items: flex-start;
+}
+
+.branch-list-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+.branch-form-panel {
+  width: 460px;
+  flex-shrink: 0;
+}
+
+/* Responsive */
+@media (max-width: 1000px) {
+  .branch-grid {
+    flex-direction: column;
+  }
+
+  .branch-form-panel {
+    width: 100%;
+  }
+}
+
+/* =====================================================
+   BUTTON SYSTEM
+===================================================== */
+
+.branch-primary-btn {
+  background: linear-gradient(135deg, #0b5cff, #3b82f6);
+  color: #ffffff;
   border: none;
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  font-weight: 700;
-  transition: background .15s ease, transform .08s ease;
+  transition: all 0.2s ease;
 }
-.btn:hover { background-color: #1d4ed8; transform: translateY(-1px); }
 
-.btn.ghost {
-  background: #fbfbff;
+.branch-primary-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(11, 92, 255, 0.25);
+}
+
+.branch-outline-btn {
+  background: #ffffff;
   color: #0b5cff;
-  border: 1px solid #e6eef8;
+  border: 1px solid #dbeafe;
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
-.btn.ghost:hover { background: #f3f6ff; }
 
-.btn.danger {
+.branch-outline-btn:hover {
+  background: #eff6ff;
+}
+
+.branch-danger-btn {
   background: #ef4444;
+  color: #ffffff;
+  border: none;
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
-.btn.danger:hover { background: #dc2626; }
 
-/* Form inputs match qp input style */
-input, textarea, select {
-  width: 100%;
+.branch-danger-btn:hover {
+  background: #dc2626;
+  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.25);
+}
+
+/* =====================================================
+   LIST SECTION
+===================================================== */
+
+.branch-card-grid {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.branch-item {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 16px;
+  border: 1px solid #eef2f7;
+  box-shadow: 0 12px 30px rgba(2, 6, 23, 0.05);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.branch-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 18px 45px rgba(2, 6, 23, 0.08);
+}
+
+.branch-item-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.branch-item-meta {
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 6px;
+}
+
+.branch-item-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+/* =====================================================
+   FORM SECTION
+===================================================== */
+
+.branch-form-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px 22px;
+  border: 1px solid #eef2f7;
+  box-shadow: 0 14px 40px rgba(2, 6, 23, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.branch-form-card h3 {
+  margin: 0 0 6px 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.branch-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.branch-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.branch-field input {
   padding: 10px 12px;
-  border-radius: 8px;
+  border-radius: 10px;
   border: 1px solid #e6eef8;
   font-size: 14px;
   outline: none;
-  background: #fff;
-  transition: border-color .12s, box-shadow .12s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-input:focus, textarea:focus, select:focus {
+
+.branch-field input:focus {
   border-color: #0b5cff;
-  box-shadow: 0 0 0 4px rgba(11,92,255,0.06);
+  box-shadow: 0 0 0 4px rgba(11, 92, 255, 0.08);
 }
 
-/* Form card on the right */
-.card form { display: flex; flex-direction: column; gap: 8px; }
+.branch-form-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
 
-.label {
+/* =====================================================
+   STATES
+===================================================== */
+
+.branch-loading {
+  margin-top: 20px;
+  font-size: 14px;
   color: #6b7280;
-  font-size: 13px;
-  margin-bottom: 4px;
 }
 
-/* List container */
-.branches-list { display: grid; gap: 12px; margin-top: 8px; }
+.branch-empty {
+  margin-top: 20px;
+  font-size: 14px;
+  color: #9ca3af;
+}
 
-/* Action row on card */
-.branch-actions { display:flex; gap:8px; margin-top:10px; }
-
-/* Error state */
-.error {
+.branch-alert {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
   color: #b91c1c;
-  background: #fff5f5;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid #fecaca;
-  margin-bottom: 12px;
-  box-shadow: none;
+  padding: 12px 14px;
+  border-radius: 10px;
+  margin-top: 18px;
+  font-size: 14px;
 }

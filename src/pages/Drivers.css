@@ -1,199 +1,382 @@
-/* Drivers.css — Admin Driver Management Styling (updated)
-   - Toolbar styling
-   - Collapsible add/edit form
-   - Floating Add (+) Button for mobile
-*/
+/* =====================================================
+   DRIVERS / RUNNERS MANAGEMENT — PREMIUM CRM UI
+===================================================== */
+
+/* ================= GLOBAL FLEX FIX ================= */
+
+.app-main,
+.app-content {
+  min-width: 0;   /* Required for horizontal scroll inside flex */
+}
+
+/* ===================================================== */
+
+:root {
+  --primary: #0b5cff;
+  --primary-light: #3b82f6;
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #ea580c;
+  --text: #0f172a;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+  --bg: #f4f7fb;
+}
+
+/* =====================================================
+   PAGE
+===================================================== */
 
 .drivers-page {
-  max-width: 1150px;
-  margin: 0 auto;
-  padding: 24px;
-  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  color: #0f172a;
+  padding: 28px 32px;
+  background: var(--bg);
+  min-height: 100vh;
+  font-family: Inter, system-ui, sans-serif;
+  color: var(--text);
 }
 
 .drivers-page h2 {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
-  color: #0b5cff;
-  margin-bottom: 12px;
+  color: var(--primary);
+  margin-bottom: 18px;
 }
 
-/* Toolbar */
+/* =====================================================
+   TOOLBAR
+===================================================== */
+
 .drivers-toolbar {
   display: flex;
-  gap: 10px;
+  gap: 14px;
   align-items: center;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 10px;
-  margin: 12px 0 16px 0;
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
-}
-
-.drivers-toolbar input,
-.drivers-toolbar select {
-  padding: 8px 10px;
-  font-size: 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  outline: none;
+  flex-wrap: wrap;
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 14px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  border: 1px solid #eef2f7;
+  margin-bottom: 22px;
 }
 
 .drivers-toolbar input {
   flex: 1;
-  min-width: 180px;
+  min-width: 240px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #f9fafc;
+  font-size: 14px;
 }
 
-.add-btn { white-space: nowrap; }
+.drivers-toolbar select {
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-size: 14px;
+}
 
-/* Collapsible area for the form */
-.collapsible { max-height: 0; overflow: hidden; transition: max-height 0.25s ease; }
-.collapsible.open { max-height: 1000px; }
+/* =====================================================
+   PREMIUM BUTTON SYSTEM
+===================================================== */
+
+.cp-btn {
+  border-radius: 999px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+  color: #fff;
+  box-shadow: 0 8px 20px rgba(11, 92, 255, 0.25);
+}
+
+.cp-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(11, 92, 255, 0.35);
+}
+
+.cp-btn.ghost {
+  background: #fff;
+  color: var(--primary);
+  border: 1px solid rgba(11, 92, 255, 0.3);
+  box-shadow: none;
+}
+
+.cp-btn.ghost:hover {
+  background: rgba(11, 92, 255, 0.05);
+}
+
+/* =====================================================
+   TABLE — SAME SCROLL SYSTEM AS MARKETING
+===================================================== */
+
+.drivers-table {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid #eef2f7;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.06);
+
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Scrollbar */
+.drivers-table::-webkit-scrollbar {
+  height: 8px;
+}
+
+.drivers-table::-webkit-scrollbar-thumb {
+  background: rgba(11, 92, 255, 0.4);
+  border-radius: 999px;
+}
+
+.drivers-table table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+}
+
+.drivers-table th,
+.drivers-table td {
+  white-space: nowrap;
+}
+
+.drivers-table thead {
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
+}
+
+.drivers-table th {
+  padding: 14px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.drivers-table td {
+  padding: 16px;
+  font-size: 14px;
+  border-bottom: 1px solid #f1f5f9;
+  vertical-align: middle;
+}
+
+.drivers-table tr:hover td {
+  background: #f8faff;
+}
+
+/* =====================================================
+   STATUS BADGES
+===================================================== */
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.status-badge.available {
+  background: #ecfdf5;
+  color: var(--success);
+}
+
+.status-badge.busy {
+  background: #fff7ed;
+  color: var(--warning);
+}
+
+.status-badge.offline {
+  background: #fef2f2;
+  color: var(--danger);
+}
+
+/* =====================================================
+   ACTION BUTTONS
+===================================================== */
+
+.driver-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 130px;
+}
+
+.dr-btn {
+  height: 36px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dr-btn.edit {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.dr-btn.edit:hover {
+  background: #4f46e5;
+  color: #fff;
+}
+
+.dr-btn.delete {
+  background: #fef2f2;
+  color: var(--danger);
+}
+
+.dr-btn.delete:hover {
+  background: var(--danger);
+  color: #fff;
+}
+
+.dr-btn.attendance {
+  background: #ecfdf5;
+  color: var(--success);
+}
+
+.dr-btn.attendance:hover {
+  background: var(--success);
+  color: #fff;
+}
+
+/* =====================================================
+   DRAWER
+===================================================== */
+
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15,23,42,0.4);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+}
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(600px, 100%);
+  height: 100vh;
+  background: #ffffff;
+  box-shadow: -30px 0 60px rgba(15,23,42,0.15);
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer.open {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  padding: 18px 20px;
+  border-bottom: 1px solid #eef2f7;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* =====================================================
+   FORM
+===================================================== */
 
 .driver-form {
+  padding: 20px;
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
-  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05);
+  flex-direction: column;
+  gap: 14px;
+  overflow-y: auto;
 }
 
 .driver-form input,
 .driver-form select {
-  padding: 8px 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
   font-size: 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  outline: none;
-  flex: 1;
-  min-width: 150px;
-  transition: border 0.2s ease;
 }
 
-.driver-form input:focus,
-.driver-form select:focus { border-color: #0b5cff; }
-
-.field-group { display: flex; gap: 8px; align-items: center; }
-
-.actions-row { display: flex; gap: 8px; }
-
-.cp-btn {
-  background: linear-gradient(90deg, #0b69ff, #00b4d8);
-  border: none;
-  color: #fff;
-  font-weight: 600;
-  border-radius: 8px;
-  padding: 8px 14px;
-  cursor: pointer;
-  transition: opacity 0.2s ease, transform 0.1s ease;
+.grid-cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
 }
-.cp-btn:hover { opacity: 0.9; }
-.cp-btn:active { transform: scale(0.97); }
-.cp-btn.ghost { background: transparent; color: #0b5cff; border: 1px solid rgba(11, 92, 255, 0.15); }
-.cp-btn.ghost:hover { background: rgba(11, 92, 255, 0.05); }
 
-.error { color: #ef4444; font-size: 14px; margin-top: 8px; }
+.field-group {
+  display: flex;
+  gap: 8px;
+}
 
-.drivers-table { overflow-x: auto; background: #fff; border-radius: 12px; box-shadow: 0 3px 10px rgba(15, 23, 42, 0.05); border: 1px solid #e5e7eb; }
-.drivers-table table { width: 100%; border-collapse: collapse; }
-.drivers-table th, .drivers-table td { text-align: left; padding: 10px 14px; font-size: 14px; border-bottom: 1px solid #f1f5f9; }
-.drivers-table th { background: #f9fafb; font-weight: 700; color: #334155; }
-.drivers-table tr:hover td { background: #f8fafc; }
-.drivers-table td button { margin-right: 6px; font-size: 13px; }
+.actions-row {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
 
-/* Floating Add Button for mobile */
+/* =====================================================
+   FLOATING BUTTON
+===================================================== */
+
 .fab-add {
   position: fixed;
-  right: 16px;
-  bottom: 16px;
-  width: 48px;
-  height: 48px;
+  bottom: 20px;
+  right: 20px;
+  width: 56px;
+  height: 56px;
   border-radius: 999px;
   border: none;
-  background: #0b5cff;
+  background: linear-gradient(135deg, var(--primary), var(--primary-light));
   color: #fff;
   font-size: 28px;
-  line-height: 0;
-  display: none; /* hidden on desktop */
-  box-shadow: 0 10px 24px rgba(11, 92, 255, 0.3);
+  display: none;
+  box-shadow: 0 14px 40px rgba(11,92,255,0.35);
   cursor: pointer;
 }
 
-/* Responsive */
-@media (max-width: 700px) {
-  .driver-form { flex-direction: column; align-items: stretch; }
-  .drivers-table table, .drivers-table th, .drivers-table td { font-size: 13px; padding: 8px; }
-  .cp-btn { width: auto; text-align: center; }
-  .fab-add { display: inline-flex; align-items: center; justify-content: center; }
-}
-/* Overlay behind drawer */
-.drawer-overlay {
-position: fixed;
-inset: 0;
-background: rgba(0, 0, 0, 0.35);
-backdrop-filter: saturate(160%) blur(1px);
-z-index: 49;
+.fab-add:hover {
+  transform: scale(1.05);
 }
 
+/* =====================================================
+   RESPONSIVE
+===================================================== */
 
-/* Drawer panel */
-.drawer {
-position: fixed;
-top: 0;
-right: 0;
-height: 100vh;
-width: min(560px, 100%);
-background: #ffffff;
-border-left: 1px solid #e5e7eb;
-box-shadow: -10px 0 30px rgba(15, 23, 42, 0.15);
-transform: translateX(100%);
-transition: transform 0.25s ease;
-z-index: 50;
-display: flex;
-flex-direction: column;
-}
-.drawer.open { transform: translateX(0); }
+@media (max-width: 768px) {
+  .drivers-page {
+    padding: 18px;
+  }
 
+  .driver-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
 
-.drawer-header {
-display: flex;
-align-items: center;
-justify-content: space-between;
-padding: 14px 16px;
-border-bottom: 1px solid #eef2f7;
-position: sticky;
-top: 0;
-background: #fff;
-z-index: 1;
-}
-.drawer-header h3 { margin: 0; font-size: 18px; font-weight: 700; }
+  .grid-cols {
+    grid-template-columns: 1fr;
+  }
 
+  .drawer {
+    width: 100%;
+  }
 
-/* Make the form scroll inside the drawer */
-.drawer .driver-form {
-box-shadow: none;
-border: none;
-border-radius: 0;
-margin: 0;
-padding: 16px;
-overflow-y: auto;
-}
-
-
-/* Reduce spacing for compact drawer layout */
-.drawer .driver-form input,
-.drawer .driver-form select {
-min-width: 180px;
-}
-
-
-@media (max-width: 700px) {
-.drawer { width: 100%; }
+  .fab-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
 }

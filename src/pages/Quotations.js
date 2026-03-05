@@ -709,39 +709,78 @@ const convertToOrder = (quote) => {
       <header className="qp-header">
         <h1>Quotations</h1>
 
-        <div className="coupons-toolbar" style={{ marginTop: 8, width: "100%" }}>
-          <input
-            className="cp-input"
-            placeholder="Search quo no / requirement / created by / notes…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{ minWidth: 240 }}
-          />
+         </header>
 
-          <div className="visits-chip-row" style={{ marginLeft: 8, flex: 1 }}>
-            <button className={`chip ${statusFilter === "all" ? "is-active" : ""}`} onClick={() => setStatusFilter("all")}>
-              All <span className="count">({statusCounts.all || 0})</span>
-            </button>
-            <button className={`chip ${statusFilter === "draft" ? "is-active" : ""}`} onClick={() => setStatusFilter("draft")}>
-              draft <span className="count">({statusCounts.draft || 0})</span>
-            </button>
-            <button className={`chip ${statusFilter === "sent" ? "is-active" : ""}`} onClick={() => setStatusFilter("sent")}>
-              sent <span className="count">({statusCounts.sent || 0})</span>
-            </button>
-            <button className={`chip ${statusFilter === "accepted" ? "is-active" : ""}`} onClick={() => setStatusFilter("accepted")}>
-              accepted <span className="count">({statusCounts.accepted || 0})</span>
-            </button>
-            <button className={`chip ${statusFilter === "rejected" ? "is-active" : ""}`} onClick={() => setStatusFilter("rejected")}>
-              rejected <span className="count">({statusCounts.rejected || 0})</span>
-            </button>
-            <button className={`chip ${statusFilter === "order_created" ? "is-active" : ""}`} onClick={() => setStatusFilter("order_created")}>
-              order created <span className="count">({statusCounts.order_created || 0})</span>
-            </button>
-          </div>
+       <div className="filter-bar">
 
-          <div className="muted">Showing {filtered.length} of {quotations.length}</div>
+  <div className="filter-left">
+
+    {/* STATUS SEGMENT */}
+    <div className="segmented status-segment">
+
+      <button
+        className={`seg-btn ${statusFilter === "all" ? "active" : ""}`}
+        onClick={() => setStatusFilter("all")}
+      >
+        All <span className="badge">{statusCounts.all || 0}</span>
+      </button>
+
+      <button
+        className={`seg-btn draft ${statusFilter === "draft" ? "active" : ""}`}
+        onClick={() => setStatusFilter("draft")}
+      >
+        Draft <span className="badge">{statusCounts.draft || 0}</span>
+      </button>
+
+      <button
+        className={`seg-btn sent ${statusFilter === "sent" ? "active" : ""}`}
+        onClick={() => setStatusFilter("sent")}
+      >
+        Sent <span className="badge">{statusCounts.sent || 0}</span>
+      </button>
+
+      <button
+        className={`seg-btn accepted ${statusFilter === "accepted" ? "active" : ""}`}
+        onClick={() => setStatusFilter("accepted")}
+      >
+        Accepted <span className="badge">{statusCounts.accepted || 0}</span>
+      </button>
+
+      <button
+        className={`seg-btn rejected ${statusFilter === "rejected" ? "active" : ""}`}
+        onClick={() => setStatusFilter("rejected")}
+      >
+        Rejected <span className="badge">{statusCounts.rejected || 0}</span>
+      </button>
+
+      <button
+        className={`seg-btn order ${statusFilter === "order_created" ? "active" : ""}`}
+        onClick={() => setStatusFilter("order_created")}
+      >
+        Order Created <span className="badge">{statusCounts.order_created || 0}</span>
+      </button>
+
+    </div>
+
+  </div>
+
+  {/* SEARCH */}
+  <div className="filter-search">
+    <input
+      className="search-input"
+      placeholder="Search quo no, requirement, customer, notes..."
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+    />
+  </div>
+
+  {/* SUMMARY */}
+  <div className="filter-summary">
+    {filtered.length} / {quotations.length}
+  </div>
+
         </div>
-      </header>
+     
 
       {error && <div className="qp-error">{error}</div>}
 
@@ -767,36 +806,75 @@ const convertToOrder = (quote) => {
               return (
                 <tr key={q.id}>
                   <td className="strong">{q.quoNo || q.quotationId || q.id}</td>
-                  <td>{q.requirementId || "—"}</td>
-                  <td>{q.createdByName || q.createdBy || "—"}</td>
+<td>
+  {q.requirementNumber || q.requirementId || "—"}
+</td>                  <td>{q.createdByName || q.createdBy || "—"}</td>
                   <td><span className={`chip ${sClass}`}>{q.status || "draft"}</span></td>
                   <td>{parseDate(q.createdAt)}</td>
                   <td>{fmtCurrency(q.totals?.total || 0)}</td>
                   <td>
-                    <div className="qp-actions">
-                      <button className="qp-link" onClick={() => openDetails(q)}>View</button>
+                <div className="qp-actions">
 
-                      {(q.status || "").toLowerCase() === "draft" && (
-                        <button className="qp-link" onClick={() => updateQuotationStatus(q, "sent", "Sent to customer")}>
-                          Mark Sent
-                        </button>
-                      )}
+  <button
+    className="qp-btn view"
+    onClick={() => openDetails(q)}
+  >
+    View
+  </button>
 
-                      {(q.status || "").toLowerCase() === "sent" && (
-                        <>
-                          <button className="qp-link" onClick={() => updateQuotationStatus(q, "accepted", "Accepted by customer")}>Accept</button>
-                          <button className="qp-link" onClick={() => updateQuotationStatus(q, "rejected", "Rejected by customer")}>Reject</button>
-                        </>
-                      )}
+  {(q.status || "").toLowerCase() === "draft" && (
+    <button
+      className="qp-btn sent"
+      onClick={() =>
+        updateQuotationStatus(q, "sent", "Sent to customer")
+      }
+    >
+      Mark Sent
+    </button>
+  )}
 
-                      {(q.status || "").toLowerCase() === "accepted" && !q.orderId && (
-                        <button className="qp-link" onClick={() => convertToOrder(q)}>Convert to Order</button>
-                      )}
+  {(q.status || "").toLowerCase() === "sent" && (
+    <>
+      <button
+        className="qp-btn accept"
+        onClick={() =>
+          updateQuotationStatus(q, "accepted", "Accepted by customer")
+        }
+      >
+        Accept
+      </button>
 
-                      {(q.orderId || (q.status || "").toLowerCase() === "order_created") && (
-                        <button className="qp-link" onClick={() => navigate("/orders")}>View Orders</button>
-                      )}
-                    </div>
+      <button
+        className="qp-btn reject"
+        onClick={() =>
+          updateQuotationStatus(q, "rejected", "Rejected by customer")
+        }
+      >
+        Reject
+      </button>
+    </>
+  )}
+
+  {(q.status || "").toLowerCase() === "accepted" && !q.orderId && (
+    <button
+      className="qp-btn convert"
+      onClick={() => convertToOrder(q)}
+    >
+      Convert to Order
+    </button>
+  )}
+
+  {(q.orderId ||
+    (q.status || "").toLowerCase() === "order_created") && (
+    <button
+      className="qp-btn orders"
+      onClick={() => navigate("/orders")}
+    >
+      View Orders
+    </button>
+  )}
+
+</div>
                   </td>
                 </tr>
               );
@@ -825,8 +903,9 @@ const convertToOrder = (quote) => {
               <div className="qp-left">
                 <div className="qp-section">
                   <div className="label">Requirement</div>
-                  <div className="value">{details.requirementId || "—"}</div>
-                </div>
+<div className="value">
+  {details.requirementNumber || details.requirementId || "—"}
+</div>                </div>
 
                 <div className="qp-section">
                   <div className="label">Created</div>

@@ -388,30 +388,40 @@ export default function Staff() {
                       ? `₹${r.baseRate}/${r.rateType}`
                       : "-"}
                   </td>
-                  <td>
-  <button
-    className="cp-btn ghost"
-    onClick={() => navigate(`/crm/staff/${r.id}`)}
-  >
-    View
-  </button>
+                 <td>
+  <div className="staff-actions">
 
-  <button className="cp-btn ghost" onClick={() => editRow(r)}>
-    Edit
-  </button>
+    <button
+      className="st-btn view"
+      onClick={() => navigate(`/crm/staff/${r.id}`)}
+    >
+      View
+    </button>
 
-  <button className="cp-btn ghost" onClick={() => remove(r.id)}>
-    Delete
-  </button>
+    <button
+      className="st-btn edit"
+      onClick={() => editRow(r)}
+    >
+      Edit
+    </button>
 
-  <button
-    className="cp-btn ghost"
-    onClick={() =>
-      navigate(`/crm/attendance?role=staff&userId=${r.id}`)
-    }
-  >
-    Attendance
-  </button>
+    <button
+      className="st-btn delete"
+      onClick={() => remove(r.id)}
+    >
+      Delete
+    </button>
+
+    <button
+      className="st-btn attendance"
+      onClick={() =>
+        navigate(`/crm/attendance?role=staff&userId=${r.id}`)
+      }
+    >
+      Attendance
+    </button>
+
+  </div>
 </td>
 
                 </tr>

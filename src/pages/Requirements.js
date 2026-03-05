@@ -16,6 +16,7 @@ import { db, auth } from "../firebase";
 import "./Requirements.css";
 import { makeHistoryEntry, propagateToLead } from "../utils/status";
 
+
 /* Quotation object — default */
 const defaultQuotation = {
   id: null,
@@ -116,7 +117,8 @@ export default function Requirements() {
   const [openQuotation, setOpenQuotation] = useState(false);
   const [quotation, setQuotation] = useState(defaultQuotation);
   const [confirmDelete, setConfirmDelete] = useState(null);
-
+const [typeFilter, setTypeFilter] = useState("all");
+const [search, setSearch] = useState("");
   // Track last focused item index for "+ Add Item below current"
   const [activeItemIdx, setActiveItemIdx] = useState(null);
 const isNursingReq = (r) => r?.serviceType === "nursing";
@@ -252,10 +254,11 @@ const openCreateQuotation = async (req) => {
   const base = {
     ...defaultQuotation,
     requirementId: req?.id || "",
+    requirementNumber: req?.requirementNumber || "",
     quoNo: `Q-${Date.now()}`,
     quotationId: `QT-${Math.floor(Date.now() / 1000)}`,
     items,
-    notes: `Quotation for requirement ${req?.reqNo || req?.id || ""}`,
+    notes: `Quotation for requirement ${req?.requirementNumber || req?.requirementId || req?.id}`,
     status: "sent",
     createdAt: null,
     createdBy: user.uid || "",
@@ -331,37 +334,47 @@ const openCreateQuotation = async (req) => {
     try {
       const user = auth.currentUser || {};
       const payload = {
-        requirementId: quotation.requirementId || "",
-         serviceType: detailsReq?.serviceType || "rental",
-        quoNo: quotation.quoNo || `Q-${Date.now()}`,
-        quotationId:
-          quotation.quotationId || `QT-${Math.floor(Date.now() / 1000)}`,
-        items: (quotation.items || []).map((it) => ({
-          name: it.name,
-          qty: Number(it.qty || 0),
-          rate: Number(it.rate || 0),
-          amount: Number(it.amount || 0),
-          notes: it.notes || "",
-          days: it.days || 0,
-          expectedStartDate: it.expectedStartDate || "",
-          expectedEndDate: it.expectedEndDate || "",
-          productId: it.productId || "",
-        })),
-        discount: quotation.discount || { type: "percent", value: 0 },
-        taxes: quotation.taxes || [],
-        notes: quotation.notes || "",
-        status: quotation.status || "sent",
-        totals: {
-          subtotal: amounts.subtotal,
-          discountAmount: amounts.discountAmount,
-          taxBreakdown: amounts.taxBreakdown,
-          totalTax: amounts.totalTax,
-          total: amounts.total,
-        },
-        createdAt: serverTimestamp(),
-        createdBy: user.uid || "",
-        createdByName: user.displayName || user.email || "",
-      };
+  requirementId: quotation.requirementId || "",
+  requirementNumber:
+    detailsReq?.requirementNumber ||
+    quotation.requirementNumber ||
+    "",
+
+  serviceType: detailsReq?.serviceType || "rental",
+
+  quoNo: quotation.quoNo || `Q-${Date.now()}`,
+  quotationId:
+    quotation.quotationId || `QT-${Math.floor(Date.now() / 1000)}`,
+
+  items: (quotation.items || []).map((it) => ({
+    name: it.name,
+    qty: Number(it.qty || 0),
+    rate: Number(it.rate || 0),
+    amount: Number(it.amount || 0),
+    notes: it.notes || "",
+    days: it.days || 0,
+    expectedStartDate: it.expectedStartDate || "",
+    expectedEndDate: it.expectedEndDate || "",
+    productId: it.productId || "",
+  })),
+
+  discount: quotation.discount || { type: "percent", value: 0 },
+  taxes: quotation.taxes || [],
+  notes: quotation.notes || "",
+  status: quotation.status || "sent",
+
+  totals: {
+    subtotal: amounts.subtotal,
+    discountAmount: amounts.discountAmount,
+    taxBreakdown: amounts.taxBreakdown,
+    totalTax: amounts.totalTax,
+    total: amounts.total,
+  },
+
+  createdAt: serverTimestamp(),
+  createdBy: user.uid || "",
+  createdByName: user.displayName || user.email || "",
+};
 
       const ref = await addDoc(collection(db, "quotations"), payload);
 
@@ -472,20 +485,51 @@ const openCreateQuotation = async (req) => {
   };
 
   // Counts & filter for chips
-  const statusCounts = useMemo(() => {
-    const map = { all: requirements.length };
-    for (const r of requirements) {
-      const s = norm(r.status);
-      if (s) map[s] = (map[s] || 0) + 1;
+ const statusCounts = useMemo(() => {
+  const counts = {
+    all: requirements.length,
+    ready_for_quotation: 0,
+    "quotation shared": 0,
+    order_created: 0,
+  };
+
+  requirements.forEach((r) => {
+    const s = (r.status || "").toLowerCase();
+
+    if (counts[s] !== undefined) {
+      counts[s]++;
     }
-    for (const s of REQ_STATUSES) if (map[s] == null) map[s] = 0;
-    return map;
-  }, [requirements]);
+  });
+
+  return counts;
+}, [requirements]);
 
   const filtered = useMemo(() => {
-    if (statusFilter === "all") return requirements;
-    return requirements.filter((r) => norm(r.status) === statusFilter);
-  }, [requirements, statusFilter]);
+  return requirements.filter((r) => {
+    const service = r.serviceType || "rental";
+
+    const matchesType =
+      typeFilter === "all" || service === typeFilter;
+
+    const matchesStatus =
+      statusFilter === "all" ||
+      (r.status || "").toLowerCase() === statusFilter.toLowerCase();
+
+    const searchText = search.toLowerCase();
+
+    const matchesSearch =
+      !searchText ||
+      (r.requirementNumber || "").toLowerCase().includes(searchText) ||
+      (r.leadSnapshot?.customerName || "")
+        .toLowerCase()
+        .includes(searchText) ||
+      (r.leadSnapshot?.phone || "")
+        .toLowerCase()
+        .includes(searchText);
+
+    return matchesType && matchesStatus && matchesSearch;
+  });
+}, [requirements, typeFilter, statusFilter, search]);
 
   if (loading)
     return (
@@ -509,41 +553,113 @@ const openCreateQuotation = async (req) => {
       </header>
 
       {/* Status chips toolbar */}
-      <section className="coupons-toolbar" style={{ marginTop: 8 }}>
-        <div className="visits-chip-row" style={{ width: "100%" }}>
-          <button
-            type="button"
-            className={`chip ${statusFilter === "all" ? "is-active" : ""}`}
-            onClick={() => setStatusFilter("all")}
-          >
-            All <span className="count">({statusCounts.all || 0})</span>
-          </button>
+      <section className="filter-bar">
 
-          <button
-            type="button"
-            className={`chip ${statusClass(
-              "ready_for_quotation"
-            )} ${statusFilter === "ready_for_quotation" ? "is-active" : ""}`}
-            onClick={() => setStatusFilter("ready_for_quotation")}
-          >
-            ready for quotation{" "}
-            <span className="count">({statusCounts.ready_for_quotation || 0})</span>
-          </button>
+  <div className="filter-left">
 
-          <button
-            type="button"
-            className={`chip ${statusClass(
-              "quotation shared"
-            )} ${statusFilter === "quotation shared" ? "is-active" : ""}`}
-            onClick={() => setStatusFilter("quotation shared")}
-          >
-            quotation shared{" "}
-            <span className="count">({statusCounts["quotation shared"] || 0})</span>
-          </button>
-        </div>
+    {/* TYPE FILTER */}
+    <div className="segmented type-segment">
+      <button
+        className={`seg-btn ${typeFilter === "all" ? "active" : ""}`}
+        onClick={() => {
+          setTypeFilter("all");
+          setStatusFilter("all");
+        }}
+      >
+        All
+      </button>
 
-        <div className="muted">Showing {filtered.length} of {requirements.length}</div>
-      </section>
+      <button
+        className={`seg-btn equipment ${
+          typeFilter === "rental" ? "active" : ""
+        }`}
+        onClick={() => {
+          setTypeFilter("rental");
+          setStatusFilter("all");
+        }}
+      >
+        📦 Rental
+      </button>
+
+      <button
+        className={`seg-btn nursing ${
+          typeFilter === "nursing" ? "active" : ""
+        }`}
+        onClick={() => {
+          setTypeFilter("nursing");
+          setStatusFilter("all");
+        }}
+      >
+        🩺 Nursing
+      </button>
+    </div>
+
+    {/* STATUS FILTER */}
+  <div className="segmented status-segment">
+
+  <button
+    className={`seg-btn ${statusFilter === "all" ? "active" : ""}`}
+    onClick={() => setStatusFilter("all")}
+  >
+    All <span className="badge">{statusCounts.all}</span>
+  </button>
+
+  <button
+    className={`seg-btn ${
+      statusFilter === "ready_for_quotation" ? "active" : ""
+    }`}
+    onClick={() => setStatusFilter("ready_for_quotation")}
+  >
+    Ready
+    <span className="badge">
+      {statusCounts.ready_for_quotation}
+    </span>
+  </button>
+
+  <button
+    className={`seg-btn ${
+      statusFilter === "quotation shared" ? "active" : ""
+    }`}
+    onClick={() => setStatusFilter("quotation shared")}
+  >
+    Shared
+    <span className="badge">
+      {statusCounts["quotation shared"]}
+    </span>
+  </button>
+
+  <button
+    className={`seg-btn ${
+      statusFilter === "order_created" ? "active" : ""
+    }`}
+    onClick={() => setStatusFilter("order_created")}
+  >
+    Order Created
+    <span className="badge">
+      {statusCounts.order_created}
+    </span>
+  </button>
+
+</div>
+
+  </div>
+
+  {/* SEARCH */}
+  <div className="filter-search">
+    <input
+      className="search-input"
+      placeholder="Search requirement no, customer, phone..."
+      value={search}
+      onChange={(e) => setSearch(e.target.value)}
+    />
+  </div>
+
+  {/* SUMMARY */}
+  <div className="filter-summary">
+    {filtered.length} / {requirements.length}
+  </div>
+
+</section>
 
       <section className="coupons-card">
         <div className="tbl-wrap">
@@ -571,8 +687,9 @@ const openCreateQuotation = async (req) => {
                 const sClass = statusClass(r.status || "");
                 return (
                   <tr key={r.id}>
-                    <td className="strong">{r.reqNo || r.requirementId || r.id}</td>
-                    <td>
+<td className="strong">
+  {r.requirementNumber || r.requirementId || r.id}
+</td>                    <td>
   {isNursingReq(r) ? (
     <span className="chip">🩺 Nursing</span>
   ) : (
@@ -589,18 +706,37 @@ const openCreateQuotation = async (req) => {
                     <td className="muted">{parseDateForDisplay(r.createdAt)}</td>
                     <td>
                       <div className="row-actions">
-                        <button className="cp-link" onClick={() => openDetails(r)}>
-                          View
-                        </button>
-                        {norm(r.status) !== "quotation shared" ? (
-                          <button className="cp-link" onClick={() => openCreateQuotation(r)}>
-                            Create Quotation
-                          </button>
-                        ) : null}
-                        <button className="cp-link" onClick={() => setConfirmDelete(r)}>
-                          Delete
-                        </button>
-                      </div>
+
+  {/* View */}
+  <button
+    type="button"
+    className="row-btn view"
+    onClick={() => openDetails(r)}
+  >
+    View
+  </button>
+
+  {/* Create Quotation */}
+  {norm(r.status) !== "quotation shared" && (
+    <button
+      type="button"
+      className="row-btn req"
+      onClick={() => openCreateQuotation(r)}
+    >
+      Create Quotation
+    </button>
+  )}
+
+  {/* Delete */}
+  <button
+    type="button"
+    className="row-btn danger"
+    onClick={() => setConfirmDelete(r)}
+  >
+    Delete
+  </button>
+
+</div>
                     </td>
                   </tr>
                 );
@@ -628,8 +764,9 @@ const openCreateQuotation = async (req) => {
           <div className="cp-form details" onClick={(e) => e.stopPropagation()}>
             <div className="cp-form-head">
               <h2>
-                Requirement: {detailsReq.reqNo || detailsReq.requirementId || detailsReq.id}
-              </h2>
+<h2>
+  Requirement: {detailsReq.requirementNumber || detailsReq.requirementId || detailsReq.id}
+</h2>              </h2>
             <button type="button" className="cp-icon" onClick={closeDetails}>✕</button>
             </div>
 
@@ -980,8 +1117,9 @@ const openCreateQuotation = async (req) => {
         >
           <div className="cp-form details" onClick={(e) => e.stopPropagation()}>
             <div className="cp-form-head">
-              <h2>Quotation for {quotation.requirementId || "—"}</h2>
-              <button type="button" className="cp-icon" onClick={closeQuotation}>
+<h2>
+  Quotation for {detailsReq?.requirementNumber || quotation.requirementId || "—"}
+</h2>              <button type="button" className="cp-icon" onClick={closeQuotation}>
                 ✕
               </button>
             </div>
@@ -1266,8 +1404,7 @@ const openCreateQuotation = async (req) => {
         <div className="cp-modal">
           <div className="cp-modal-card">
             <h3>
-              Delete requirement “{confirmDelete.reqNo || confirmDelete.customerName}”?
-            </h3>
+Delete requirement “{confirmDelete.requirementNumber || confirmDelete.customerName}”?          </h3>
             <p className="muted">
               This will permanently remove the requirement and its attachments (if any).
             </p>

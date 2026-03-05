@@ -11,43 +11,63 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import "./Requirements.css";
+import { runTransaction } from "firebase/firestore";
 
 const emptyLine = () => ({ productId: "", name: "", qty: 1, unitNotes: "" });
 
 export default function RequirementForm({ lead, requirement = null, templateRequirement = null, onSaved, onCancel }) {
   const [form, setForm] = useState({
-    requirementId: null,
-    serviceType: "rental", // rental | nursing
+  // 🔹 Identity
+  requirementId: null,
+  requirementNumber: "", // ✅ NEW (professional number)
 
-    leadId: lead?.id || "",
-    nursing: {
-  staffType: "nurse",     // nurse | caretaker
-  count: 1,
-  shift: "day",           // day | night | full_day
-  notes: "",
-},
+  // 🔹 Type
+  serviceType: "rental", // rental | nursing
 
-    leadSnapshot: {
-      customerName: lead?.customerName || "",
-      contactPerson: lead?.contactPerson || "",
-      phone: lead?.phone || "",
-    },
-    equipment: [emptyLine()],
-    expectedStartDate: "",
-    expectedDurationDays: 7,
-    expectedEndDate: "",
-    deliveryAddress: lead?.address || "",
-    deliveryCity: lead?.address ? (lead.address.split(",").pop() || "") : "",
-    deliveryContact: {
-      name: lead?.contactPerson || "",
-      phone: lead?.phone || "",
-      email: lead?.email || "",
-    },
-    urgency: "normal",
-    specialInstructions: "",
-    status: "draft",
-    assignedTo: "",
-  });
+  // 🔹 Lead linkage
+  leadId: lead?.id || "",
+
+  // 🔹 Nursing (only used if serviceType === nursing)
+  nursing: {
+    staffType: "nurse",     // nurse | caretaker
+    count: 1,
+    shift: "day",           // day | night | full_day
+    notes: "",
+  },
+
+  // 🔹 Lead snapshot (freezes data at time of requirement creation)
+  leadSnapshot: {
+    customerName: lead?.customerName || "",
+    contactPerson: lead?.contactPerson || "",
+    phone: lead?.phone || "",
+  },
+
+  // 🔹 Equipment (only used if rental)
+  equipment: [emptyLine()],
+
+  // 🔹 Timing
+  expectedStartDate: "",
+  expectedDurationDays: 7,
+  expectedEndDate: "",
+
+  // 🔹 Delivery
+  deliveryAddress: lead?.address || "",
+  deliveryCity: lead?.address
+    ? (lead.address.split(",").pop() || "").trim()
+    : "",
+
+  deliveryContact: {
+    name: lead?.contactPerson || "",
+    phone: lead?.phone || "",
+    email: lead?.email || "",
+  },
+
+  // 🔹 Meta
+  urgency: "normal",
+  specialInstructions: "",
+  status: "draft",
+  assignedTo: "",
+});
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -67,6 +87,27 @@ export default function RequirementForm({ lead, requirement = null, templateRequ
   const [suggestFor, setSuggestFor] = useState(null); // row index or null
   const wrapsRef = useRef([]); // ref to each name input wrapper
 
+async function generateRequirementNumber() {
+  const counterRef = doc(db, "counters", "requirements");
+
+  return await runTransaction(db, async (transaction) => {
+    const counterDoc = await transaction.get(counterRef);
+
+    let lastNumber = 0;
+    if (counterDoc.exists()) {
+      lastNumber = counterDoc.data().lastNumber || 0;
+    }
+
+    const newNumber = lastNumber + 1;
+
+    transaction.set(counterRef, { lastNumber: newNumber }, { merge: true });
+
+    const year = new Date().getFullYear();
+    const padded = String(newNumber).padStart(4, "0");
+
+    return `REQ-${year}-${padded}`;
+  });
+}
   // Close suggestions on outside click
   useEffect(() => {
     function handleDocMouseDown(e) {
@@ -99,15 +140,15 @@ export default function RequirementForm({ lead, requirement = null, templateRequ
   // 2) templateRequirement provided → CLONE MODE (prefill only, no requirementId)
   // 3) neither → seed from lead for create
   useEffect(() => {
-    if (requirement) {
-      // EDIT existing
-      setForm((prev) => ({
-        ...prev,
-        ...requirement,
-        requirementId: requirement.id || requirement.requirementId, // enables update flow
-      }));
-      return;
-    }
+   if (requirement) {
+  setForm((prev) => ({
+    ...prev,
+    ...requirement,
+    requirementId: requirement.id || requirement.requirementId,
+    requirementNumber: requirement.requirementNumber || "",
+  }));
+  return;
+}
 
     if (templateRequirement) {
       // CLONE/PREFILL (no requirementId!)
@@ -225,91 +266,104 @@ export default function RequirementForm({ lead, requirement = null, templateRequ
 
 
   // Save (create/update)
-  async function save(nextStatus = "draft", silent = false) {
-    const v = validate();
-    if (v) {
-      if (!silent) setError(v);
-      throw new Error(v);
-    }
-    setSaving(true);
-    setError("");
-    try {
-      const user = auth.currentUser || {};
-      const payload = {
-  // 🔹 Lead linkage
-  leadId: form.leadId || "",
-  leadSnapshot: form.leadSnapshot || {},
-
-  // 🔹 Service type (NEW – very important)
-  serviceType: form.serviceType || "rental",
-
-  // 🔹 Nursing data (ONLY when serviceType = nursing)
-  nursing:
-    form.serviceType === "nursing"
-      ? {
-          staffType: form.nursing?.staffType || "nurse",
-          count: Number(form.nursing?.count || 1),
-          shift: form.nursing?.shift || "day",
-          notes: form.nursing?.notes || "",
-        }
-      : null,
-
-  // 🔹 Equipment (ONLY when serviceType = rental)
-  equipment:
-    form.serviceType === "rental"
-      ? form.equipment || []
-      : [],
-
-  // 🔹 Common timing fields (used by BOTH)
-  expectedStartDate: form.expectedStartDate || "",
-  expectedDurationDays: Number(form.expectedDurationDays) || 0,
-  expectedEndDate: form.expectedEndDate || "",
-
-  // 🔹 Address & contact
-  deliveryAddress: form.deliveryAddress || "",
-  deliveryCity: form.deliveryCity || "",
-  deliveryContact: form.deliveryContact || {},
-
-  // 🔹 Meta
-  urgency: form.urgency || "normal",
-  specialInstructions: form.specialInstructions || "",
-  status: nextStatus || "draft",
-  assignedTo: form.assignedTo || "",
-
-  // 🔹 Audit
-  updatedAt: serverTimestamp(),
-  updatedBy: user.uid || "",
-  updatedByName: user.displayName || user.email || "",
-};
-
-
-      if (form.requirementId) {
-        // UPDATE existing
-        const ref = doc(db, "requirements", form.requirementId);
-        await updateDoc(ref, payload);
-      } else {
-        // CREATE new
-        const ref = await addDoc(collection(db, "requirements"), {
-          ...payload,
-          createdAt: serverTimestamp(),
-          createdBy: user.uid || "",
-          createdByName: user.displayName || user.email || "",
-        });
-        await updateDoc(ref, { requirementId: ref.id });
-        setForm((f) => ({ ...f, requirementId: ref.id }));
-      }
-
-      setLastSaved(new Date());
-      if (!silent && onSaved) onSaved(payload);
-      return true;
-    } catch (err) {
-      console.error("Requirement save error:", err);
-      if (!silent) setError(err.message || "Failed to save requirement");
-      throw err;
-    } finally {
-      setSaving(false);
-    }
+ async function save(nextStatus = "draft", silent = false) {
+  const v = validate();
+  if (v) {
+    if (!silent) setError(v);
+    throw new Error(v);
   }
+
+  setSaving(true);
+  setError("");
+
+  try {
+    const user = auth.currentUser || {};
+    let requirementNumberFinal = form.requirementNumber;
+
+    const payload = {
+      leadId: form.leadId || "",
+      leadSnapshot: form.leadSnapshot || {},
+      serviceType: form.serviceType || "rental",
+
+      nursing:
+        form.serviceType === "nursing"
+          ? {
+              staffType: form.nursing?.staffType || "nurse",
+              count: Number(form.nursing?.count || 1),
+              shift: form.nursing?.shift || "day",
+              notes: form.nursing?.notes || "",
+            }
+          : null,
+
+      equipment:
+        form.serviceType === "rental"
+          ? form.equipment || []
+          : [],
+
+      expectedStartDate: form.expectedStartDate || "",
+      expectedDurationDays: Number(form.expectedDurationDays) || 0,
+      expectedEndDate: form.expectedEndDate || "",
+
+      deliveryAddress: form.deliveryAddress || "",
+      deliveryCity: form.deliveryCity || "",
+      deliveryContact: form.deliveryContact || {},
+
+      urgency: form.urgency || "normal",
+      specialInstructions: form.specialInstructions || "",
+      status: nextStatus || "draft",
+      assignedTo: form.assignedTo || "",
+
+      updatedAt: serverTimestamp(),
+      updatedBy: user.uid || "",
+      updatedByName: user.displayName || user.email || "",
+    };
+
+    if (form.requirementId) {
+      const ref = doc(db, "requirements", form.requirementId);
+      await updateDoc(ref, payload);
+    } else {
+      requirementNumberFinal = await generateRequirementNumber();
+
+      const ref = await addDoc(collection(db, "requirements"), {
+        ...payload,
+        requirementNumber: requirementNumberFinal,
+        requirementId: null,
+        createdAt: serverTimestamp(),
+        createdBy: user.uid || "",
+        createdByName: user.displayName || user.email || "",
+      });
+
+      await updateDoc(ref, {
+        requirementId: ref.id,
+      });
+
+      setForm((f) => ({
+        ...f,
+        requirementId: ref.id,
+        requirementNumber: requirementNumberFinal,
+      }));
+    }
+
+    setLastSaved(new Date());
+
+    if (!silent && onSaved) {
+      onSaved({
+        ...payload,
+        requirementNumber: requirementNumberFinal,
+      });
+    }
+
+    return true;
+
+  } catch (err) {
+    console.error("Requirement save error:", err);
+    if (!silent) setError(err.message || "Failed to save requirement");
+    throw err;
+
+  } finally {
+    setSaving(false);
+  }
+}
 
   const saveReady = () => save("ready_for_quotation").catch(() => {});
 
@@ -324,8 +378,13 @@ export default function RequirementForm({ lead, requirement = null, templateRequ
       React.createElement(
         "div",
         { className: "req-title" },
-        React.createElement("h2", null, form.requirementId ? "Edit Requirement" : "Create Requirement"),
-        React.createElement(
+React.createElement(
+  "h2",
+  null,
+  form.requirementNumber
+    ? `Requirement ${form.requirementNumber}`
+    : "Create Requirement"
+),        React.createElement(
           "div",
           { className: "req-sub" },
           "Lead: ",

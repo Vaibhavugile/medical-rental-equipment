@@ -8,6 +8,7 @@
   overflow: hidden;
 }
 
+
 /* allow tooltips to escape */
 .sidebar.collapsed {
   overflow: visible;
@@ -45,8 +46,10 @@
 /* CONTENT */
 .app-content {
   padding: 24px;
+  flex: 1 1 auto;
+
+  overflow-x: auto;   /* 🔥 allow horizontal scroll */
   overflow-y: auto;
-  flex: 1;
 }
 
 /* ===============================

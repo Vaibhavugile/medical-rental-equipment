@@ -99,3 +99,81 @@
   border-color:#0b5cff !important;
 }
 
+/* ===== ACTION BUTTONS (Color Coded) ===== */
+
+.qp-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.qp-btn {
+  height: 32px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* View */
+.qp-btn.view {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+.qp-btn.view:hover {
+  background: #4f46e5;
+  color: #fff;
+}
+
+/* Mark Sent */
+.qp-btn.sent {
+  background: #ecfeff;
+  color: #0891b2;
+}
+.qp-btn.sent:hover {
+  background: #0891b2;
+  color: #fff;
+}
+
+/* Accept */
+.qp-btn.accept {
+  background: #ecfdf5;
+  color: #10b981;
+}
+.qp-btn.accept:hover {
+  background: #10b981;
+  color: #fff;
+}
+
+/* Reject */
+.qp-btn.reject {
+  background: #fef2f2;
+  color: #ef4444;
+}
+.qp-btn.reject:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* Convert to Order */
+.qp-btn.convert {
+  background: #fff7ed;
+  color: #ea580c;
+}
+.qp-btn.convert:hover {
+  background: #ea580c;
+  color: #fff;
+}
+
+/* View Orders */
+.qp-btn.orders {
+  background: #eef2ff;
+  color: #4338ca;
+}
+.qp-btn.orders:hover {
+  background: #4338ca;
+  color: #fff;
+}

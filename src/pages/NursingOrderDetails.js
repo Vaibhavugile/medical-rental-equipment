@@ -390,7 +390,7 @@ const saveServices = async () => {
 
                 amount,
 
-                status: "active",     // active | completed | cancelled
+                status: "assigned",     // active | completed | cancelled
                 paid: false,
 
                 createdAt: serverTimestamp(),

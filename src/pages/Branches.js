@@ -15,149 +15,237 @@ import { db, auth } from "../firebase";
 import "./Branches.css";
 
 export default function Branches() {
-  const [branches, setBranches] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: "", address: "", contact: "", phone: "" });
-  const [error, setError] = useState("");
+  const [branchList, setBranchList] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [activeBranch, setActiveBranch] = useState(null);
+  const [formState, setFormState] = useState({
+    branchName: "",
+    branchAddress: "",
+    branchContact: "",
+    branchPhone: "",
+  });
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    setLoading(true);
+    setIsLoading(true);
     const q = query(collection(db, "branches"), orderBy("name", "asc"));
+
     const unsub = onSnapshot(
       q,
       (snap) => {
-        setBranches(snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) })));
-        setLoading(false);
+        setBranchList(
+          snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }))
+        );
+        setIsLoading(false);
       },
       (err) => {
-        console.error("branches onSnapshot", err);
-        setLoading(false);
-        setError(err?.message || "Failed to load branches");
+        console.error("branches snapshot error", err);
+        setFormError(err?.message || "Unable to load branches");
+        setIsLoading(false);
       }
     );
+
     return () => unsub();
   }, []);
 
-  const startAdd = () => {
-    setEditing(null);
-    setForm({ name: "", address: "", contact: "", phone: "" });
-    setError("");
-  };
-  const startEdit = (b) => {
-    setEditing(b);
-    setForm({ name: b.name || "", address: b.address || "", contact: b.contact || "", phone: b.phone || "" });
-    setError("");
+  const resetForm = () => {
+    setActiveBranch(null);
+    setFormState({
+      branchName: "",
+      branchAddress: "",
+      branchContact: "",
+      branchPhone: "",
+    });
+    setFormError("");
   };
 
-  const save = async (e) => {
-    e?.preventDefault();
-    setError("");
-    if (!form.name.trim()) return setError("Branch name required");
+  const editBranch = (branch) => {
+    setActiveBranch(branch);
+    setFormState({
+      branchName: branch.name || "",
+      branchAddress: branch.address || "",
+      branchContact: branch.contact || "",
+      branchPhone: branch.phone || "",
+    });
+    setFormError("");
+  };
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setFormError("");
+
+    if (!formState.branchName.trim()) {
+      return setFormError("Branch name is required");
+    }
+
     const user = auth.currentUser || {};
+
     try {
-      if (editing) {
-        await updateDoc(doc(db, "branches", editing.id), {
-          ...form,
+      if (activeBranch) {
+        await updateDoc(doc(db, "branches", activeBranch.id), {
+          name: formState.branchName,
+          address: formState.branchAddress,
+          contact: formState.branchContact,
+          phone: formState.branchPhone,
           updatedAt: serverTimestamp(),
           updatedBy: user.uid || "",
-          updatedByName: user.displayName || user.email || "",
         });
       } else {
         await addDoc(collection(db, "branches"), {
-          ...form,
+          name: formState.branchName,
+          address: formState.branchAddress,
+          contact: formState.branchContact,
+          phone: formState.branchPhone,
           createdAt: serverTimestamp(),
           createdBy: user.uid || "",
-          createdByName: user.displayName || user.email || "",
         });
       }
-      setEditing(null);
-      setForm({ name: "", address: "", contact: "", phone: "" });
+
+      resetForm();
     } catch (err) {
-      console.error("save branch", err);
-      setError(err.message || "Failed to save branch");
+      console.error("branch save error", err);
+      setFormError(err.message || "Failed to save branch");
     }
   };
 
-  const remove = async (b) => {
-    if (!window.confirm(`Delete branch "${b.name}"? This cannot be undone.`)) return;
+  const deleteBranch = async (branch) => {
+    if (!window.confirm(`Delete branch "${branch.name}"?`)) return;
     try {
-      await deleteDoc(doc(db, "branches", b.id));
+      await deleteDoc(doc(db, "branches", branch.id));
     } catch (err) {
-      console.error("delete branch", err);
-      setError(err.message || "Failed to delete branch");
+      console.error("delete branch error", err);
+      setFormError(err.message || "Delete failed");
     }
   };
 
   return (
-    <div className="branches-wrap">
-      <header className="page-header" style={{ marginBottom: 12 }}>
-        <h1>Branches</h1>
-        <p className="muted">Manage branches / locations where inventory is stored.</p>
-      </header>
+    <div className="branch-layout">
+      <div className="branch-header">
+        <h2>Branch Locations</h2>
+        <p className="branch-subtext">
+          Manage inventory storage locations.
+        </p>
+      </div>
 
-      {error && <div className="error" role="alert">{error}</div>}
+      {formError && (
+        <div className="branch-alert" role="alert">
+          {formError}
+        </div>
+      )}
 
-      <div className="two-column">
-        <div className="left-col">
-          <div style={{ marginBottom: 10, display: "flex", gap: 8 }}>
-            <button className="btn" type="button" onClick={startAdd}>+ New Branch</button>
-          </div>
+      <div className="branch-grid">
+        {/* LEFT SIDE */}
+        <div className="branch-list-panel">
+          <button className="branch-primary-btn" onClick={resetForm}>
+            + Create Branch
+          </button>
 
-          {loading ? (
-            <div>Loading…</div>
+          {isLoading ? (
+            <div className="branch-loading">Loading...</div>
           ) : (
-            <div className="branches-list">
-              {branches.map((b) => (
-                <div key={b.id} className="branch-card">
-                  <div className="branch-title">{b.name}</div>
-                  <div className="muted" style={{ marginTop: 6 }}>{b.address || "—"}</div>
-                  <div className="muted" style={{ marginTop: 6 }}>{b.contact ? `${b.contact}${b.phone ? ` · ${b.phone}` : ""}` : (b.phone || "—")}</div>
-                  <div className="branch-actions">
-                    <button className="btn ghost" type="button" onClick={() => startEdit(b)}>Edit</button>
-                    <button className="btn danger" type="button" onClick={() => remove(b)}>Delete</button>
+            <div className="branch-card-grid">
+              {branchList.map((b) => (
+                <div key={b.id} className="branch-item">
+                  <div className="branch-item-title">{b.name}</div>
+                  <div className="branch-item-meta">
+                    {b.address || "No address"}
+                  </div>
+                  <div className="branch-item-meta">
+                    {b.contact || b.phone
+                      ? `${b.contact || ""} ${b.phone ? " · " + b.phone : ""}`
+                      : "No contact info"}
+                  </div>
+
+                  <div className="branch-item-actions">
+                    <button
+                      className="branch-outline-btn"
+                      onClick={() => editBranch(b)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="branch-danger-btn"
+                      onClick={() => deleteBranch(b)}
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               ))}
-              {branches.length === 0 && <div className="muted">No branches yet.</div>}
+
+              {branchList.length === 0 && (
+                <div className="branch-empty">
+                  No branches created yet.
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        <aside className="right-col">
-          <form className="card" onSubmit={save} aria-labelledby="branch-form-title">
-            <h3 id="branch-form-title">{editing ? `Edit branch: ${editing.name}` : "New Branch"}</h3>
+        {/* RIGHT SIDE */}
+        <div className="branch-form-panel">
+          <form onSubmit={handleSave} className="branch-form-card">
+            <h3>
+              {activeBranch
+                ? `Editing: ${activeBranch.name}`
+                : "Create New Branch"}
+            </h3>
 
-            <label className="label">Name</label>
-            <input value={form.name} onChange={(e) => setForm((s) => ({ ...s, name: e.target.value }))} />
+            <div className="branch-field">
+              <label>Branch Name</label>
+              <input
+                value={formState.branchName}
+                onChange={(e) =>
+                  setFormState({ ...formState, branchName: e.target.value })
+                }
+              />
+            </div>
 
-            <label className="label">Address</label>
-            <input value={form.address} onChange={(e) => setForm((s) => ({ ...s, address: e.target.value }))} />
+            <div className="branch-field">
+              <label>Address</label>
+              <input
+                value={formState.branchAddress}
+                onChange={(e) =>
+                  setFormState({ ...formState, branchAddress: e.target.value })
+                }
+              />
+            </div>
 
-            <label className="label">Contact</label>
-            <input value={form.contact} onChange={(e) => setForm((s) => ({ ...s, contact: e.target.value }))} />
+            <div className="branch-field">
+              <label>Contact</label>
+              <input
+                value={formState.branchContact}
+                onChange={(e) =>
+                  setFormState({ ...formState, branchContact: e.target.value })
+                }
+              />
+            </div>
 
-            <label className="label">Phone</label>
-            <input value={form.phone} onChange={(e) => setForm((s) => ({ ...s, phone: e.target.value }))} />
+            <div className="branch-field">
+              <label>Phone</label>
+              <input
+                value={formState.branchPhone}
+                onChange={(e) =>
+                  setFormState({ ...formState, branchPhone: e.target.value })
+                }
+              />
+            </div>
 
-            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              <button className="btn" type="submit">Save</button>
-              <button className="btn ghost" type="button" onClick={() => { setEditing(null); setForm({ name: "", address: "", contact: "", phone: "" }); }}>Cancel</button>
+            <div className="branch-form-actions">
+              <button className="branch-primary-btn" type="submit">
+                Save
+              </button>
+              <button
+                type="button"
+                className="branch-outline-btn"
+                onClick={resetForm}
+              >
+                Cancel
+              </button>
             </div>
           </form>
-        </aside>
+        </div>
       </div>
-
-      <style>{`
-        /* small layout helper to mimic previous two-column layout */
-        .two-column { display: flex; gap: 20px; margin-top: 12px; }
-        .left-col { flex: 1; }
-        .right-col { width: 420px; }
-        @media (max-width: 880px) {
-          .two-column { flex-direction: column; }
-          .right-col { width: 100%; }
-        }
-      `}</style>
     </div>
   );
 }

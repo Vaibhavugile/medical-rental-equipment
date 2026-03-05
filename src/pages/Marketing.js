@@ -290,23 +290,36 @@ export default function Marketing() {
                   <td style={{ fontSize: 12, color: "#6b7280" }}>
                     {r.uid || r.authUid || r.id}
                   </td>
-                  <td>
-  <button className="cp-btn ghost" onClick={() => editRow(r)}>Edit</button>
-  <button className="cp-btn ghost" onClick={() => deleteRow(r.id)}>Delete</button>
+     <td>
+  <div className="marketing-actions">
 
-  {/* NEW: Attendance + Track (marketing) */}
-  <button
-    className="cp-btn ghost"
-    onClick={() => window.location.href = `/crm/attendance?role=marketing&driverId=${r.id}`}
-  >
-    Attendance
-  </button>
-  <button
-    className="cp-btn ghost"
-    onClick={() => window.location.href = `/crm/tracking?role=marketing&driverId=${r.id}`}
-  >
-    Track
-  </button>
+    <button className="mk-btn edit" onClick={() => editRow(r)}>
+      Edit
+    </button>
+
+    <button className="mk-btn delete" onClick={() => deleteRow(r.id)}>
+      Delete
+    </button>
+
+    <button
+      className="mk-btn attendance"
+      onClick={() =>
+        window.location.href = `/crm/attendance?role=marketing&driverId=${r.id}`
+      }
+    >
+      Attendance
+    </button>
+
+    <button
+      className="mk-btn track"
+      onClick={() =>
+        window.location.href = `/crm/tracking?role=marketing&driverId=${r.id}`
+      }
+    >
+      Track
+    </button>
+
+  </div>
 </td>
 
                 </tr>

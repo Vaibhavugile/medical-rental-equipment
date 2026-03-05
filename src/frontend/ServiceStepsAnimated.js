@@ -12,6 +12,8 @@ import { scrollToContact } from "../utils/scrollToContact";
    - Automatically stacks on mobile via CSS.
    ========================= */
 export function ServiceTwoCol(props) {
+  const WHATSAPP_LINK =
+  "https://wa.me/917777066885?text=Hi%20BookMyMedicare%2C%20I%20need%20home%20healthcare%20assistance.";
   const {
     eyebrow = "Services",
     title = "Service Title",
@@ -21,10 +23,10 @@ export function ServiceTwoCol(props) {
     img = "",
     imgAlt = "",
     imageOnRight = true,
-    ctaPrimary = {
-      text: "Talk to a specialist",
-      onClick: scrollToContact,
-    },
+   ctaPrimary = {
+  text: "Talk to Specialist",
+  onClick: () => window.open(WHATSAPP_LINK, "_blank"),
+},
     paddingTop
   } = props;
 

@@ -67,7 +67,7 @@ const [search, setSearch] = useState("");
 const [statusFilter, setStatusFilter] = useState("all");
 const [fromDate, setFromDate] = useState("");
 const [toDate, setToDate] = useState("");
-
+const [serviceFilter, setServiceFilter] = useState("all");
 
   /* =========================
      Load Nursing Orders
@@ -89,8 +89,28 @@ const [toDate, setToDate] = useState("");
 
     load();
   }, []);
+
+function getServiceType(order) {
+  const name = order.items?.[0]?.name?.toLowerCase() || "";
+
+  if (name.includes("caretaker")) return "caretaker";
+  if (name.includes("nurse")) return "nursing";
+
+  return "other";
+}
+const nursingCount = orders.filter((o) =>
+  o.items?.[0]?.name?.toLowerCase().includes("nurs")
+).length;
+
+const caretakerCount = orders.filter((o) =>
+  o.items?.[0]?.name?.toLowerCase().includes("caretaker")
+).length;
+
+const allCount = orders.length;
+
 const filteredOrders = orders.filter((o) => {
-  // --- SEARCH ---
+
+  // SEARCH
   const q = search.toLowerCase();
   const matchesSearch =
     !q ||
@@ -98,11 +118,11 @@ const filteredOrders = orders.filter((o) => {
     o.customerName?.toLowerCase().includes(q) ||
     o.deliveryAddress?.toLowerCase().includes(q);
 
-  // --- STATUS ---
+  // STATUS
   const matchesStatus =
     statusFilter === "all" || o.status === statusFilter;
 
-  // --- DATE RANGE (SERVICE START DATE) ---
+  // DATE
   const serviceStartRaw = o.items?.[0]?.expectedStartDate;
   const serviceStart = toYmd(serviceStartRaw);
 
@@ -116,9 +136,18 @@ const filteredOrders = orders.filter((o) => {
     matchesDate = matchesDate && serviceStart <= toDate;
   }
 
-  return matchesSearch && matchesStatus && matchesDate;
-});
+  // SERVICE TYPE
+  const serviceType = getServiceType(o);
+  const matchesService =
+    serviceFilter === "all" || serviceType === serviceFilter;
 
+  return (
+    matchesSearch &&
+    matchesStatus &&
+    matchesDate &&
+    matchesService
+  );
+});
 
 
   return (
@@ -126,13 +155,38 @@ const filteredOrders = orders.filter((o) => {
       {/* Header */}
      <div className="no-head">
   <div className="no-head-top">
-    <h2>Nursing Orders</h2>
+    <h2>Nursing & Caretakers Orders</h2>
+    
 <button
   className="cp-btn"
   onClick={() => setCreateOpen(true)}
 >
-  + Add Nursing Order
+  + Add Nursing / Caretaker Order
 </button>  </div>
+<div className="service-filter">
+
+  <button
+    className={`service-filter-btn ${serviceFilter === "all" ? "is-active" : ""}`}
+    onClick={() => setServiceFilter("all")}
+  >
+    All <span className="filter-count">{allCount}</span>
+  </button>
+
+  <button
+    className={`service-filter-btn ${serviceFilter === "nursing" ? "is-active" : ""}`}
+    onClick={() => setServiceFilter("nursing")}
+  >
+    Nursing <span className="filter-count">{nursingCount}</span>
+  </button>
+
+  <button
+    className={`service-filter-btn ${serviceFilter === "caretaker" ? "is-active" : ""}`}
+    onClick={() => setServiceFilter("caretaker")}
+  >
+    Caretaker <span className="filter-count">{caretakerCount}</span>
+  </button>
+
+</div>
 
   <div className="no-filters">
     <div className="no-filter-row-1">
@@ -222,10 +276,10 @@ const filteredOrders = orders.filter((o) => {
                     </td>
 
                     <td>
-                      <span className="pill blue">
-                        Nursing
-                      </span>
-                    </td>
+  <span className="pill blue">
+    {o.items?.[0]?.name || "—"}
+  </span>
+</td>
 
                     <td>{fmtDate(startDate)}</td>
 

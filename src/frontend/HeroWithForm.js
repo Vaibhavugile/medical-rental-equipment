@@ -9,7 +9,8 @@ export default function HeroWithForm({ imgSrc = "/banner.jpg" }) {
   const bgRef = useRef(null);
   const leftRef = useRef(null);
   const formRef = useRef(null);
-
+const [toast, setToast] = useState(null);
+const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -45,6 +46,13 @@ export default function HeroWithForm({ imgSrc = "/banner.jpg" }) {
     };
   }, []);
 
+  function showToast(type, message) {
+  setToast({ type, message });
+  setTimeout(() => {
+    setToast(null);
+  }, 3500);
+}
+
   function handleChange(e) {
     const { name, value } = e.target;
     setForm((s) => ({ ...s, [name]: value }));
@@ -56,59 +64,45 @@ export default function HeroWithForm({ imgSrc = "/banner.jpg" }) {
   }
 async function handleSubmit(e) {
   e.preventDefault();
-  setStatus(null);
 
-  if (!form.name.trim())
-    return setStatus({ type: "error", message: "Please enter your name." });
+  if (!form.name.trim()) {
+    return showToast("error", "Please enter your full name.");
+  }
 
-  if (!validatePhone(form.phone))
-    return setStatus({ type: "error", message: "Please enter a valid 10-digit phone number." });
+  if (!validatePhone(form.phone)) {
+    return showToast("error", "Enter valid 10-digit phone number.");
+  }
 
-  if (!form.city)
-    return setStatus({ type: "error", message: "Please select your city." });
+  if (!form.city) {
+    return showToast("error", "Please select your city.");
+  }
 
-  if (!form.service)
-    return setStatus({ type: "error", message: "Please select a service." });
+  if (!form.service) {
+    return showToast("error", "Please select a service.");
+  }
 
   try {
-    setStatus({ type: "sending", message: "Sending..." });
+    setLoading(true);
+    showToast("info", "Submitting request...");
 
     const nowIso = new Date().toISOString();
 
     const leadPayload = {
-      // core
       customerName: form.name.trim(),
       contactPerson: form.name.trim(),
       phone: form.phone.replace(/\D/g, ""),
-      email: "",
       city: form.city,
       type: form.service,
       notes: form.requirements || "",
-      address: "",
-
-      // status
       status: "new",
       leadSource: "website",
 
-      // audit
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      createdBy: "website",
-      createdByName: "Website",
-      updatedBy: "website",
-      updatedByName: "Website",
 
-      // history init
       history: [
         {
           type: "create",
-          field: null,
-          oldValue: null,
-          newValue: JSON.stringify({
-            customerName: form.name.trim(),
-            contactPerson: form.name.trim(),
-            phone: form.phone.replace(/\D/g, "")
-          }),
           note: "Lead created from website form",
           changedBy: "website",
           changedByName: "Website",
@@ -119,10 +113,7 @@ async function handleSubmit(e) {
 
     await addDoc(collection(db, "leads"), leadPayload);
 
-    setStatus({
-      type: "success",
-      message: "Thanks — we will call you shortly."
-    });
+    showToast("success", "Thanks! We will call you shortly.");
 
     setForm({
       name: "",
@@ -131,12 +122,12 @@ async function handleSubmit(e) {
       service: "",
       requirements: ""
     });
+
   } catch (err) {
     console.error("Lead save failed:", err);
-    setStatus({
-      type: "error",
-      message: "Something went wrong. Please try again."
-    });
+    showToast("error", "Something went wrong. Please try again.");
+  } finally {
+    setLoading(false);
   }
 }
 
@@ -233,14 +224,15 @@ async function handleSubmit(e) {
             </label>
 
             <div className="hp-form-actions">
-              <button type="submit" className="hp-submit">{status?.type === "sending" ? "Sending..." : "Request a Callback"}</button>
-            </div>
+<button type="submit" className="hp-submit" disabled={loading}>
+  {loading ? "Submitting..." : "Request a Callback"}
+</button>            </div>
 
-            {status && (
-              <div role="status" className={`hp-status ${status.type === "error" ? "hp-error" : status.type === "success" ? "hp-success" : "hp-info"}`}>
-                {status.message}
-              </div>
-            )}
+           {toast && (
+  <div className={`hp-toast hp-toast-${toast.type}`}>
+    {toast.message}
+  </div>
+)}
           </form>
         </aside>
       </div>

@@ -24,7 +24,7 @@ const Doctors = () => {
   const [selectedDoctor, setSelectedDoctor] = useState("");
 
   const [loading, setLoading] = useState(false);
-
+const [toast, setToast] = useState(null);
   const [form, setForm] = useState({
     name: "",
     age: "",
@@ -102,45 +102,76 @@ const Doctors = () => {
 
   /* ================= SAVE APPOINTMENT ================= */
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+ const handleSubmit = async (e) => {
+  e.preventDefault();
 
-    try {
-      setLoading(true);
+  if (!form.name.trim()) {
+    return setToast({
+      type: "error",
+      message: "Patient name is required",
+    });
+  }
 
-      await addDoc(
-        collection(db, "appointments"),
-        {
-          doctor: selectedDoctor,
-          ...form,
-          status: "pending",
-          createdAt: new Date(),
-        }
-      );
+  if (!/^[0-9]{10}$/.test(form.phone)) {
+    return setToast({
+      type: "error",
+      message: "Enter valid 10 digit phone number",
+    });
+  }
 
-      alert("Appointment Booked ✅");
+  if (!form.date || !form.time) {
+    return setToast({
+      type: "error",
+      message: "Select date and time",
+    });
+  }
 
-      setShowModal(false);
+  if (!form.problem.trim()) {
+    return setToast({
+      type: "error",
+      message: "Please describe the problem",
+    });
+  }
 
-      setForm({
-        name: "",
-        age: "",
-        gender: "",
-        phone: "",
-        email: "",
-        date: "",
-        time: "",
-        address: "",
-        problem: "",
-      });
+  try {
+    setLoading(true);
 
-    } catch (err) {
-      console.error(err);
-      alert("Error ❌");
-    } finally {
-      setLoading(false);
-    }
-  };
+    await addDoc(collection(db, "appointments"), {
+      doctor: selectedDoctor,
+      ...form,
+      status: "pending",
+      createdAt: new Date(),
+    });
+
+    setToast({
+      type: "success",
+      message: "Appointment booked successfully!",
+    });
+
+    setShowModal(false);
+
+    setForm({
+      name: "",
+      age: "",
+      gender: "",
+      phone: "",
+      email: "",
+      date: "",
+      time: "",
+      address: "",
+      problem: "",
+    });
+
+  } catch (err) {
+    setToast({
+      type: "error",
+      message: "Booking failed. Try again.",
+    });
+  } finally {
+    setLoading(false);
+    setTimeout(() => setToast(null), 3000);
+  }
+};
 
   /* ================= OPEN MODAL ================= */
 
@@ -379,6 +410,11 @@ const Doctors = () => {
         </div>
 
       )}
+      {toast && (
+  <div className={`toast ${toast.type}`}>
+    {toast.message}
+  </div>
+)}
 
     </div>
   );

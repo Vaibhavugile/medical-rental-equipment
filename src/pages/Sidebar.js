@@ -76,7 +76,7 @@ const SECTIONS = [
       },
       {
         key: "nursing_orders",     // ✅
-        label: "Nursing Orders",
+        label: "Nursing & Caretakers Orders",
         path: "/crm/nursing-orders",
         icon: Stethoscope,
       },

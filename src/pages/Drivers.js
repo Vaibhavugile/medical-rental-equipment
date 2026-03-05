@@ -297,64 +297,76 @@ export default function Drivers() {
       </div>
 
       <div className="drivers-table">
+        
         {loading ? (
           <p>Loading drivers…</p>
         ) : (
           <table>
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Phone</th>
-                <th>Email</th>
-                <th>Vehicle/Equip</th>
-                <th>Status</th>
-                <th>Salary</th>
-                <th>Period</th>
-                <th>Join Date</th>
-                <th>License #</th>
-                <th>Expiry</th>
-                <th>Shift</th>
-                <th>Address</th>
-                <th>Emergency Contact</th>
-                <th>Auth UID</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
+          <thead>
+  <tr>
+    <th>Name</th>
+    <th>Phone</th>
+    <th>Vehicle</th>
+    <th>Status</th>
+    <th>Salary</th>
+    <th>Shift</th>
+    <th>Actions</th>
+  </tr>
+</thead>
             <tbody>
               {filtered.map((d) => (
                 <tr key={d.id}>
-                  <td>{d.name || "-"}</td>
-                  <td>{d.phone || "-"}</td>
-                  <td>{d.loginEmail || "-"}</td>
-                  <td>{d.vehicle || "-"}</td>
-                  <td>{d.status || "-"}</td>
-                  <td>{d.salary === "" || d.salary === undefined ? "-" : toCurrency(d.salary)}</td>
-                  <td>{d.salaryPeriod || "-"}</td>
-                  <td>{d.joinDate || "-"}</td>
-                  <td>{d.licenseNumber || "-"}</td>
-                  <td>{d.licenseExpiry || "-"}</td>
-                  <td>{d.shift || "-"}</td>
-                  <td style={{ maxWidth: 220, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{d.address || "-"}</td>
-                  <td>
-                    {d.emergencyContactName || d.emergencyContactPhone
-                      ? `${d.emergencyContactName || ""}${d.emergencyContactName && d.emergencyContactPhone ? " — " : ""}${d.emergencyContactPhone || ""}`
-                      : "-"}
-                  </td>
-                  <td style={{ fontSize: 12, color: "#6b7280" }}>{d.authUid ? String(d.authUid).slice(0, 8) + "…" : "-"}</td>
-                  <td>
-                    <button className="cp-btn ghost" onClick={() => editDriver(d)}>Edit</button>
-                    <button className="cp-btn ghost" onClick={() => deleteDriverById(d.id)}>Delete</button>
-                    <button className="cp-btn ghost" onClick={() => navigate(`/crm/attendance?driverId=${d.id}`)}>
-  Attendance
-</button>
-<button
-  className="cp-btn ghost"
-  onClick={() => navigate(`/crm/tracking?driverId=${d.id}`)}
->
-  Track
-</button>
-                  </td>
-                </tr>
+  <td className="driver-name">
+    {d.name || "-"}
+  </td>
+
+  <td>{d.phone || "-"}</td>
+
+  <td>{d.vehicle || "-"}</td>
+
+  <td>
+    <span className={`status-badge ${(d.status || "").toLowerCase()}`}>
+      {d.status || "-"}
+    </span>
+  </td>
+
+  <td>
+    {d.salary === "" || d.salary === undefined
+      ? "-"
+      : `₹${toCurrency(d.salary)}/${d.salaryPeriod || ""}`}
+  </td>
+
+  <td style={{ textTransform: "capitalize" }}>
+    {d.shift || "-"}
+  </td>
+
+  <td>
+    <div className="driver-actions">
+
+      <button
+        className="dr-btn edit"
+        onClick={() => editDriver(d)}
+      >
+        Edit
+      </button>
+
+      <button
+        className="dr-btn delete"
+        onClick={() => deleteDriverById(d.id)}
+      >
+        Delete
+      </button>
+
+      <button
+        className="dr-btn attendance"
+        onClick={() => navigate(`/crm/attendance?driverId=${d.id}`)}
+      >
+        Attendance
+      </button>
+
+    </div>
+  </td>
+</tr>
               ))}
             </tbody>
           </table>
