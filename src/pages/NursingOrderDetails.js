@@ -83,6 +83,11 @@ export default function NursingOrderDetails() {
     });
 
   };
+  const [stopServiceModal, setStopServiceModal] = useState({
+  open: false,
+  assignment: null,
+  endDate: ""
+});
 
   const [assignDates, setAssignDates] = useState({
   startDate: "",
@@ -412,7 +417,7 @@ export default function NursingOrderDetails() {
     0
   );
 
- const assignStaff = async (staff) => {
+const assignStaff = async (staff) => {
 
   if (!order) return;
 
@@ -449,8 +454,8 @@ export default function NursingOrderDetails() {
     const start = new Date(assignDates.startDate);
     const end = new Date(assignDates.endDate);
 
-    if (end < start) {
-      alert("End date cannot be before start date");
+    if (end <= start) {
+      alert("End date must be after start date");
       setAssigning(false);
       return;
     }
@@ -502,24 +507,47 @@ export default function NursingOrderDetails() {
 
     const diffMs = end - start;
 
+    /* HOURLY */
+
     if (serviceRateType === "hourly") {
 
       hours = Math.ceil(diffMs / (1000 * 60 * 60));
 
     }
 
+    /* DAILY (ignore time) */
+
     if (serviceRateType === "daily") {
 
-      days = Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
+      const startDay = new Date(start);
+      const endDay = new Date(end);
+
+      startDay.setHours(0,0,0,0);
+      endDay.setHours(0,0,0,0);
+
+      const diffDays =
+        (endDay - startDay) / (1000 * 60 * 60 * 24);
+
+      days = diffDays + 1;
 
     }
 
+    /* MONTHLY */
+
     if (serviceRateType === "monthly") {
 
-      const totalDays =
-        Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
+      const startDay = new Date(start);
+      const endDay = new Date(end);
 
-      months = Math.round(totalDays / 30);
+      startDay.setHours(0,0,0,0);
+      endDay.setHours(0,0,0,0);
+
+      const diffDays =
+        (endDay - startDay) / (1000 * 60 * 60 * 24) + 1;
+
+      months = Math.round(diffDays / 30);
+
+      if (months < 1) months = 1;
 
     }
 
@@ -706,7 +734,152 @@ export default function NursingOrderDetails() {
       alert(e.message || "Failed to save payment");
     }
   };
+const stopStaffService = async () => {
 
+  const assignment = stopServiceModal.assignment;
+  const stopDate = stopServiceModal.endDate;
+
+  if (!assignment || !stopDate) return;
+
+  try {
+
+    const start = new Date(assignment.startDate);
+    const end = new Date(stopDate);
+
+    if (end <= start) {
+      alert("Stop date must be after start date");
+      return;
+    }
+
+    let hours = 0;
+    let days = 0;
+    let months = 0;
+
+    const diffMs = end - start;
+
+    /* =========================
+       HOURLY CALCULATION
+    ========================= */
+
+    if (assignment.rateType === "hourly") {
+
+      hours = Math.ceil(diffMs / (1000 * 60 * 60));
+
+    }
+
+    /* =========================
+       DAILY CALCULATION
+       Ignore time part
+    ========================= */
+
+    if (assignment.rateType === "daily") {
+
+      const startDay = new Date(start);
+      const endDay = new Date(end);
+
+      startDay.setHours(0,0,0,0);
+      endDay.setHours(0,0,0,0);
+
+      const diffDays =
+        (endDay - startDay) / (1000 * 60 * 60 * 24);
+
+      days = diffDays + 1;
+
+    }
+
+    /* =========================
+       MONTHLY CALCULATION
+    ========================= */
+
+    if (assignment.rateType === "monthly") {
+
+      const startDay = new Date(start);
+      const endDay = new Date(end);
+
+      startDay.setHours(0,0,0,0);
+      endDay.setHours(0,0,0,0);
+
+      const diffDays =
+        (endDay - startDay) / (1000 * 60 * 60 * 24) + 1;
+
+      months = Math.round(diffDays / 30);
+
+      if (months < 1) months = 1;
+
+    }
+
+    /* =========================
+       SALARY CALCULATION
+    ========================= */
+
+    let amount = 0;
+
+    if (assignment.rateType === "hourly") {
+      amount = hours * assignment.rate;
+    }
+
+    if (assignment.rateType === "daily") {
+      amount = days * assignment.rate;
+    }
+
+    if (assignment.rateType === "monthly") {
+      amount = months * assignment.rate;
+    }
+
+    const balanceAmount =
+      amount - Number(assignment.paidAmount || 0);
+
+    /* =========================
+       UPDATE FIRESTORE
+    ========================= */
+
+    await updateDoc(doc(db, "staffAssignments", assignment.id), {
+
+      endDate: stopDate,
+
+      hours,
+      days,
+      months,
+
+      amount,
+      balanceAmount,
+
+      status: "completed",
+
+      stoppedAt: serverTimestamp(),
+      stoppedBy: auth.currentUser?.uid || ""
+
+    });
+
+    await loadAssignments();
+
+    /* =========================
+       CLOSE MODAL
+    ========================= */
+
+    setStopServiceModal({
+      open: false,
+      assignment: null,
+      endDate: ""
+    });
+
+  } catch (err) {
+
+    console.error(err);
+    alert("Failed to stop staff service");
+
+  }
+
+};
+const openStopServiceModal = (assignment) => {
+
+  setStopServiceModal({
+    open: true,
+    assignment,
+    endDate: formatDateTimeLocal(assignment.endDate || new Date())
+  });
+
+};
 
   const payAssignment = async (assignment) => {
     if (!window.confirm("Mark this staff payment as paid?")) return;
@@ -1329,120 +1502,107 @@ export default function NursingOrderDetails() {
 
                     <div className="nod-staff-meta">
 
-                      <span
-                        className={`nod-badge ${a.paid ? "nod-badge-green" : "nod-badge-orange"
-                          }`}
-                      >
-                        {a.paid ? "Paid" : "Unpaid"}
-                      </span>
+  {/* Payment badge */}
+  <span
+    className={`nod-badge ${
+      a.paid ? "nod-badge-green" : "nod-badge-orange"
+    }`}
+  >
+    {a.paid ? "Paid" : "Unpaid"}
+  </span>
 
-                      <button
-                        className="nod-btn nod-btn-secondary nod-attendance-btn"
-                        onClick={() =>
-                          navigate(
-                            `/crm/attendance?role=staff&userId=${a.staffId}&from=${a.startDate}&to=${a.endDate}`
-                          )
-                        }
-                      >
-                        View Attendance
-                      </button>
+  {/* Stopped badge */}
+  {a.status === "completed" && (
+    <span className="nod-badge nod-badge-blue">
+      Stopped
+    </span>
+  )}
 
-                    </div>
+  {/* Attendance */}
+  <button
+    className="nod-btn nod-btn-secondary nod-attendance-btn"
+    onClick={() =>
+      navigate(
+        `/crm/attendance?role=staff&userId=${a.staffId}&from=${a.startDate}&to=${a.endDate}`
+      )
+    }
+  >
+    View Attendance
+  </button>
 
-                  </div>
+  {/* EDIT */}
+  {editingStaffId === a.id ? (
+    <>
+      <button
+        className="nod-btn nod-btn-primary small"
+        onClick={() =>
+          saveStaffSalary({
+            ...a,
+            amount: tempSalary[a.id],
+          })
+        }
+      >
+        Save
+      </button>
 
-                  <div className="nod-staff-actions">
+      <button
+        className="nod-btn nod-btn-secondary small"
+        onClick={() => {
+          setEditingStaffId(null);
+          setTempSalary({});
+        }}
+      >
+        Cancel
+      </button>
+    </>
+  ) : (
+    <button
+      className="nod-btn nod-btn-secondary small"
+      onClick={() => {
+        setEditingStaffId(a.id);
+        setTempSalary({ [a.id]: a.amount });
+      }}
+    >
+      Edit
+    </button>
+  )}
 
-                    {/* SALARY */}
-                    <div className="nod-bold">
-                      {editingStaffId === a.id ? (
-                        <>
-                          ₹
-                          <input
-                            type="number"
-                            className="nod-input small"
-                            value={tempSalary[a.id]}
-                            onChange={(e) =>
-                              setTempSalary((p) => ({
-                                ...p,
-                                [a.id]: Number(e.target.value || 0),
-                              }))
-                            }
-                          />
-                        </>
-                      ) : (
-                        <>₹ {fmtCurrency(a.amount)}</>
-                      )}
-                    </div>
-                    <div
-                      className="nod-muted small nod-payment-history"
-                      onClick={() => openPaymentHistory(a)}
-                    >
-                      Paid ₹{fmtCurrency(a.paidAmount || 0)} / ₹{fmtCurrency(a.amount)}
-                    </div>
+  {/* PAY */}
+  
 
+  {/* UNASSIGN */}
+  {a.status !== "cancelled" && (
+    <button
+      className="nod-btn nod-btn-danger small"
+      onClick={() => unassignStaff(a.id)}
+    >
+      Unassign
+    </button>
+  )}
 
-                    {/* EDIT */}
-                    <div className="nod-row small">
+  {/* STOP */}
+  {a.status !== "completed" && (
+    <button
+      className="nod-btn nod-btn-danger small"
+      onClick={() => openStopServiceModal(a)}
+    >
+      Stop
+    </button>
+  )}
+  {a.status !== "cancelled" && (a.paidAmount || 0) < a.amount && (
+    <button
+      className="nod-btn nod-btn-primary small"
+      onClick={() => openStaffPayment(a)}
+    >
+      Pay
+    </button>
+  )}
 
-                      {editingStaffId === a.id ? (
-                        <>
-                          <button
-                            className="nod-btn nod-btn-primary small"
-                            onClick={() =>
-                              saveStaffSalary({
-                                ...a,
-                                amount: tempSalary[a.id],
-                              })
-                            }
-                          >
-                            Save
-                          </button>
-
-                          <button
-                            className="nod-btn nod-btn-secondary small"
-                            onClick={() => {
-                              setEditingStaffId(null);
-                              setTempSalary({});
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          className="nod-btn nod-btn-secondary small"
-                          onClick={() => {
-                            setEditingStaffId(a.id);
-                            setTempSalary({ [a.id]: a.amount });
-                          }}
-                        >
-                          Edit
-                        </button>
-                      )}
-
-                    </div>
-
-                    {/* PAY */}
-                    {a.status !== "cancelled" && (a.paidAmount || 0) < a.amount && (<button
-                      className="nod-btn nod-btn-primary"
-                      onClick={() => openStaffPayment(a)}
-                    >
-                      Pay
-                    </button>
-                    )}
-
-                    {/* UNASSIGN */}
-                    {a.status !== "cancelled" && (
-                      <button
-                        className="nod-btn nod-btn-danger"
-                        onClick={() => unassignStaff(a.id)}
-                      >
-                        Unassign
-                      </button>
-                    )}
+</div>
 
                   </div>
+
+                 
 
                 </div>
               ))}
@@ -1816,6 +1976,63 @@ const end = new Date(assignDates.endDate);
     >
       Close
     </button>
+
+  </div>
+</div>
+
+)}
+{stopServiceModal.open && (
+
+<div className="nod-modal">
+  <div className="nod-modal-card">
+
+    <h4>Stop Staff Service</h4>
+
+    <div className="nod-muted">
+      Staff: {stopServiceModal.assignment?.staffName}
+    </div>
+
+    <div className="nod-muted">
+      Current End Date: {stopServiceModal.assignment?.endDate}
+    </div>
+
+    <label>Stop Date / Time</label>
+
+    <input
+      type="datetime-local"
+      className="nod-input"
+      value={stopServiceModal.endDate}
+      onChange={(e)=>
+        setStopServiceModal(p=>({
+          ...p,
+          endDate:e.target.value
+        }))
+      }
+    />
+
+    <div className="nod-row">
+
+      <button
+        className="nod-btn nod-btn-secondary"
+        onClick={() =>
+          setStopServiceModal({
+            open:false,
+            assignment:null,
+            endDate:""
+          })
+        }
+      >
+        Cancel
+      </button>
+
+      <button
+        className="nod-btn nod-btn-danger"
+        onClick={stopStaffService}
+      >
+        Stop Service
+      </button>
+
+    </div>
 
   </div>
 </div>
