@@ -48,6 +48,7 @@ export default function Staff() {
     experienceYears: "",
     servicesOffered: "",
     shiftPreference: "day",
+    shiftType: "day",
 
     baseRate: "",
     rateType: "daily",
@@ -55,6 +56,10 @@ export default function Staff() {
     emergencyContactName: "",
     emergencyContactPhone: "",
     relation: "",
+    bankName: "",
+bankAccountNumber: "",
+bankIfsc: "",
+upiId: "",
 
     joiningDate: "",
 
@@ -97,14 +102,26 @@ export default function Staff() {
 
   /* ================= HELPERS ================= */
   const validate = (p) => {
-    if (!p.name.trim()) return "Name is required";
-    if (!p.loginEmail.trim()) return "Email is required";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.loginEmail))
-      return "Invalid email";
-    if (p.aadharNumber && p.aadharNumber.length < 12)
-      return "Invalid Aadhaar number";
-    return "";
-  };
+  if (!p.name.trim()) return "Name is required";
+
+  if (!p.loginEmail.trim()) return "Email is required";
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.loginEmail))
+    return "Invalid email";
+
+  if (p.aadharNumber && p.aadharNumber.length < 12)
+    return "Invalid Aadhaar number";
+
+  // IFSC validation
+  if (p.bankIfsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(p.bankIfsc))
+    return "Invalid IFSC code";
+
+  // UPI validation
+  if (p.upiId && !/^[\w.-]+@[\w.-]+$/.test(p.upiId))
+    return "Invalid UPI ID";
+
+  return "";
+};
 
   const normalize = (p) => ({
     name: p.name.trim(),
@@ -131,6 +148,7 @@ export default function Staff() {
       .filter(Boolean),
 
     shiftPreference: p.shiftPreference,
+    shiftType: p.shiftType,
 
     baseRate: p.baseRate === "" ? "" : Number(p.baseRate),
     rateType: p.rateType,
@@ -140,7 +158,10 @@ export default function Staff() {
     relation: p.relation.trim(),
 
     joiningDate: p.joiningDate || "",
-
+    bankName: p.bankName.trim(),
+bankAccountNumber: p.bankAccountNumber.trim(),
+bankIfsc: p.bankIfsc.trim().toUpperCase(),
+upiId: p.upiId.trim().toLowerCase(),
     available: !!p.available,
     active: !!p.active,
 
@@ -311,6 +332,19 @@ export default function Staff() {
           <input placeholder="Services (comma separated)"
             value={form.servicesOffered}
             onChange={(e) => setForm({ ...form, servicesOffered: e.target.value })} />
+            <select
+  value={form.shiftType}
+  onChange={(e) =>
+    setForm({ ...form, shiftType: e.target.value })
+  }
+>
+    <option value="">Select Shift</option>
+
+  <option value="day">Day Shift</option>
+  <option value="night">Night Shift</option>
+  <option value="full">Full Day (24hr)</option>
+  <option value="flexible">Flexible</option>
+</select>
 
           <input type="number" placeholder="Base Rate"
             value={form.baseRate}
@@ -318,6 +352,7 @@ export default function Staff() {
 
           <select value={form.rateType}
             onChange={(e) => setForm({ ...form, rateType: e.target.value })}>
+            <option value="">Select Rate Type</option>
             <option value="hourly">Hourly</option>
             <option value="daily">Daily</option>
             <option value="monthly">Monthly</option>
@@ -334,6 +369,38 @@ export default function Staff() {
             onChange={(e) =>
               setForm({ ...form, emergencyContactPhone: e.target.value })
             } />
+            <h4>Bank Details</h4>
+
+<input
+  placeholder="Bank Name"
+  value={form.bankName}
+  onChange={(e) =>
+    setForm({ ...form, bankName: e.target.value })
+  }
+/>
+
+<input
+  placeholder="Account Number"
+  value={form.bankAccountNumber}
+  onChange={(e) =>
+    setForm({ ...form, bankAccountNumber: e.target.value })
+  }
+/>
+
+<input
+  placeholder="IFSC Code"
+  value={form.bankIfsc}
+  onChange={(e) =>
+    setForm({ ...form, bankIfsc: e.target.value })
+  }
+/>
+<input
+  placeholder="UPI ID"
+  value={form.upiId}
+  onChange={(e) =>
+    setForm({ ...form, upiId: e.target.value })
+  }
+/>
 
           <div className="actions-row">
             <button className="cp-btn">
@@ -358,6 +425,7 @@ export default function Staff() {
               <tr>
                 <th>Name</th>
                 <th>Type</th>
+                    <th>Shift</th>
                 <th>Phone</th>
                 <th>Aadhaar</th>
                 <th>Services</th>
@@ -376,6 +444,13 @@ export default function Staff() {
 </td>
 
                   <td>{r.staffType}</td>
+
+<td>
+  {r.shiftType
+    ? r.shiftType.charAt(0).toUpperCase() + r.shiftType.slice(1)
+    : "-"}
+</td>
+
                   <td>{r.phone || "-"}</td>
                   <td>
                     {r.aadharNumber

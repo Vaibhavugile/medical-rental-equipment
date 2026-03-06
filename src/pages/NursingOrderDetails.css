@@ -293,7 +293,11 @@
   font-size: 16px;
   font-weight: 600;
 }
-
+.nod-service-block {
+  border-top: 1px dashed #e5e7eb;
+  padding-top: 14px;
+  margin-top: 14px;
+}
 /* ===============================
    RESPONSIVE
 ================================ */

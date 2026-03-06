@@ -38,11 +38,15 @@ export default function NursingOrderDetails() {
 
     const [assignOpen, setAssignOpen] = useState(false);
     const [assigning, setAssigning] = useState(false);
+    const [assignServiceIndex, setAssignServiceIndex] = useState(null);
     const [editableItems, setEditableItems] = useState([]);
     const [servicesEditing, setServicesEditing] = useState(false);
 const [editingStaffId, setEditingStaffId] = useState(null);
 const [tempSalary, setTempSalary] = useState({});
-
+const openAssignModal = (serviceIndex) => {
+  setAssignServiceIndex(serviceIndex);
+  setAssignOpen(true);
+};
     const fmtDateTime = (iso) => {
         if (!iso) return "";
         return new Date(iso).toLocaleString();
@@ -337,89 +341,126 @@ const saveServices = async () => {
     const pendingSalary = totalSalary - paidSalary;
 
 
-    const assignStaff = async (staff) => {
-        if (!order) return;
+   const assignStaff = async (staff) => {
+  if (!order) return;
 
-        setAssigning(true);
+  setAssigning(true);
 
-        try {
-            /* ===============================
-               0️⃣ CHECK EXISTING ACTIVE ASSIGNMENT
-            =============================== */
+  try {
+    /* ===============================
+       0️⃣ GET SELECTED SERVICE
+    =============================== */
 
-            const q = query(
-                collection(db, "staffAssignments"),
-                where("orderId", "==", id),
-                where("staffId", "==", staff.id),
-                where("status", "==", "active")
-            );
+    const item = order.items?.[assignServiceIndex] || {};
 
-            const existingSnap = await getDocs(q);
+    if (!item) {
+      alert("Service not found");
+      setAssigning(false);
+      return;
+    }
 
-            if (!existingSnap.empty) {
-                alert("This staff is already assigned to this order.");
-                setAssigning(false);
-                return;
-            }
+    /* ===============================
+       1️⃣ CHECK EXISTING ASSIGNMENT
+       (same staff + same service)
+    =============================== */
 
-            /* ===============================
-               1️⃣ CREATE STAFF ASSIGNMENT
-            =============================== */
+    const q = query(
+      collection(db, "staffAssignments"),
+      where("orderId", "==", id),
+      where("staffId", "==", staff.id),
+      where("serviceIndex", "==", assignServiceIndex),
+      where("status", "==", "assigned")
+    );
 
-            const item = order.items?.[0] || {};
+    const existingSnap = await getDocs(q);
 
-            const days = Number(item.days || 0);
-            const rate = Number(staff.baseRate || 0);
-            const amount = days * rate;
+    if (!existingSnap.empty) {
+      alert("This staff is already assigned to this service.");
+      setAssigning(false);
+      return;
+    }
 
-            await addDoc(collection(db, "staffAssignments"), {
-                staffId: staff.id,
-                staffName: staff.name,
-                staffType: staff.staffType,
+    /* ===============================
+       2️⃣ CALCULATE DAYS
+    =============================== */
 
-                orderId: id,
-                orderNo: order.orderNo,
+    let days = Number(item.days || 0);
 
-                startDate: item.expectedStartDate || "",
-                endDate: item.expectedEndDate || "",
-                days,
+    if (!days && item.expectedStartDate && item.expectedEndDate) {
+      const start = new Date(item.expectedStartDate);
+      const end = new Date(item.expectedEndDate);
 
-                shift: staff.shiftPreference || "day",
-                rate,
-                rateType: staff.rateType || "daily",
+      const diff =
+        Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
-                amount,
+      days = diff > 0 ? diff : 0;
+    }
 
-                status: "assigned",     // active | completed | cancelled
-                paid: false,
+    /* ===============================
+       3️⃣ CALCULATE SALARY
+    =============================== */
 
-                createdAt: serverTimestamp(),
-                createdBy: auth.currentUser?.uid || "",
-            });
+    const rate = Number(staff.baseRate || 0);
+    const amount = days * rate;
 
-            /* ===============================
-               2️⃣ UPDATE NURSING ORDER STATUS
-            =============================== */
+    /* ===============================
+       4️⃣ CREATE ASSIGNMENT
+    =============================== */
 
-            await updateDoc(doc(db, "nursingOrders", id), {
-                status: "assigned",
-                updatedAt: serverTimestamp(),
-                updatedBy: auth.currentUser?.uid || "",
-            });
+    await addDoc(collection(db, "staffAssignments"), {
+      staffId: staff.id,
+      staffName: staff.name,
+      staffType: staff.staffType,
 
-            // ✅ IMPORTANT
-            await loadAssignments();
+      orderId: id,
+      orderNo: order.orderNo,
 
-            setAssignOpen(false);
+      serviceIndex: assignServiceIndex,
+      serviceName: item.name || "Service",
 
-        } catch (err) {
-            console.error("assignStaff error", err);
-            alert("Failed to assign staff");
-        } finally {
-            setAssigning(false);
-        }
-    };
+      startDate: item.expectedStartDate || "",
+      endDate: item.expectedEndDate || "",
 
+      days,
+      rate,
+      rateType: staff.rateType || "daily",
+
+      shift: staff.shiftPreference || "day",
+
+      amount,
+
+      status: "assigned",
+      paid: false,
+
+      createdAt: serverTimestamp(),
+      createdBy: auth.currentUser?.uid || "",
+    });
+
+    /* ===============================
+       5️⃣ UPDATE ORDER STATUS
+    =============================== */
+
+    await updateDoc(doc(db, "nursingOrders", id), {
+      status: "assigned",
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser?.uid || "",
+    });
+
+    /* ===============================
+       6️⃣ RELOAD ASSIGNMENTS
+    =============================== */
+
+    await loadAssignments();
+
+    setAssignOpen(false);
+
+  } catch (err) {
+    console.error("assignStaff error", err);
+    alert("Failed to assign staff");
+  } finally {
+    setAssigning(false);
+  }
+};
     const unassignStaff = async (assignmentId) => {
         if (!window.confirm("Unassign this staff from order?")) return;
 
@@ -836,6 +877,13 @@ const saveStaffSalary = async (assignment) => {
           ₹ {fmtCurrency(it.amount)}
         </div>
 
+  <button
+    className="nod-btn nod-btn-primary small"
+    onClick={() => openAssignModal(i)}
+  >
+    Assign Nurse
+  </button>
+
         {servicesEditing && (
           <button
             className="nod-btn nod-btn-danger small"
@@ -1000,24 +1048,84 @@ const saveStaffSalary = async (assignment) => {
 
             {/* ASSIGNED STAFF HEADER */}
             <div className="nod-card">
-                <div className="nod-row">
-                    <h3>Assigned Nurse</h3>
-                    <button
-                        className="nod-btn nod-btn-primary"
-                        onClick={() => setAssignOpen(true)}
-                    >
-                        + Assign Nurse
-                    </button>
-                </div>
 
-                {loadingAssignments && (
-                    <div className="nod-muted">Loading assignments…</div>
-                )}
+  <h3>Assigned Nurses</h3>
 
-                {!loadingAssignments && assignments.length === 0 && (
-                    <div className="nod-muted">No Nurse assigned yet</div>
-                )}
+  {loadingAssignments && (
+    <div className="nod-muted">Loading assignments…</div>
+  )}
+
+  {!loadingAssignments && editableItems.map((service, i) => {
+
+    const serviceAssignments = assignments.filter(
+      (a) => a.serviceIndex === i && a.status !== "cancelled"
+    );
+
+    return (
+      <div key={i} className="nod-service-block">
+
+        {/* SERVICE HEADER */}
+        <div className="nod-row">
+          <strong>
+            Service {i + 1}: {service.name}
+          </strong>
+
+          <button
+            className="nod-btn nod-btn-primary small"
+            onClick={() => openAssignModal(i)}
+          >
+            Assign Nurse
+          </button>
+        </div>
+
+        {/* NO STAFF */}
+        {serviceAssignments.length === 0 && (
+          <div className="nod-muted">
+            No nurse assigned
+          </div>
+        )}
+
+        {/* STAFF LIST */}
+        {serviceAssignments.map((a) => (
+          <div key={a.id} className="nod-staff-row">
+
+            <div>
+              <strong>{a.staffName}</strong>
+
+              <div className="nod-muted">
+                {a.staffType} · {a.shift}
+              </div>
+
+              <div className="nod-muted">
+                {a.startDate} → {a.endDate} · {a.days} days
+              </div>
             </div>
+
+            <div className="nod-staff-actions">
+
+              <div className="nod-bold">
+                ₹ {fmtCurrency(a.amount)}
+              </div>
+
+              {!a.paid && a.status === "completed" && (
+                <button
+                  className="nod-btn nod-btn-primary small"
+                  onClick={() => payAssignment(a)}
+                >
+                  Pay
+                </button>
+              )}
+
+            </div>
+
+          </div>
+        ))}
+
+      </div>
+    );
+  })}
+
+</div>
 
             {/* SALARY SUMMARY */}
             <div className="nod-card">
@@ -1050,6 +1158,7 @@ const saveStaffSalary = async (assignment) => {
                 <div key={a.id} className="nod-staff-row">
                     <div>
                         <strong>{a.staffName}</strong>
+                        <div className="nod-muted">{a.serviceName}</div>
 
                         <div className="nod-muted">
                             {a.staffType} · {a.shift}
@@ -1222,9 +1331,13 @@ const saveStaffSalary = async (assignment) => {
                                 <div key={s.id} className="nod-staff-card">
                                     <div>
                                         <strong>{s.name}</strong>
-                                        <div className="nod-muted">
-                                            {s.staffType} · ₹{s.baseRate}/{s.rateType}
-                                        </div>
+                                       <div className="nod-muted">
+  {s.staffType} · {s.shiftType || "day"} shift
+</div>
+
+<div className="nod-muted">
+  ₹{s.baseRate}/{s.rateType}
+</div>
                                     </div>
                                     <button
                                         className="nod-btn nod-btn-primary"
