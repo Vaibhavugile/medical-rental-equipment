@@ -43,6 +43,24 @@ export default function NursingOrderDetails() {
   const [servicesEditing, setServicesEditing] = useState(false);
   const [editingStaffId, setEditingStaffId] = useState(null);
   const [tempSalary, setTempSalary] = useState({});
+  const [extendServiceModal, setExtendServiceModal] = useState({
+  open: false,
+  serviceIndex: null,
+  endDate: "",
+  amount: ""
+});
+  const openExtendServiceModal = (serviceIndex) => {
+
+  const service = editableItems?.[serviceIndex];
+
+  setExtendServiceModal({
+    open: true,
+    serviceIndex,
+    endDate: formatDateTimeLocal(service?.expectedEndDate),
+    amount: ""
+  });
+
+};
   const formatDateTimeLocal = (value) => {
   if (!value) return "";
 
@@ -645,6 +663,208 @@ const assignStaff = async (staff) => {
   finally {
 
     setAssigning(false);
+
+  }
+
+};
+const extendService = async () => {
+
+  const { serviceIndex, endDate, amount } = extendServiceModal;
+
+  if (!endDate || !amount) {
+    alert("Enter end date and amount");
+    return;
+  }
+
+  const extraAmount = Number(amount);
+
+  try {
+
+    const service = editableItems[serviceIndex];
+    const updatedEndDate = endDate;
+
+    /* =====================
+       UPDATE SERVICE
+    ===================== */
+
+    const updatedItems = [...editableItems];
+
+    updatedItems[serviceIndex] = {
+      ...service,
+      expectedEndDate: updatedEndDate,
+      amount: Number(service.amount || 0) + extraAmount
+    };
+
+    const newTotals = calculateTotals(
+      updatedItems,
+      order?.totals?.discountAmount || 0,
+      order?.totals?.taxBreakdown || []
+    );
+
+    await updateDoc(doc(db, "nursingOrders", id), {
+
+  items: updatedItems,
+  totals: newTotals,
+
+  extensionHistory: [
+    ...(order.extensionHistory || []),
+    {
+      serviceIndex,
+      serviceName: service.name,
+
+      oldEndDate: service.expectedEndDate,
+      newEndDate: updatedEndDate,
+
+      extraAmount,
+
+      extendedByUid: auth.currentUser?.uid || "",
+      extendedByName:
+        auth.currentUser?.displayName ||
+        auth.currentUser?.email ||
+        "Admin",
+
+      extendedAt: new Date().toISOString()
+    }
+  ],
+
+  updatedAt: serverTimestamp()
+
+});
+
+    /* =====================
+       UPDATE STAFF ASSIGNMENTS
+    ===================== */
+
+    const q = query(
+      collection(db, "staffAssignments"),
+      where("orderId", "==", id),
+      where("serviceIndex", "==", serviceIndex),
+      where("status", "==", "assigned")
+    );
+
+    const snap = await getDocs(q);
+
+    for (const d of snap.docs) {
+
+      const a = d.data();
+
+      const start = new Date(a.startDate);
+      const end = new Date(updatedEndDate);
+
+      let hours = 0;
+      let days = 0;
+      let months = 0;
+
+      const diffMs = end - start;
+
+      /* =====================
+         HOURLY
+      ===================== */
+
+      if (a.rateType === "hourly") {
+
+        hours = Math.floor(diffMs / (1000 * 60 * 60));
+
+      }
+
+      /* =====================
+         DAILY
+         (Prevents +1 day for 1 minute)
+      ===================== */
+
+      if (a.rateType === "daily") {
+
+        const startDay = new Date(start);
+        const endDay = new Date(end);
+
+        startDay.setHours(0,0,0,0);
+        endDay.setHours(0,0,0,0);
+
+        const diffDays =
+          Math.floor((endDay - startDay) / (1000 * 60 * 60 * 24));
+
+        days = diffDays + 1;
+
+      }
+
+      /* =====================
+         MONTHLY
+      ===================== */
+
+      if (a.rateType === "monthly") {
+
+        const startDay = new Date(start);
+        const endDay = new Date(end);
+
+        startDay.setHours(0,0,0,0);
+        endDay.setHours(0,0,0,0);
+
+        const diffDays =
+          Math.floor((endDay - startDay) / (1000 * 60 * 60 * 24)) + 1;
+
+        months = Math.floor(diffDays / 30);
+
+        if (diffDays % 30 !== 0) months++;
+
+        if (months < 1) months = 1;
+
+      }
+
+      /* =====================
+         RECALCULATE SALARY
+      ===================== */
+
+      let newAmount = 0;
+
+      if (a.rateType === "hourly") newAmount = hours * a.rate;
+      if (a.rateType === "daily") newAmount = days * a.rate;
+      if (a.rateType === "monthly") newAmount = months * a.rate;
+
+      const newBalance =
+        newAmount - Number(a.paidAmount || 0);
+
+      await updateDoc(doc(db, "staffAssignments", d.id), {
+
+        endDate: updatedEndDate,
+
+        hours,
+        days,
+        months,
+
+        amount: newAmount,
+        balanceAmount: newBalance,
+
+        updatedAt: serverTimestamp()
+
+      });
+
+    }
+
+    /* =====================
+       REFRESH UI
+    ===================== */
+
+    setEditableItems(updatedItems);
+
+    setOrder(o => ({
+      ...o,
+      items: updatedItems,
+      totals: newTotals
+    }));
+
+    await loadAssignments();
+
+    setExtendServiceModal({
+      open: false,
+      serviceIndex: null,
+      endDate: "",
+      amount: ""
+    });
+
+  } catch (err) {
+
+    console.error(err);
+    alert("Failed to extend service");
 
   }
 
@@ -1278,6 +1498,12 @@ const openStopServiceModal = (assignment) => {
               >
                 Assign Nurse
               </button>
+              <button
+  className="nod-btn nod-btn-secondary small"
+  onClick={() => openExtendServiceModal(i)}
+>
+  Extend Service
+</button>
 
               {servicesEditing && (
                 <button
@@ -1500,7 +1726,29 @@ const openStopServiceModal = (assignment) => {
                       {a.rateType === "monthly" && ` ${a.months || 0} months`}
                     </div>
 
-                    <div className="nod-staff-meta">
+      <div className="nod-staff-meta">
+
+  {/* SALARY DISPLAY / EDIT */}
+  <div className="nod-bold">
+    {editingStaffId === a.id ? (
+      <>
+        ₹
+        <input
+          type="number"
+          className="nod-input small"
+          value={tempSalary[a.id]}
+          onChange={(e) =>
+            setTempSalary((p) => ({
+              ...p,
+              [a.id]: Number(e.target.value || 0),
+            }))
+          }
+        />
+      </>
+    ) : (
+      <>₹ {fmtCurrency(a.amount)}</>
+    )}
+  </div>
 
   {/* Payment badge */}
   <span
@@ -1518,6 +1766,14 @@ const openStopServiceModal = (assignment) => {
     </span>
   )}
 
+  {/* Payment summary */}
+  <div
+    className="nod-muted small nod-payment-history"
+    onClick={() => openPaymentHistory(a)}
+  >
+    Paid ₹{fmtCurrency(a.paidAmount || 0)} / ₹{fmtCurrency(a.amount)}
+  </div>
+
   {/* Attendance */}
   <button
     className="nod-btn nod-btn-secondary nod-attendance-btn"
@@ -1530,7 +1786,7 @@ const openStopServiceModal = (assignment) => {
     View Attendance
   </button>
 
-  {/* EDIT */}
+  {/* EDIT / SAVE */}
   {editingStaffId === a.id ? (
     <>
       <button
@@ -1568,7 +1824,14 @@ const openStopServiceModal = (assignment) => {
   )}
 
   {/* PAY */}
-  
+  {a.status !== "cancelled" && (a.paidAmount || 0) < a.amount && (
+    <button
+      className="nod-btn nod-btn-primary small"
+      onClick={() => openStaffPayment(a)}
+    >
+      Pay
+    </button>
+  )}
 
   {/* UNASSIGN */}
   {a.status !== "cancelled" && (
@@ -1587,14 +1850,6 @@ const openStopServiceModal = (assignment) => {
       onClick={() => openStopServiceModal(a)}
     >
       Stop
-    </button>
-  )}
-  {a.status !== "cancelled" && (a.paidAmount || 0) < a.amount && (
-    <button
-      className="nod-btn nod-btn-primary small"
-      onClick={() => openStaffPayment(a)}
-    >
-      Pay
     </button>
   )}
 
@@ -1680,6 +1935,49 @@ const openStopServiceModal = (assignment) => {
             </div>
           ))}
       </div>
+
+      <div className="nod-card">
+
+<h3>Service Extensions</h3>
+
+{(order.extensionHistory || []).length === 0 && (
+  <div className="nod-muted">
+    No extensions recorded
+  </div>
+)}
+
+{(order.extensionHistory || [])
+.slice()
+.reverse()
+.map((e,i)=>(
+  <div key={i} className="nod-row nod-extension-row">
+
+    <div>
+
+      <strong>{e.serviceName}</strong>
+
+      <div className="nod-muted small">
+        {e.oldEndDate} → {e.newEndDate}
+      </div>
+
+      <div className="nod-muted small">
+        Extended by {e.extendedByName}
+      </div>
+
+      <div className="nod-muted small">
+        {new Date(e.extendedAt).toLocaleString()}
+      </div>
+
+    </div>
+
+    <div className="nod-green">
+      + ₹{fmtCurrency(e.extraAmount)}
+    </div>
+
+  </div>
+))}
+
+</div>
 
 
       {/* ASSIGN MODAL */}
@@ -2030,6 +2328,69 @@ const end = new Date(assignDates.endDate);
         onClick={stopStaffService}
       >
         Stop Service
+      </button>
+
+    </div>
+
+  </div>
+</div>
+
+)}
+{extendServiceModal.open && (
+
+<div className="nod-modal">
+  <div className="nod-modal-card">
+
+    <h4>Extend Service</h4>
+
+    <label>New End Date</label>
+
+    <input
+      type="datetime-local"
+      className="nod-input"
+      value={extendServiceModal.endDate}
+      onChange={(e)=>
+        setExtendServiceModal(p=>({
+          ...p,
+          endDate:e.target.value
+        }))
+      }
+    />
+
+    <label>Extra Amount</label>
+
+    <input
+      type="number"
+      className="nod-input"
+      placeholder="Extension Amount"
+      value={extendServiceModal.amount}
+      onChange={(e)=>
+        setExtendServiceModal(p=>({
+          ...p,
+          amount:e.target.value
+        }))
+      }
+    />
+
+    <div className="nod-row">
+
+      <button
+        className="nod-btn nod-btn-secondary"
+        onClick={()=>setExtendServiceModal({
+          open:false,
+          serviceIndex:null,
+          endDate:"",
+          amount:""
+        })}
+      >
+        Cancel
+      </button>
+
+      <button
+        className="nod-btn nod-btn-primary"
+        onClick={extendService}
+      >
+        Extend Service
       </button>
 
     </div>
