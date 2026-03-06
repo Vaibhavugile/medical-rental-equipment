@@ -43,10 +43,29 @@ export default function NursingOrderDetails() {
   const [servicesEditing, setServicesEditing] = useState(false);
   const [editingStaffId, setEditingStaffId] = useState(null);
   const [tempSalary, setTempSalary] = useState({});
+  const formatDateTimeLocal = (value) => {
+  if (!value) return "";
+
+  const d = new Date(value);
+
+  const pad = (n) => String(n).padStart(2, "0");
+
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
   const openAssignModal = (serviceIndex) => {
-    setAssignServiceIndex(serviceIndex);
-    setAssignOpen(true);
-  };
+
+  const service = editableItems?.[serviceIndex];
+
+  setAssignServiceIndex(serviceIndex);
+
+  setAssignDates({
+    startDate: formatDateTimeLocal(service?.expectedStartDate),
+    endDate: formatDateTimeLocal(service?.expectedEndDate)
+  });
+
+  setAssignOpen(true);
+
+};
   const fmtDateTime = (iso) => {
     if (!iso) return "";
     return new Date(iso).toLocaleString();
@@ -64,6 +83,11 @@ export default function NursingOrderDetails() {
     });
 
   };
+
+  const [assignDates, setAssignDates] = useState({
+  startDate: "",
+  endDate: ""
+});
 
   const displayUser = (uid, name) =>
     uid === auth.currentUser?.uid ? "You" : name;
@@ -211,17 +235,37 @@ export default function NursingOrderDetails() {
      Load Staff
   ====================== */
 
-  useEffect(() => {
-    const loadStaff = async () => {
+ useEffect(() => {
+
+  const loadStaff = async () => {
+
+    try {
+
       const snap = await getDocs(collection(db, "staff"));
-      setStaffList(
-        snap.docs
-          .map((d) => ({ id: d.id, ...(d.data() || {}) }))
-          .filter((s) => s.active && s.available)
+
+      const staff = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() || {})
+      }));
+
+      // optional: sort staff by name for cleaner UI
+      staff.sort((a, b) =>
+        (a.name || "").localeCompare(b.name || "")
       );
-    };
-    loadStaff();
-  }, []);
+
+      setStaffList(staff);
+
+    } catch (err) {
+
+      console.error("Failed to load staff", err);
+
+    }
+
+  };
+
+  loadStaff();
+
+}, []);
   useEffect(() => {
     if (order?.items) {
       setEditableItems(order.items);
@@ -368,188 +412,215 @@ export default function NursingOrderDetails() {
     0
   );
 
-  const assignStaff = async (staff) => {
+ const assignStaff = async (staff) => {
 
-    if (!order) return;
+  if (!order) return;
 
-    setAssigning(true);
+  setAssigning(true);
 
-    try {
+  try {
 
-      /* ===============================
-         0️⃣ GET SELECTED SERVICE
-      =============================== */
+    /* ===============================
+       0️⃣ GET SELECTED SERVICE
+    =============================== */
 
-      const item = order.items?.[assignServiceIndex];
+    const item = order.items?.[assignServiceIndex];
 
-      if (!item) {
-        alert("Service not found");
-        setAssigning(false);
-        return;
-      }
-
-      const serviceRateType =
-        item.rateType || staff.rateType || "daily";
-
-
-      /* ===============================
-         1️⃣ CHECK EXISTING ASSIGNMENT
-      =============================== */
-
-      const q = query(
-        collection(db, "staffAssignments"),
-        where("orderId", "==", id),
-        where("staffId", "==", staff.id),
-        where("serviceIndex", "==", assignServiceIndex),
-        where("status", "==", "assigned")
-      );
-
-      const existingSnap = await getDocs(q);
-
-      if (!existingSnap.empty) {
-        alert("This staff is already assigned to this service.");
-        setAssigning(false);
-        return;
-      }
-
-
-      /* ===============================
-         2️⃣ CALCULATE DURATION
-      =============================== */
-
-      let hours = 0;
-      let days = 0;
-      let months = 0;
-
-      if (item.expectedStartDate && item.expectedEndDate) {
-
-        const start = new Date(item.expectedStartDate);
-        const end = new Date(item.expectedEndDate);
-
-        const diffMs = end - start;
-
-        if (serviceRateType === "hourly") {
-
-          hours = Math.ceil(diffMs / (1000 * 60 * 60));
-
-        }
-
-        if (serviceRateType === "daily") {
-
-          days =
-            Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
-
-        }
-
-        if (serviceRateType === "monthly") {
-
-          const totalDays =
-            Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
-
-          months = Math.round(totalDays / 30);
-
-        }
-
-      }
-
-
-      /* ===============================
-         3️⃣ CALCULATE SALARY
-      =============================== */
-
-      const rate = Number(staff.baseRate || 0);
-
-      let amount = 0;
-
-      if (serviceRateType === "hourly") {
-        amount = hours * rate;
-      }
-
-      if (serviceRateType === "daily") {
-        amount = days * rate;
-      }
-
-      if (serviceRateType === "monthly") {
-        amount = months * rate;
-      }
-
-
-      /* ===============================
-         4️⃣ CREATE ASSIGNMENT
-      =============================== */
-
-      await addDoc(collection(db, "staffAssignments"), {
-
-        staffId: staff.id,
-        staffName: staff.name,
-        staffType: staff.staffType,
-
-        orderId: id,
-        orderNo: order.orderNo,
-
-        serviceIndex: assignServiceIndex,
-        serviceName: item.name || "Service",
-
-        startDate: item.expectedStartDate || "",
-        endDate: item.expectedEndDate || "",
-
-        hours,
-        days,
-        months,
-
-        rate,
-        rateType: serviceRateType,
-
-        shift: staff.shiftPreference || "day",
-
-        amount,
-
-        paidAmount: 0,
-        balanceAmount: amount,
-
-        status: "assigned",
-        paid: false,
-
-        payments: [],
-
-        createdAt: serverTimestamp(),
-        createdBy: auth.currentUser?.uid || "",
-      });
-
-
-      /* ===============================
-         5️⃣ UPDATE ORDER STATUS
-      =============================== */
-
-      await updateDoc(doc(db, "nursingOrders", id), {
-        status: "assigned",
-        updatedAt: serverTimestamp(),
-        updatedBy: auth.currentUser?.uid || "",
-      });
-
-
-      /* ===============================
-         6️⃣ RELOAD ASSIGNMENTS
-      =============================== */
-
-      await loadAssignments();
-
-      setAssignOpen(false);
-
-    }
-    catch (err) {
-
-      console.error("assignStaff error", err);
-      alert("Failed to assign staff");
-
-    }
-    finally {
-
+    if (!item) {
+      alert("Service not found");
       setAssigning(false);
+      return;
+    }
+
+    const serviceRateType =
+      item.rateType || staff.rateType || "daily";
+
+
+    /* ===============================
+       1️⃣ VALIDATE DATES
+    =============================== */
+
+    if (!assignDates.startDate || !assignDates.endDate) {
+      alert("Please select start and end dates");
+      setAssigning(false);
+      return;
+    }
+
+    const start = new Date(assignDates.startDate);
+    const end = new Date(assignDates.endDate);
+
+    if (end < start) {
+      alert("End date cannot be before start date");
+      setAssigning(false);
+      return;
+    }
+
+    /* Optional: prevent assignment outside service range */
+
+    if (item.expectedStartDate && item.expectedEndDate) {
+
+      const serviceStart = new Date(item.expectedStartDate);
+      const serviceEnd = new Date(item.expectedEndDate);
+
+      if (start < serviceStart || end > serviceEnd) {
+        alert("Assignment must be within service dates");
+        setAssigning(false);
+        return;
+      }
 
     }
 
-  };
+
+    /* ===============================
+       2️⃣ CHECK EXISTING ASSIGNMENT
+    =============================== */
+
+    const q = query(
+      collection(db, "staffAssignments"),
+      where("orderId", "==", id),
+      where("staffId", "==", staff.id),
+      where("serviceIndex", "==", assignServiceIndex),
+      where("status", "==", "assigned")
+    );
+
+    const existingSnap = await getDocs(q);
+
+    if (!existingSnap.empty) {
+      alert("This staff is already assigned to this service.");
+      setAssigning(false);
+      return;
+    }
+
+
+    /* ===============================
+       3️⃣ CALCULATE DURATION
+    =============================== */
+
+    let hours = 0;
+    let days = 0;
+    let months = 0;
+
+    const diffMs = end - start;
+
+    if (serviceRateType === "hourly") {
+
+      hours = Math.ceil(diffMs / (1000 * 60 * 60));
+
+    }
+
+    if (serviceRateType === "daily") {
+
+      days = Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
+
+    }
+
+    if (serviceRateType === "monthly") {
+
+      const totalDays =
+        Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
+
+      months = Math.round(totalDays / 30);
+
+    }
+
+
+    /* ===============================
+       4️⃣ CALCULATE SALARY
+    =============================== */
+
+    const rate = Number(staff.baseRate || 0);
+
+    let amount = 0;
+
+    if (serviceRateType === "hourly") {
+      amount = hours * rate;
+    }
+
+    if (serviceRateType === "daily") {
+      amount = days * rate;
+    }
+
+    if (serviceRateType === "monthly") {
+      amount = months * rate;
+    }
+
+
+    /* ===============================
+       5️⃣ CREATE ASSIGNMENT
+    =============================== */
+
+    await addDoc(collection(db, "staffAssignments"), {
+
+      staffId: staff.id,
+      staffName: staff.name,
+      staffType: staff.staffType,
+
+      orderId: id,
+      orderNo: order.orderNo,
+
+      serviceIndex: assignServiceIndex,
+      serviceName: item.name || "Service",
+
+      startDate: assignDates.startDate,
+      endDate: assignDates.endDate,
+
+      hours,
+      days,
+      months,
+
+      rate,
+      rateType: serviceRateType,
+
+      shift: staff.shiftPreference || "day",
+
+      amount,
+
+      paidAmount: 0,
+      balanceAmount: amount,
+
+      status: "assigned",
+      paid: false,
+
+      payments: [],
+
+      createdAt: serverTimestamp(),
+      createdBy: auth.currentUser?.uid || "",
+    });
+
+
+    /* ===============================
+       6️⃣ UPDATE ORDER STATUS
+    =============================== */
+
+    await updateDoc(doc(db, "nursingOrders", id), {
+      status: "assigned",
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser?.uid || "",
+    });
+
+
+    /* ===============================
+       7️⃣ RELOAD ASSIGNMENTS
+    =============================== */
+
+    await loadAssignments();
+
+    setAssignOpen(false);
+
+  }
+  catch (err) {
+
+    console.error("assignStaff error", err);
+    alert("Failed to assign staff");
+
+  }
+  finally {
+
+    setAssigning(false);
+
+  }
+
+};
   const unassignStaff = async (assignmentId) => {
     if (!window.confirm("Unassign this staff from order?")) return;
 
@@ -963,7 +1034,7 @@ export default function NursingOrderDetails() {
                 {servicesEditing ? (
                   <>
                     <input
-                      type="date"
+                      type="datetime-local"
                       className="nod-input small"
                       value={it.expectedStartDate}
                       onChange={(e) => {
@@ -977,7 +1048,8 @@ export default function NursingOrderDetails() {
                     />
                     {" → "}
                     <input
-                      type="date"
+                    type="datetime-local"
+                      
                       className="nod-input small"
                       value={it.expectedEndDate}
                       onChange={(e) => {
@@ -1455,6 +1527,39 @@ export default function NursingOrderDetails() {
         <div className="nod-modal">
           <div className="nod-modal-card">
             <h4>Assign Nurse</h4>
+            <div className="nod-assign-dates">
+
+  <div>
+    <label>Start Date</label>
+    <input
+      type="datetime-local"
+      className="nod-input"
+      value={assignDates.startDate}
+      onChange={(e)=>
+        setAssignDates(p=>({
+          ...p,
+          startDate:e.target.value
+        }))
+      }
+    />
+  </div>
+
+  <div>
+    <label>End Date</label>
+    <input
+      type="datetime-local"
+      className="nod-input"
+      value={assignDates.endDate}
+      onChange={(e)=>
+        setAssignDates(p=>({
+          ...p,
+          endDate:e.target.value
+        }))
+      }
+    />
+  </div>
+
+</div>
 
             <div className="nod-staff-grid">
               {staffList.map((s) => (
@@ -1497,8 +1602,8 @@ export default function NursingOrderDetails() {
                       /* DAILY SERVICE */
                       if (item.expectedStartDate && item.expectedEndDate) {
 
-                        const start = new Date(item.expectedStartDate);
-                        const end = new Date(item.expectedEndDate);
+                        const start = new Date(assignDates.startDate);
+const end = new Date(assignDates.endDate);
 
                         const diff =
                           Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;

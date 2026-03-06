@@ -433,7 +433,23 @@
   border-radius:8px;
   border:1px solid #e5e7eb;
 }
+.nod-assign-dates{
+  display:flex;
+  gap:12px;
+  margin-bottom:16px;
+}
 
+.nod-assign-dates div{
+  flex:1;
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+
+.nod-assign-dates label{
+  font-size:12px;
+  color:#64748b;
+}
 /* ===============================
    CLOSE BUTTON
 ================================ */
