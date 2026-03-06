@@ -298,6 +298,165 @@
   padding-top: 14px;
   margin-top: 14px;
 }
+
+/* ===============================
+   PREMIUM ASSIGN NURSE MODAL
+================================ */
+
+.nod-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+/* Modal container */
+
+.nod-modal-card {
+  background: #ffffff;
+  width: 760px;
+  max-width: calc(100vw - 32px);
+  border-radius: 18px;
+  padding: 26px;
+  box-shadow:
+    0 30px 70px rgba(0,0,0,0.25),
+    0 6px 18px rgba(0,0,0,0.12);
+  animation: nodModalPop 0.25s ease;
+}
+
+/* Modal title */
+
+.nod-modal-card h4 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 18px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 10px;
+}
+
+/* ===============================
+   STAFF GRID
+================================ */
+
+.nod-staff-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+/* ===============================
+   STAFF CARD
+================================ */
+
+.nod-staff-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 10px;
+  transition: all 0.18s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.nod-staff-card:hover {
+  border-color: #2563eb;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.08);
+  transform: translateY(-2px);
+}
+
+/* Staff name */
+
+.nod-staff-card strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+/* staff info */
+
+.nod-staff-card .nod-muted {
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+/* service duration */
+
+.nod-staff-card .nod-muted.small {
+  color: #475569;
+  font-weight: 500;
+}
+
+/* ===============================
+   ASSIGN BUTTON
+================================ */
+
+.nod-staff-card .nod-btn {
+  width: 100%;
+  margin-top: 6px;
+}
+
+/* PAYMENT HISTORY CLICK */
+
+.nod-payment-history{
+  cursor:pointer;
+  transition:all .15s;
+}
+
+.nod-payment-history:hover{
+  color:#2563eb;
+  text-decoration:underline;
+}
+
+
+/* PAYMENT LIST */
+
+.nod-payment-list{
+  margin-top:14px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.nod-payment-item{
+  display:flex;
+  justify-content:space-between;
+  padding:10px 12px;
+  background:#f8fafc;
+  border-radius:8px;
+  border:1px solid #e5e7eb;
+}
+
+/* ===============================
+   CLOSE BUTTON
+================================ */
+
+.nod-modal-card > .nod-btn-secondary {
+  width: 100%;
+  margin-top: 6px;
+}
+
+/* ===============================
+   MODAL ANIMATION
+================================ */
+
+@keyframes nodModalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
 /* ===============================
    RESPONSIVE
 ================================ */
