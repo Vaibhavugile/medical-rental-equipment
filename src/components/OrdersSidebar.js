@@ -20,7 +20,7 @@ export default function OrdersSidebar({
     ["starts_today", "Starts Today", derivedCounts.starts_today],
     ["ending_today", "Ending Today", derivedCounts.ending_today],
     ["ending_soon", "Ending Soon (5 days)", derivedCounts.ending_soon],
-    
+    ["return_overdue", "Return Overdue", derivedCounts.return_overdue],
     ["on_rent", "On Rent", derivedCounts.on_rent],
         ["completed", "Completed", derivedCounts.completed],
     ["cancelled", "Cancelled", derivedCounts.cancelled],

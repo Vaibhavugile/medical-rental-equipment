@@ -54,6 +54,12 @@ export default function OrderDrawer({
   // misc
   navigate,
 }) {
+  const [extendService, setExtendService] = useState({
+  open: false,
+  itemIndex: null,
+  newEndDate: "",
+  extraPrice: "",
+});
   // --- local helpers (UI-only) ---
   const fmtCurrency = (v) => {
     try {
@@ -520,6 +526,25 @@ const fmtDate = (d) => {
                                 }
                               />
                             </div>
+              <button
+  className="cp-btn ghost"
+  style={{
+    marginTop: 18,
+    padding: "4px 10px",
+    fontSize: "12px",
+    width: "auto"
+  }}
+  onClick={() =>
+    setExtendService({
+      open: true,
+      itemIndex: idx,
+      newEndDate: it.expectedEndDate || "",
+      extraPrice: "",
+    })
+  }
+>
+  Extend Service
+</button>
                           </div>
 
                           <div
@@ -1243,7 +1268,94 @@ const fmtDate = (d) => {
     </div>
   </div>
 )}
+{extendService.open && (
+  <div className="cp-modal" onClick={() => setExtendService({ open:false })}>
+    <div className="cp-modal-card" onClick={(e)=>e.stopPropagation()}>
 
+      <h4>Extend Service</h4>
+
+      <div style={{marginTop:12}}>
+        <div className="label muted">New End Date</div>
+
+        <input
+          type="date"
+          className="cp-input"
+          value={extendService.newEndDate}
+          onChange={(e)=>
+            setExtendService(s=>({
+              ...s,
+              newEndDate:e.target.value
+            }))
+          }
+        />
+      </div>
+
+      <div style={{marginTop:10}}>
+        <div className="label muted">Additional Price</div>
+
+        <input
+          className="cp-input"
+          placeholder="Enter extension price"
+          value={extendService.extraPrice}
+          onChange={(e)=>
+            setExtendService(s=>({
+              ...s,
+              extraPrice:e.target.value
+            }))
+          }
+        />
+      </div>
+
+      <div style={{
+        display:"flex",
+        justifyContent:"flex-end",
+        gap:8,
+        marginTop:16
+      }}>
+
+        <button
+          className="cp-btn ghost"
+          onClick={()=>setExtendService({open:false})}
+        >
+          Cancel
+        </button>
+
+        <button
+          className="cp-btn"
+          onClick={()=>{
+
+            const idx = extendService.itemIndex;
+            const item = selectedOrder.items[idx];
+
+            const extra = Number(extendService.extraPrice || 0);
+
+            updateOrderItem(idx,{
+              expectedEndDate: extendService.newEndDate,
+              rate: Number(item.rate || 0) + extra,
+
+              extensionHistory:[
+                ...(item.extensionHistory || []),
+                {
+                  previousEndDate:item.expectedEndDate,
+                  newEndDate:extendService.newEndDate,
+                  extraPrice:extra,
+                  date:new Date().toISOString()
+                }
+              ]
+            });
+
+            setExtendService({open:false});
+
+          }}
+        >
+          Save Extension
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+)}
 
         {/* Payment modal */}
         {paymentModal.open && paymentModal.form && (

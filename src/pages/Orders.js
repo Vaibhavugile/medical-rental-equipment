@@ -195,6 +195,8 @@ export function deriveDetailedStatus(order) {
   // 1️⃣ HARD STATES (FINAL)
   if (base === "cancelled") return "cancelled";
   if (base === "completed") return "completed";
+  // 🔴 RETURN OVERDUE
+if (isReturnOverdue(order)) return "return_overdue";
 
   const today = todayYMD();
   const start = getStartDate(order);
@@ -252,6 +254,8 @@ export const detailedStatusColor = (s) => {
       return "#f97316"; // orange
     case "ready_to_dispatch":
       return "#7c3aed"; // purple
+      case "return_overdue":
+  return "#dc2626";
     case "in_transit":
       return "#f59e0b"; // amber
     case "on_rent":
@@ -283,20 +287,27 @@ export const getResourceBadges = (order) => {
 
   /* 💰 PAYMENT STATES */
   const total = Number(order?.totals?.total || 0);
-  const totalPaid = Number(order?.paymentSummary?.totalPaid || 0);
-  const balance = Number(order?.paymentSummary?.balance || 0);
+const totalPaid = Number(order?.paymentSummary?.totalPaid || 0);
+const balance = Math.max(0, total - totalPaid);
 
-  if (total > 0) {
-    if (totalPaid === 0 && balance > 0) {
-      badges.push({ key: "payment_due", label: "Payment Due" });
-    } 
-    else if (totalPaid > 0 && balance > 0) {
-      badges.push({ key: "partially_paid", label: "Partially Paid" });
-    } 
-    else if (balance === 0) {
-      badges.push({ key: "fully_paid", label: "Fully Paid" });
-    }
+if (total > 0) {
+
+  // Nothing paid
+  if (totalPaid === 0) {
+    badges.push({ key: "payment_due", label: "Payment Due" });
   }
+
+  // Partially paid
+  else if (totalPaid > 0 && totalPaid < total) {
+    badges.push({ key: "partially_paid", label: "Partially Paid" });
+  }
+
+  // Fully paid
+  else if (totalPaid >= total) {
+    badges.push({ key: "fully_paid", label: "Fully Paid" });
+  }
+
+}
 
   /* 📦 ASSETS */
   const astate = assetsAssignmentState(order);
@@ -475,6 +486,8 @@ const derivedCounts = useMemo(() => {
     active: 0,
     completed: 0,
     cancelled: 0,
+    return_overdue: 0, 
+    ending_soon: 0,
   };
 
  for (const o of orders) {
@@ -1913,35 +1926,38 @@ const badgeText = getDeliveryBadgeText(o, deliveriesByOrder);
   <td>{fmtCurrency(o.totals?.total || 0)}</td>
 
   <td>
-    <button className="cp-link" onClick={() => openOrder(o)}>
+  <div className="order-actions">
+
+    <button
+      className="order-action view"
+      onClick={() => openOrder(o)}
+    >
       View
     </button>
 
-{o.forceOnRent !== true && o.status !== "completed" && o.status !== "cancelled" && (
-  <button
-    className="cp-link"
-    onClick={async () => {
-      if (!window.confirm("Mark this order as ON RENT?")) return;
+    {o.forceOnRent !== true && (
+      <button
+        className="order-action rent"
+        onClick={async () => {
+          if (!window.confirm("Mark this order as ON RENT?")) return;
 
-      try {
-        await updateDoc(doc(db, "orders", o.id), {
-          forceOnRent: true,
-          status: "active", // ensure stays active while on rent
-          updatedAt: serverTimestamp(),
-        });
-      } catch (e) {
-        alert(e.message || "Failed to mark On Rent");
-      }
-    }}
-  >
-    Mark On Rent
-  </button>
-)}
+          try {
+            await updateDoc(doc(db, "orders", o.id), {
+              forceOnRent: true,
+              status: "active",
+              updatedAt: serverTimestamp(),
+            });
+          } catch (e) {
+            alert(e.message || "Failed to mark On Rent");
+          }
+        }}
+      >
+        Mark On Rent
+      </button>
+    )}
 
-
-
-   
-  </td>
+  </div>
+</td>
 </tr>
 
               );

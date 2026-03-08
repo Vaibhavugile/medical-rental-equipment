@@ -16,6 +16,51 @@
   align-items: center;
   margin-bottom: 12px;
 }
+/* ACTIONS CONTAINER */
+
+.order-actions{
+display:flex;
+flex-direction:column;
+gap:4px;
+}
+
+
+/* BASE BUTTON */
+
+.order-action{
+font-size:13px;
+padding:4px 8px;
+border-radius:6px;
+border:none;
+cursor:pointer;
+transition:all .15s ease;
+width:100px;
+text-align:center;
+}
+
+
+/* VIEW BUTTON */
+
+.order-action.view{
+background:#eef2ff;
+color:#2563eb;
+}
+
+.order-action.view:hover{
+background:#dbeafe;
+}
+
+
+/* MARK ON RENT BUTTON */
+
+.order-action.rent{
+background:#ecfdf5;
+color:#059669;
+}
+
+.order-action.rent:hover{
+background:#d1fae5;
+}
 
 .orders-header h1 {
   font-size: 20px;
