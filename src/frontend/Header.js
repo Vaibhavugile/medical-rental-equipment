@@ -16,7 +16,7 @@ const BASE_NAV_ITEMS = [
   { id: "services", label: "Services", dropdown: true },
   { id: "blogs", label: "Blogs", route: "/blogs" },
   { id: "providers", label: "Providers", route: "/our-team" },
-  { id: "contact", label: "Contact" },
+  { id: "contact", label: "Contact" ,route:"/#contact"},
 ];
 
 const LANDING_ONLY_ITEMS = [
@@ -176,14 +176,14 @@ const NAV_ITEMS = isLandingPage
     setMobileOpen(false);
   }
 
-  function handleNavClick(e, item) {
+function handleNavClick(e, item) {
   e.preventDefault();
 
-  // Scroll-only items (About, Reviews, Contact, etc.)
+  // Section navigation (About, Reviews, Contact, etc.)
   if (!item.route) {
     const el = document.getElementById(item.id);
 
-    // If section exists on CURRENT page → smooth scroll
+    // If section exists on current page → smooth scroll
     if (el) {
       const offset = headerRef.current?.offsetHeight || 0;
       const top = el.getBoundingClientRect().top + window.pageYOffset;
@@ -197,16 +197,14 @@ const NAV_ITEMS = isLandingPage
       return;
     }
 
-    // If section NOT present → stay on same page, just update hash
-    window.location.hash = item.id;
-    setMobileOpen(false);
+    // If section NOT on this page → go to homepage section
+    window.location.href = `/#${item.id}`;
     return;
   }
 
-  // Route-based navigation
+  // Route navigation
   window.location.href = item.route;
 }
-
 
   /* ================= RENDER ================= */
   return (
@@ -230,7 +228,7 @@ const NAV_ITEMS = isLandingPage
       {!item.dropdown && (
         <a
           role="menuitem"
-          href={item.route ? item.route : `#${item.id}`}
+href={item.route ? item.route : `/#${item.id}`}
           className={activeId === item.id ? "active" : ""}
           onClick={(e) => handleNavClick(e, item)}
         >

@@ -165,8 +165,24 @@ async function handleSubmit(e) {
             </p>
 
             <div className="hp-fixed-cta-row">
-              <a href="#booking" className="hp-btn-primary">Request a Callback</a>
-              <a href="#services" className="hp-btn-ghost">Explore Services</a>
+<button
+  type="button"
+  className="hp-btn-primary"
+  onClick={() => {
+    formRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "center"
+    });
+
+    formRef.current?.classList.add("form-highlight");
+
+    setTimeout(() => {
+      formRef.current?.classList.remove("form-highlight");
+    }, 2000);
+  }}
+>
+  Request a Callback
+</button>              <a href="#services" className="hp-btn-ghost">Explore Services</a>
             </div>
           </div>
         </div>
@@ -211,6 +227,7 @@ async function handleSubmit(e) {
   <option value="ambulance_care">Ambulance Care</option>
   <option value="medical_equipment">Medical Equipment</option>
   <option value="nursing_care">Nursing Care</option>
+  <option value="caretaer_service">Caretaker Service</option>
   <option value="physiotherapy">Physiotherapy Support</option>
   <option value="respiratory_care">Respiratory Care</option>
   <option value="pharmacy_delivery">Pharmacy Delivery</option>

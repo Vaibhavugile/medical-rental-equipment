@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   collection,
+  collectionGroup,
   getDocs,
   query,
   where,
@@ -8,6 +9,7 @@ import {
   doc,
   setDoc,
   serverTimestamp,
+  getDoc,
 } from "firebase/firestore";
 import { db } from "../../firebase";
 import {
@@ -39,11 +41,11 @@ const navigate = useNavigate();
 
   const isDateActive = startDate && endDate;
   const [paymentModal, setPaymentModal] = useState({
-    open: false,
-    date: null,
-    method: null,
-    payments: [],
-  });
+  open: false,
+  date: null,
+  method: null,
+  rows: [],
+});
 
 
   /* ---------- INITIAL LOAD ---------- */
@@ -68,56 +70,49 @@ const navigate = useNavigate();
     setLoading(false);
   }
 async function openPaymentDetails(date, method) {
-  setLoading(true);
 
-  const ordersSnap = await getDocs(collection(db, "orders"));
+const start = Timestamp.fromDate(new Date(date + "T00:00:00.000Z"));
+const end = Timestamp.fromDate(new Date(date + "T23:59:59.999Z"));
+  const q = query(
+    collectionGroup(db, "payments"),
+    where("status", "==", "completed"),
+    where("method", "==", method),
+    where("createdAt", ">=", start),
+    where("createdAt", "<=", end)
+  );
+
+  const snap = await getDocs(q);
+
+  const payments = snap.docs.map((d) => ({
+    id: d.id,
+    ref: d.ref,
+    ...d.data(),
+  }));
+
   const rows = [];
+for (const pay of payments) {
 
-  for (const docSnap of ordersSnap.docs) {
-    const order = docSnap.data();
-    const orderTotal = Number(order.totals?.total || 0);
+  const payDate = pay.createdAt?.toDate().toISOString().slice(0,10);
+  if (payDate !== date) continue;
 
-    const paySnap = await getDocs(
-      collection(db, "orders", docSnap.id, "payments")
-    );
+  const orderId = pay.ref.parent.parent.id;
 
-    let totalPaidForOrder = 0;
+  const orderRef = doc(db, "orders", orderId);
+  const orderSnap = await getDoc(orderRef);
 
-    // 1️⃣ First pass → calculate total paid for this order
-    paySnap.forEach((p) => {
-      const pay = p.data();
-      if (pay.status === "completed") {
-        totalPaidForOrder += Number(pay.amount || 0);
-      }
-    });
+  const order = orderSnap.data() || {};
+  const orderTotal = Number(order.totals?.total || 0);
 
-    const outstanding = orderTotal - totalPaidForOrder;
-
-    // 2️⃣ Second pass → pick only clicked date + method
-    paySnap.forEach((p) => {
-      const pay = p.data();
-      const payDate = pay.createdAt
-        ?.toDate()
-        .toISOString()
-        .slice(0, 10);
-
-      if (
-        pay.status === "completed" &&
-        pay.method === method &&
-        payDate === date
-      ) {
-        rows.push({
-          orderNo: order.orderNo || docSnap.id,
-          customer: order.customerName || "—",
-          orderTotal,
-          paymentAmount: pay.amount,
-          paymentMethod: pay.method,
-          paidAt: pay.createdAt.toDate().toLocaleString(),
-          outstanding, // ✅ ADD THIS
-        });
-      }
-    });
-  }
+  rows.push({
+    orderNo: order.orderNo || orderId,
+    customer: order.customerName || "—",
+    orderTotal,
+    paymentAmount: pay.amount,
+    paymentMethod: pay.method,
+    paidAt: pay.createdAt?.toDate().toLocaleString(),
+    outstanding: orderTotal - Number(order.paymentSummary?.totalPaid || 0)
+  });
+}
 
   setPaymentModal({
     open: true,
@@ -125,10 +120,7 @@ async function openPaymentDetails(date, method) {
     method,
     rows,
   });
-
-  setLoading(false);
 }
-
 
 
 
@@ -225,7 +217,7 @@ async function openPaymentDetails(date, method) {
         <Kpi
   label="Outstanding Balance"
   value={kpis.balance}
-  onClick={() => navigate("/reports/financial/outstanding")}
+  onClick={() => navigate("/crm/reports/financial/outstanding")}
 />
 
       </div>
@@ -344,9 +336,9 @@ async function openPaymentDetails(date, method) {
                   </td>
 
                   <td
-                    className="clickable-cell"
-                    onkey={() => openPaymentDetails(r.date, "card")}
-                  >
+  className="clickable-cell"
+  onClick={() => openPaymentDetails(r.date, "card")}
+>
                     ₹ {m.card || 0}
                   </td>
 

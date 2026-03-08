@@ -221,7 +221,37 @@
     opacity: 1;
   }
 }
+/* form highlight animation */
+.form-highlight {
+  animation: formPulse 1.2s ease;
+}
 
+@keyframes formPulse {
+
+  0% {
+    transform: scale(1);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  }
+
+  50% {
+    transform: scale(1.03);
+    box-shadow: 0 0 0 6px rgba(242,140,40,0.25),
+                0 20px 60px rgba(242,140,40,0.35);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+  }
+
+}
+.hp-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  padding: 14px 32px;
+}
 /* ================= MOBILE TOAST ================= */
 
 @media (max-width: 600px) {

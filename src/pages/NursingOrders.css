@@ -244,7 +244,71 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.no-kpis{
+display:grid;
+grid-template-columns:repeat(5,1fr);
+gap:14px;
+margin:18px 0;
+}
 
+.no-kpi{
+background:white;
+border-radius:10px;
+padding:14px;
+box-shadow:0 2px 6px rgba(0,0,0,0.05);
+cursor:pointer;
+transition:all .15s ease;
+}
+
+.no-kpi:hover{
+transform:translateY(-2px);
+}
+
+.no-kpi-label{
+font-size:12px;
+color:#64748b;
+}
+
+.no-kpi-value{
+font-size:24px;
+font-weight:700;
+}
+
+.no-kpi.active{
+border:2px solid #2563eb;
+background:#eff6ff;
+}
+
+.no-kpi.warning{
+border-left:4px solid #f59e0b;
+}
+.no-kpis{
+display:grid;
+grid-template-columns:repeat(5,1fr);
+gap:14px;
+margin:18px 0;
+}
+
+.no-kpi{
+background:white;
+border-radius:10px;
+padding:14px;
+box-shadow:0 2px 6px rgba(0,0,0,0.05);
+}
+
+.no-kpi-label{
+font-size:12px;
+color:#64748b;
+}
+
+.no-kpi-value{
+font-size:24px;
+font-weight:700;
+}
+
+.no-kpi.warning{
+border-left:4px solid #f59e0b;
+}
 /* =========================
    STATUS PILLS
 ========================= */

@@ -1090,32 +1090,77 @@ const openStopServiceModal = (assignment) => {
   ====================== */
 
   const markStatus = async (status) => {
+
+  const message =
+    status === "active"
+      ? "Are you sure you want to mark this order as ACTIVE?"
+      : "Are you sure you want to mark this order as COMPLETED?";
+
+  const confirmed = window.confirm(message);
+
+  if (!confirmed) return;
+
+  try {
+
+    /* =========================
+       UPDATE ORDER STATUS
+    ========================= */
+
     await updateDoc(doc(db, "nursingOrders", id), {
       status,
-      completedAt: status === "completed"
-        ? serverTimestamp()
-        : null,
+      completedAt:
+        status === "completed" ? serverTimestamp() : null,
       updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser?.uid || ""
     });
 
+    /* =========================
+       UPDATE LOCAL UI STATE
+    ========================= */
+
+    setOrder((prev) => ({
+      ...prev,
+      status
+    }));
+
+
+    /* =========================
+       IF COMPLETED → COMPLETE STAFF
+    ========================= */
 
     if (status === "completed") {
+
       const q = query(
-        collection(db, "staffAssignments"),
-        where("orderId", "==", id),
-        where("status", "==", "active")
-      );
+  collection(db, "staffAssignments"),
+  where("orderId", "==", id),
+  where("status", "in", ["assigned", "active"])
+);
 
       const snap = await getDocs(q);
 
       for (const d of snap.docs) {
+
         await updateDoc(doc(db, "staffAssignments", d.id), {
           status: "completed",
           completedAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
         });
+
       }
+
+      /* reload assignments in UI */
+      await loadAssignments();
+
     }
-  };
+
+  } catch (err) {
+
+    console.error("markStatus error", err);
+    alert("Failed to update order status");
+
+  }
+
+};
   const buildStaffActivityLog = (oldA, newA) => {
     if (!oldA || !newA) return null;
 
@@ -1262,7 +1307,6 @@ const openStopServiceModal = (assignment) => {
   /* ======================
      UI
   ====================== */
-
   if (loading) return <div className="nod-muted">Loading…</div>;
   if (error) return <div className="nod-error">{error}</div>;
   if (!order) return null;
@@ -1321,6 +1365,7 @@ const openStopServiceModal = (assignment) => {
         </div>
 
         {editableItems.map((it, i) => (
+          
           <div key={i} className="nod-item-row">
             <div>
               {/* SERVICE NAME */}
@@ -1410,6 +1455,7 @@ const openStopServiceModal = (assignment) => {
               <div className="nod-bold">
                 ₹ {fmtCurrency(it.amount)}
               </div>
+              
 
               <button
                 className="nod-btn nod-btn-primary small"
@@ -1607,8 +1653,9 @@ const openStopServiceModal = (assignment) => {
               {/* SERVICE HEADER */}
               <div className="nod-row">
                 <strong>
-                  Service {i + 1}: {service.name}
+                  Service {i + 1}: {service.name} : {Number(service.qty || 0)} REQUIRED
                 </strong>
+               
 
                 <button
                   className="nod-btn nod-btn-primary small"

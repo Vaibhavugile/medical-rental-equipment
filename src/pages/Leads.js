@@ -502,7 +502,7 @@ const openWhatsApp = (phone) => {
         setOpenReq(true);
       }}
     >
-      + Create Requirement
+      +Add Req
     </button>
   </div>
 </header>
@@ -716,6 +716,13 @@ const openWhatsApp = (phone) => {
   >
     Next
   </button>
+  <button
+  title="WhatsApp"
+  className="row-btn whatsapp"
+  onClick={() => openWhatsApp(l.phone)}
+>
+  <FontAwesomeIcon icon={faWhatsapp} />
+</button>
 
 </div>
               </td>

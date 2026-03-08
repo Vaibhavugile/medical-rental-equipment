@@ -44,7 +44,9 @@
   border-bottom: 1px solid var(--border);
   box-shadow: var(--shadow);
 }
-
+#contact {
+  scroll-margin-top: 110px;
+}
 /* =========================================================
    NAV CONTAINER
 ========================================================= */

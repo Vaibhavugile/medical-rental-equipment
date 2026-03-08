@@ -40,23 +40,33 @@ const fmtDateTime = (ts) => {
 function toYmd(value) {
   if (!value) return null;
 
-  // Firestore Timestamp
+  // if datetime-local string
+  if (typeof value === "string") {
+    return value.split("T")[0];
+  }
+
+  // firestore timestamp
   if (value?.toDate) {
-    return value.toDate().toISOString().slice(0, 10);
+    const d = value.toDate();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
   }
 
   // JS Date
   if (value instanceof Date) {
-    return value.toISOString().slice(0, 10);
-  }
-
-  // ISO string or yyyy-mm-dd
-  if (typeof value === "string") {
-    return value.slice(0, 10);
+    return `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,"0")}-${String(value.getDate()).padStart(2,"0")}`;
   }
 
   return null;
 }
+const toDateOnly = (value) => {
+  if (!value) return null;
+
+  if (value?.toDate) return value.toDate().toISOString().slice(0, 10);
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (typeof value === "string") return value.slice(0, 10);
+
+  return null;
+};
 
 export default function NursingOrders() {
   const navigate = useNavigate();
@@ -68,7 +78,7 @@ const [statusFilter, setStatusFilter] = useState("all");
 const [fromDate, setFromDate] = useState("");
 const [toDate, setToDate] = useState("");
 const [serviceFilter, setServiceFilter] = useState("all");
-
+const [kpiFilter, setKpiFilter] = useState("all");
   /* =========================
      Load Nursing Orders
   ========================= */
@@ -110,50 +120,205 @@ const allCount = orders.length;
 
 const filteredOrders = orders.filter((o) => {
 
-  // SEARCH
   const q = search.toLowerCase();
+
   const matchesSearch =
     !q ||
     o.orderNo?.toLowerCase().includes(q) ||
     o.customerName?.toLowerCase().includes(q) ||
     o.deliveryAddress?.toLowerCase().includes(q);
 
-  // STATUS
   const matchesStatus =
     statusFilter === "all" || o.status === statusFilter;
 
-  // DATE
-  const serviceStartRaw = o.items?.[0]?.expectedStartDate;
-  const serviceStart = toYmd(serviceStartRaw);
+  /* ---------- SERVICE TYPE ---------- */
+
+  const serviceType = getServiceType(o);
+
+  const matchesService =
+    serviceFilter === "all" || serviceType === serviceFilter;
+
+  /* ---------- SERVICE DATES ---------- */
+
+  const startDates =
+    o.items?.map((it) => toYmd(it.expectedStartDate)).filter(Boolean) || [];
+
+  const endDates =
+    o.items?.map((it) => toYmd(it.expectedEndDate)).filter(Boolean) || [];
+
+  const startDate =
+    startDates.length > 0 ? startDates.sort()[0] : null;
+
+  const endDate =
+    endDates.length > 0 ? endDates.sort().slice(-1)[0] : null;
+
+  const today = new Date().toLocaleDateString("en-CA");
+
+  /* ---------- DATE RANGE FILTER ---------- */
 
   let matchesDate = true;
 
-  if (fromDate && serviceStart) {
-    matchesDate = serviceStart >= fromDate;
+  if (fromDate && startDate) {
+    matchesDate = startDate >= fromDate;
   }
 
-  if (toDate && serviceStart) {
-    matchesDate = matchesDate && serviceStart <= toDate;
+  if (toDate && startDate) {
+    matchesDate = matchesDate && startDate <= toDate;
   }
 
-  // SERVICE TYPE
-  const serviceType = getServiceType(o);
-  const matchesService =
-    serviceFilter === "all" || serviceType === serviceFilter;
+  /* ---------- KPI FILTER ---------- */
+
+  let matchesKpi = true;
+
+  if (kpiFilter === "active") {
+    matchesKpi = o.status === "active";
+  }
+
+  if (kpiFilter === "completed") {
+    matchesKpi = o.status === "completed";
+  }
+
+  if (kpiFilter === "startingToday") {
+    matchesKpi = startDate && startDate === today;
+  }
+
+  if (kpiFilter === "endingToday") {
+    matchesKpi = endDate && endDate === today;
+  }
+
+  if (kpiFilter === "endingSoon") {
+
+    if (!endDate) return false;
+
+    const diff =
+      (new Date(endDate) - new Date(today)) /
+      (1000 * 60 * 60 * 24);
+
+    matchesKpi = diff > 0 && diff <= 5;
+  }
 
   return (
     matchesSearch &&
     matchesStatus &&
+    matchesService &&
     matchesDate &&
-    matchesService
+    matchesKpi
   );
-});
 
+});
+const today = new Date().toLocaleDateString("en-CA");
+const serviceRanges = orders.map((o) => {
+
+  const startDates =
+    o.items?.map((it) => toDateOnly(it.expectedStartDate)).filter(Boolean) || [];
+
+  const endDates =
+    o.items?.map((it) => toDateOnly(it.expectedEndDate)).filter(Boolean) || [];
+
+  const start =
+    startDates.length > 0 ? startDates.sort()[0] : null;
+
+  const end =
+    endDates.length > 0 ? endDates.sort().slice(-1)[0] : null;
+
+  return {
+    ...o,
+    serviceStart: start,
+    serviceEnd: end
+  };
+
+});
+const activeCount = serviceRanges.filter(
+  (o) => o.status === "active"
+).length;
+
+const completedCount = serviceRanges.filter(
+  (o) => o.status === "completed"
+).length;
+
+const startingTodayCount = serviceRanges.filter((o) => {
+
+  if (!o.serviceStart) return false;
+
+  return o.serviceStart.slice(0,10) === today;
+
+}).length;
+
+const endingTodayCount = serviceRanges.filter((o) => {
+
+  if (!o.serviceEnd) return false;
+
+  return o.serviceEnd.slice(0,10) === today;
+
+}).length;
+
+const endingSoonCount = serviceRanges.filter((o) => {
+  if (!o.serviceEnd) return false;
+
+  const diff =
+    (new Date(o.serviceEnd) - new Date(today)) /
+    (1000 * 60 * 60 * 24);
+
+  return diff > 0 && diff <= 5; // next 3 days
+}).length;
 
   return (
     <div className="no-wrap">
       {/* Header */}
      <div className="no-head">
+      <div className="no-kpis">
+
+  <div
+    className={`no-kpi ${kpiFilter === "active" ? "active" : ""}`}
+    onClick={() =>
+      setKpiFilter(kpiFilter === "active" ? "all" : "active")
+    }
+  >
+    <div className="no-kpi-label">Active</div>
+    <div className="no-kpi-value">{activeCount}</div>
+  </div>
+
+  <div
+    className={`no-kpi ${kpiFilter === "completed" ? "active" : ""}`}
+    onClick={() =>
+      setKpiFilter(kpiFilter === "completed" ? "all" : "completed")
+    }
+  >
+    <div className="no-kpi-label">Completed</div>
+    <div className="no-kpi-value">{completedCount}</div>
+  </div>
+
+  <div
+    className={`no-kpi ${kpiFilter === "startingToday" ? "active" : ""}`}
+    onClick={() =>
+      setKpiFilter(kpiFilter === "startingToday" ? "all" : "startingToday")
+    }
+  >
+    <div className="no-kpi-label">Starting Today</div>
+    <div className="no-kpi-value">{startingTodayCount}</div>
+  </div>
+
+  <div
+    className={`no-kpi ${kpiFilter === "endingToday" ? "active" : ""}`}
+    onClick={() =>
+      setKpiFilter(kpiFilter === "endingToday" ? "all" : "endingToday")
+    }
+  >
+    <div className="no-kpi-label">Ending Today</div>
+    <div className="no-kpi-value">{endingTodayCount}</div>
+  </div>
+
+  <div
+    className={`no-kpi warning ${kpiFilter === "endingSoon" ? "active" : ""}`}
+    onClick={() =>
+      setKpiFilter(kpiFilter === "endingSoon" ? "all" : "endingSoon")
+    }
+  >
+    <div className="no-kpi-label">Ending Soon</div>
+    <div className="no-kpi-value">{endingSoonCount}</div>
+  </div>
+
+</div>
   <div className="no-head-top">
     <h2>Nursing & Caretakers Orders</h2>
     
@@ -191,18 +356,50 @@ const filteredOrders = orders.filter((o) => {
   <div className="no-filters">
     <div className="no-filter-row-1">
       <input
-        type="text"
-        className="no-input no-search"
-        placeholder="Search order no, customer, address…"
-      />
+  type="text"
+  className="no-input no-search"
+  placeholder="Search order no, customer, address…"
+  value={search}
+  onChange={(e) => setSearch(e.target.value)}
+/>
     </div>
 
     <div className="no-filter-row-2">
-      <select className="no-input no-compact">...</select>
-      <input type="date" className="no-input no-compact" />
-      <input type="date" className="no-input no-compact" />
-      <button className="cp-btn ghost">Clear</button>
-    </div>
+<select
+  className="no-input no-compact"
+  value={statusFilter}
+  onChange={(e) => setStatusFilter(e.target.value)}
+>
+  <option value="all">All Status</option>
+  <option value="created">Created</option>
+  <option value="assigned">Assigned</option>
+  <option value="active">Active</option>
+  <option value="completed">Completed</option>
+</select>
+<input
+  type="date"
+  className="no-input no-compact"
+  value={fromDate}
+  onChange={(e) => setFromDate(e.target.value)}
+/>     
+<input
+  type="date"
+  className="no-input no-compact"
+  value={toDate}
+  onChange={(e) => setToDate(e.target.value)}
+/>    
+<button
+  className="cp-btn ghost"
+  onClick={() => {
+    setSearch("");
+    setStatusFilter("all");
+    setFromDate("");
+    setToDate("");
+    setServiceFilter("all");
+  }}
+>
+  Clear
+</button>    </div>
   </div>
 </div>
 
@@ -216,7 +413,8 @@ const filteredOrders = orders.filter((o) => {
               <th>Customer</th>
               <th>Status</th>
               <th>Service</th>
-              <th>Start Date</th>
+              <th>Start</th>
+              <th>End</th>
               <th>Created</th>
               <th>Nurse</th>
               <th>Total</th>
@@ -227,7 +425,7 @@ const filteredOrders = orders.filter((o) => {
           <tbody>
             {loading && (
               <tr>
-                <td colSpan="9" className="no-muted">
+                <td colSpan="10" className="no-muted">
                   Loading nursing orders…
                 </td>
               </tr>
@@ -236,7 +434,7 @@ const filteredOrders = orders.filter((o) => {
            {!loading && filteredOrders.length === 0 && (
 
               <tr>
-                <td colSpan="9" className="no-muted">
+                <td colSpan="10" className="no-muted">
                   No nursing orders found
                 </td>
               </tr>
@@ -251,8 +449,21 @@ const filteredOrders = orders.filter((o) => {
                     0
                   ) || 0;
 
-                const startDate =
-                  o.items?.[0]?.expectedStartDate || null;
+            const startDates =
+  o.items?.map((it) => toYmd(it.expectedStartDate)).filter(Boolean) || [];
+
+const endDates =
+  o.items?.map((it) => toYmd(it.expectedEndDate)).filter(Boolean) || [];
+
+const startDate =
+  startDates.length > 0
+    ? startDates.sort()[0]
+    : null;
+
+const endDate =
+  endDates.length > 0
+    ? endDates.sort().slice(-1)[0]
+    : null;
 
                 return (
                   <tr key={o.id}>
@@ -282,8 +493,8 @@ const filteredOrders = orders.filter((o) => {
 </td>
 
                     <td>{fmtDate(startDate)}</td>
-
-                    <td>{fmtDateTime(o.createdAt)}</td>
+<td>{fmtDate(endDate)}</td>
+<td>{fmtDateTime(o.createdAt)}</td>
 
                     <td>{staffCount}</td>
 

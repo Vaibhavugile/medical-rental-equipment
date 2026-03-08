@@ -5,55 +5,41 @@ const StatItem = ({ icon, end, suffix, title }) => {
   const [count, setCount] = useState(0);
   const ref = useRef(null);
   const started = useRef(false);
-  const hasScrolled = useRef(false);
 
   useEffect(() => {
-    // Detect first scroll (prevents auto start on refresh)
-    const handleScroll = () => {
-      hasScrolled.current = true;
-      window.removeEventListener("scroll", handleScroll);
-    };
-
-    window.addEventListener("scroll", handleScroll);
-
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (
-          entry.isIntersecting &&
-          !started.current &&
-          hasScrolled.current
-        ) {
+        // start animation only when visible
+        if (entry.isIntersecting && !started.current) {
           started.current = true;
 
           const duration = 1800;
           const startTime = performance.now();
 
-          const animate = (currentTime) => {
-            const progress = Math.min(
-              (currentTime - startTime) / duration,
-              1
-            );
-
+          const animate = (time) => {
+            const progress = Math.min((time - startTime) / duration, 1);
             const value = Math.floor(progress * end);
+
             setCount(value);
 
             if (progress < 1) {
               requestAnimationFrame(animate);
+            } else {
+              setCount(end);
             }
           };
 
           requestAnimationFrame(animate);
         }
       },
-      { threshold: 0.6 }
+      {
+        threshold: 0.6, // start when 60% visible
+      }
     );
 
     if (ref.current) observer.observe(ref.current);
 
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("scroll", handleScroll);
-    };
+    return () => observer.disconnect();
   }, [end]);
 
   return (
@@ -77,6 +63,7 @@ const StatsBar = () => {
   return (
     <section className="stats-section">
       <div className="stats-bar">
+
         <StatItem
           icon="fa-heart-pulse"
           end={99}
@@ -97,6 +84,7 @@ const StatsBar = () => {
           suffix=""
           title="Highly Specialized Physiotherapists"
         />
+
       </div>
     </section>
   );
