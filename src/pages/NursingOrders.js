@@ -94,7 +94,7 @@ function getServiceType(order) {
   const name = order.items?.[0]?.name?.toLowerCase() || "";
 
   if (name.includes("caretaker")) return "caretaker";
-  if (name.includes("nurse")) return "nursing";
+  if (name.includes("nurs")) return "nursing";
 
   return "other";
 }

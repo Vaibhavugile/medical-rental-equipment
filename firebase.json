@@ -5,6 +5,7 @@
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },
+
   "functions": [
     {
       "source": "functions",
@@ -22,58 +23,93 @@
       ]
     }
   ],
+
   "hosting": {
-  "public": "build",
-  "ignore": [
-    "firebase.json",
-    "**/.*",
-    "**/node_modules/**"
-  ],
+    "public": "build",
 
-  "redirects": [
-    {
-      "source": "/palliative.php",
-      "destination": "/palliative-care",
-      "type": 301
-    },
-    {
-      "source": "/surgery.php",
-      "destination": "/post-surgery-care",
-      "type": 301
-    },
-    {
-      "source": "/pharmacy-delivery.php",
-      "destination": "/pharmacy-delivery",
-      "type": 301
-    },
-    {
-      "source": "/our-team.php",
-      "destination": "/our-team",
-      "type": 301
-    },
-    {
-      "source": "/contact.php",
-      "destination": "/#contact",
-      "type": 301
-    }
-  ],
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
 
-  "rewrites": [
-    { "source": "**", "destination": "/index.html" }
-  ],
+    "redirects": [
+      {
+        "source": "/palliative.php",
+        "destination": "/palliative-care",
+        "type": 301
+      },
+      {
+        "source": "/surgery.php",
+        "destination": "/post-surgery-care",
+        "type": 301
+      },
+      {
+        "source": "/pharmacy-delivery.php",
+        "destination": "/pharmacy-delivery",
+        "type": 301
+      },
+      {
+        "source": "/our-team.php",
+        "destination": "/our-team",
+        "type": 301
+      },
+      {
+        "source": "/contact.php",
+        "destination": "/#contact",
+        "type": 301
+      }
+    ],
 
-  "headers": [
-    {
-      "source": "**/*.@(js|css)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
-    }
-  ]
-},
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ],
+
+    "headers": [
+      {
+        "source": "**/*.@(js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          }
+        ]
+      },
+
+      {
+        "source": "**/*.@(jpg|jpeg|gif|png|svg|webp|avif)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000"
+          }
+        ]
+      },
+
+      {
+        "source": "**/*.@(woff|woff2|ttf|otf)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000"
+          }
+        ]
+      },
+
+      {
+        "source": "**/*.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      }
+    ]
+  },
 
   "storage": {
     "rules": "storage.rules"

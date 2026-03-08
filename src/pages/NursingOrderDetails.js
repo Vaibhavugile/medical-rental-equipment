@@ -43,6 +43,11 @@ export default function NursingOrderDetails() {
   const [servicesEditing, setServicesEditing] = useState(false);
   const [editingStaffId, setEditingStaffId] = useState(null);
   const [tempSalary, setTempSalary] = useState({});
+  const [staffFilters, setStaffFilters] = useState({
+  staffType: "all",
+  shiftType: "all",
+  rateType: "all"
+});
   const [extendServiceModal, setExtendServiceModal] = useState({
   open: false,
   serviceIndex: null,
@@ -84,6 +89,75 @@ export default function NursingOrderDetails() {
   setAssignOpen(true);
 
 };
+const getDuration = (start, end) => {
+
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+
+  const diffMs = endDate - startDate;
+
+  if (diffMs <= 0) {
+    return { hours: 0, days: 0, months: 0 };
+  }
+
+  /* HOURS */
+
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+
+  /* DAYS (inclusive calendar days) */
+
+  const startDay = new Date(startDate);
+  const endDay = new Date(endDate);
+
+  startDay.setHours(0,0,0,0);
+  endDay.setHours(0,0,0,0);
+
+  const days =
+    Math.floor((endDay - startDay) / (1000 * 60 * 60 * 24)) + 1;
+
+  /* MONTHS */
+
+  let months = 0;
+
+  if (days >= 29) {
+    months = Math.floor(days / 30);
+    if (days % 30 !== 0) months++;
+  }
+
+  return {
+    hours,
+    days,
+    months
+  };
+
+};
+
+const calculateStaffSalary = (start, end, rate, rateType) => {
+
+  const duration = getDuration(start, end);
+
+  let amount = 0;
+
+  if (rateType === "hourly") {
+    amount = duration.hours * rate;
+  }
+
+  if (rateType === "daily") {
+    amount = duration.days * rate;
+  }
+
+  if (rateType === "monthly") {
+    amount = duration.months * rate;
+  }
+
+  return {
+    hours: duration.hours,
+    days: duration.days,
+    months: duration.months,
+    amount
+  };
+
+};
   const fmtDateTime = (iso) => {
     if (!iso) return "";
     return new Date(iso).toLocaleString();
@@ -110,6 +184,23 @@ export default function NursingOrderDetails() {
   const [assignDates, setAssignDates] = useState({
   startDate: "",
   endDate: ""
+});
+const filteredStaff = staffList.filter((s) => {
+
+  if (staffFilters.staffType !== "all" && s.staffType !== staffFilters.staffType) {
+    return false;
+  }
+
+  if (staffFilters.shiftType !== "all" && s.shiftType !== staffFilters.shiftType) {
+    return false;
+  }
+
+  if (staffFilters.rateType !== "all" && s.rateType !== staffFilters.rateType) {
+    return false;
+  }
+
+  return true;
+
 });
 
   const displayUser = (uid, name) =>
@@ -455,8 +546,7 @@ const assignStaff = async (staff) => {
       return;
     }
 
-    const serviceRateType =
-      item.rateType || staff.rateType || "daily";
+    const staffRateType = staff.rateType || "daily";
 
 
     /* ===============================
@@ -478,7 +568,9 @@ const assignStaff = async (staff) => {
       return;
     }
 
-    /* Optional: prevent assignment outside service range */
+    /* ===============================
+       Ensure assignment inside service
+    =============================== */
 
     if (item.expectedStartDate && item.expectedEndDate) {
 
@@ -516,83 +608,26 @@ const assignStaff = async (staff) => {
 
 
     /* ===============================
-       3️⃣ CALCULATE DURATION
-    =============================== */
-
-    let hours = 0;
-    let days = 0;
-    let months = 0;
-
-    const diffMs = end - start;
-
-    /* HOURLY */
-
-    if (serviceRateType === "hourly") {
-
-      hours = Math.ceil(diffMs / (1000 * 60 * 60));
-
-    }
-
-    /* DAILY (ignore time) */
-
-    if (serviceRateType === "daily") {
-
-      const startDay = new Date(start);
-      const endDay = new Date(end);
-
-      startDay.setHours(0,0,0,0);
-      endDay.setHours(0,0,0,0);
-
-      const diffDays =
-        (endDay - startDay) / (1000 * 60 * 60 * 24);
-
-      days = diffDays + 1;
-
-    }
-
-    /* MONTHLY */
-
-    if (serviceRateType === "monthly") {
-
-      const startDay = new Date(start);
-      const endDay = new Date(end);
-
-      startDay.setHours(0,0,0,0);
-      endDay.setHours(0,0,0,0);
-
-      const diffDays =
-        (endDay - startDay) / (1000 * 60 * 60 * 24) + 1;
-
-      months = Math.round(diffDays / 30);
-
-      if (months < 1) months = 1;
-
-    }
-
-
-    /* ===============================
-       4️⃣ CALCULATE SALARY
+       3️⃣ CALCULATE SALARY (NEW ENGINE)
     =============================== */
 
     const rate = Number(staff.baseRate || 0);
 
-    let amount = 0;
+    const salary = calculateStaffSalary(
+      assignDates.startDate,
+      assignDates.endDate,
+      rate,
+      staffRateType
+    );
 
-    if (serviceRateType === "hourly") {
-      amount = hours * rate;
-    }
-
-    if (serviceRateType === "daily") {
-      amount = days * rate;
-    }
-
-    if (serviceRateType === "monthly") {
-      amount = months * rate;
-    }
+    const hours = salary.hours;
+    const days = salary.days;
+    const months = salary.months;
+    const amount = salary.amount;
 
 
     /* ===============================
-       5️⃣ CREATE ASSIGNMENT
+       4️⃣ CREATE ASSIGNMENT
     =============================== */
 
     await addDoc(collection(db, "staffAssignments"), {
@@ -615,7 +650,7 @@ const assignStaff = async (staff) => {
       months,
 
       rate,
-      rateType: serviceRateType,
+      rateType: staffRateType,
 
       shift: staff.shiftPreference || "day",
 
@@ -635,7 +670,7 @@ const assignStaff = async (staff) => {
 
 
     /* ===============================
-       6️⃣ UPDATE ORDER STATUS
+       5️⃣ UPDATE ORDER STATUS
     =============================== */
 
     await updateDoc(doc(db, "nursingOrders", id), {
@@ -646,7 +681,7 @@ const assignStaff = async (staff) => {
 
 
     /* ===============================
-       7️⃣ RELOAD ASSIGNMENTS
+       6️⃣ RELOAD ASSIGNMENTS
     =============================== */
 
     await loadAssignments();
@@ -703,33 +738,33 @@ const extendService = async () => {
 
     await updateDoc(doc(db, "nursingOrders", id), {
 
-  items: updatedItems,
-  totals: newTotals,
+      items: updatedItems,
+      totals: newTotals,
 
-  extensionHistory: [
-    ...(order.extensionHistory || []),
-    {
-      serviceIndex,
-      serviceName: service.name,
+      extensionHistory: [
+        ...(order.extensionHistory || []),
+        {
+          serviceIndex,
+          serviceName: service.name,
 
-      oldEndDate: service.expectedEndDate,
-      newEndDate: updatedEndDate,
+          oldEndDate: service.expectedEndDate,
+          newEndDate: updatedEndDate,
 
-      extraAmount,
+          extraAmount,
 
-      extendedByUid: auth.currentUser?.uid || "",
-      extendedByName:
-        auth.currentUser?.displayName ||
-        auth.currentUser?.email ||
-        "Admin",
+          extendedByUid: auth.currentUser?.uid || "",
+          extendedByName:
+            auth.currentUser?.displayName ||
+            auth.currentUser?.email ||
+            "Admin",
 
-      extendedAt: new Date().toISOString()
-    }
-  ],
+          extendedAt: new Date().toISOString()
+        }
+      ],
 
-  updatedAt: serverTimestamp()
+      updatedAt: serverTimestamp()
 
-});
+    });
 
     /* =====================
        UPDATE STAFF ASSIGNMENTS
@@ -748,77 +783,18 @@ const extendService = async () => {
 
       const a = d.data();
 
-      const start = new Date(a.startDate);
-      const end = new Date(updatedEndDate);
-
-      let hours = 0;
-      let days = 0;
-      let months = 0;
-
-      const diffMs = end - start;
-
       /* =====================
-         HOURLY
+         USE CENTRAL SALARY ENGINE
       ===================== */
 
-      if (a.rateType === "hourly") {
+      const salary = calculateStaffSalary(
+        a.startDate,
+        updatedEndDate,
+        a.rate,
+        a.rateType
+      );
 
-        hours = Math.floor(diffMs / (1000 * 60 * 60));
-
-      }
-
-      /* =====================
-         DAILY
-         (Prevents +1 day for 1 minute)
-      ===================== */
-
-      if (a.rateType === "daily") {
-
-        const startDay = new Date(start);
-        const endDay = new Date(end);
-
-        startDay.setHours(0,0,0,0);
-        endDay.setHours(0,0,0,0);
-
-        const diffDays =
-          Math.floor((endDay - startDay) / (1000 * 60 * 60 * 24));
-
-        days = diffDays + 1;
-
-      }
-
-      /* =====================
-         MONTHLY
-      ===================== */
-
-      if (a.rateType === "monthly") {
-
-        const startDay = new Date(start);
-        const endDay = new Date(end);
-
-        startDay.setHours(0,0,0,0);
-        endDay.setHours(0,0,0,0);
-
-        const diffDays =
-          Math.floor((endDay - startDay) / (1000 * 60 * 60 * 24)) + 1;
-
-        months = Math.floor(diffDays / 30);
-
-        if (diffDays % 30 !== 0) months++;
-
-        if (months < 1) months = 1;
-
-      }
-
-      /* =====================
-         RECALCULATE SALARY
-      ===================== */
-
-      let newAmount = 0;
-
-      if (a.rateType === "hourly") newAmount = hours * a.rate;
-      if (a.rateType === "daily") newAmount = days * a.rate;
-      if (a.rateType === "monthly") newAmount = months * a.rate;
+      const newAmount = salary.amount;
 
       const newBalance =
         newAmount - Number(a.paidAmount || 0);
@@ -827,9 +803,9 @@ const extendService = async () => {
 
         endDate: updatedEndDate,
 
-        hours,
-        days,
-        months,
+        hours: salary.hours,
+        days: salary.days,
+        months: salary.months,
 
         amount: newAmount,
         balanceAmount: newBalance,
@@ -971,83 +947,22 @@ const stopStaffService = async () => {
       return;
     }
 
-    let hours = 0;
-    let days = 0;
-    let months = 0;
-
-    const diffMs = end - start;
-
     /* =========================
-       HOURLY CALCULATION
+       CALCULATE SALARY USING ENGINE
     ========================= */
 
-    if (assignment.rateType === "hourly") {
+    const salary = calculateStaffSalary(
+      assignment.startDate,
+      stopDate,
+      Number(assignment.rate || 0),
+      assignment.rateType
+    );
 
-      hours = Math.ceil(diffMs / (1000 * 60 * 60));
+    const amount = Number(salary.amount || 0);
 
-    }
+    const paidAmount = Number(assignment.paidAmount || 0);
 
-    /* =========================
-       DAILY CALCULATION
-       Ignore time part
-    ========================= */
-
-    if (assignment.rateType === "daily") {
-
-      const startDay = new Date(start);
-      const endDay = new Date(end);
-
-      startDay.setHours(0,0,0,0);
-      endDay.setHours(0,0,0,0);
-
-      const diffDays =
-        (endDay - startDay) / (1000 * 60 * 60 * 24);
-
-      days = diffDays + 1;
-
-    }
-
-    /* =========================
-       MONTHLY CALCULATION
-    ========================= */
-
-    if (assignment.rateType === "monthly") {
-
-      const startDay = new Date(start);
-      const endDay = new Date(end);
-
-      startDay.setHours(0,0,0,0);
-      endDay.setHours(0,0,0,0);
-
-      const diffDays =
-        (endDay - startDay) / (1000 * 60 * 60 * 24) + 1;
-
-      months = Math.round(diffDays / 30);
-
-      if (months < 1) months = 1;
-
-    }
-
-    /* =========================
-       SALARY CALCULATION
-    ========================= */
-
-    let amount = 0;
-
-    if (assignment.rateType === "hourly") {
-      amount = hours * assignment.rate;
-    }
-
-    if (assignment.rateType === "daily") {
-      amount = days * assignment.rate;
-    }
-
-    if (assignment.rateType === "monthly") {
-      amount = months * assignment.rate;
-    }
-
-    const balanceAmount =
-      amount - Number(assignment.paidAmount || 0);
+    const balanceAmount = Math.max(0, amount - paidAmount);
 
     /* =========================
        UPDATE FIRESTORE
@@ -1057,9 +972,9 @@ const stopStaffService = async () => {
 
       endDate: stopDate,
 
-      hours,
-      days,
-      months,
+      hours: salary.hours || 0,
+      days: salary.days || 0,
+      months: salary.months || 0,
 
       amount,
       balanceAmount,
@@ -1070,6 +985,10 @@ const stopStaffService = async () => {
       stoppedBy: auth.currentUser?.uid || ""
 
     });
+
+    /* =========================
+       REFRESH UI
+    ========================= */
 
     await loadAssignments();
 
@@ -1715,16 +1634,28 @@ const openStopServiceModal = (assignment) => {
                     <strong>{a.staffName}</strong>
 
                     <div className="nod-muted">
-                      {a.staffType} · {a.shift}
+                      {a.staffType}
                     </div>
 
                     <div className="nod-muted">
-                      {a.startDate} → {a.endDate} ·
+  {fmtDateTime(a.startDate)} → {fmtDateTime(a.endDate)} · {(() => {
 
-                      {a.rateType === "hourly" && ` ${a.hours || 0} hours`}
-                      {a.rateType === "daily" && ` ${a.days || 0} days`}
-                      {a.rateType === "monthly" && ` ${a.months || 0} months`}
-                    </div>
+    if (a.rateType === "hourly") {
+      return `${a.hours || 0} hours`;
+    }
+
+    if (a.rateType === "daily") {
+      return `${a.days || 0} days`;
+    }
+
+    if (a.rateType === "monthly") {
+      return `${a.months || 0} months`;
+    }
+
+    return "";
+
+  })()}
+</div>
 
       <div className="nod-staff-meta">
 
@@ -1984,7 +1915,9 @@ const openStopServiceModal = (assignment) => {
       {assignOpen && (
         <div className="nod-modal">
           <div className="nod-modal-card">
+             <div className="assign-modal-header">
             <h4>Assign Nurse</h4>
+            </div>
             <div className="nod-assign-dates">
 
   <div>
@@ -2018,9 +1951,71 @@ const openStopServiceModal = (assignment) => {
   </div>
 
 </div>
+<div className="assign-filter">
+
+  <div className="assign-filter-row">
+    <label>Staff Type</label>
+
+    <div className="assign-filter-chips">
+      {["all","nurse","caretaker"].map(type => (
+        <button
+          key={type}
+          className={`assign-chip ${staffFilters.staffType === type ? "active" : ""}`}
+          onClick={() =>
+            setStaffFilters(p => ({ ...p, staffType: type }))
+          }
+        >
+          {type === "all" ? "All" : type}
+        </button>
+      ))}
+    </div>
+
+  </div>
+
+
+  <div className="assign-filter-row">
+    <label>Shift</label>
+
+    <div className="assign-filter-chips">
+      {["all","day","night","full","flexible"].map(shift => (
+        <button
+          key={shift}
+          className={`assign-chip ${staffFilters.shiftType === shift ? "active" : ""}`}
+          onClick={() =>
+            setStaffFilters(p => ({ ...p, shiftType: shift }))
+          }
+        >
+          {shift}
+        </button>
+      ))}
+    </div>
+
+  </div>
+
+
+  <div className="assign-filter-row">
+    <label>Rate</label>
+
+    <div className="assign-filter-chips">
+      {["all","hourly","daily","monthly"].map(rate => (
+        <button
+          key={rate}
+          className={`assign-chip ${staffFilters.rateType === rate ? "active" : ""}`}
+          onClick={() =>
+            setStaffFilters(p => ({ ...p, rateType: rate }))
+          }
+        >
+          {rate}
+        </button>
+      ))}
+    </div>
+
+  </div>
+
+</div>
 
             <div className="nod-staff-grid">
-              {staffList.map((s) => (
+              {filteredStaff.map((s) => (
                 <div key={s.id} className="nod-staff-card">
                   <div>
                     <strong>{s.name}</strong>
@@ -2083,6 +2078,7 @@ const end = new Date(assignDates.endDate);
                 </div>
               ))}
             </div>
+             <div className="assign-modal-footer">
 
             <button
               className="nod-btn nod-btn-secondary"
@@ -2090,6 +2086,7 @@ const end = new Date(assignDates.endDate);
             >
               Close
             </button>
+            </div>
           </div>
         </div>
       )}

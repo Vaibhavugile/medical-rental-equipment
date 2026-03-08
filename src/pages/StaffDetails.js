@@ -162,7 +162,27 @@ useEffect(() => {
 
   loadPayrollHistory();
 }, [id]);
+const totalAssignments =
+  activeAssignments.length + assignmentHistory.length;
 
+const totalEarnings = assignmentHistory.reduce(
+  (sum, a) => sum + Number(a.amount || 0),
+  0
+);
+
+const currentMonth = new Date().getMonth();
+const currentYear = new Date().getFullYear();
+
+const monthlyIncome = payrollHistory
+  .filter((p) => {
+    if (!p.paidAt?.toDate) return false;
+    const d = p.paidAt.toDate();
+    return (
+      d.getMonth() === currentMonth &&
+      d.getFullYear() === currentYear
+    );
+  })
+  .reduce((sum, p) => sum + Number(p.totalAmount || 0), 0);
 
   /* ======================
      UI
@@ -182,6 +202,37 @@ useEffect(() => {
         </button>
       </div>
 
+<div className="sd-stats">
+
+  <div className="sd-stat">
+    <div className="sd-stat-label">Total Earnings</div>
+    <div className="sd-stat-value">
+      ₹ {fmtCurrency(totalEarnings)}
+    </div>
+  </div>
+
+  <div className="sd-stat">
+    <div className="sd-stat-label">Active Assignments</div>
+    <div className="sd-stat-value">
+      {activeAssignments.length}
+    </div>
+  </div>
+
+  <div className="sd-stat">
+    <div className="sd-stat-label">Total Assignments</div>
+    <div className="sd-stat-value">
+      {totalAssignments}
+    </div>
+  </div>
+
+  <div className="sd-stat">
+    <div className="sd-stat-label">This Month Income</div>
+    <div className="sd-stat-value">
+      ₹ {fmtCurrency(monthlyIncome)}
+    </div>
+  </div>
+
+</div>
       {/* BASIC INFO */}
       <div className="sd-card">
         <h3>Basic Information</h3>

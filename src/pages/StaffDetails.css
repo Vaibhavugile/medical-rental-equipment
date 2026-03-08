@@ -3,8 +3,8 @@
 ================================ */
 
 .sd-wrap {
-  padding: 24px;
-  background: #f8fafc;
+  padding: 28px;
+  background: #f6f8fb;
   min-height: 100vh;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   color: #0f172a;
@@ -18,13 +18,14 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .sd-head h2 {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 600;
   margin: 0;
+  letter-spacing: -0.2px;
 }
 
 /* ===============================
@@ -32,19 +33,20 @@
 ================================ */
 
 .sd-btn {
-  padding: 8px 14px;
+  padding: 9px 16px;
   border-radius: 8px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e2e8f0;
   background: #ffffff;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.18s ease;
   color: #0f172a;
 }
 
 .sd-btn:hover {
   background: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 .sd-btn.ghost {
@@ -62,17 +64,23 @@
 
 .sd-card {
   background: #ffffff;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e2e8f0;
   border-radius: 14px;
-  padding: 16px 18px;
-  margin-bottom: 16px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  padding: 18px 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.03);
+  transition: all 0.2s ease;
+}
+
+.sd-card:hover {
+  box-shadow: 0 6px 18px rgba(0,0,0,0.06);
 }
 
 .sd-card h3 {
-  margin: 0 0 12px 0;
+  margin: 0 0 14px 0;
   font-size: 15px;
   font-weight: 600;
+  color: #0f172a;
 }
 
 /* ===============================
@@ -81,8 +89,8 @@
 
 .sd-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 16px;
 }
 
 .sd-grid label {
@@ -94,6 +102,7 @@
 
 .sd-grid div {
   font-size: 14px;
+  font-weight: 500;
 }
 
 /* ===============================
@@ -108,15 +117,16 @@
 
 .sd-badges {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 
 .sd-badge {
-  padding: 4px 10px;
+  padding: 5px 11px;
   font-size: 12px;
   border-radius: 999px;
   font-weight: 500;
   border: 1px solid transparent;
+  letter-spacing: .2px;
 }
 
 .sd-badge.ok {
@@ -138,32 +148,32 @@
 }
 
 /* ===============================
-   Assigned Orders
+   Assignment Rows
 ================================ */
 
-.sd-order-row {
+.sd-assign-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 14px;
+  padding: 13px 15px;
   border-radius: 10px;
   border: 1px solid #e5e7eb;
   margin-top: 10px;
-  cursor: pointer;
-  transition: all 0.15s ease;
   background: #ffffff;
+  transition: all 0.15s ease;
 }
 
-.sd-order-row:hover {
+.sd-assign-row:hover {
   background: #f8fafc;
   border-color: #cbd5f5;
+  transform: translateY(-1px);
 }
 
-.sd-order-row strong {
+.sd-assign-row strong {
   font-size: 14px;
 }
 
-.sd-order-total {
+.sd-amount {
   font-weight: 600;
   font-size: 14px;
 }
@@ -175,6 +185,7 @@
 .sd-muted {
   color: #64748b;
   font-size: 13px;
+  margin-top: 3px;
 }
 
 .sd-error {
@@ -183,6 +194,7 @@
   padding: 12px;
   border-radius: 10px;
   margin-bottom: 12px;
+  font-size: 13px;
 }
 
 /* ===============================
@@ -190,8 +202,9 @@
 ================================ */
 
 @media (max-width: 768px) {
+
   .sd-wrap {
-    padding: 16px;
+    padding: 18px;
   }
 
   .sd-head {
@@ -200,9 +213,46 @@
     gap: 10px;
   }
 
-  .sd-order-row {
+  .sd-assign-row {
     flex-direction: column;
     align-items: flex-start;
     gap: 6px;
   }
+
+}
+/* ===============================
+   Staff Stats Dashboard
+================================ */
+
+.sd-stats{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+gap:16px;
+margin-bottom:18px;
+}
+
+.sd-stat{
+background:#ffffff;
+border:1px solid #e5e7eb;
+border-radius:12px;
+padding:16px;
+box-shadow:0 2px 6px rgba(0,0,0,0.04);
+transition:all .2s ease;
+}
+
+.sd-stat:hover{
+transform:translateY(-2px);
+box-shadow:0 6px 14px rgba(0,0,0,0.06);
+}
+
+.sd-stat-label{
+font-size:12px;
+color:#64748b;
+margin-bottom:6px;
+}
+
+.sd-stat-value{
+font-size:20px;
+font-weight:600;
+color:#0f172a;
 }

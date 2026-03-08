@@ -236,6 +236,55 @@ border-bottom:none;
   font-size: 12px;
   border-radius: 6px;
 }
+.assign-filter{
+display:flex;
+flex-direction:column;
+gap:14px;
+margin:18px 0;
+}
+
+.assign-filter-row{
+display:flex;
+flex-direction:column;
+gap:6px;
+}
+
+.assign-filter-row label{
+font-size:13px;
+font-weight:600;
+color:#374151;
+}
+
+.assign-filter-chips{
+display:flex;
+flex-wrap:wrap;
+gap:8px;
+}
+
+.assign-chip{
+display:inline-flex;
+align-items:center;
+justify-content:center;
+padding:6px 14px;
+border-radius:20px;
+border:1px solid #d1d5db;
+background:#ffffff;
+font-size:13px;
+color:#374151; /* fix text color */
+cursor:pointer;
+transition:all .2s ease;
+width:auto;
+}
+
+.assign-chip:hover{
+background:#f3f4f6;
+}
+
+.assign-chip.active{
+background:#2563eb;
+color:#ffffff;
+border-color:#2563eb;
+}
 
 /* RIGHT SIDE */
 .nod-staff-actions {
@@ -356,9 +405,21 @@ border-bottom:none;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 16px;
+  max-height:420px;
+overflow-y:auto;
   margin-bottom: 18px;
 }
 
+
+
+.assign-modal-footer{
+position:sticky;
+bottom:0;
+background:#fff;
+padding-top:10px;
+border-top:1px solid #eee;
+text-align:center;
+}
 /* ===============================
    STAFF CARD
 ================================ */

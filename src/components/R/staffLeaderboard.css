@@ -1,0 +1,101 @@
+.nor-leaderboard{
+
+display:flex;
+
+flex-direction:column;
+
+gap:10px;
+
+}
+
+.nor-leader-card{
+
+display:flex;
+
+align-items:center;
+
+justify-content:space-between;
+
+padding:12px 14px;
+
+border-radius:8px;
+
+background:#fff;
+
+box-shadow:0 3px 8px rgba(0,0,0,0.05);
+
+}
+
+/* RANK */
+
+.nor-rank{
+
+font-size:20px;
+
+width:40px;
+
+text-align:center;
+
+}
+
+/* INFO */
+
+.nor-leader-info{
+
+flex:1;
+
+}
+
+.nor-leader-name{
+
+font-weight:600;
+
+}
+
+.nor-leader-type{
+
+font-size:13px;
+
+color:#666;
+
+text-transform:capitalize;
+
+}
+
+/* STATS */
+
+.nor-leader-stats{
+
+text-align:right;
+
+}
+
+.nor-leader-earned{
+
+font-weight:700;
+
+color:#16a34a;
+
+}
+
+.nor-leader-orders{
+
+font-size:13px;
+
+color:#666;
+
+}
+
+/* TOP 3 COLORS */
+
+.nor-rank-1{
+border-left:6px solid gold;
+}
+
+.nor-rank-2{
+border-left:6px solid silver;
+}
+
+.nor-rank-3{
+border-left:6px solid #cd7f32;
+}
