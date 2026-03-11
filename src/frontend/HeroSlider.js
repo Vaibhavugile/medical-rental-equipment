@@ -8,8 +8,8 @@ import "./HeroSlider.css";
 
 const slidesData = [
   {
-    image: "/hero-slide-icusetup1.png",
-    mobileImage: "/hero-slide-icusetup1-mobile.png",
+    image: "/hero-slide-icusetup1.webp",
+    mobileImage: "/hero-slide-icusetup1-mobile.webp",
     tagline: "Hospital Level ICU Care at Home",
     title: (
       <>
@@ -21,8 +21,8 @@ const slidesData = [
   },
 
   {
-    image: "/hero-slide-expert1.png",
-    mobileImage: "/hero-slide-expert1-mobile.png",
+    image: "/hero-slide-expert1.webp",
+    mobileImage: "/hero-slide-expert1-mobile.webp",
     tagline: "Trusted Clinical Experts",
     title: (
       <>
@@ -34,8 +34,8 @@ const slidesData = [
   },
 
   {
-    image: "/hero-slide-nursingcare1.png",
-    mobileImage: "/hero-slide-nursingcare1-mobile.png",
+    image: "/hero-slide-nursingcare1.webp",
+    mobileImage: "/hero-slide-nursingcare1-mobile.webp",
     tagline: "Compassionate Home Care",
     title: (
       <>
@@ -47,8 +47,8 @@ const slidesData = [
   },
 
   {
-    image: "/hero-slide-chemo1.png",
-    mobileImage: "/hero-slide-chemo1-mobile.png",
+    image: "/hero-slide-chemo1.webp",
+    mobileImage: "/hero-slide-chemo1-mobile.webp",
     tagline: "Advanced Cancer Care at Home",
     title: (
       <>
@@ -60,8 +60,8 @@ const slidesData = [
   },
 
   {
-    image: "/hero-slide-pharmacy1.png",
-    mobileImage: "/hero-slide-pharmacy1-mobile.png",
+    image: "/hero-slide-pharmacy1.webp",
+    mobileImage: "/hero-slide-pharmacy1-mobile.webp",
     tagline: "Trusted Medicine Delivery",
     title: (
       <>
@@ -73,8 +73,8 @@ const slidesData = [
   },
 
   {
-    image: "/hero-slide-bloodtest1.png",
-    mobileImage: "/hero-slide-bloodtest1-mobile.png",
+    image: "/hero-slide-bloodtest1.webp",
+    mobileImage: "/hero-slide-bloodtest1-mobile.webp",
     tagline: "Diagnostic Care at Home",
     title: (
       <>

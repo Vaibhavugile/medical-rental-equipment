@@ -8,7 +8,7 @@ const AboutSection = () => {
       {/* IMAGE SIDE */}
       <div className="about-premium-image">
         <img
-          src="./hero-slide-expert1.png"
+          src="./hero-slide-expert1.webp"
           alt="Certified Healthcare Professionals"
         />
 

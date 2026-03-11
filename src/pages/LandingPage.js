@@ -83,13 +83,13 @@ export default function LandingPage() {
               <TrustedProviders />
 
        
-
+{/* 
          <section
   id="gallery"
   aria-label="Completed Medical Setups Gallery"
 >
   <SetupGallery id="gallery" />
-</section>
+</section> */}
 
 <YoutubeVideos />
  

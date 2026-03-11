@@ -9,6 +9,7 @@ import {
   where,
   Timestamp,
   getCountFromServer,
+  setDoc,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -23,6 +24,12 @@ const err = (...a) => DEBUG && console.error("[AttendanceAdmin]", ...a);
 export default function AttendanceAdmin() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+const [manualPerson, setManualPerson] = useState("");
+const [manualDate, setManualDate] = useState(isoOf(new Date()));
+const [manualCheckIn, setManualCheckIn] = useState("");
+const [manualCheckOut, setManualCheckOut] = useState("");
+const [manualNotes, setManualNotes] = useState("");
+const [savingManual, setSavingManual] = useState(false);
 
   // role = "drivers" | "marketing" (default drivers)
   const [role, setRole] = useState(() => (searchParams.get("role") || "drivers").toLowerCase());
@@ -54,6 +61,7 @@ export default function AttendanceAdmin() {
     log("sync url params", params);
     setSearchParams(params);
   }, [role, personId, dateFrom, dateTo, setSearchParams]);
+  
 
   // Load people (drivers or marketing)
   useEffect(() => {
@@ -273,6 +281,62 @@ useEffect(() => {
     URL.revokeObjectURL(url);
   };
 
+  async function saveManualAttendance() {
+  try {
+    if (!manualPerson) {
+      alert("Select person");
+      return;
+    }
+
+    if (!manualCheckIn) {
+      alert("Enter check-in time");
+      return;
+    }
+
+    setSavingManual(true);
+
+    const base =
+      role === "marketing"
+        ? "marketing"
+        : role === "staff"
+        ? "staff"
+        : "drivers";
+
+    const dayId = manualDate;
+
+    const checkInDate = new Date(`${manualDate}T${manualCheckIn}`);
+    const checkOutDate = manualCheckOut
+      ? new Date(`${manualDate}T${manualCheckOut}`)
+      : null;
+
+    const ref = doc(db, base, manualPerson, "attendance", dayId);
+
+    await setDoc(
+      ref,
+      {
+        date: manualDate,
+        checkInServer: Timestamp.fromDate(checkInDate),
+        checkOutServer: checkOutDate ? Timestamp.fromDate(checkOutDate) : null,
+        status: checkOutDate ? "present" : "open",
+        notes: manualNotes || "Manual attendance by admin",
+        createdBy: "admin",
+      },
+      { merge: true }
+    );
+
+    alert("Attendance saved");
+
+    setManualCheckIn("");
+    setManualCheckOut("");
+    setManualNotes("");
+  } catch (e) {
+    console.error(e);
+    alert("Failed to save attendance");
+  } finally {
+    setSavingManual(false);
+  }
+}
+
   return (
     <div className="attendance-page">
 <h2>
@@ -307,6 +371,46 @@ useEffect(() => {
         <div className="spacer" />
         <button className="cp-btn" onClick={exportCsv}>Export CSV</button>
       </div>
+      <div className="manual-attendance">
+  <h3>Manual Attendance</h3>
+
+  <select value={manualPerson} onChange={(e) => setManualPerson(e.target.value)}>
+    <option value="">Select Person</option>
+    {people.map((p) => (
+      <option key={p.id} value={p.id}>
+        {p.name || p.loginEmail || p.email}
+      </option>
+    ))}
+  </select>
+
+  <input
+    type="date"
+    value={manualDate}
+    onChange={(e) => setManualDate(e.target.value)}
+  />
+
+  <input
+    type="time"
+    value={manualCheckIn}
+    onChange={(e) => setManualCheckIn(e.target.value)}
+  />
+
+  <input
+    type="time"
+    value={manualCheckOut}
+    onChange={(e) => setManualCheckOut(e.target.value)}
+  />
+
+  <input
+    placeholder="Notes"
+    value={manualNotes}
+    onChange={(e) => setManualNotes(e.target.value)}
+  />
+
+  <button className="cp-btn" onClick={saveManualAttendance} disabled={savingManual}>
+    {savingManual ? "Saving..." : "Save Attendance"}
+  </button>
+</div>
 
       {error && <p className="error">{error}</p>}
 

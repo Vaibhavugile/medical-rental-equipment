@@ -47,7 +47,7 @@ import Marketing from "./pages/Marketing";
 import Visits from "./pages/Visits";
 import ReportsHome from "./pages/reports/ReportsHome";
 import AttendanceAdmin from "./pages/AttendanceAdmin";
-
+import PrivacyPolicys from "./pages/privacyp";
 /* ======================= EQUIPMENT ======================= */
 import EquipmentList from "./pages/medical-equipment/EquipmentList";
 import EquipmentDetail from "./pages/medical-equipment/EquipmentDetail";
@@ -57,7 +57,7 @@ import ProductReport from "./pages/reports/ProductReport";
 import FinancialReport from "./pages/reports/FinancialReport";
 import OutstandingOrdersReport from "./pages/reports/OutstandingOrdersReport";
 import AssetsReport from "./pages/reports/AssetsReport";
-
+import Support from "./pages/supportss";
 /* ======================= TRACKING ======================= */
 import TrackingPage from "./pages/TrackingPage";
 import LandingNew from "./pages/Landingnew";
@@ -266,6 +266,8 @@ export default function App() {
         <Route path="/physiotherapy" element={<PhysiotherapyPage />} />
         <Route path="/respiratory-care" element={<RespiratoryPage />} />
         <Route path="/doctors" element={<Doctors />} />
+        <Route path="/appsupport" element={<Support />} />
+                <Route path="/appprivacy" element={<PrivacyPolicys />} />
 
         <Route path="/equipment" element={<EquipmentList />} />
         <Route path="/equipment/:slug" element={<EquipmentDetail />} />

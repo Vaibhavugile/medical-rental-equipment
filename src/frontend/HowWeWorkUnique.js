@@ -3,7 +3,7 @@ import "./HowWeWorkUnique.css";
 
 export default function HowWeWorkUnique({
   id = "how-we-work",
-  imgSrc = "/how-image.jpg",
+  imgSrc = "/how-image.webp",
   bullets = [
     "A proper and complete clinical assessment of each patient by our medical team.",
     "Daily monitoring of patients as per BookMyMedicare protocol with documentation.",

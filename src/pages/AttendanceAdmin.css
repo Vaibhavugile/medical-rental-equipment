@@ -12,7 +12,21 @@
   font-size: 20px;
   margin: 0 0 12px;
 }
+.manual-attendance{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  padding:16px;
+  background:#fff;
+  border-radius:10px;
+  margin-bottom:16px;
+  border:1px solid #eee;
+}
 
+.manual-attendance input,
+.manual-attendance select{
+  padding:8px;
+}
 /* Filters / Toolbar */
 .toolbar {
   display: flex;
