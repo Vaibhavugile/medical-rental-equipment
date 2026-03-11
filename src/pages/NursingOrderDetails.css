@@ -328,23 +328,34 @@ border-color:#2563eb;
    MODAL
 ================================ */
 
-.nod-modal {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 50;
+/* MODAL BACKDROP */
+
+.nod-modal{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100vh;
+display:flex;
+align-items:center;
+justify-content:center;
+background:rgba(0,0,0,0.35);
+z-index:1000;
 }
 
-.nod-modal-card {
-  background: #ffffff;
-  width: 560px;
-  max-width: calc(100vw - 32px);
-  border-radius: 16px;
-  padding: 22px;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+/* MODAL CARD */
+
+.nod-modal-card{
+background:#fff;
+border-radius:14px;
+width:900px;
+max-width:95vw;
+
+max-height:90vh;      /* IMPORTANT */
+overflow-y:auto;      /* ENABLE SCROLL */
+
+padding:24px;
+box-shadow:0 10px 40px rgba(0,0,0,0.2);
 }
 
 .nod-modal-card h4 {
@@ -409,7 +420,62 @@ border-color:#2563eb;
 overflow-y:auto;
   margin-bottom: 18px;
 }
+/* RATE CONFIG SECTION */
 
+.assign-rate-config{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:16px;
+margin-top:18px;
+margin-bottom:18px;
+}
+
+/* LABELS */
+
+.assign-rate-config label{
+display:block;
+font-size:13px;
+font-weight:600;
+margin-bottom:6px;
+color:#444;
+}
+
+/* DROPDOWN */
+
+.assign-rate-config select{
+width:100%;
+height:40px;
+border-radius:8px;
+border:1px solid #d9dfe7;
+padding:0 12px;
+font-size:14px;
+background:#fff;
+transition:all .2s ease;
+}
+
+/* HOVER */
+
+.assign-rate-config select:hover{
+border-color:#2f6fed;
+}
+
+/* FOCUS */
+
+.assign-rate-config select:focus{
+outline:none;
+border-color:#2f6fed;
+box-shadow:0 0 0 2px rgba(47,111,237,0.15);
+}
+
+/* MOBILE */
+
+@media (max-width:600px){
+
+.assign-rate-config{
+grid-template-columns:1fr;
+}
+
+}
 
 
 .assign-modal-footer{
