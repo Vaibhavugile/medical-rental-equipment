@@ -134,6 +134,7 @@ const calcDuration = (start, end, rateType) => {
 export default function NursingOrderCreate({
   open,
   quotation: incomingQuotation,
+  serviceType = "nursing",
   onClose,
   onCreated,
 }) {
@@ -262,7 +263,11 @@ export default function NursingOrderCreate({
       ============================ */
       const items = (freshQuotation?.items || []).map((it, idx) => ({
         id: it.id || `n-${Date.now()}-${idx}`,
-        name: it.name || "Nursing Service",
+        name:
+  it.name ||
+  (serviceType === "caretaker"
+    ? "Caretaker Service"
+    : "Nursing Service"),
         qty: Number(it.qty || 1),
         rate: Number(it.rate || 0),
         amount: Number(it.amount || it.qty * it.rate),
@@ -292,7 +297,7 @@ export default function NursingOrderCreate({
         quotationNo: freshQuotation?.quoNo || "",
         requirementId: requirement?.id || "",
         orderNo: `NO-${Math.floor(Date.now() / 1000)}`,
-
+ serviceType,
         customerName,
         deliveryAddress,
         deliveryContact,
@@ -362,7 +367,10 @@ const addItem = () => {
 
     items.push({
       id: `n-${Date.now()}`,
-      name: "Nursing Service",
+     name:
+  base?.serviceType === "caretaker"
+    ? "Caretaker Service"
+    : "Nursing Service",
       qty: 1,                 // staff count
       rate: "", 
       rateType: "daily",   // NEW
@@ -490,7 +498,7 @@ const createOrder = async () => {
       deliveryContact: draft.deliveryContact || null,
       leadId: draft.leadId || null,
 
-      serviceType: "nursing", // 🔑 IMPORTANT
+     serviceType: draft.serviceType || "nursing",
       items: itemsPayload,
       discount: draft.discount,
       taxes: draft.taxes,
@@ -571,8 +579,9 @@ return (
     >
       {/* Header */}
       <div className="cp-form-head">
-        <h2>Create Nursing Order — {draft?.orderNo || "…"}</h2>
-        <div>
+<h2>
+  Create {draft?.serviceType === "caretaker" ? "Caretaker" : "Nursing"} Order — {draft?.orderNo || "…"}
+</h2>        <div>
           <button
             className="cp-btn ghost"
             onClick={() => onClose && onClose()}
@@ -707,14 +716,15 @@ return (
                   marginBottom: 6,
                 }}
               >
-                <h3 style={{ margin: 0 }}>Nursing Services</h3>
-                <button
-                  type="button"
-                  className="cp-btn ghost"
-                  onClick={addItem}
-                >
-                  + Add staff
-                </button>
+<h3 style={{ margin: 0 }}>
+  {draft?.serviceType === "caretaker" ? "Caretaker Services" : "Nursing Services"}
+</h3>               <button
+  type="button"
+  className="cp-btn ghost"
+  onClick={addItem}
+>
+  + Add {draft?.serviceType === "caretaker" ? "Caretaker" : "Nurse"}
+</button>
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

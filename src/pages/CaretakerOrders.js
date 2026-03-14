@@ -68,7 +68,7 @@ const toDateOnly = (value) => {
   return null;
 };
 
-export default function NursingOrders() {
+export default function CaretakerOrders() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -100,6 +100,7 @@ const [kpiFilter, setKpiFilter] = useState("all");
     load();
   }, []);
 
+  
 function getServiceType(order) {
   const name = order.items?.[0]?.name?.toLowerCase() || "";
 
@@ -109,7 +110,7 @@ function getServiceType(order) {
   return "other";
 }
 const pageOrders = orders.filter(
-  (o) => !o.serviceType || o.serviceType === "nursing"
+  (o) => o.serviceType === "caretaker"
 );
 const nursingCount = orders.filter((o) =>
   o.items?.[0]?.name?.toLowerCase().includes("nurs")
@@ -323,13 +324,13 @@ const endingSoonCount = serviceRanges.filter((o) => {
 
 </div>
   <div className="no-head-top">
-    <h2>Nursing Orders</h2>
+    <h2>Caretakers Orders</h2>
     
 <button
   className="cp-btn"
   onClick={() => setCreateOpen(true)}
 >
-  + Add Nursing Order
+  + Add Caretaker Order
 </button>  </div>
 <div className="service-filter">
 
@@ -533,7 +534,7 @@ const endDate =
       {createOpen && (
   <NursingOrderCreate
     open
-    serviceType="nursing"
+    serviceType="caretaker"
     onClose={() => setCreateOpen(false)}
     onCreated={() => {
       setCreateOpen(false);

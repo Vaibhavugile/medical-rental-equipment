@@ -81,6 +81,7 @@ import AdminAddDoctor from "./pages/AdminAddDoctor";
 import StaffSalary from "./pages/StaffSalary";
 import SalaryRequests from "./pages/SalaryRequests";
 import SalaryPayrollPage from "./pages/SalaryPayrollPage";
+import CaretakerOrders from "./pages/CaretakerOrders";
 /* ============================================================
    PRIVATE ROUTE (AUTH ONLY, SILENT)
 ============================================================ */
@@ -195,6 +196,10 @@ function CRMApp() {
 <Route path="adminsupport" element={<AdminSupportingPatients />}/>
 <Route path="adminappointment" element={<AdminAppointments />}/>
 <Route path="add-doctor" element={<AdminAddDoctor />}/>
+<Route
+  path="caretaker-orders"
+  element={<CaretakerOrders />}
+/>
 
             <Route path="*" element={<NotFound />} />
           </Routes>
