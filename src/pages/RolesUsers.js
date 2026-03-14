@@ -24,6 +24,12 @@ const SIDEBAR_OPTIONS = [
   { key: "runners", label: "Runners" },
   { key: "payroll", label: "Payroll" },
   { key: "reports", label: "Reports" },
+ 
+    { key: "Nurse_caretakerpay", label: "Nurse Caretaker Basepay" },
+
+    { key: "Payment_Increase_Request", label: "Payment Increase Requests" },
+
+
   { key: "branches", label: "Branches" },
   { key: "inventory", label: "Inventory" },
   { key: "tracking", label: "Tracking" },

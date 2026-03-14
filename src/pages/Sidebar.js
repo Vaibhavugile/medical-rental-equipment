@@ -120,6 +120,19 @@ const SECTIONS = [
         path: "/crm/reports",
         icon: BarChart3,
       },
+        {
+        key: "Nurse_caretakerpay",            // ✅
+        label: "Basepay",
+        path: "/crm/staffsalary",
+        icon: BarChart3,
+      },
+       {
+        key: "Payment_Increase_Request",            // ✅
+        label: "Salary Increase Request",
+        path: "/crm/salaryrequest",
+        icon: BarChart3,
+      },
+      
     ],
   },
   {

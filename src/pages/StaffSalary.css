@@ -1,19 +1,52 @@
+/* ===============================
+PAGE
+=============================== */
+
 .ss-wrap{
-padding:24px;
+padding:28px;
+max-width:1200px;
+margin:auto;
+font-family:system-ui,-apple-system,Segoe UI,Roboto;
 }
+
+
+/* ===============================
+HEADER
+=============================== */
 
 .ss-header{
 display:flex;
 justify-content:space-between;
 align-items:center;
-margin-bottom:20px;
+margin-bottom:22px;
+}
+
+.ss-header h2{
+font-size:22px;
+font-weight:600;
+}
+
+
+/* ===============================
+HEADER BUTTONS
+=============================== */
+
+.ss-actions{
+display:flex;
+gap:10px;
 }
 
 .ss-btn{
 padding:8px 14px;
-border-radius:6px;
+border-radius:8px;
 border:none;
+font-size:14px;
 cursor:pointer;
+transition:0.2s;
+}
+
+.ss-btn:hover{
+transform:translateY(-1px);
 }
 
 .ss-primary{
@@ -21,33 +54,136 @@ background:#2f6fed;
 color:white;
 }
 
-.ss-list{
-display:flex;
-flex-direction:column;
-gap:10px;
+.ss-secondary{
+background:#f3f4f6;
+color:#333;
 }
 
-.ss-card{
-background:#fff;
-border:1px solid #eee;
-padding:14px;
+
+/* ===============================
+CARE TYPE ADD BAR
+=============================== */
+
+.ss-care-add-bar{
+display:flex;
+gap:12px;
+margin-bottom:18px;
+}
+
+.ss-care-add-bar input{
+flex:1;
+padding:9px 12px;
+border:1px solid #d9d9d9;
 border-radius:8px;
+font-size:14px;
 }
 
-.ss-row{
-display:flex;
-justify-content:space-between;
-align-items:center;
+.ss-care-add-bar button{
+min-width:120px;
 }
+
+
+/* ===============================
+FILTER ROW
+=============================== */
+
+.ss-filters-row{
+display:flex;
+gap:12px;
+margin-bottom:20px;
+align-items:center;
+flex-wrap:nowrap;
+overflow-x:auto;
+}
+
+.ss-filters-row input{
+padding:9px 12px;
+border:1px solid #ddd;
+border-radius:8px;
+font-size:14px;
+min-width:200px;
+}
+
+.ss-filters-row select{
+padding:9px 12px;
+border:1px solid #ddd;
+border-radius:8px;
+font-size:14px;
+background:white;
+min-width:150px;
+}
+
+
+/* ===============================
+TABLE
+=============================== */
+
+.ss-table{
+width:100%;
+border-collapse:collapse;
+background:white;
+border-radius:10px;
+overflow:hidden;
+border:1px solid #e5e7eb;
+}
+
+.ss-table thead{
+background:#f9fafb;
+}
+
+.ss-table th{
+text-align:left;
+padding:12px 14px;
+font-size:13px;
+font-weight:600;
+color:#444;
+border-bottom:1px solid #e5e7eb;
+}
+
+.ss-table td{
+padding:12px 14px;
+font-size:14px;
+border-bottom:1px solid #f1f1f1;
+}
+
+.ss-table tr:hover{
+background:#fafafa;
+}
+
+
+/* ===============================
+RATE VALUE
+=============================== */
 
 .ss-rate{
 font-weight:600;
+color:#2f6fed;
 }
 
-.ss-muted{
-color:#777;
-font-size:14px;
+
+/* ===============================
+TABLE ACTION BUTTONS
+=============================== */
+
+.ss-actions-cell{
+display:flex;
+gap:8px;
 }
+
+.ss-edit{
+background:#eef2ff;
+color:#2f6fed;
+}
+
+.ss-delete{
+background:#fee2e2;
+color:#dc2626;
+}
+
+
+/* ===============================
+MODAL
+=============================== */
 
 .ss-modal{
 position:fixed;
@@ -55,25 +191,92 @@ top:0;
 left:0;
 width:100%;
 height:100%;
-background:rgba(0,0,0,0.4);
+background:rgba(0,0,0,0.45);
 display:flex;
 align-items:center;
 justify-content:center;
+z-index:999;
 }
 
 .ss-modal-card{
 background:white;
-padding:20px;
-border-radius:8px;
-width:350px;
+padding:24px;
+border-radius:12px;
+width:360px;
 display:flex;
 flex-direction:column;
-gap:10px;
+gap:12px;
+box-shadow:0 15px 35px rgba(0,0,0,0.25);
 }
 
-.ss-actions{
+.ss-modal-card h3{
+margin-bottom:6px;
+}
+
+.ss-modal-card label{
+font-size:13px;
+color:#555;
+}
+
+.ss-modal-card input,
+.ss-modal-card select{
+padding:9px 12px;
+border:1px solid #ddd;
+border-radius:8px;
+font-size:14px;
+}
+
+
+/* ===============================
+MODAL ACTIONS
+=============================== */
+
+.ss-modal-actions{
 display:flex;
 justify-content:flex-end;
 gap:10px;
 margin-top:10px;
+}
+
+
+/* ===============================
+TEXT / LOADING
+=============================== */
+
+.ss-muted{
+font-size:13px;
+color:#6b7280;
+margin-top:10px;
+}
+
+
+/* ===============================
+RESPONSIVE
+=============================== */
+
+@media (max-width:900px){
+
+.ss-header{
+flex-direction:column;
+align-items:flex-start;
+gap:12px;
+}
+
+.ss-actions{
+width:100%;
+}
+
+.ss-care-add-bar{
+flex-direction:column;
+}
+
+.ss-filters-row{
+flex-wrap:wrap;
+}
+
+.ss-table{
+display:block;
+overflow-x:auto;
+}
+
 }

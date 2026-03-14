@@ -79,6 +79,8 @@ import Doctors from "./pages/Doctors";
 import AdminAppointments from "./pages/AdminAppointments";
 import AdminAddDoctor from "./pages/AdminAddDoctor";
 import StaffSalary from "./pages/StaffSalary";
+import SalaryRequests from "./pages/SalaryRequests";
+import SalaryPayrollPage from "./pages/SalaryPayrollPage";
 /* ============================================================
    PRIVATE ROUTE (AUTH ONLY, SILENT)
 ============================================================ */
@@ -169,10 +171,13 @@ function CRMApp() {
             <Route path="staff" element={<Staff />} />
             <Route path="staff/:id" element={<StaffDetails />} />
             <Route path="staffsalary" element={<StaffSalary />} />
+            <Route path="salaryrequest" element={<SalaryRequests />} />
+
             <Route path="visits" element={<Visits />} />
             <Route path="reports" element={<ReportsHome />} />
             <Route path="attendance" element={<AttendanceAdmin />} />
             <Route path="payroll" element={<PayrollGenerate />} />
+            <Route path="salarypayroll" element={<SalaryPayrollPage />} />
 
             <Route path="tracking" element={<TrackingPageWithParams />} />
 

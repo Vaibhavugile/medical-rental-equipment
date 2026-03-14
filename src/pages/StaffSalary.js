@@ -1,197 +1,522 @@
 import React, { useEffect, useState } from "react";
 import {
-  collection,
-  addDoc,
-  getDocs,
-  serverTimestamp
+collection,
+addDoc,
+getDocs,
+updateDoc,
+deleteDoc,
+doc,
+serverTimestamp
 } from "firebase/firestore";
 import { db } from "../firebase";
 import "./StaffSalary.css";
 
-export default function StaffSalary() {
+export default function StaffSalary(){
 
-  const [rates, setRates] = useState([]);
-  const [loading, setLoading] = useState(true);
+const [rates,setRates] = useState([]);
+const [careTypes,setCareTypes] = useState([]);
 
-  const [formOpen, setFormOpen] = useState(false);
+const [loading,setLoading] = useState(true);
 
-  const [form, setForm] = useState({
-    role: "nurse",
-    careType: "base",
-    shift: "day",
-    rateType: "daily",
-    rate: ""
-  });
+const [formOpen,setFormOpen] = useState(false);
+const [careTypeFormOpen,setCareTypeFormOpen] = useState(false);
 
-  const loadRates = async () => {
+const [editingRate,setEditingRate] = useState(null);
 
-    setLoading(true);
+const [newCareType,setNewCareType] = useState("");
 
-    const snap = await getDocs(collection(db, "staffRates"));
+const [search,setSearch] = useState("");
 
-    const list = snap.docs.map(d => ({
-      id: d.id,
-      ...(d.data() || {})
-    }));
+const [filters,setFilters] = useState({
+role:"all",
+careType:"all",
+shift:"all",
+sort:"newest"
+});
 
-    setRates(list);
+const [form,setForm] = useState({
+role:"nurse",
+careType:"",
+shift:"day",
+rateType:"daily",
+rate:""
+});
 
-    setLoading(false);
 
-  };
+/* =============================
+LOAD CARE TYPES
+============================= */
 
-  useEffect(() => {
-    loadRates();
-  }, []);
+const loadCareTypes = async()=>{
 
-  const saveRate = async () => {
+const snap = await getDocs(collection(db,"careTypes"));
 
-    if (!form.rate) {
-      alert("Enter rate");
-      return;
-    }
+const list = snap.docs.map(d=>({
+id:d.id,
+...(d.data()||{})
+}));
 
-    await addDoc(collection(db, "staffRates"), {
-      ...form,
-      rate: Number(form.rate),
-      createdAt: serverTimestamp()
-    });
+setCareTypes(list);
 
-    setForm({
-      role: "nurse",
-      careType: "base",
-      shift: "day",
-      rateType: "daily",
-      rate: ""
-    });
+if(list.length && !form.careType){
+setForm(p=>({...p,careType:list[0].name}));
+}
 
-    setFormOpen(false);
+};
 
-    loadRates();
-  };
 
-  return (
-    <div className="ss-wrap">
+/* =============================
+LOAD RATES
+============================= */
 
-      <div className="ss-header">
+const loadRates = async()=>{
 
-        <h2>Staff Salary Rates</h2>
+setLoading(true);
 
-        <button
-          className="ss-btn ss-primary"
-          onClick={() => setFormOpen(true)}
-        >
-          + Add Rate
-        </button>
+const snap = await getDocs(collection(db,"staffRates"));
 
-      </div>
+const list = snap.docs.map(d=>({
+id:d.id,
+...(d.data()||{})
+}));
 
-      {loading && <div className="ss-muted">Loading...</div>}
+setRates(list);
 
-      {!loading && rates.length === 0 && (
-        <div className="ss-muted">No rates added</div>
-      )}
+setLoading(false);
 
-      <div className="ss-list">
+};
 
-        {rates.map(r => (
-          <div key={r.id} className="ss-card">
 
-            <div className="ss-row">
+useEffect(()=>{
+loadRates();
+loadCareTypes();
+},[]);
 
-              <div>
-                <strong>{r.role}</strong>
-                <div className="ss-muted">
-                  {r.careType} · {r.shift}
-                </div>
-              </div>
 
-              <div className="ss-rate">
-                ₹ {r.rate} / {r.rateType}
-              </div>
 
-            </div>
+/* =============================
+ADD CARE TYPE
+============================= */
 
-          </div>
-        ))}
+const addCareType = async()=>{
 
-      </div>
+if(!newCareType) return;
 
-      {formOpen && (
-        <div className="ss-modal">
+const name = newCareType.toLowerCase().trim();
 
-          <div className="ss-modal-card">
+const exists = careTypes.find(c=>c.name===name);
 
-            <h3>Add Salary Rate</h3>
+if(exists){
+alert("Care type already exists");
+return;
+}
 
-            <label>Role</label>
-            <select
-              value={form.role}
-              onChange={(e) =>
-                setForm(p => ({ ...p, role: e.target.value }))
-              }
-            >
-              <option value="nurse">Nurse</option>
-              <option value="caretaker">Caretaker</option>
-            </select>
+await addDoc(collection(db,"careTypes"),{
+name,
+createdAt:serverTimestamp()
+});
 
-            <label>Care Type</label>
-            <select
-              value={form.careType}
-              onChange={(e) =>
-                setForm(p => ({ ...p, careType: e.target.value }))
-              }
-            >
-              <option value="base">Base Care</option>
-              <option value="icu">ICU Care</option>
-              <option value="vent">Ventilator Care</option>
-            </select>
+setNewCareType("");
+setCareTypeFormOpen(false);
 
-            <label>Shift</label>
-            <select
-              value={form.shift}
-              onChange={(e) =>
-                setForm(p => ({ ...p, shift: e.target.value }))
-              }
-            >
-              <option value="day">Day Shift</option>
-              <option value="night">Night Shift</option>
-              <option value="full">Day & Night</option>
-            </select>
+loadCareTypes();
 
-            <label>Rate</label>
-            <input
-              type="number"
-              placeholder="Enter rate"
-              value={form.rate}
-              onChange={(e) =>
-                setForm(p => ({ ...p, rate: e.target.value }))
-              }
-            />
+};
 
-            <div className="ss-actions">
 
-              <button
-                className="ss-btn"
-                onClick={() => setFormOpen(false)}
-              >
-                Cancel
-              </button>
 
-              <button
-                className="ss-btn ss-primary"
-                onClick={saveRate}
-              >
-                Save
-              </button>
+/* =============================
+SAVE RATE (ADD OR EDIT)
+============================= */
 
-            </div>
+const saveRate = async()=>{
 
-          </div>
+if(!form.rate){
+alert("Enter rate");
+return;
+}
 
-        </div>
-      )}
+if(editingRate){
 
-    </div>
-  );
+await updateDoc(doc(db,"staffRates",editingRate),{
+...form,
+rate:Number(form.rate)
+});
+
+}else{
+
+const exists = rates.find(r=>
+r.role===form.role &&
+r.careType===form.careType &&
+r.shift===form.shift
+);
+
+if(exists){
+alert("Rate already exists");
+return;
+}
+
+await addDoc(collection(db,"staffRates"),{
+...form,
+rate:Number(form.rate),
+createdAt:serverTimestamp()
+});
+
+}
+
+setEditingRate(null);
+
+setForm({
+role:"nurse",
+careType:careTypes?.[0]?.name || "",
+shift:"day",
+rateType:"daily",
+rate:""
+});
+
+setFormOpen(false);
+
+loadRates();
+
+};
+
+
+
+/* =============================
+EDIT RATE
+============================= */
+
+const openEditRate = (rate)=>{
+
+setEditingRate(rate.id);
+
+setForm({
+role:rate.role,
+careType:rate.careType,
+shift:rate.shift,
+rateType:rate.rateType,
+rate:rate.rate
+});
+
+setFormOpen(true);
+
+};
+
+
+
+/* =============================
+DELETE RATE
+============================= */
+
+const deleteRate = async(id)=>{
+
+const confirmDelete = window.confirm("Delete this rate?");
+
+if(!confirmDelete) return;
+
+await deleteDoc(doc(db,"staffRates",id));
+
+loadRates();
+
+};
+
+
+
+/* =============================
+FILTER + SEARCH
+============================= */
+
+let filteredRates = rates.filter(r=>{
+
+if(filters.role!=="all" && r.role!==filters.role) return false;
+
+if(filters.careType!=="all" && r.careType!==filters.careType) return false;
+
+if(filters.shift!=="all" && r.shift!==filters.shift) return false;
+
+if(search){
+
+const s = search.toLowerCase();
+
+if(
+!r.role?.toLowerCase().includes(s) &&
+!r.careType?.toLowerCase().includes(s) &&
+!r.shift?.toLowerCase().includes(s)
+) return false;
+
+}
+
+return true;
+
+});
+
+
+if(filters.sort==="highest") filteredRates.sort((a,b)=>b.rate-a.rate);
+if(filters.sort==="lowest") filteredRates.sort((a,b)=>a.rate-b.rate);
+
+
+
+/* =============================
+UI
+============================= */
+
+return(
+
+<div className="ss-wrap">
+
+<div className="ss-header">
+
+<h2>Staff Salary Rates</h2>
+
+<div className="ss-actions">
+
+<button
+className="ss-btn ss-secondary"
+onClick={()=>setCareTypeFormOpen(!careTypeFormOpen)}
+>
++ Add Care Type
+</button>
+
+<button
+className="ss-btn ss-primary"
+onClick={()=>setFormOpen(true)}
+>
++ Add Rate
+</button>
+
+</div>
+
+</div>
+
+
+
+{/* ADD CARE TYPE */}
+
+{careTypeFormOpen && (
+
+<div className="ss-care-add-bar">
+
+<input
+placeholder="New care type..."
+value={newCareType}
+onChange={(e)=>setNewCareType(e.target.value)}
+/>
+
+<button
+className="ss-btn ss-primary"
+onClick={addCareType}
+>
+Add
+</button>
+
+<button
+className="ss-btn"
+onClick={()=>setCareTypeFormOpen(false)}
+>
+Cancel
+</button>
+
+</div>
+
+)}
+
+
+
+{/* FILTERS ROW */}
+
+<div className="ss-filters-row">
+
+<input
+placeholder="Search..."
+value={search}
+onChange={(e)=>setSearch(e.target.value)}
+/>
+
+<select
+value={filters.role}
+onChange={(e)=>setFilters(p=>({...p,role:e.target.value}))}
+>
+<option value="all">All Roles</option>
+<option value="nurse">Nurse</option>
+<option value="caretaker">Caretaker</option>
+</select>
+
+<select
+value={filters.careType}
+onChange={(e)=>setFilters(p=>({...p,careType:e.target.value}))}
+>
+<option value="all">All Care Types</option>
+
+{careTypes.map(c=>(
+<option key={c.id} value={c.name}>{c.name}</option>
+))}
+
+</select>
+
+<select
+value={filters.shift}
+onChange={(e)=>setFilters(p=>({...p,shift:e.target.value}))}
+>
+<option value="all">All Shifts</option>
+<option value="day">Day</option>
+<option value="night">Night</option>
+<option value="full">Full</option>
+</select>
+
+<select
+value={filters.sort}
+onChange={(e)=>setFilters(p=>({...p,sort:e.target.value}))}
+>
+<option value="newest">Newest</option>
+<option value="highest">Highest Rate</option>
+<option value="lowest">Lowest Rate</option>
+</select>
+
+</div>
+
+
+
+{/* TABLE */}
+
+<table className="ss-table">
+
+<thead>
+
+<tr>
+<th>Role</th>
+<th>Care Type</th>
+<th>Shift</th>
+<th>Rate</th>
+<th>Actions</th>
+</tr>
+
+</thead>
+
+<tbody>
+
+{filteredRates.map(r=>(
+
+<tr key={r.id}>
+
+<td>{r.role}</td>
+
+<td>{r.careType}</td>
+
+<td>{r.shift}</td>
+
+<td className="ss-rate">
+₹ {r.rate} / {r.rateType}
+</td>
+
+<td className="ss-actions-cell">
+
+<button
+className="ss-btn ss-edit"
+onClick={()=>openEditRate(r)}
+>
+Edit
+</button>
+
+<button
+className="ss-btn ss-delete"
+onClick={()=>deleteRate(r.id)}
+>
+Delete
+</button>
+
+</td>
+
+</tr>
+
+))}
+
+</tbody>
+
+</table>
+
+{loading && <div className="ss-muted">Loading...</div>}
+
+
+
+{/* ADD / EDIT MODAL */}
+
+{formOpen && (
+
+<div className="ss-modal">
+
+<div className="ss-modal-card">
+
+<h3>{editingRate ? "Edit Rate" : "Add Salary Rate"}</h3>
+
+<label>Role</label>
+
+<select
+value={form.role}
+onChange={(e)=>setForm(p=>({...p,role:e.target.value}))}
+>
+<option value="nurse">Nurse</option>
+<option value="caretaker">Caretaker</option>
+</select>
+
+<label>Care Type</label>
+
+<select
+value={form.careType}
+onChange={(e)=>setForm(p=>({...p,careType:e.target.value}))}
+>
+{careTypes.map(c=>(
+<option key={c.id} value={c.name}>{c.name}</option>
+))}
+</select>
+
+<label>Shift</label>
+
+<select
+value={form.shift}
+onChange={(e)=>setForm(p=>({...p,shift:e.target.value}))}
+>
+<option value="day">Day</option>
+<option value="night">Night</option>
+<option value="full">Full</option>
+</select>
+
+<label>Rate</label>
+
+<input
+type="number"
+value={form.rate}
+onChange={(e)=>setForm(p=>({...p,rate:e.target.value}))}
+/>
+
+<div className="ss-actions">
+
+<button
+className="ss-btn"
+onClick={()=>{
+setFormOpen(false);
+setEditingRate(null);
+}}
+>
+Cancel
+</button>
+
+<button
+className="ss-btn ss-primary"
+onClick={saveRate}
+>
+Save
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+)}
+
+</div>
+
+);
+
 }

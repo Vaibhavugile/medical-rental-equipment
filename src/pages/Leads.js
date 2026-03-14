@@ -723,6 +723,14 @@ const openWhatsApp = (phone) => {
 >
   <FontAwesomeIcon icon={faWhatsapp} />
 </button>
+ <button
+    title="Delete Lead"
+    className="row-btn delete"
+    onClick={() => setConfirmDelete(l)}
+  >
+    🗑
+  </button>
+
 
 </div>
               </td>

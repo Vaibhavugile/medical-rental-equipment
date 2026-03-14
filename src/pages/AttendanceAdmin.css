@@ -27,6 +27,11 @@
 .manual-attendance select{
   padding:8px;
 }
+.salary {
+  background: #ecfdf5;
+  color: #065f46;
+  font-weight: 600;
+}
 /* Filters / Toolbar */
 .toolbar {
   display: flex;

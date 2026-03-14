@@ -31,11 +31,12 @@ export default function NursingOrderDetails() {
   const [order, setOrder] = useState(null);
   const [staffList, setStaffList] = useState([]);
   const [assignments, setAssignments] = useState([]);
-
+const [userRole, setUserRole] = useState("");
+const isSuperAdmin = userRole === "superadmin";
   const [loading, setLoading] = useState(true);
   const [loadingAssignments, setLoadingAssignments] = useState(true);
   const [error, setError] = useState("");
-
+const [salaryRequests, setSalaryRequests] = useState([]);
   const [assignOpen, setAssignOpen] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [assignServiceIndex, setAssignServiceIndex] = useState(null);
@@ -44,6 +45,7 @@ export default function NursingOrderDetails() {
   const [editingStaffId, setEditingStaffId] = useState(null);
   const [tempSalary, setTempSalary] = useState({});
   const [rateCard, setRateCard] = useState([]);
+  const [careTypes, setCareTypes] = useState([]);
   const [assignRateConfig, setAssignRateConfig] = useState({
     careType: "base",
     shift: "day"
@@ -59,6 +61,22 @@ export default function NursingOrderDetails() {
     endDate: "",
     amount: ""
   });
+  const [salaryRequestModal, setSalaryRequestModal] = useState({
+    open: false,
+    assignment: null,
+    rate: "",
+    note: ""
+  });
+  const openSalaryRequestModal = (assignment) => {
+
+    setSalaryRequestModal({
+      open: true,
+      assignment,
+      rate: "",
+      note: ""
+    });
+
+  };
   const openExtendServiceModal = (serviceIndex) => {
 
     const service = editableItems?.[serviceIndex];
@@ -346,6 +364,138 @@ export default function NursingOrderDetails() {
     loadRates();
 
   }, []);
+ useEffect(() => {
+
+  const loadUserRole = async () => {
+
+    try {
+
+      const uid = auth.currentUser?.uid;
+
+      console.log("UID:", uid);
+
+      if (!uid) {
+        console.log("No UID found");
+        return;
+      }
+
+      const ref = doc(db, "users", uid);
+
+      console.log("Fetching user doc:", ref.path);
+
+      const snap = await getDoc(ref);
+
+      console.log("Firestore document exists:", snap.exists());
+
+      if (snap.exists()) {
+
+        const data = snap.data();
+
+        console.log("User document data:", data);
+
+        const role = data?.role || "";
+
+        console.log("User role from Firestore:", role);
+
+        setUserRole(role);
+
+      } else {
+
+        console.log("User document NOT FOUND in Firestore");
+
+      }
+
+    } catch (err) {
+
+      console.error("Failed loading user role", err);
+
+    }
+
+  };
+
+  loadUserRole();
+
+}, []);
+useEffect(() => {
+
+  const loadCareTypes = async () => {
+
+    try {
+
+      const snap = await getDocs(collection(db, "careTypes"));
+
+      const list = snap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() || {})
+      }));
+
+      setCareTypes(list);
+
+      // auto set first care type
+      if (list.length) {
+        setAssignRateConfig(p => ({
+          ...p,
+          careType: list[0].name
+        }));
+      }
+
+    } catch (err) {
+
+      console.error("Failed loading care types", err);
+
+    }
+
+  };
+
+  loadCareTypes();
+
+}, []);
+  useEffect(() => {
+
+  const loadRequests = async () => {
+
+    try {
+
+      const q = query(
+        collection(db, "salaryOverrideRequests"),
+        where("orderId", "==", id)
+      );
+
+      const snap = await getDocs(q);
+
+      const data = snap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() || {})
+      }));
+
+      setSalaryRequests(data);
+
+    } catch (err) {
+
+      console.error("Failed loading salary requests", err);
+
+    }
+
+  };
+
+  if (id) loadRequests();
+
+}, [id]);
+const getSalaryRequest = (assignmentId) => {
+
+  const list = salaryRequests
+    .filter(r => r.assignmentId === assignmentId);
+
+  if (list.length === 0) return null;
+
+  list.sort((a,b)=>
+    new Date(b.requestedAt || 0) -
+    new Date(a.requestedAt || 0)
+  );
+
+  return list[0]; // latest request
+
+};
   /* ======================
      Load Assignments
   ====================== */
@@ -556,121 +706,9 @@ export default function NursingOrderDetails() {
     0
   );
 
- const getSalaryPreview = (staff) => {
+  const getSalaryPreview = (staff) => {
 
-  if (!assignDates.startDate || !assignDates.endDate) return null;
-
-  const rateEntry = rateCard.find(r =>
-    r.role === staff.staffType &&
-    r.careType === assignRateConfig.careType &&
-    r.shift === assignRateConfig.shift
-  );
-
-  if (!rateEntry) return null;
-
-  const rate = Number(rateEntry.rate);
-  const rateType = rateEntry.rateType || "daily";
-
-  const salary = calculateStaffSalary(
-    assignDates.startDate,
-    assignDates.endDate,
-    rate,
-    rateType
-  );
-
-  return {
-    rate,
-    rateType,
-    days: salary.days,
-    hours: salary.hours,
-    months: salary.months,
-    amount: salary.amount
-  };
-
-};
-const assignStaff = async (staff) => {
-
-  if (!order) return;
-
-  setAssigning(true);
-
-  try {
-
-    /* ===============================
-       0️⃣ GET SELECTED SERVICE
-    =============================== */
-
-    const item = order.items?.[assignServiceIndex];
-
-    if (!item) {
-      alert("Service not found");
-      setAssigning(false);
-      return;
-    }
-
-
-    /* ===============================
-       1️⃣ VALIDATE DATES
-    =============================== */
-
-    if (!assignDates.startDate || !assignDates.endDate) {
-      alert("Please select start and end dates");
-      setAssigning(false);
-      return;
-    }
-
-    const start = new Date(assignDates.startDate);
-    const end = new Date(assignDates.endDate);
-
-    if (end <= start) {
-      alert("End date must be after start date");
-      setAssigning(false);
-      return;
-    }
-
-
-    /* ===============================
-       Ensure assignment inside service
-    =============================== */
-
-    if (item.expectedStartDate && item.expectedEndDate) {
-
-      const serviceStart = new Date(item.expectedStartDate);
-      const serviceEnd = new Date(item.expectedEndDate);
-
-      if (start < serviceStart || end > serviceEnd) {
-        alert("Assignment must be within service dates");
-        setAssigning(false);
-        return;
-      }
-
-    }
-
-
-    /* ===============================
-       2️⃣ CHECK EXISTING ASSIGNMENT
-    =============================== */
-
-    const q = query(
-      collection(db, "staffAssignments"),
-      where("orderId", "==", id),
-      where("staffId", "==", staff.id),
-      where("serviceIndex", "==", assignServiceIndex),
-      where("status", "==", "assigned")
-    );
-
-    const existingSnap = await getDocs(q);
-
-    if (!existingSnap.empty) {
-      alert("This staff is already assigned to this service.");
-      setAssigning(false);
-      return;
-    }
-
-
-    /* ===============================
-       3️⃣ GET GLOBAL RATE
-    =============================== */
+    if (!assignDates.startDate || !assignDates.endDate) return null;
 
     const rateEntry = rateCard.find(r =>
       r.role === staff.staffType &&
@@ -678,112 +716,298 @@ const assignStaff = async (staff) => {
       r.shift === assignRateConfig.shift
     );
 
-    if (!rateEntry) {
-      alert("Salary rate not configured for this role, care type and shift");
-      setAssigning(false);
-      return;
-    }
+    if (!rateEntry) return null;
 
     const rate = Number(rateEntry.rate);
-    const staffRateType = rateEntry.rateType || "daily";
-
-
-    /* ===============================
-       4️⃣ CALCULATE SALARY
-    =============================== */
+    const rateType = rateEntry.rateType || "daily";
 
     const salary = calculateStaffSalary(
       assignDates.startDate,
       assignDates.endDate,
       rate,
-      staffRateType
+      rateType
     );
 
-    const hours = salary.hours;
-    const days = salary.days;
-    const months = salary.months;
-    const amount = salary.amount;
-
-
-    /* ===============================
-       5️⃣ CREATE ASSIGNMENT
-    =============================== */
-
-    await addDoc(collection(db, "staffAssignments"), {
-
-      staffId: staff.id,
-      staffName: staff.name,
-      staffType: staff.staffType,
-
-      role: staff.staffType,
-      careType: assignRateConfig.careType,
-      shift: assignRateConfig.shift,
-
-      orderId: id,
-      orderNo: order.orderNo,
-
-      serviceIndex: assignServiceIndex,
-      serviceName: item.name || "Service",
-
-      startDate: assignDates.startDate,
-      endDate: assignDates.endDate,
-
-      hours,
-      days,
-      months,
-
+    return {
       rate,
-      rateType: staffRateType,
+      rateType,
+      days: salary.days,
+      hours: salary.hours,
+      months: salary.months,
+      amount: salary.amount
+    };
 
-      amount,
+  };
+  const assignStaff = async (staff) => {
 
-      paidAmount: 0,
-      balanceAmount: amount,
+    if (!order) return;
 
-      status: "assigned",
-      paid: false,
+    setAssigning(true);
 
-      payments: [],
+    try {
 
-      createdAt: serverTimestamp(),
-      createdBy: auth.currentUser?.uid || "",
+      /* ===============================
+         0️⃣ GET SELECTED SERVICE
+      =============================== */
+
+      const item = order.items?.[assignServiceIndex];
+
+      if (!item) {
+        alert("Service not found");
+        setAssigning(false);
+        return;
+      }
+
+
+      /* ===============================
+         1️⃣ VALIDATE DATES
+      =============================== */
+
+      if (!assignDates.startDate || !assignDates.endDate) {
+        alert("Please select start and end dates");
+        setAssigning(false);
+        return;
+      }
+
+      const start = new Date(assignDates.startDate);
+      const end = new Date(assignDates.endDate);
+
+      if (end <= start) {
+        alert("End date must be after start date");
+        setAssigning(false);
+        return;
+      }
+
+
+      /* ===============================
+         Ensure assignment inside service
+      =============================== */
+
+      if (item.expectedStartDate && item.expectedEndDate) {
+
+        const serviceStart = new Date(item.expectedStartDate);
+        const serviceEnd = new Date(item.expectedEndDate);
+
+        if (start < serviceStart || end > serviceEnd) {
+          alert("Assignment must be within service dates");
+          setAssigning(false);
+          return;
+        }
+
+      }
+
+
+      /* ===============================
+         2️⃣ CHECK EXISTING ASSIGNMENT
+      =============================== */
+
+      const q = query(
+        collection(db, "staffAssignments"),
+        where("orderId", "==", id),
+        where("staffId", "==", staff.id),
+        where("serviceIndex", "==", assignServiceIndex),
+        where("status", "==", "assigned")
+      );
+
+      const existingSnap = await getDocs(q);
+
+      if (!existingSnap.empty) {
+        alert("This staff is already assigned to this service.");
+        setAssigning(false);
+        return;
+      }
+
+
+      /* ===============================
+         3️⃣ GET GLOBAL RATE
+      =============================== */
+
+      const rateEntry = rateCard.find(r =>
+        r.role === staff.staffType &&
+        r.careType === assignRateConfig.careType &&
+        r.shift === assignRateConfig.shift
+      );
+
+      if (!rateEntry) {
+        alert("Salary rate not configured for this role, care type and shift");
+        setAssigning(false);
+        return;
+      }
+
+      const rate = Number(rateEntry.rate);
+      const staffRateType = rateEntry.rateType || "daily";
+
+
+      /* ===============================
+         4️⃣ CALCULATE SALARY
+      =============================== */
+
+      const salary = calculateStaffSalary(
+        assignDates.startDate,
+        assignDates.endDate,
+        rate,
+        staffRateType
+      );
+
+      const hours = salary.hours;
+      const days = salary.days;
+      const months = salary.months;
+      const amount = salary.amount;
+
+
+      /* ===============================
+         5️⃣ CREATE ASSIGNMENT
+      =============================== */
+
+      await addDoc(collection(db, "staffAssignments"), {
+
+        staffId: staff.id,
+        staffName: staff.name,
+        staffType: staff.staffType,
+
+        role: staff.staffType,
+        careType: assignRateConfig.careType,
+        shift: assignRateConfig.shift,
+
+        orderId: id,
+        orderNo: order.orderNo,
+
+        serviceIndex: assignServiceIndex,
+        serviceName: item.name || "Service",
+
+        startDate: assignDates.startDate,
+        endDate: assignDates.endDate,
+
+        hours,
+        days,
+        months,
+
+        rate,
+        rateType: staffRateType,
+
+        amount,
+
+        paidAmount: 0,
+        balanceAmount: amount,
+
+        status: "assigned",
+        paid: false,
+
+        payments: [],
+
+        createdAt: serverTimestamp(),
+        createdBy: auth.currentUser?.uid || "",
+      });
+
+
+      /* ===============================
+         6️⃣ UPDATE ORDER STATUS
+      =============================== */
+
+      await updateDoc(doc(db, "nursingOrders", id), {
+        status: "assigned",
+        updatedAt: serverTimestamp(),
+        updatedBy: auth.currentUser?.uid || "",
+      });
+
+
+      /* ===============================
+         7️⃣ RELOAD ASSIGNMENTS
+      =============================== */
+
+      await loadAssignments();
+
+      setAssignOpen(false);
+
+    }
+    catch (err) {
+
+      console.error("assignStaff error", err);
+      alert("Failed to assign staff");
+
+    }
+    finally {
+
+      setAssigning(false);
+
+    }
+
+  };
+ const submitSalaryRequest = async () => {
+
+  const a = salaryRequestModal.assignment;
+
+  const requestedRate = Number(salaryRequestModal.rate);
+
+  if (!requestedRate) {
+    alert("Enter requested rate");
+    return;
+  }
+
+  const salary = calculateStaffSalary(
+    a.startDate,
+    a.endDate,
+    requestedRate,
+    a.rateType
+  );
+
+  try {
+
+    await addDoc(collection(db, "salaryOverrideRequests"), {
+
+      assignmentId: a.id,
+
+      orderId: a.orderId,
+      orderNo: a.orderNo,
+
+      /* NEW FIELDS */
+
+      orderTotal: order?.totals?.total || 0,
+      staffType: a.staffType,
+
+      staffId: a.staffId,
+      staffName: a.staffName,
+
+      role: a.role,
+      careType: a.careType,
+      shift: a.shift,
+
+      serviceStart: a.startDate,
+      serviceEnd: a.endDate,
+
+      currentRate: a.rate,
+      requestedRate,
+
+      currentAmount: a.amount,
+      requestedAmount: salary.amount,
+
+      note: salaryRequestModal.note,
+
+      status: "pending",
+
+      requestedAt: serverTimestamp(),
+      requestedBy: auth.currentUser?.uid || ""
+
     });
 
+    alert("Salary request submitted");
 
-    /* ===============================
-       6️⃣ UPDATE ORDER STATUS
-    =============================== */
-
-    await updateDoc(doc(db, "nursingOrders", id), {
-      status: "assigned",
-      updatedAt: serverTimestamp(),
-      updatedBy: auth.currentUser?.uid || "",
+    setSalaryRequestModal({
+      open: false,
+      assignment: null,
+      rate: "",
+      note: ""
     });
-
-
-    /* ===============================
-       7️⃣ RELOAD ASSIGNMENTS
-    =============================== */
-
-    await loadAssignments();
-
-    setAssignOpen(false);
 
   }
   catch (err) {
 
-    console.error("assignStaff error", err);
-    alert("Failed to assign staff");
-
-  }
-  finally {
-
-    setAssigning(false);
+    console.error(err);
+    alert("Failed to submit request");
 
   }
 
 };
-
 
   const extendService = async () => {
 
@@ -1791,25 +2015,25 @@ const assignStaff = async (staff) => {
 
                       {/* SALARY DISPLAY / EDIT */}
                       <div className="nod-bold">
-                        {editingStaffId === a.id ? (
-                          <>
-                            ₹
-                            <input
-                              type="number"
-                              className="nod-input small"
-                              value={tempSalary[a.id]}
-                              onChange={(e) =>
-                                setTempSalary((p) => ({
-                                  ...p,
-                                  [a.id]: Number(e.target.value || 0),
-                                }))
-                              }
-                            />
-                          </>
-                        ) : (
-                          <>₹ {fmtCurrency(a.amount)}</>
-                        )}
-                      </div>
+  {isSuperAdmin && editingStaffId === a.id ? (
+    <>
+      ₹
+      <input
+        type="number"
+        className="nod-input small"
+        value={tempSalary[a.id]}
+        onChange={(e) =>
+          setTempSalary((p) => ({
+            ...p,
+            [a.id]: Number(e.target.value || 0),
+          }))
+        }
+      />
+    </>
+  ) : (
+    <>₹ {fmtCurrency(a.amount)}</>
+  )}
+</div>
 
                       {/* Payment badge */}
                       <span
@@ -1845,43 +2069,105 @@ const assignStaff = async (staff) => {
                       >
                         View Attendance
                       </button>
+                      {(() => {
+
+  const req = getSalaryRequest(a.id);
+
+  if (!req) {
+    return (
+      <button
+        className="nod-btn nod-btn-secondary small"
+        onClick={() => openSalaryRequestModal(a)}
+      >
+        Request Salary Increase
+      </button>
+    );
+  }
+
+  if (req.status === "pending") {
+    return (
+      <span className="nod-badge nod-badge-orange">
+        Request Pending
+      </span>
+    );
+  }
+
+  if (req.status === "approved") {
+    return (
+      <>
+        <span className="nod-badge nod-badge-green">
+          Salary Increased
+        </span>
+
+        <button
+          className="nod-btn nod-btn-secondary small"
+          onClick={() => openSalaryRequestModal(a)}
+        >
+          Request Again
+        </button>
+      </>
+    );
+  }
+
+  if (req.status === "rejected") {
+    return (
+      <>
+        <span className="nod-badge nod-badge-red">
+          Request Rejected
+        </span>
+
+        <button
+          className="nod-btn nod-btn-secondary small"
+          onClick={() => openSalaryRequestModal(a)}
+        >
+          Request Again
+        </button>
+      </>
+    );
+  }
+
+})()}
+ 
 
                       {/* EDIT / SAVE */}
-                      {editingStaffId === a.id ? (
-                        <>
-                          <button
-                            className="nod-btn nod-btn-primary small"
-                            onClick={() =>
-                              saveStaffSalary({
-                                ...a,
-                                amount: tempSalary[a.id],
-                              })
-                            }
-                          >
-                            Save
-                          </button>
+                     {/* EDIT / SAVE (SUPERADMIN ONLY) */}
+{isSuperAdmin && (
+  editingStaffId === a.id ? (
+    <>
+      <button
+        className="nod-btn nod-btn-primary small"
+        onClick={() =>
+          saveStaffSalary({
+            ...a,
+            amount: tempSalary[a.id],
+          })
+        }
+      >
+        Save
+      </button>
 
-                          <button
-                            className="nod-btn nod-btn-secondary small"
-                            onClick={() => {
-                              setEditingStaffId(null);
-                              setTempSalary({});
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          className="nod-btn nod-btn-secondary small"
-                          onClick={() => {
-                            setEditingStaffId(a.id);
-                            setTempSalary({ [a.id]: a.amount });
-                          }}
-                        >
-                          Edit
-                        </button>
-                      )}
+      <button
+        className="nod-btn nod-btn-secondary small"
+        onClick={() => {
+          setEditingStaffId(null);
+          setTempSalary({});
+        }}
+      >
+        Cancel
+      </button>
+    </>
+  ) : (
+    <button
+      className="nod-btn nod-btn-secondary small"
+      onClick={() => {
+        setEditingStaffId(a.id);
+        setTempSalary({ [a.id]: a.amount });
+      }}
+    >
+      Edit
+    </button>
+  )
+)}
 
                       {/* PAY */}
                       {a.status !== "cancelled" && (a.paidAmount || 0) < a.amount && (
@@ -2041,248 +2327,252 @@ const assignStaff = async (staff) => {
 
 
       {/* ASSIGN MODAL */}
-      
-{assignOpen && (
-  <div className="nod-modal">
-    <div className="nod-modal-card">
 
-      <div className="assign-modal-header">
-        <h4>Assign Nurse</h4>
-      </div>
+      {assignOpen && (
+        <div className="nod-modal">
+          <div className="nod-modal-card">
 
-      {/* DATE SELECTION */}
+            <div className="assign-modal-header">
+              <h4>Assign Nurse</h4>
+            </div>
 
-      <div className="nod-assign-dates">
+            {/* DATE SELECTION */}
 
-        <div>
-          <label>Start Date</label>
-          <input
-            type="datetime-local"
-            className="nod-input"
-            value={assignDates.startDate}
-            onChange={(e)=>
-              setAssignDates(p=>({
-                ...p,
-                startDate:e.target.value
-              }))
-            }
-          />
-        </div>
-
-        <div>
-          <label>End Date</label>
-          <input
-            type="datetime-local"
-            className="nod-input"
-            value={assignDates.endDate}
-            onChange={(e)=>
-              setAssignDates(p=>({
-                ...p,
-                endDate:e.target.value
-              }))
-            }
-          />
-        </div>
-
-      </div>
-      <div className="assign-rate-config">
-
-        <div>
-          <label>Care Type</label>
-
-          <select
-            className="nod-input"
-            value={assignRateConfig.careType}
-            onChange={(e)=>
-              setAssignRateConfig(p=>({
-                ...p,
-                careType:e.target.value
-              }))
-            }
-          >
-            <option value="base">Base Care</option>
-            <option value="icu">ICU Care</option>
-            <option value="vent">Ventilator Care</option>
-          </select>
-        </div>
-
-        <div>
-          <label>Shift</label>
-
-          <select
-            className="nod-input"
-            value={assignRateConfig.shift}
-            onChange={(e)=>
-              setAssignRateConfig(p=>({
-                ...p,
-                shift:e.target.value
-              }))
-            }
-          >
-            <option value="day">Day Shift</option>
-            <option value="night">Night Shift</option>
-            <option value="full">Day & Night</option>
-          </select>
-        </div>
-
-      </div>
-
-
-      {/* STAFF FILTERS */}
-
-      <div className="assign-filter">
-
-        <div className="assign-filter-row">
-          <label>Staff Type</label>
-
-          <div className="assign-filter-chips">
-            {["all","nurse","caretaker"].map(type=>(
-              <button
-                key={type}
-                className={`assign-chip ${staffFilters.staffType===type?"active":""}`}
-                onClick={()=>setStaffFilters(p=>({...p,staffType:type}))}
-              >
-                {type==="all"?"All":type}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="assign-filter-row">
-          <label>Shift</label>
-
-          <div className="assign-filter-chips">
-            {["all","day","night","full","flexible"].map(shift=>(
-              <button
-                key={shift}
-                className={`assign-chip ${staffFilters.shiftType===shift?"active":""}`}
-                onClick={()=>setStaffFilters(p=>({...p,shiftType:shift}))}
-              >
-                {shift}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="assign-filter-row">
-          <label>Rate</label>
-
-          <div className="assign-filter-chips">
-            {["all","hourly","daily","monthly"].map(rate=>(
-              <button
-                key={rate}
-                className={`assign-chip ${staffFilters.rateType===rate?"active":""}`}
-                onClick={()=>setStaffFilters(p=>({...p,rateType:rate}))}
-              >
-                {rate}
-              </button>
-            ))}
-          </div>
-        </div>
-
-      </div>
-
-
-      {/* GLOBAL RATE CONFIG */}
-
-      
-
-
-      {/* STAFF GRID */}
-
-      <div className="nod-staff-grid">
-
-        {filteredStaff.map((s)=>{
-
-          const preview = getSalaryPreview(s);
-
-          return (
-            <div key={s.id} className="nod-staff-card">
+            <div className="nod-assign-dates">
 
               <div>
-
-                <strong>{s.name}</strong>
-
-                <div className="nod-muted">
-                  {s.staffType} · {s.shiftType || "day"} shift
-                </div>
-
-                {/* SALARY PREVIEW */}
-
-                {preview ? (
-
-                  <div className="salary-preview">
-
-                    <div className="nod-muted small">
-                      Rate: ₹{preview.rate}/{preview.rateType}
-                    </div>
-
-                    {preview.rateType==="daily" && (
-                      <div className="nod-muted small">
-                        Duration: {preview.days} days
-                      </div>
-                    )}
-
-                    {preview.rateType==="hourly" && (
-                      <div className="nod-muted small">
-                        Duration: {preview.hours} hours
-                      </div>
-                    )}
-
-                    {preview.rateType==="monthly" && (
-                      <div className="nod-muted small">
-                        Duration: {preview.months} months
-                      </div>
-                    )}
-
-                    <div className="nod-bold">
-                      Total Salary: ₹{fmtCurrency(preview.amount)}
-                    </div>
-
-                  </div>
-
-                ) : (
-
-                  <div className="nod-muted small">
-                    Salary rate not configured
-                  </div>
-
-                )}
-
+                <label>Start Date</label>
+                <input
+                  type="datetime-local"
+                  className="nod-input"
+                  value={assignDates.startDate}
+                  onChange={(e) =>
+                    setAssignDates(p => ({
+                      ...p,
+                      startDate: e.target.value
+                    }))
+                  }
+                />
               </div>
 
+              <div>
+                <label>End Date</label>
+                <input
+                  type="datetime-local"
+                  className="nod-input"
+                  value={assignDates.endDate}
+                  onChange={(e) =>
+                    setAssignDates(p => ({
+                      ...p,
+                      endDate: e.target.value
+                    }))
+                  }
+                />
+              </div>
+
+            </div>
+            <div className="assign-rate-config">
+
+              <div>
+                <label>Care Type</label>
+
+                <select
+  className="nod-input"
+  value={assignRateConfig.careType}
+  onChange={(e) =>
+    setAssignRateConfig(p => ({
+      ...p,
+      careType: e.target.value
+    }))
+  }
+>
+
+  {careTypes.map(c => (
+    <option key={c.id} value={c.name}>
+      {c.name}
+    </option>
+  ))}
+
+</select>
+              </div>
+
+              <div>
+                <label>Shift</label>
+
+                <select
+                  className="nod-input"
+                  value={assignRateConfig.shift}
+                  onChange={(e) =>
+                    setAssignRateConfig(p => ({
+                      ...p,
+                      shift: e.target.value
+                    }))
+                  }
+                >
+                  <option value="day">Day Shift</option>
+                  <option value="night">Night Shift</option>
+                  <option value="full">Day & Night</option>
+                </select>
+              </div>
+
+            </div>
+
+
+            {/* STAFF FILTERS */}
+
+            <div className="assign-filter">
+
+              <div className="assign-filter-row">
+                <label>Staff Type</label>
+
+                <div className="assign-filter-chips">
+                  {["all", "nurse", "caretaker"].map(type => (
+                    <button
+                      key={type}
+                      className={`assign-chip ${staffFilters.staffType === type ? "active" : ""}`}
+                      onClick={() => setStaffFilters(p => ({ ...p, staffType: type }))}
+                    >
+                      {type === "all" ? "All" : type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="assign-filter-row">
+                <label>Shift</label>
+
+                <div className="assign-filter-chips">
+                  {["all", "day", "night", "full", "flexible"].map(shift => (
+                    <button
+                      key={shift}
+                      className={`assign-chip ${staffFilters.shiftType === shift ? "active" : ""}`}
+                      onClick={() => setStaffFilters(p => ({ ...p, shiftType: shift }))}
+                    >
+                      {shift}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="assign-filter-row">
+                <label>Rate</label>
+
+                <div className="assign-filter-chips">
+                  {["all", "hourly", "daily", "monthly"].map(rate => (
+                    <button
+                      key={rate}
+                      className={`assign-chip ${staffFilters.rateType === rate ? "active" : ""}`}
+                      onClick={() => setStaffFilters(p => ({ ...p, rateType: rate }))}
+                    >
+                      {rate}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+            </div>
+
+
+            {/* GLOBAL RATE CONFIG */}
+
+
+
+
+            {/* STAFF GRID */}
+
+            <div className="nod-staff-grid">
+
+              {filteredStaff.map((s) => {
+
+                const preview = getSalaryPreview(s);
+
+                return (
+                  <div key={s.id} className="nod-staff-card">
+
+                    <div>
+
+                      <strong>{s.name}</strong>
+
+                      <div className="nod-muted">
+                        {s.staffType} · {s.shiftType || "day"} shift
+                      </div>
+
+                      {/* SALARY PREVIEW */}
+
+                      {preview ? (
+
+                        <div className="salary-preview">
+
+                          <div className="nod-muted small">
+                            Rate: ₹{preview.rate}/{preview.rateType}
+                          </div>
+
+                          {preview.rateType === "daily" && (
+                            <div className="nod-muted small">
+                              Duration: {preview.days} days
+                            </div>
+                          )}
+
+                          {preview.rateType === "hourly" && (
+                            <div className="nod-muted small">
+                              Duration: {preview.hours} hours
+                            </div>
+                          )}
+
+                          {preview.rateType === "monthly" && (
+                            <div className="nod-muted small">
+                              Duration: {preview.months} months
+                            </div>
+                          )}
+
+                          <div className="nod-bold">
+                            Total Salary: ₹{fmtCurrency(preview.amount)}
+                          </div>
+
+                        </div>
+
+                      ) : (
+
+                        <div className="nod-muted small">
+                          Salary rate not configured
+                        </div>
+
+                      )}
+
+                    </div>
+
+                    <button
+                      className="nod-btn nod-btn-primary"
+                      disabled={assigning || !preview}
+                      onClick={() => assignStaff(s)}
+                    >
+                      Assign
+                    </button>
+
+                  </div>
+                );
+
+              })}
+
+            </div>
+
+
+            {/* FOOTER */}
+
+            <div className="assign-modal-footer">
+
               <button
-                className="nod-btn nod-btn-primary"
-                disabled={assigning || !preview}
-                onClick={()=>assignStaff(s)}
+                className="nod-btn nod-btn-secondary"
+                onClick={() => setAssignOpen(false)}
               >
-                Assign
+                Close
               </button>
 
             </div>
-          );
 
-        })}
-
-      </div>
-
-
-      {/* FOOTER */}
-
-      <div className="assign-modal-footer">
-
-        <button
-          className="nod-btn nod-btn-secondary"
-          onClick={()=>setAssignOpen(false)}
-        >
-          Close
-        </button>
-
-      </div>
-
-    </div>
-  </div>
-)}
+          </div>
+        </div>
+      )}
 
 
 
@@ -2591,7 +2881,68 @@ const assignStaff = async (staff) => {
         </div>
 
       )}
+    {salaryRequestModal.open && (
 
+  <div className="salaryreq-overlay">
+
+    <div className="salaryreq-modal">
+
+      <h4 className="salaryreq-title">
+        Request Salary Increase
+      </h4>
+
+      <div className="salaryreq-current">
+        Current Rate: ₹{salaryRequestModal.assignment?.rate}/{salaryRequestModal.assignment?.rateType}
+      </div>
+
+      <input
+        type="number"
+        className="salaryreq-input"
+        placeholder="Requested Rate"
+        value={salaryRequestModal.rate}
+        onChange={(e)=>
+          setSalaryRequestModal(p=>({
+            ...p,
+            rate:e.target.value
+          }))
+        }
+      />
+
+      <textarea
+        className="salaryreq-textarea"
+        placeholder="Reason / Note"
+        value={salaryRequestModal.note}
+        onChange={(e)=>
+          setSalaryRequestModal(p=>({
+            ...p,
+            note:e.target.value
+          }))
+        }
+      />
+
+      <div className="salaryreq-actions">
+
+        <button
+          className="salaryreq-btn salaryreq-btn-cancel"
+          onClick={()=>setSalaryRequestModal({ open:false })}
+        >
+          Cancel
+        </button>
+
+        <button
+          className="salaryreq-btn salaryreq-btn-submit"
+          onClick={submitSalaryRequest}
+        >
+          Submit Request
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+
+)}
     </div>
   );
 }

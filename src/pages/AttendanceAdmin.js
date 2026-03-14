@@ -134,7 +134,8 @@ const base =
           out.push(rec);
         }
         if (!mounted) return;
-        setRecords(out);
+        out.sort((a,b)=> a.dayId.localeCompare(b.dayId));
+setRecords(out);
       } catch (e) {
         err("attendance load", e);
         setError(`Failed to load attendance: ${e?.message || e}`);
@@ -236,17 +237,41 @@ useEffect(() => {
   const peopleById = useMemo(() => Object.fromEntries(people.map(p => [p.id, p])), [people]);
 
   // Aggregation per person (existing attendance summary)
-  const totals = useMemo(() => {
-    const map = new Map();
-    for (const r of records) {
-      const id = r.personId || "(unknown)";
-      const prev = map.get(id) || { sessions: 0, minutes: 0 };
-      prev.sessions += 1;
-      prev.minutes += r.durationMinutes || 0;
-      map.set(id, prev);
-    }
-    return map;
-  }, [records]);
+ const totals = useMemo(() => {
+
+  const map = new Map();
+  const graceState = {};
+
+  for (const r of records) {
+
+    const id = r.personId;
+
+    const type = getAttendanceType(
+      r.durationMinutes,
+      r.personId,
+      r.dayId,
+      graceState
+    );
+
+    const prev = map.get(id) || {
+      present: 0,
+      half: 0,
+      absent: 0,
+      minutes: 0
+    };
+
+    if (type === "present") prev.present++;
+    if (type === "half") prev.half++;
+    if (type === "absent") prev.absent++;
+
+    prev.minutes += r.durationMinutes || 0;
+
+    map.set(id, prev);
+  }
+
+  return map;
+
+}, [records]);
 
   // quick lookup for per-user leads/visits
   const perUserById = useMemo(() => {
@@ -267,7 +292,7 @@ useEffect(() => {
       fmtDT(r.checkInAt),
       fmtDT(r.checkOutAt),
       r.durationMinutes ?? "",
-      r.status || "",
+      r.attendanceType || "",
       (r.notes || "").replace(/\n/g, " "),
       r.id,
     ]);
@@ -415,74 +440,144 @@ useEffect(() => {
       {error && <p className="error">{error}</p>}
 
       {/* Table */}
-      <div className="table-wrap">
-        {loading ? (
-          <p>Loading attendance…</p>
-        ) : (
-          <table className="attendance-table">
-            <thead>
-              <tr>
-                <th>
-  {role === "marketing"
-    ? "Marketing User"
-    : role === "staff"
-    ? "Staff"
-    : "Driver"}
-</th>
+    <div className="table-wrap">
+  {loading ? (
+    <p>Loading attendance…</p>
+  ) : (
+    (() => {
+      // shared grace tracker for table rendering
+      const graceStateForTable = {};
 
-                <th>Date</th>
-                <th>Check-in</th>
-                <th>Check-out</th>
-                <th>Duration</th>
-                <th>Status</th>
-                <th>Notes</th>
-                <th>Track</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              {records.map(r => (
+      return (
+        <table className="attendance-table">
+          <thead>
+            <tr>
+              <th>
+                {role === "marketing"
+                  ? "Marketing User"
+                  : role === "staff"
+                  ? "Staff"
+                  : "Driver"}
+              </th>
+
+              <th>Date</th>
+              <th>Check-in</th>
+              <th>Check-out</th>
+              <th>Duration</th>
+              <th>Status</th>
+              <th>Notes</th>
+              <th>Track</th>
+              <th></th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {records.map((r) => {
+              const attendance = getAttendanceType(
+                r.durationMinutes,
+                r.personId,
+                r.dayId,
+                graceStateForTable
+              );
+
+              return (
                 <tr key={r.id}>
                   <td style={{ minWidth: 220 }}>
-                    <div className="dname">{peopleById[r.personId]?.name || "(unknown)"}</div>
-                    <div className="muted">{peopleById[r.personId]?.loginEmail || peopleById[r.personId]?.email || r.personId}</div>
+                    <div className="dname">
+                      {peopleById[r.personId]?.name || "(unknown)"}
+                    </div>
+                    <div className="muted">
+                      {peopleById[r.personId]?.loginEmail ||
+                        peopleById[r.personId]?.email ||
+                        r.personId}
+                    </div>
                   </td>
+
                   <td className="mono">{r.dayId}</td>
+
                   <td>{fmtDT(r.checkInAt)}</td>
-                  <td>{fmtDT(r.checkOutAt) || <span className="chip warn">Open</span>}</td>
+
+                  <td>
+                    {fmtDT(r.checkOutAt) || (
+                      <span className="chip warn">Open</span>
+                    )}
+                  </td>
+
                   <td>{minsToHhmm(r.durationMinutes || 0)}</td>
-                  <td>{r.status || (r.checkOutAt ? "present" : "open")}</td>
-                  <td style={{ maxWidth: 280, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.notes || "-"}</td>
+
+                  <td>{attendance}</td>
+
+                  <td
+                    style={{
+                      maxWidth: 280,
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {r.notes || "-"}
+                  </td>
+
                   <td>
                     <button
                       className="cp-btn ghost"
-                      onClick={() => navigate(`/crm/tracking?role=${role}&driverId=${r.personId}&date=${r.dayId}`)}
+                      onClick={() =>
+                        navigate(
+                          `/crm/tracking?role=${role}&driverId=${r.personId}&date=${r.dayId}`
+                        )
+                      }
                     >
                       Track
                     </button>
                   </td>
+
                   <td>
-                    <button className="cp-btn ghost" onClick={() => setOpenRow(r)}>Details</button>
+                    <button
+                      className="cp-btn ghost"
+                      onClick={() => setOpenRow(r)}
+                    >
+                      Details
+                    </button>
                   </td>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
+              );
+            })}
+          </tbody>
+        </table>
+      );
+    })()
+  )}
+</div>
 
       {/* Per-person totals (same UI, now includes Leads/Visits) */}
       <div className="totals">
         {[...totals.entries()].map(([id, t]) => {
-          const pu = perUserById[id] || { leads: 0, visits: 0 };
+
+  const pu = perUserById[id] || { leads: 0, visits: 0 };
+
+  // salary calculation
+  const monthlySalary = peopleById[id]?.salaryMonthly || 0;
+  const perDaySalary = monthlySalary / 26;
+
+  const salary =
+    (t.present * perDaySalary) +
+    (t.half * (perDaySalary / 2));
           return (
             <div className="total-row" key={id}>
               <div className="name">{peopleById[id]?.name || id}</div>
               <div className="muted">{peopleById[id]?.loginEmail || peopleById[id]?.email || ""}</div>
-              <div className="pill">{t.sessions} sessions</div>
-              <div className="pill">{minsToHhmm(t.minutes)}</div>
-              <div className="pill">Leads {pu.leads}</div>
-              <div className="pill">Visits {pu.visits}</div>
+           <div className="pill">Present {t.present}</div>
+<div className="pill">Half {t.half}</div>
+<div className="pill">Absent {t.absent}</div>
+
+<div className="pill">Hours {minsToHhmm(t.minutes)}</div>
+
+<div className="pill salary">
+  Salary ₹{Math.round(salary)}
+</div>
+
+<div className="pill">Leads {pu.leads}</div>
+<div className="pill">Visits {pu.visits}</div>
               {perUserLoading && <div className="muted" style={{ marginLeft: 8 }}>updating…</div>}
               {perUserError && (
                 <div className="pill warn" title={perUserError}>
@@ -646,8 +741,12 @@ function mapDayDoc({ id, personId, dayId, raw }) {
     status: raw.status || (checkOutAt ? "present" : "open"),
   };
 
-  rec.durationMinutes = durationInMinutes(rec.checkInAt, rec.checkOutAt);
-  return rec;
+
+rec.durationMinutes = durationInMinutes(rec.checkInAt, rec.checkOutAt);
+
+return rec;
+
+
 }
 
 // ---- NEW: time range + counting helpers ----
@@ -706,4 +805,35 @@ async function countVisitsForUser(visitsColRef, fromTs, toTs, userKeyVal) {
   snapA.forEach(d => ids.add(d.id));
   snapB.forEach(d => ids.add(d.id));
   return ids.size;
+}
+function getAttendanceType(durationMinutes, personId, dayId, graceState) {
+
+  const month = dayId.slice(0,7);
+
+  if (!graceState[personId]) graceState[personId] = {};
+  if (!graceState[personId][month]) graceState[personId][month] = 0;
+
+  // FULL DAY
+  if (durationMinutes >= 525) {
+    return "present";
+  }
+
+  // 8–8.74 hrs
+  if (durationMinutes >= 480) {
+
+    if (graceState[personId][month] < 2) {
+      graceState[personId][month] += 1;
+      return "present";
+    }
+
+    return "half";
+  }
+
+  // HALF DAY
+  if (durationMinutes >= 240) {
+    return "half";
+  }
+
+  // ABSENT
+  return "absent";
 }

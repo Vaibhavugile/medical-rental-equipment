@@ -1,0 +1,124 @@
+.salary-page{
+padding:24px;
+}
+
+/* Header */
+
+.salary-page h2{
+margin-bottom:20px;
+font-size:26px;
+font-weight:600;
+color:#1f2937;
+}
+
+/* Toolbar */
+
+.toolbar{
+display:flex;
+align-items:center;
+gap:12px;
+margin-bottom:20px;
+background:#ffffff;
+padding:12px 16px;
+border-radius:10px;
+border:1px solid #e5e7eb;
+}
+
+.toolbar input[type="month"]{
+padding:8px 12px;
+border:1px solid #d1d5db;
+border-radius:6px;
+font-size:14px;
+background:#f9fafb;
+}
+
+/* Table */
+
+.salary-table{
+width:100%;
+border-collapse:collapse;
+background:#ffffff;
+border-radius:10px;
+overflow:hidden;
+border:1px solid #e5e7eb;
+}
+
+/* Table header */
+
+.salary-table thead{
+background:#f3f4f6;
+}
+
+.salary-table th{
+text-align:left;
+padding:14px;
+font-size:13px;
+font-weight:600;
+color:#374151;
+border-bottom:1px solid #e5e7eb;
+}
+
+/* Table rows */
+
+.salary-table td{
+padding:14px;
+font-size:14px;
+color:#374151;
+border-bottom:1px solid #f1f5f9;
+}
+
+/* Row hover */
+
+.salary-table tr:hover
+
+/* Buttons */
+
+.salary-table button{
+background:#2563eb;
+color:white;
+border:none;
+padding:7px 14px;
+font-size:13px;
+border-radius:6px;
+cursor:pointer;
+transition:all 0.2s ease;
+}
+
+.salary-table button:hover
+
+/* Paid label */
+
+.salary-paid{
+color:#16a34a;
+font-weight:600;
+}
+
+/* Pending */
+
+.salary-pending{
+color:#dc2626;
+font-weight:600;
+}
+
+/* Responsive */
+
+@media (max-width:900px){
+
+.salary-page{
+padding:16px;
+}
+
+.toolbar{
+flex-wrap:wrap;
+}
+
+.salary-table{
+font-size:12px;
+}
+
+.salary-table th,
+.salary-table td{
+padding:10px;
+}
+
+}

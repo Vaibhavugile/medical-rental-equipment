@@ -18,13 +18,14 @@ export default function Marketing() {
   const [editingId, setEditingId] = useState(null);
 
   const empty = {
-    name: "",
-    loginEmail: "",
-    phone: "",
-    branchId: "",
-    active: true,
-    authUid: "", // optional; if provided we will set doc id to this
-  };
+  name: "",
+  loginEmail: "",
+  phone: "",
+  branchId: "",
+  salaryMonthly: "",
+  active: true,
+  authUid: "",
+};
   const [form, setForm] = useState(empty);
 
   // Load all marketing users
@@ -64,15 +65,16 @@ export default function Marketing() {
   };
 
   const normalize = (p) => ({
-    name: p.name.trim(),
-    loginEmail: p.loginEmail.trim().toLowerCase(),
-    phone: p.phone.trim(),
-    branchId: p.branchId.trim(),
-    active: !!p.active,
-    authUid: p.authUid.trim(),   // optional
-    role: "marketing",
-    updatedAt: serverTimestamp(),
-  });
+  name: p.name.trim(),
+  loginEmail: p.loginEmail.trim().toLowerCase(),
+  phone: p.phone.trim(),
+  branchId: p.branchId.trim(),
+  salaryMonthly: Number(p.salaryMonthly || 0),
+  active: !!p.active,
+  authUid: p.authUid.trim(),
+  role: "marketing",
+  updatedAt: serverTimestamp(),
+});
 
   // Save (add or update)
   const save = async (e) => {
@@ -117,14 +119,15 @@ export default function Marketing() {
 
   const editRow = (r) => {
     setEditingId(r.id);
-    setForm({
-      name: r.name || "",
-      loginEmail: r.loginEmail || r.email || "",
-      phone: r.phone || "",
-      branchId: r.branchId || "",
-      active: r.active !== false,
-      authUid: r.uid || r.authUid || "",
-    });
+   setForm({
+  name: r.name || "",
+  loginEmail: r.loginEmail || r.email || "",
+  phone: r.phone || "",
+  branchId: r.branchId || "",
+  salaryMonthly: r.salaryMonthly || "",
+  active: r.active !== false,
+  authUid: r.uid || r.authUid || "",
+});
   };
 
   const deleteRow = async (id) => {
@@ -230,6 +233,14 @@ export default function Marketing() {
             value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })}
           />
           <input
+  type="number"
+  placeholder="Monthly Salary (₹)"
+  value={form.salaryMonthly || ""}
+  onChange={(e) =>
+    setForm({ ...form, salaryMonthly: e.target.value })
+  }
+/>
+          <input
             type="text" placeholder="Auth UID (optional)"
             value={form.authUid} onChange={(e) => setForm({ ...form, authUid: e.target.value })}
             title="If you already created the Firebase Auth user, paste the UID to make the doc id match."
@@ -270,6 +281,7 @@ export default function Marketing() {
                 <th>Login Email</th>
                 <th>Phone</th>
                 <th>Branch</th>
+                <th>Salary</th>
                 <th>Active</th>
                 <th>UID</th>
                 <th>Actions</th>
@@ -282,7 +294,8 @@ export default function Marketing() {
                   <td>{r.loginEmail || r.email || "-"}</td>
                   <td>{r.phone || "-"}</td>
                   <td>{r.branchId || "-"}</td>
-                  <td style={{whiteSpace:'nowrap'}}>
+<td>₹{r.salaryMonthly || 0}</td>
+<td style={{whiteSpace:'nowrap'}}>
                     <button className="cp-btn ghost" onClick={() => toggleActive(r, !(r.active !== false))}>
                       {r.active !== false ? "Active" : "Inactive"}
                     </button>
