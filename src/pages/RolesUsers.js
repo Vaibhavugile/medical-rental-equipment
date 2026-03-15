@@ -28,7 +28,7 @@ const SIDEBAR_OPTIONS = [
     { key: "Nurse_caretakerpay", label: "Nurse Caretaker Basepay" },
 
     { key: "Payment_Increase_Request", label: "Payment Increase Requests" },
-
+  { key: "caretaker-orders", label: "Caretaker Orders" },
 
   { key: "branches", label: "Branches" },
   { key: "inventory", label: "Inventory" },

@@ -273,30 +273,44 @@ const end = it.expectedEndDate
 
   const duration = calcDuration(start, end, rateType);
 
-  const qty = Number(it.qty || 1);
-  const rate = Number(it.rate || 0);
+       const qty = Number(it.qty || 1);
 
-  return {
-    id: it.id || `n-${Date.now()}-${idx}`,
-    name:
-      it.name ||
-      (serviceType === "caretaker"
-        ? "Caretaker Service"
-        : "Nursing Service"),
 
-    qty,
-    rate,
-    rateType,
+// quotation total
+const subtotal = Number(it.amount || 0);
 
-    duration,
+// auto calculate daily rate
+const rate =
+  duration > 0
+    ? subtotal / (qty * duration)
+    : 0;
 
-    amount: qty * rate * duration,
+return {
+  id: it.id || `n-${Date.now()}-${idx}`,
 
-    notes: it.notes || "",
+  name:
+    it.name ||
+    (serviceType === "caretaker"
+      ? "Caretaker Service"
+      : "Nursing Service"),
 
-    expectedStartDate: start,
-    expectedEndDate: end,
-  };
+  qty,
+
+  // daily rate calculated from quotation total
+  rate: Math.round(rate),
+
+  rateType,
+
+  duration,
+
+  // keep quotation subtotal
+  amount: subtotal,
+
+  notes: it.notes || "",
+
+  expectedStartDate: start,
+  expectedEndDate: end,
+};
 });
 
       const discount =
@@ -783,7 +797,12 @@ return (
                       <select
   className="cp-input"
   style={{ width: 200 }}
-  value={it.name}
+  value={
+    it.name ||
+    (draft?.serviceType === "caretaker"
+      ? "Caretaker Service"
+      : "Nursing Service")
+  }
   onChange={(e) =>
     updateDraftItem(idx, { name: e.target.value })
   }

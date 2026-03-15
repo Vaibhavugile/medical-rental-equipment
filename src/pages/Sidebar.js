@@ -76,10 +76,18 @@ const SECTIONS = [
       },
       {
         key: "nursing_orders",     // ✅
-        label: "Nursing & Caretakers Orders",
+        label: "Nursing Orders",
         path: "/crm/nursing-orders",
         icon: Stethoscope,
       },
+         {
+        key: "caretaker-orders",     // ✅
+        label: "Caretakers Orders",
+        path: "/crm/caretaker-orders",
+        icon: Stethoscope,
+      },
+
+      
     ],
   },
   {
