@@ -76,7 +76,7 @@ export default function Quotations() {
   // NEW: WhatsApp send state
   const [waPhone, setWaPhone] = useState("");
   const [sendingWa, setSendingWa] = useState(false);
-
+const [typeFilter, setTypeFilter] = useState("all");
   const [orderModalQuote, setOrderModalQuote] = useState(null);
   const navigate = useNavigate();
   const isNursingQuote = (q) =>
@@ -117,27 +117,43 @@ export default function Quotations() {
   }, [quotations]);
 
   const filtered = useMemo(() => {
-    const list = statusFilter === "all"
-      ? quotations
-      : quotations.filter((q) => String(q.status || "draft").toLowerCase() === statusFilter);
+  let list = quotations;
 
-    if (!search.trim()) return list;
+  // Service type filter
+  if (typeFilter !== "all") {
+    list = list.filter(
+      (q) => (q.serviceType || "rental") === typeFilter
+    );
+  }
 
-    const term = search.trim().toLowerCase();
-    return list.filter((q) => {
-      const fields = [
-        q.quoNo,
-        q.quotationId,
-        q.requirementId,
-        q.createdByName,
-        q.createdBy,
-        q.notes,
-        q.customerName,   // ✅ searchable
-        q.customerPhone,  // ✅ searchable
-      ].map((x) => String(x || "").toLowerCase());
-      return fields.some((f) => f.includes(term));
-    });
-  }, [quotations, statusFilter, search]);
+  // Status filter
+  if (statusFilter !== "all") {
+    list = list.filter(
+      (q) =>
+        String(q.status || "draft").toLowerCase() ===
+        statusFilter
+    );
+  }
+
+  if (!search.trim()) return list;
+
+  const term = search.trim().toLowerCase();
+
+  return list.filter((q) => {
+    const fields = [
+      q.quoNo,
+      q.quotationId,
+      q.requirementId,
+      q.createdByName,
+      q.createdBy,
+      q.notes,
+      q.customerName,
+      q.customerPhone,
+    ].map((x) => String(x || "").toLowerCase());
+
+    return fields.some((f) => f.includes(term));
+  });
+}, [quotations, statusFilter, typeFilter, search]);
 
   // ===== Helpers to fetch from requirement -> leadssnapshop / leadSnapshot
   const pickFromRequirement = (req = {}) => {
@@ -717,7 +733,50 @@ serviceType: quote.serviceType || "rental",
        <div className="filter-bar">
 
   <div className="filter-left">
+{/* SERVICE TYPE FILTER */}
+<div className="segmented type-segment">
 
+  <button
+    className={`seg-btn ${typeFilter === "all" ? "active" : ""}`}
+    onClick={() => {
+      setTypeFilter("all");
+      setStatusFilter("all");
+    }}
+  >
+    All
+  </button>
+
+  <button
+    className={`seg-btn equipment ${typeFilter === "rental" ? "active" : ""}`}
+    onClick={() => {
+      setTypeFilter("rental");
+      setStatusFilter("all");
+    }}
+  >
+    📦 Equipment
+  </button>
+
+  <button
+    className={`seg-btn nursing ${typeFilter === "nursing" ? "active" : ""}`}
+    onClick={() => {
+      setTypeFilter("nursing");
+      setStatusFilter("all");
+    }}
+  >
+    🩺 Nursing
+  </button>
+
+  <button
+    className={`seg-btn caretaker ${typeFilter === "caretaker" ? "active" : ""}`}
+    onClick={() => {
+      setTypeFilter("caretaker");
+      setStatusFilter("all");
+    }}
+  >
+    🧑‍⚕️ Caretaker
+  </button>
+
+</div>
     {/* STATUS SEGMENT */}
     <div className="segmented status-segment">
 

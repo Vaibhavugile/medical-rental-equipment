@@ -98,20 +98,29 @@ const [salaryRequests, setSalaryRequests] = useState([]);
 
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
-  const openAssignModal = (serviceIndex) => {
+const openAssignModal = (serviceIndex) => {
 
-    const service = editableItems?.[serviceIndex];
+  const service = editableItems?.[serviceIndex];
 
-    setAssignServiceIndex(serviceIndex);
+  setAssignServiceIndex(serviceIndex);
 
-    setAssignDates({
-      startDate: formatDateTimeLocal(service?.expectedStartDate),
-      endDate: formatDateTimeLocal(service?.expectedEndDate)
-    });
+  setAssignDates({
+    startDate: formatDateTimeLocal(service?.expectedStartDate),
+    endDate: formatDateTimeLocal(service?.expectedEndDate)
+  });
 
-    setAssignOpen(true);
+  /* Auto select correct staff type based on order service */
+  setStaffFilters((prev) => ({
+    ...prev,
+    staffType:
+      order?.serviceType === "caretaker"
+        ? "caretaker"
+        : "nurse"
+  }));
 
-  };
+  setAssignOpen(true);
+
+};
   const getDuration = (start, end) => {
 
     const startDate = new Date(start);
@@ -1622,10 +1631,15 @@ const getSalaryRequest = (assignmentId) => {
     <div className="nod-wrap">
       {/* HEADER */}
       <div className="nod-head">
-        <h2>Nursing Order — {order.orderNo}</h2>
-        <button className="nod-btn nod-btn-secondary" onClick={() => navigate(-1)}>
-          Back
-        </button>
+        <h2>{order.serviceType === "caretaker"
+    ? "Caretaker Order"
+    : "Nursing Order"} — {order.orderNo}</h2>
+          <button
+    className="nod-btn nod-btn-secondary"
+    onClick={() => navigate(-1)}
+  >
+    Back
+  </button>
       </div>
 
       {/* CUSTOMER */}
@@ -1768,7 +1782,7 @@ const getSalaryRequest = (assignmentId) => {
                 className="nod-btn nod-btn-primary small"
                 onClick={() => openAssignModal(i)}
               >
-                Assign Nurse
+                {order.serviceType === "caretaker" ? "Assign Caretaker" : "Assign Nurse"}
               </button>
               <button
                 className="nod-btn nod-btn-secondary small"
@@ -1968,7 +1982,7 @@ const getSalaryRequest = (assignmentId) => {
                   className="nod-btn nod-btn-primary small"
                   onClick={() => openAssignModal(i)}
                 >
-                  Assign Nurse
+                 {order.serviceType === "caretaker" ? "Assign Caretaker" : "Assign Nurse"}
                 </button>
               </div>
 
@@ -2333,7 +2347,7 @@ const getSalaryRequest = (assignmentId) => {
           <div className="nod-modal-card">
 
             <div className="assign-modal-header">
-              <h4>Assign Nurse</h4>
+              <h4>{order.serviceType === "caretaker" ? "Assign Caretaker" : "Assign Nurse"}</h4>
             </div>
 
             {/* DATE SELECTION */}
@@ -2426,15 +2440,23 @@ const getSalaryRequest = (assignmentId) => {
                 <label>Staff Type</label>
 
                 <div className="assign-filter-chips">
-                  {["all", "nurse", "caretaker"].map(type => (
-                    <button
-                      key={type}
-                      className={`assign-chip ${staffFilters.staffType === type ? "active" : ""}`}
-                      onClick={() => setStaffFilters(p => ({ ...p, staffType: type }))}
-                    >
-                      {type === "all" ? "All" : type}
-                    </button>
-                  ))}
+                 {(
+  order.serviceType === "caretaker"
+    ? ["caretaker"]
+    : ["nurse"]
+).map(type => (
+  <button
+    key={type}
+    className={`assign-chip ${
+      staffFilters.staffType === type ? "active" : ""
+    }`}
+    onClick={() =>
+      setStaffFilters((p) => ({ ...p, staffType: type }))
+    }
+  >
+    {type}
+  </button>
+))}
                 </div>
               </div>
 
@@ -2496,6 +2518,17 @@ const getSalaryRequest = (assignmentId) => {
                       <div className="nod-muted">
                         {s.staffType} · {s.shiftType || "day"} shift
                       </div>
+                      {order.serviceType === "nursing" && s.staffType === "caretaker" && (
+  <div className="nod-muted small">
+    Only nurses allowed
+  </div>
+)}
+
+{order.serviceType === "caretaker" && s.staffType === "nurse" && (
+  <div className="nod-muted small">
+    Only caretakers allowed
+  </div>
+)}
 
                       {/* SALARY PREVIEW */}
 
