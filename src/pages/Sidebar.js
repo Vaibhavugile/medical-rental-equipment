@@ -130,13 +130,20 @@ const SECTIONS = [
     items: [
       {
         key: "payroll",            // ✅
-        label: "Payroll",
+        label: "Nursing Report",
         path: "/crm/payroll",
         icon: Wallet,
       },
       {
+        key: "caretakers_report",            // ✅
+        label: "Caretaker Report",
+        path: "/crm/reports/caretaker",
+        icon: Wallet,
+      },
+      
+      {
         key: "reports",            // ✅
-        label: "Reports",
+        label: " Euipment Reports",
         path: "/crm/reports",
         icon: BarChart3,
       },

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase";
 
-export default function useNursingReportData(filters){
+export default function useNursingReportData(filters, serviceType = "nursing") {
 
 const [loading,setLoading]=useState(true);
 
@@ -19,7 +19,7 @@ const [activity,setActivity]=useState([]);
 useEffect(()=>{
 setLoading(true);
 load();
-},[filters]);
+},[filters, serviceType]);
 
 /* =========================
 DATE FILTER
@@ -86,8 +86,23 @@ id:d.id,
 ...(d.data()||{})
 }));
 
+/* =========================
+FILTER BY DATE + SERVICE TYPE
+========================= */
+
 const filteredOrders =
-allOrders.filter(o=>inRange(o.createdAt));
+allOrders.filter(o=>{
+
+const dateOk = inRange(o.createdAt);
+
+const typeOk =
+serviceType === "all"
+? true
+: (o.serviceType || "nursing") === serviceType;
+
+return dateOk && typeOk;
+
+});
 
 /* =========================
 ASSIGNMENTS

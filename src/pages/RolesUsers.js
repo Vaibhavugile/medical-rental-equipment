@@ -26,6 +26,7 @@ const SIDEBAR_OPTIONS = [
   { key: "marketing", label: "Marketing" },
   { key: "runners", label: "Runners" },
   { key: "payroll", label: "Payroll" },
+  { key: "caretakers_report", label: "Caretakers Report" },
   { key: "reports", label: "Reports" },
  
     { key: "Nurse_caretakerpay", label: "Nurse Caretaker Basepay" },

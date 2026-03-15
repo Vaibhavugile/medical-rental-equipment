@@ -1,6 +1,5 @@
 import React,{useState} from "react";
 
-
 import useNursingReportData from "./useNursingReportData";
 import ReportModal from "../components/R/ReportModal";
 import ReportFilters from "../components/R/ReportFilters";
@@ -18,63 +17,40 @@ import LossOrdersTable from "../components/R/LossOrdersTable";
 import ExtensionAnalytics from "../components/R/ExtensionAnalytics";
 import ActivityAnalytics from "../components/R/ActivityAnalytics";
 
-export default function PayrollGenerate(){
-
-/* =========================
-DATE FILTER STATE
-========================= */
+export default function PayrollGenerate({ serviceType="nursing" }){
 
 const [filters,setFilters] = useState({
-
 type:"month",
 start:null,
 end:null
-
 });
 
-/* =========================
-LOAD REPORT DATA
-========================= */
+const report = useNursingReportData(filters,serviceType);
 
-const report = useNursingReportData(filters);
 const [modal,setModal]=useState(null);
+
 if(report.loading){
-
 return(
-
 <div className="nor-root">
-
 Loading analytics...
-
 </div>
-
 )
-
 }
-
-/* =========================
-UI
-========================= */
 
 return(
 
 <div className="nor-root">
 
 <h1 className="nor-title">
-
-Nursing Operations Intelligence
-
+{serviceType==="caretaker"
+? "Caretaker Operations Intelligence"
+: "Nursing Operations Intelligence"}
 </h1>
-
-{/* FILTERS */}
 
 <ReportFilters
 filters={filters}
 setFilters={setFilters}
 />
-
-{/* OVERVIEW */}
-
 
 <OverviewCards
 data={report.summary}
@@ -90,8 +66,6 @@ onClose={()=>setModal(null)}
 <DailyRevenueReport/>
 <DailySalaryReport/>
 
-{/* FINANCIAL ANALYTICS */}
-
 <RevenueAnalytics
 data={report.paymentMethods}
 />
@@ -99,8 +73,6 @@ data={report.paymentMethods}
 <ProfitAnalytics
 data={report.summary}
 />
-
-{/* ORDER ANALYTICS */}
 
 <OrderProfitTable
 data={report.orders}
@@ -110,8 +82,6 @@ data={report.orders}
 data={report.lossOrders}
 />
 
-{/* STAFF ANALYTICS */}
-
 <StaffLeaderboard
 data={report.staffLeaderboard}
 />
@@ -120,25 +90,17 @@ data={report.staffLeaderboard}
 data={report.staff}
 />
 
-{/* SERVICE ANALYTICS */}
-
 <ServiceAnalytics
 data={report.services}
 />
-
-{/* PAYROLL */}
 
 <SalaryInsights
 data={report.summary}
 />
 
-{/* EXTENSIONS */}
-
 <ExtensionAnalytics
 data={report.extensions}
 />
-
-{/* ACTIVITY */}
 
 <ActivityAnalytics
 data={report.activity}
