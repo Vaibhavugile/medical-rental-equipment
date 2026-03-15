@@ -95,8 +95,20 @@ const SECTIONS = [
     items: [
       {
         key: "staff",              // ✅
-        label: "Nurses",
+        label: "Staff",
         path: "/crm/staff",
+        icon: Users,
+      },
+         {
+        key: "nurses",              // ✅
+        label: "Nurses",
+        path: "/crm/nurses",
+        icon: Users,
+      },
+          {
+        key: "caretakers",              // ✅
+        label: "Caretakers",
+        path: "/crm/caretakers",
         icon: Users,
       },
       {

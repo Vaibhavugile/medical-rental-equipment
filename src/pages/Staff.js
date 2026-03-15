@@ -15,7 +15,7 @@ import { db } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import "./Staff.css";
 
-export default function Staff() {
+export default function Staff({ defaultType = "all" }) {
   const navigate = useNavigate();
 
   const [rows, setRows] = useState([]);
@@ -23,8 +23,7 @@ export default function Staff() {
   const [error, setError] = useState("");
 
   const [search, setSearch] = useState("");
-  const [typeFilter, setTypeFilter] = useState("all");
-
+const [typeFilter, setTypeFilter] = useState(defaultType);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
@@ -43,7 +42,7 @@ export default function Staff() {
     bloodGroup: "",
     address: "",
 
-    staffType: "nurse",
+    staffType: defaultType === "all" ? "nurse" : defaultType,
     qualifications: "",
     experienceYears: "",
     servicesOffered: "",
@@ -105,6 +104,10 @@ upiId: "",
   if (!p.name.trim()) return "Name is required";
 
   if (!p.loginEmail.trim()) return "Email is required";
+  if (p.phone && !/^\d{10}$/.test(p.phone))
+  return "Phone number must be 10 digits";
+if (p.alternatePhone && !/^\d{10}$/.test(p.alternatePhone))
+  return "Alternate phone must be 10 digits";
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.loginEmail))
     return "Invalid email";
@@ -251,7 +254,13 @@ upiId: p.upiId.trim().toLowerCase(),
   /* ================= UI ================= */
   return (
     <div className="staff-page">
-      <h2>Nursing & Caretaker Management</h2>
+      <h2>
+  {defaultType === "caretaker"
+    ? "Caretaker Management"
+    : defaultType === "nurse"
+    ? "Nursing Staff Management"
+    : "Nursing & Caretaker Management"}
+</h2>
 
       <div className="staff-toolbar">
         <input
@@ -268,18 +277,16 @@ upiId: p.upiId.trim().toLowerCase(),
           <option value="caretaker">Caretaker</option>
         </select>
         <button
-          className="cp-btn"
-          onClick={() => {
-            setForm(empty);
-            setEditingId(null);
-            setShowForm(true);
-          }}
-        >
-          Add Nurse
-        </button>
-        <button onClick={() => navigate("/crm/payroll")}>
-  Payroll
+  className="cp-btn"
+  onClick={() => {
+    setForm(empty);
+    setEditingId(null);
+    setShowForm(true);
+  }}
+>
+  {defaultType === "caretaker" ? "Add Caretaker" : "Add Nurse"}
 </button>
+       
 
       </div>
 
@@ -288,7 +295,15 @@ upiId: p.upiId.trim().toLowerCase(),
       )}
       <div className={`drawer ${showForm ? "open" : ""}`}>
         <div className="drawer-header">
-          <h3>{editingId ? "Edit Nurse" : "Add Nurse"}</h3>
+          <h3>
+  {editingId
+    ? defaultType === "caretaker"
+      ? "Edit Caretaker"
+      : "Edit Nurse"
+    : defaultType === "caretaker"
+    ? "Add Caretaker"
+    : "Add Nurse"}
+</h3>
           <button className="cp-btn ghost" onClick={() => setShowForm(false)}>
             Close
           </button>
@@ -301,12 +316,29 @@ upiId: p.upiId.trim().toLowerCase(),
           <input placeholder="Login Email *" value={form.loginEmail}
             onChange={(e) => setForm({ ...form, loginEmail: e.target.value })} />
 
-          <input placeholder="Phone" value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <input
+  placeholder="Phone *"
+  value={form.phone}
+  maxLength={10}
+  onChange={(e) => {
+    const value = e.target.value.replace(/\D/g, ""); // numbers only
+    if (value.length <= 10) {
+      setForm({ ...form, phone: value });
+    }
+  }}
+/>
 
-          <input placeholder="Alternate Phone" value={form.alternatePhone}
-            onChange={(e) => setForm({ ...form, alternatePhone: e.target.value })} />
-
+         <input
+  placeholder="Alternate Phone"
+  value={form.alternatePhone}
+  maxLength={10}
+  onChange={(e) => {
+    const value = e.target.value.replace(/\D/g, "");
+    if (value.length <= 10) {
+      setForm({ ...form, alternatePhone: value });
+    }
+  }}
+/>
           <input placeholder="Aadhaar Number" value={form.aadharNumber}
             onChange={(e) => setForm({ ...form, aadharNumber: e.target.value })} />
 
@@ -404,8 +436,14 @@ upiId: p.upiId.trim().toLowerCase(),
 
           <div className="actions-row">
             <button className="cp-btn">
-              {editingId ? "Update Nurse" : "Add Nurse"}
-            </button>
+  {editingId
+    ? defaultType === "caretaker"
+      ? "Update Caretaker"
+      : "Update Nurse"
+    : defaultType === "caretaker"
+    ? "Add Caretaker"
+    : "Add Nurse"}
+</button>
             <button type="button" className="cp-btn ghost"
               onClick={() => setShowForm(false)}>
               Cancel

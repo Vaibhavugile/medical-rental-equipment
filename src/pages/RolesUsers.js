@@ -20,6 +20,9 @@ const SIDEBAR_OPTIONS = [
   { key: "orders", label: "Orders" },
   { key: "nursing_orders", label: "Nursing Orders" },
   { key: "staff", label: "Staff" },
+  { key: "nurses", label: "Nurses" },
+  { key: "caretakers", label: "Caretakers" },
+
   { key: "marketing", label: "Marketing" },
   { key: "runners", label: "Runners" },
   { key: "payroll", label: "Payroll" },

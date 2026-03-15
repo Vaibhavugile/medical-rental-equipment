@@ -82,6 +82,8 @@ import StaffSalary from "./pages/StaffSalary";
 import SalaryRequests from "./pages/SalaryRequests";
 import SalaryPayrollPage from "./pages/SalaryPayrollPage";
 import CaretakerOrders from "./pages/CaretakerOrders";
+import Nurses from "./pages/Nurses";
+import Caretakers from "./pages/Caretakers";
 /* ============================================================
    PRIVATE ROUTE (AUTH ONLY, SILENT)
 ============================================================ */
@@ -200,6 +202,8 @@ function CRMApp() {
   path="caretaker-orders"
   element={<CaretakerOrders />}
 />
+<Route path="nurses" element={<Nurses />} />
+<Route path="caretakers" element={<Caretakers />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
