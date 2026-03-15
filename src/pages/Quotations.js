@@ -80,9 +80,10 @@ export default function Quotations() {
   const [orderModalQuote, setOrderModalQuote] = useState(null);
   const navigate = useNavigate();
   const isNursingQuote = (q) =>
-    q?.meta?.serviceType === "nursing" ||
-    q?.serviceType === "nursing";
-
+  q?.meta?.serviceType === "nursing" ||
+  q?.meta?.serviceType === "caretaker" ||
+  q?.serviceType === "nursing" ||
+  q?.serviceType === "caretaker";
 
   useEffect(() => {
     setLoading(true);
@@ -554,16 +555,18 @@ const convertToOrder = (quote) => {
   setError("");
 
   const isNursing =
-    quote?.items?.some((it) =>
-      /nurse|caretaker|care staff/i.test(it.name || "")
-    ) ||
-    quote?.serviceType === "nursing";
+  quote?.serviceType === "nursing" ||
+  quote?.serviceType === "caretaker" ||
+  quote?.items?.some((it) =>
+    /nurse|caretaker|care staff/i.test(it.name || "")
+  );
 
   setOrderModalQuote({
     ...quote,
 
     // internal flag only for UI routing
     __orderType: isNursing ? "nursing" : "rental",
+serviceType: quote.serviceType || "rental",
   });
 };
 
@@ -906,6 +909,16 @@ const convertToOrder = (quote) => {
 <div className="value">
   {details.requirementNumber || details.requirementId || "—"}
 </div>                </div>
+<div className="qp-section">
+  <div className="label">Service</div>
+  <div className="value">
+    {details.serviceType === "caretaker"
+      ? "Caretaker"
+      : details.serviceType === "nursing"
+      ? "Nursing"
+      : "Equipment Rental"}
+  </div>
+</div>
 
                 <div className="qp-section">
                   <div className="label">Created</div>
@@ -1306,6 +1319,7 @@ const convertToOrder = (quote) => {
   <NursingOrderCreate
     open
     quotation={orderModalQuote}
+     serviceType={orderModalQuote.serviceType}
     onClose={() => setOrderModalQuote(null)}
     onCreated={(orderId) => {
       if (details && details.id === orderModalQuote.id) {

@@ -121,8 +121,8 @@ const [typeFilter, setTypeFilter] = useState("all");
 const [search, setSearch] = useState("");
   // Track last focused item index for "+ Add Item below current"
   const [activeItemIdx, setActiveItemIdx] = useState(null);
-const isNursingReq = (r) => r?.serviceType === "nursing";
-
+const isNursingReq = (r) =>
+  r?.serviceType === "nursing" || r?.serviceType === "caretaker";
   useEffect(() => {
     setLoading(true);
     const q = query(collection(db, "requirements"), orderBy("createdAt", "desc"));
@@ -263,6 +263,7 @@ const openCreateQuotation = async (req) => {
     createdAt: null,
     createdBy: user.uid || "",
     createdByName: user.displayName || user.email || "",
+    serviceType: req?.serviceType || "rental",
   };
 
   setQuotation(base);
@@ -340,7 +341,10 @@ const openCreateQuotation = async (req) => {
     quotation.requirementNumber ||
     "",
 
-  serviceType: detailsReq?.serviceType || "rental",
+  serviceType:
+  detailsReq?.serviceType ||
+  quotation?.serviceType ||
+  "rental",
 
   quoNo: quotation.quoNo || `Q-${Date.now()}`,
   quotationId:
@@ -592,6 +596,17 @@ const openCreateQuotation = async (req) => {
       >
         🩺 Nursing
       </button>
+      <button
+  className={`seg-btn caretaker ${
+    typeFilter === "caretaker" ? "active" : ""
+  }`}
+  onClick={() => {
+    setTypeFilter("caretaker");
+    setStatusFilter("all");
+  }}
+>
+  🧑‍⚕️ Caretaker
+</button>
     </div>
 
     {/* STATUS FILTER */}
@@ -680,17 +695,30 @@ const openCreateQuotation = async (req) => {
             <tbody>
               {filtered.map((r) => {
                 const customer =
-                  r.leadSnapshot?.customerName || r.customerName || r.name || "—";
-                const contact =
-                  r.leadSnapshot?.contactPerson || r.contactPerson || "—";
-                const phone = r.leadSnapshot?.phone || r.phone || "—";
+  r.leadSnapshot?.customerName ||
+  r.customerName ||
+  r.deliveryContact?.name ||
+  r.name ||
+  "—";
+               const contact =
+  r.leadSnapshot?.contactPerson ||
+  r.contactPerson ||
+  r.deliveryContact?.name ||
+  "—";
+                const phone =
+  r.leadSnapshot?.phone ||
+  r.phone ||
+  r.deliveryContact?.phone ||
+  "—";
                 const sClass = statusClass(r.status || "");
                 return (
                   <tr key={r.id}>
 <td className="strong">
   {r.requirementNumber || r.requirementId || r.id}
-</td>                    <td>
-  {isNursingReq(r) ? (
+</td>                 <td>
+  {r.serviceType === "caretaker" ? (
+    <span className="chip">🧑‍⚕️ Caretaker</span>
+  ) : r.serviceType === "nursing" ? (
     <span className="chip">🩺 Nursing</span>
   ) : (
     <span className="chip">📦 Rental</span>
@@ -775,10 +803,11 @@ const openCreateQuotation = async (req) => {
                 <div className="details-row">
                   <div className="label muted">Requester</div>
                   <div className="value strong">
-                    {detailsReq.name ||
-                      detailsReq.customerName ||
-                      detailsReq.leadSnapshot?.customerName ||
-                      "—"}
+                   {detailsReq.name ||
+  detailsReq.customerName ||
+  detailsReq.leadSnapshot?.customerName ||
+  detailsReq.deliveryContact?.name ||
+  "—"}
                   </div>
                 </div>
 
@@ -796,7 +825,10 @@ const openCreateQuotation = async (req) => {
                 <div className="details-row">
                   <div className="label muted">Phone</div>
                   <div className="value">
-                    {detailsReq.phone || detailsReq.leadSnapshot?.phone || "—"}
+                   {detailsReq.phone ||
+  detailsReq.leadSnapshot?.phone ||
+  detailsReq.deliveryContact?.phone ||
+  "—"}
                   </div>
                 </div>
 

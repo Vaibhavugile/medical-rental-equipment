@@ -22,18 +22,22 @@ export default function RequirementForm({ lead, requirement = null, templateRequ
   requirementNumber: "", // ✅ NEW (professional number)
 
   // 🔹 Type
-  serviceType: "rental", // rental | nursing
-
+serviceType:
+  lead?.type === "equipment"
+    ? "rental"
+    : lead?.type === "caretaker"
+    ? "caretaker"
+    : "nursing",
   // 🔹 Lead linkage
   leadId: lead?.id || "",
 
   // 🔹 Nursing (only used if serviceType === nursing)
   nursing: {
-    staffType: "nurse",     // nurse | caretaker
-    count: 1,
-    shift: "day",           // day | night | full_day
-    notes: "",
-  },
+  staffType: lead?.type === "caretaker" ? "caretaker" : "nurse",
+  count: 1,
+  shift: "day",
+  notes: "",
+},
 
   // 🔹 Lead snapshot (freezes data at time of requirement creation)
   leadSnapshot: {
@@ -72,7 +76,12 @@ export default function RequirementForm({ lead, requirement = null, templateRequ
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [lastSaved, setLastSaved] = useState(null);
-
+const serviceLabel =
+  lead?.type === "caretaker"
+    ? "Caretaker"
+    : lead?.type === "nursing"
+    ? "Nursing"
+    : "Equipment";
   // Products for suggestions
   const [products, setProducts] = useState([]); // [{id, name, sku, defaultRate, ...}]
   useEffect(() => {
@@ -285,8 +294,8 @@ async function generateRequirementNumber() {
       leadSnapshot: form.leadSnapshot || {},
       serviceType: form.serviceType || "rental",
 
-      nursing:
-        form.serviceType === "nursing"
+     nursing:
+  form.serviceType === "nursing" || form.serviceType === "caretaker"
           ? {
               staffType: form.nursing?.staffType || "nurse",
               count: Number(form.nursing?.count || 1),
@@ -498,30 +507,58 @@ React.createElement(
 React.createElement(
   "div",
   { className: "card" },
-  React.createElement("h3", null, "Service Type"),
-  React.createElement(
+React.createElement(
+  "h3",
+  null,
+  serviceLabel === "Equipment"
+    ? "Service Type"
+    : `${serviceLabel} Service`
+),  React.createElement(
     "select",
     {
       className: "input",
       value: form.serviceType,
-      onChange: (e) =>
-        setForm((f) => ({
-          ...f,
-          serviceType: e.target.value,
-        })),
+     onChange: (e) => {
+  const val = e.target.value;
+
+  setForm((f) => ({
+    ...f,
+    serviceType: val,
+    nursing: {
+      ...f.nursing,
+      staffType:
+        val === "caretaker"
+          ? "caretaker"
+          : val === "nursing"
+          ? "nurse"
+          : f.nursing.staffType,
     },
-    React.createElement("option", { value: "rental" }, "Equipment Rental"),
-    React.createElement("option", { value: "nursing" }, "Nursing / Caretaker")
-  )
+  }));
+},
+    },
+React.createElement("option", { value: "rental" }, "Equipment Rental"),
+React.createElement("option", { value: "nursing" }, "Nursing"),
+React.createElement("option", { value: "caretaker" }, "Caretaker")  )
 ),
-form.serviceType === "nursing" &&
+(form.serviceType === "nursing" || form.serviceType === "caretaker") &&
 React.createElement(
   "div",
   { className: "card", style: { gridColumn: "1 / -1" } },
-  React.createElement("h3", null, "Nursing / Caretaker Details"),
-
+React.createElement(
+  "h3",
+  null,
+form.serviceType === "caretaker"
+  ? "Caretaker Details"
+  : "Nursing Details"
+),
   // Staff Type
-  React.createElement("label", null, "Staff Type"),
+  React.createElement(
+  "label",
+  null,
+ form.serviceType === "caretaker"
+  ? "Caretaker Type"
+  : "Nurse Type"
+),
   React.createElement(
     "select",
     {

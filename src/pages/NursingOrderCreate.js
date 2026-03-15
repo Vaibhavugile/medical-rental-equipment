@@ -222,34 +222,34 @@ export default function NursingOrderCreate({
       /* ============================
          5️⃣ Resolve customer + contact
       ============================ */
-      const customerName =
-        ls?.customerName ||
-        requirement?.customerName ||
-        freshQuotation?.customerName ||
-        lead?.customerName ||
-        lead?.name ||
-        "";
+     const customerName =
+  freshQuotation?.deliveryContact?.name ||
+  freshQuotation?.customerName ||
+  requirement?.deliveryContact?.name ||
+  requirement?.leadSnapshot?.customerName ||
+  lead?.customerName ||
+  "";
 
-      const deliveryAddress =
-        ls?.address ||
-        requirement?.deliveryAddress ||
-        freshQuotation?.deliveryAddress ||
-        lead?.address ||
-        "";
+     const deliveryAddress =
+  freshQuotation?.deliveryAddress ||
+  requirement?.deliveryAddress ||
+  lead?.address ||
+  "";
 
       const deliveryContact = {
         name:
-          ls?.contactPerson ||
-          requirement?.contactPerson ||
-          freshQuotation?.deliveryContact?.name ||
-          lead?.contactPerson ||
-          "",
+  freshQuotation?.deliveryContact?.name ||
+  requirement?.deliveryContact?.name ||
+  ls?.contactPerson ||
+  lead?.contactPerson ||
+  freshQuotation?.customerName ||
+  "",
         phone:
-          ls?.phone ||
-          requirement?.phone ||
-          freshQuotation?.deliveryContact?.phone ||
-          lead?.phone ||
-          "",
+  freshQuotation?.deliveryContact?.phone ||
+  requirement?.deliveryContact?.phone ||
+  requirement?.leadSnapshot?.phone ||
+  lead?.phone ||
+  "",
         email:
           ls?.email ||
           requirement?.email ||
@@ -261,26 +261,43 @@ export default function NursingOrderCreate({
       /* ============================
          6️⃣ Build nursing items
       ============================ */
-      const items = (freshQuotation?.items || []).map((it, idx) => ({
-        id: it.id || `n-${Date.now()}-${idx}`,
-        name:
-  it.name ||
-  (serviceType === "caretaker"
-    ? "Caretaker Service"
-    : "Nursing Service"),
-        qty: Number(it.qty || 1),
-        rate: Number(it.rate || 0),
-        amount: Number(it.amount || it.qty * it.rate),
-        notes: it.notes || "",
-        days:
-          it.days ||
-          diffDaysInclusive(
-            it.expectedStartDate,
-            it.expectedEndDate
-          ),
-        expectedStartDate: it.expectedStartDate || "",
-        expectedEndDate: it.expectedEndDate || "",
-      }));
+      const items = (freshQuotation?.items || []).map((it, idx) => {
+ const start = it.expectedStartDate
+  ? `${it.expectedStartDate}T00:00`
+  : "";
+
+const end = it.expectedEndDate
+  ? `${it.expectedEndDate}T00:00`
+  : "";
+  const rateType = it.rateType || "daily";
+
+  const duration = calcDuration(start, end, rateType);
+
+  const qty = Number(it.qty || 1);
+  const rate = Number(it.rate || 0);
+
+  return {
+    id: it.id || `n-${Date.now()}-${idx}`,
+    name:
+      it.name ||
+      (serviceType === "caretaker"
+        ? "Caretaker Service"
+        : "Nursing Service"),
+
+    qty,
+    rate,
+    rateType,
+
+    duration,
+
+    amount: qty * rate * duration,
+
+    notes: it.notes || "",
+
+    expectedStartDate: start,
+    expectedEndDate: end,
+  };
+});
 
       const discount =
         freshQuotation?.discount || { type: "percent", value: 0 };

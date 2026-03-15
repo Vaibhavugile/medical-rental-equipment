@@ -544,6 +544,15 @@ const openWhatsApp = (phone) => {
       >
         Nursing
       </button>
+      <button
+  className={`seg-btn caretaker ${typeFilter === "caretaker" ? "active" : ""}`}
+  onClick={() => {
+    setTypeFilter("caretaker");
+    setStatusFilter("all");
+  }}
+>
+  Caretaker
+</button>
     </div>
 
     {/* STATUS SEGMENT */}
@@ -631,8 +640,10 @@ const openWhatsApp = (phone) => {
               </td>
 
               <td className="cell-muted">
-                {l.type || "equipment"}
-              </td>
+  {(l.type || "equipment")
+    .charAt(0)
+    .toUpperCase() + (l.type || "equipment").slice(1)}
+</td>
 
               <td>
                 <span className={`chip ${statusClass(l.status)}`}>
@@ -872,22 +883,15 @@ const openWhatsApp = (phone) => {
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <label style={{ fontSize: 13, fontWeight: 600 }}>Type</label>
           <select
-            value={form.type}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, type: e.target.value }))
-            }
-            style={{
-              height: 44,
-              padding: "0 14px",
-              borderRadius: 10,
-              border: "1px solid #e2e8f0",
-              background: "#f8fafc",
-              fontSize: 14,
-            }}
-          >
-            <option value="equipment">equipment</option>
-            <option value="nursing">nursing</option>
-          </select>
+  value={form.type}
+  onChange={(e) =>
+    setForm((f) => ({ ...f, type: e.target.value }))
+  }
+>
+  <option value="equipment">equipment</option>
+  <option value="nursing">nursing</option>
+  <option value="caretaker">caretaker</option>
+</select>
         </div>
 
         {/* NOTES FULL WIDTH */}
