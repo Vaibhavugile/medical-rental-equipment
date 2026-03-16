@@ -1058,6 +1058,7 @@ const getSalaryRequest = (assignmentId) => {
 
         items: updatedItems,
         totals: newTotals,
+        lastExtendedAt: serverTimestamp(),
 
         extensionHistory: [
           ...(order.extensionHistory || []),
@@ -1284,6 +1285,7 @@ date: new Date().toISOString()
       await updateDoc(doc(db, "nursingOrders", id), {
         payments: updatedPayments,
         updatedAt: serverTimestamp(),
+        lastPaymentAt: serverTimestamp(), 
       });
       const newBalance = orderTotal - (totalPaid + newPayment.amount);
 

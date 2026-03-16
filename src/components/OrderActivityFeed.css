@@ -1,0 +1,186 @@
+.activity-card{
+
+background:#fff;
+
+border-radius:14px;
+
+padding:25px;
+
+margin-top:30px;
+
+box-shadow:0 6px 20px rgba(0,0,0,0.06);
+
+}
+
+.activity-title{
+
+font-size:20px;
+
+font-weight:700;
+
+margin-bottom:20px;
+
+color:#1f2937;
+
+}
+
+/* TABLE */
+
+.activity-table{
+
+width:100%;
+
+border-collapse:collapse;
+
+font-size:14px;
+
+}
+
+.activity-table th{
+
+text-align:left;
+
+padding:12px 14px;
+
+background:#f8fafc;
+
+font-weight:600;
+
+color:#374151;
+
+border-bottom:1px solid #e5e7eb;
+
+}
+
+.activity-table td{
+
+padding:12px 14px;
+
+border-bottom:1px solid #f1f5f9;
+
+color:#374151;
+
+}
+
+.activity-table tr:hover{
+
+background:#f9fafb;
+
+}
+
+/* ORDER */
+
+.order-no{
+
+font-weight:600;
+
+color:#2563eb;
+
+}
+
+/* SERVICE */
+
+.service-type{
+
+text-transform:capitalize;
+
+color:#6b7280;
+
+}
+
+/* AMOUNT */
+
+.amount{
+
+font-weight:600;
+
+}
+
+/* BADGES */
+
+.badge{
+
+padding:5px 10px;
+
+border-radius:20px;
+
+font-size:12px;
+
+font-weight:600;
+
+display:inline-block;
+
+}
+
+/* CREATED */
+
+.badge.created{
+
+background:#e0f2fe;
+
+color:#0284c7;
+
+}
+
+/* PAYMENT */
+
+.badge.payment{
+
+background:#dcfce7;
+
+color:#16a34a;
+
+}
+
+/* EXTENDED */
+
+.badge.extended{
+
+background:#ede9fe;
+
+color:#7c3aed;
+
+}
+
+/* EMPTY */
+
+.activity-empty{
+
+padding:40px;
+
+text-align:center;
+
+color:#9ca3af;
+
+font-size:14px;
+
+}
+
+/* LOADING */
+
+.activity-loading{
+
+padding:20px;
+
+color:#6b7280;
+
+}
+.activity-toolbar{
+display:flex;
+gap:10px;
+margin-bottom:15px;
+flex-wrap:wrap;
+}
+
+.activity-search{
+padding:8px 10px;
+border-radius:6px;
+border:1px solid #ddd;
+min-width:220px;
+}
+
+.activity-toolbar select{
+padding:8px;
+border-radius:6px;
+border:1px solid #ddd;
+}

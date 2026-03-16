@@ -6,6 +6,10 @@ import KpiSection from "../components/AccountReport/KpiSection";
 import FunnelChart from "../components/AccountReport/FunnelChart";
 import ChartsGrid from "../components/AccountReport/ChartsGrid";
 import TablesSection from "../components/AccountReport/TablesSection";
+import OrderActivityFeed from "../components/OrderActivityFeed";
+
+import { migrateOrders } from "../utils/migrateOrders";
+import { migrateNursingOrders } from "../utils/migrateNursingOrders";
 
 import "./AccountDashboard.css";
 
@@ -92,7 +96,7 @@ return(
 <div className="account-header">
 
 <h1 className="account-title">
-Account  Dashboard
+Account Dashboard
 </h1>
 
 <div className="account-filters">
@@ -128,6 +132,7 @@ className="date-input"
 <div className="loading">
 Loading report...
 </div>
+
 )}
 
 {/* DASHBOARD */}
@@ -136,13 +141,45 @@ Loading report...
 
 <>
 
+{/* KPI SECTION */}
 <KpiSection report={report}/>
 
+{/* FUNNEL */}
 <FunnelChart report={report}/>
 
+{/* CHARTS */}
 <ChartsGrid report={report}/>
 
-<TablesSection report={report}/>
+{/* TABLES */}
+{/* <TablesSection report={report}/> */}
+
+{/* ORDER ACTIVITY FEED */}
+<OrderActivityFeed
+startDate={startDate}
+endDate={endDate}
+/>
+
+{/* MIGRATION BUTTONS (TEMPORARY) */}
+
+{/*
+<button
+onClick={async () => {
+await migrateOrders();
+alert("Migration finished");
+}}
+>
+Run Orders Migration
+</button>
+
+<button
+onClick={async () => {
+await migrateNursingOrders();
+alert("Nursing migration finished");
+}}
+>
+Run Nursing Orders Migration
+</button>
+*/}
 
 </>
 

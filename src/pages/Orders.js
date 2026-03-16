@@ -1602,6 +1602,9 @@ function getDeliveryBadgeText(order, deliveriesByOrder = {}) {
           createdByName:
             auth.currentUser?.displayName || auth.currentUser?.email || "",
         });
+        await updateDoc(doc(db,"orders",selectedOrder.id),{
+  lastPaymentAt: serverTimestamp()
+});
       }
 
       const snap = await getDoc(doc(db, "orders", selectedOrder.id));

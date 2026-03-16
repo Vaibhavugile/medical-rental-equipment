@@ -5,7 +5,7 @@ import {
   reserveAsset,
   unreserveAsset,
 } from "../utils/inventory";
-import { doc, onSnapshot,increment, arrayUnion  } from "firebase/firestore";
+import { doc, onSnapshot,increment, arrayUnion,updateDoc,serverTimestamp  } from "firebase/firestore";
 import { db } from "../firebase";
 import { updateAccountReport } from "../utils/accountReport";
 
@@ -1390,6 +1390,9 @@ const fmtDate = (d) => {
       }
     ]
   });
+  await updateDoc(doc(db,"orders",selectedOrder.id),{
+  lastExtendedAt: serverTimestamp()
+});
 
   /* 🔥 ACCOUNT REPORT UPDATE */
 
