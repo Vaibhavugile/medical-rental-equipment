@@ -11,7 +11,9 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  increment,
 } from "firebase/firestore";
+import { updateAccountReport } from "../utils/accountReport";
 import { db, auth } from "../firebase";
 import "./Requirements.css";
 import { makeHistoryEntry, propagateToLead } from "../utils/status";
@@ -381,6 +383,9 @@ const openCreateQuotation = async (req) => {
 };
 
       const ref = await addDoc(collection(db, "quotations"), payload);
+      await updateAccountReport({
+  quotationsSent: increment(1)
+})
 
       // Mark requirement as "quotation shared"
       if (quotation.requirementId) {

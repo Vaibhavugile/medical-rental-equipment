@@ -93,12 +93,12 @@ const SECTIONS = [
   {
     title: "People",
     items: [
-      {
-        key: "staff",              // ✅
-        label: "Staff",
-        path: "/crm/staff",
-        icon: Users,
-      },
+      // {
+      //   key: "staff",              // ✅
+      //   label: "Staff",
+      //   path: "/crm/staff",
+      //   icon: Users,
+      // },
          {
         key: "nurses",              // ✅
         label: "Nurses",
@@ -129,6 +129,12 @@ const SECTIONS = [
     title: "Finance",
     items: [
       {
+        key: "accountreport",            // ✅
+        label: " Account Reports",
+        path: "/crm/accountreport",
+        icon: BarChart3,
+      },
+      {
         key: "payroll",            // ✅
         label: "Nursing Report",
         path: "/crm/payroll",
@@ -147,6 +153,8 @@ const SECTIONS = [
         path: "/crm/reports",
         icon: BarChart3,
       },
+      
+      
         {
         key: "Nurse_caretakerpay",            // ✅
         label: "Basepay",

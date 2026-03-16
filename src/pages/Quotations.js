@@ -11,7 +11,9 @@ import {
   serverTimestamp,
   updateDoc,
   getDoc, // ✅ added
+  increment,
 } from "firebase/firestore";
+import { updateAccountReport } from "../utils/accountReport";
 import { db, auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import "./Quotations.css";
@@ -528,6 +530,7 @@ const [typeFilter, setTypeFilter] = useState("all");
   };
 
   const updateQuotationStatus = async (quote, newStatus, note = "") => {
+    if (quote.status === newStatus) return;
     setError("");
     try {
       const user = auth.currentUser || {};
@@ -538,6 +541,18 @@ const [typeFilter, setTypeFilter] = useState("all");
         updatedBy: user.uid || "",
         updatedByName: user.displayName || user.email || "",
       });
+      // 📊 Update account report counters
+if (newStatus === "accepted") {
+  await updateAccountReport({
+    quotationAccepted: increment(1)
+  });
+}
+
+if (newStatus === "rejected") {
+  await updateAccountReport({
+    quotationRejected: increment(1)
+  });
+}
       if (quote.requirementId) {
         const reqRef = doc(db, "requirements", quote.requirementId);
         const entry = makeHistoryEntry(user, {

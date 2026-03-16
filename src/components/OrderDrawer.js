@@ -5,9 +5,9 @@ import {
   reserveAsset,
   unreserveAsset,
 } from "../utils/inventory";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot,increment, arrayUnion  } from "firebase/firestore";
 import { db } from "../firebase";
-
+import { updateAccountReport } from "../utils/accountReport";
 
 export default function OrderDrawer({
   // state
@@ -705,6 +705,50 @@ const fmtDate = (d) => {
                               </div>
                             </div>
                           )}
+                          {(it.extensionHistory || []).length > 0 && (
+  <div style={{ marginTop: 12 }}>
+
+    <div className="muted" style={{ fontWeight: 600 }}>
+      Extension History
+    </div>
+
+    <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 6 }}>
+
+      {(it.extensionHistory || []).map((ext, i) => (
+
+        <div
+          key={i}
+          style={{
+            background: "#f9fafb",
+            border: "1px solid #e5e7eb",
+            borderRadius: 6,
+            padding: 6,
+            fontSize: 12
+          }}
+        >
+
+          <div>
+            <strong>
+              {fmtDate(ext.previousEndDate)} → {fmtDate(ext.newEndDate)}
+            </strong>
+          </div>
+
+          <div className="muted">
+            Extra: ₹{fmtCurrency(ext.extraPrice || 0)}
+          </div>
+
+          <div className="muted">
+            {ext.date ? new Date(ext.date).toLocaleString() : ""}
+          </div>
+
+        </div>
+
+      ))}
+
+    </div>
+
+  </div>
+)}
                         </div>
                       </div>
                     </div>
@@ -1017,34 +1061,34 @@ const fmtDate = (d) => {
                           >
                             {p.status || "completed"}
                           </div>
-                          <button
+                          {/* <button
                             className="cp-btn ghost"
                             onClick={() => openPaymentModal(p.id)}
                           >
                             Edit
-                          </button>
-                          <button
+                          </button> */}
+                          {/* <button
                             className="cp-btn ghost"
                             onClick={() => removePayment(p.id)}
                           >
                             Delete
-                          </button>
-                          {p.status !== "refunded" && (
+                          </button> */}
+                          {/* {p.status !== "refunded" && (
                             <button
                               className="cp-btn ghost"
                               onClick={() => markPaymentStatus(p.id, "refunded")}
                             >
                               Mark refunded
                             </button>
-                          )}
-                          {p.status !== "pending" && (
+                          )} */}
+                          {/* {p.status !== "pending" && (
                             <button
                               className="cp-btn ghost"
                               onClick={() => markPaymentStatus(p.id, "pending")}
                             >
                               Mark pending
                             </button>
-                          )}
+                          )} */}
                         </div>
                       </div>
                     ))}
@@ -1052,16 +1096,16 @@ const fmtDate = (d) => {
                 </div>
 
                 <div style={{ marginTop: 16 }}>
-                  <button
+                  {/* <button
                     className="cp-btn"
                     onClick={() => {
                       alert("Use the Save action exposed in the parent if needed.");
                     }}
                   >
                     Save Order
-                  </button>
+                  </button> */}
 
-                  <button
+                  {/* <button
                     className="cp-btn ghost"
                     style={{ marginLeft: 8 }}
                     onClick={() => {
@@ -1074,7 +1118,7 @@ const fmtDate = (d) => {
                     }}
                   >
                     Copy JSON
-                  </button>
+                  </button> */}
                 </div>
               </div>
             </div>
@@ -1322,31 +1366,79 @@ const fmtDate = (d) => {
 
         <button
           className="cp-btn"
-          onClick={()=>{
+          onClick={async () => {
 
-            const idx = extendService.itemIndex;
-            const item = selectedOrder.items[idx];
+  const idx = extendService.itemIndex;
+  const item = selectedOrder.items[idx];
 
-            const extra = Number(extendService.extraPrice || 0);
+  const extra = Number(extendService.extraPrice || 0);
 
-            updateOrderItem(idx,{
-              expectedEndDate: extendService.newEndDate,
-              rate: Number(item.rate || 0) + extra,
+  const oldEnd = item.expectedEndDate;
+  const newEnd = extendService.newEndDate;
 
-              extensionHistory:[
-                ...(item.extensionHistory || []),
-                {
-                  previousEndDate:item.expectedEndDate,
-                  newEndDate:extendService.newEndDate,
-                  extraPrice:extra,
-                  date:new Date().toISOString()
-                }
-              ]
-            });
+  await updateOrderItem(idx,{
+    expectedEndDate: newEnd,
+    rate: Number(item.rate || 0) + extra,
 
-            setExtendService({open:false});
+    extensionHistory:[
+      ...(item.extensionHistory || []),
+      {
+        previousEndDate: oldEnd,
+        newEndDate: newEnd,
+        extraPrice: extra,
+        date: new Date().toISOString()
+      }
+    ]
+  });
 
-          }}
+  /* 🔥 ACCOUNT REPORT UPDATE */
+
+  await updateAccountReport({
+
+    totalRevenue: increment(extra),
+    totalExtensions: increment(1),
+    
+    
+    /* ======================
+       EXTENSION REVENUE
+    ====================== */
+    
+    totalExtensionRevenue: increment(extra),
+
+    equipmentRevenue: increment(extra),
+
+    pendingAmount: increment(extra),
+
+    equipmentExtensionsCount: increment(1),
+
+    equipmentExtensionsAmount: increment(extra),
+
+    extensions: arrayUnion({
+
+      orderId: selectedOrder.id,
+      orderNo: selectedOrder.orderNo,
+
+      serviceType: "equipment",
+
+      serviceName: item.name || "",
+
+      startDate: item.expectedStartDate,
+
+      oldEndDate: oldEnd,
+
+      newEndDate: newEnd,
+
+      extraAmount: extra,
+
+      date: new Date().toISOString()
+
+    })
+
+  });
+
+  setExtendService({open:false});
+
+}}
         >
           Save Extension
         </button>

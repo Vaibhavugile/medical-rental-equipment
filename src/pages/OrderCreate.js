@@ -9,8 +9,10 @@ import {
   getDocs,
   updateDoc,
   serverTimestamp,
+  increment,
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
+import { updateAccountReport } from "../utils/accountReport";
 import { db, auth } from "../firebase";
 import { listBranches, listAvailableAssetsForRange, reserveAsset } from "../utils/inventory";
 import { makeHistoryEntry, propagateToLead } from "../utils/status";
@@ -850,11 +852,57 @@ const createOrder = async () => {
       createdAt: serverTimestamp(),
       createdBy: user.uid || "",
       createdByName: user.displayName || user.email || "",
+      reportDate: new Date().toISOString().slice(0,10),
     };
 
     // 1️⃣ Create order
     const ref = await addDoc(collection(db, "orders"), orderPayload);
     const orderId = ref.id;
+    // 📊 Update Daily Account Report
+await updateAccountReport({
+
+  /* ORDERS */
+  ordersCreated: increment(1),
+  equipmentOrders: increment(1),
+
+  /* REVENUE */
+  totalRevenue: increment(totals.total),
+  equipmentRevenue: increment(totals.total),
+
+  subtotalTotal: increment(totals.subtotal || 0),
+
+  taxTotal: increment(totals.totalTax || 0),
+  discountTotal: increment(totals.discountAmount || 0),
+
+  /* ORDER SNAPSHOT */
+  orders: arrayUnion({
+
+    orderId: orderId,
+    orderNo: draft.orderNo,
+
+    customer: draft.customerName,
+
+    serviceType: "equipment",
+
+    subtotal: totals.subtotal || 0,
+    tax: totals.totalTax || 0,
+    discount: totals.discountAmount || 0,
+    total: totals.total || 0,
+
+    items: draft.items.map(it => ({
+      productId: it.productId,
+      name: it.name,
+      qty: it.qty,
+      days: it.days,
+      startDate: it.expectedStartDate,
+      endDate: it.expectedEndDate
+    })),
+
+    createdAt: new Date()
+
+  })
+
+});
 
     // 2️⃣ Reserve assigned assets WITH DATE RANGE
     for (const it of itemsPayload) {

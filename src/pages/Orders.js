@@ -13,7 +13,9 @@ import {
   addDoc,
   deleteDoc,
   arrayUnion,
+  increment
 } from "firebase/firestore";
+import { updateAccountReport } from "../utils/accountReport";
 import { db, auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import "./Orders.css";
@@ -1609,6 +1611,43 @@ function getDeliveryBadgeText(order, deliveriesByOrder = {}) {
         setSelectedOrder(fresh);
       }
       await updateOrderPaymentSummary(selectedOrder.id);
+      const orderTotal = Number(selectedOrder.totals?.total || 0);
+
+const alreadyPaid = Number(paymentSummary.totalPaid || 0);
+
+const newBalance = Math.max(
+  0,
+  orderTotal - (alreadyPaid + amount)
+);
+
+await updateAccountReport({
+
+  totalCollected: increment(amount),
+
+  equipmentCollected: increment(amount),
+
+  pendingAmount: increment(-amount),
+
+  payments: arrayUnion({
+
+    orderId: selectedOrder.id,
+    orderNo: selectedOrder.orderNo,
+
+    serviceType: "equipment",
+
+    amount: amount,
+
+    orderTotal: orderTotal,
+
+    balanceAfter: newBalance,
+
+    method: form.method,
+
+    date: new Date().toISOString()
+
+  })
+
+});
 
       closePaymentModal();
     } catch (err) {
@@ -1682,6 +1721,23 @@ const removePayment = async (paymentId) => {
 
     // 🔥 IMPORTANT: update summary immediately after deletion
     await updateOrderPaymentSummary(selectedOrder.id);
+    const payment = selectedOrder.payments.find(p => p.id === paymentId);
+
+if (payment) {
+
+  const amount = Number(payment.amount || 0);
+
+  await updateAccountReport({
+
+    totalCollected: increment(-amount),
+
+    equipmentCollected: increment(-amount),
+
+    pendingAmount: increment(amount)
+
+  });
+
+}
 
     // Refresh drawer data
     const snap = await getDoc(doc(db, "orders", selectedOrder.id));
@@ -1723,6 +1779,47 @@ const markPaymentStatus = async (paymentId, status) => {
 
     // 🔥 IMPORTANT: update summary after status change
     await updateOrderPaymentSummary(selectedOrder.id);
+    const payment = selectedOrder.payments.find(p => p.id === paymentId);
+
+if (payment) {
+
+  const amount = Number(payment.amount || 0);
+
+  const oldStatus = payment.status || "completed";
+
+  if (oldStatus !== status) {
+
+    if (status === "completed") {
+
+      await updateAccountReport({
+
+        totalCollected: increment(amount),
+
+        equipmentCollected: increment(amount),
+
+        pendingAmount: increment(-amount)
+
+      });
+
+    }
+
+    if (oldStatus === "completed" && status === "pending") {
+
+      await updateAccountReport({
+
+        totalCollected: increment(-amount),
+
+        equipmentCollected: increment(-amount),
+
+        pendingAmount: increment(amount)
+
+      });
+
+    }
+
+  }
+
+}
 
     // Refresh drawer data
     const snap = await getDoc(doc(db, "orders", selectedOrder.id));

@@ -1,7 +1,12 @@
-import { doc, setDoc, increment, serverTimestamp } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  serverTimestamp,
+   increment
+} from "firebase/firestore";
 import { db } from "../firebase";
 
-export async function updateAccountReport(updates) {
+export async function updateAccountReport(updates = {}) {
 
   const today = new Date().toISOString().slice(0, 10);
 
@@ -11,9 +16,16 @@ export async function updateAccountReport(updates) {
     ref,
     {
       date: today,
+
+      // first creation safety
+      createdAt: serverTimestamp(),
+
+      // every update
       updatedAt: serverTimestamp(),
-      ...updates,
+
+      ...updates
     },
     { merge: true }
   );
+
 }

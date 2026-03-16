@@ -12,7 +12,9 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  increment,
 } from "firebase/firestore";
+import { updateAccountReport } from "../utils/accountReport";
 import { db, auth } from "../firebase";
 import "./Leads.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -347,6 +349,9 @@ export default function Leads() {
             "",
           history: [createEntry],
         });
+        await updateAccountReport({
+        leadsAdded: increment(1)
+});
       }
 
       closeDrawer();
@@ -396,6 +401,11 @@ export default function Leads() {
         updatedByName: user.displayName || user.email || user.uid || "",
         history: arrayUnion(entry),
       });
+      if(nextStatus === "contacted"){
+  await updateAccountReport({
+    leadsContacted: increment(1)
+  });
+}
 
       closeStatusModal();
     } catch (err) {

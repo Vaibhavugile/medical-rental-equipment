@@ -1,0 +1,42 @@
+.charts-wrapper{
+
+margin-top:30px;
+margin-bottom:30px;
+
+}
+
+.chart-grid{
+
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:24px;
+margin-bottom:24px;
+
+}
+
+.chart-card{
+
+background:white;
+padding:20px;
+border-radius:14px;
+box-shadow:0 6px 18px rgba(0,0,0,0.08);
+
+transition:all .2s ease;
+
+}
+
+.chart-card:hover{
+
+transform:translateY(-3px);
+box-shadow:0 10px 24px rgba(0,0,0,0.12);
+
+}
+
+.chart-title{
+
+font-size:16px;
+font-weight:600;
+margin-bottom:12px;
+color:#111827;
+
+}

@@ -8,9 +8,11 @@ import {
   onSnapshot,
   query,
   orderBy,
+    increment,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import "./Requirements.css";
+import { updateAccountReport } from "../utils/accountReport";
 import { runTransaction } from "firebase/firestore";
 
 const emptyLine = () => ({ productId: "", name: "", qty: 1, unitNotes: "" });
@@ -341,10 +343,14 @@ async function generateRequirementNumber() {
         createdBy: user.uid || "",
         createdByName: user.displayName || user.email || "",
       });
+      await updateAccountReport({
+  requirementsCreated: increment(1)
+});
 
       await updateDoc(ref, {
         requirementId: ref.id,
       });
+
 
       setForm((f) => ({
         ...f,

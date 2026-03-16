@@ -28,6 +28,8 @@ const SIDEBAR_OPTIONS = [
   { key: "payroll", label: "Payroll" },
   { key: "caretakers_report", label: "Caretakers Report" },
   { key: "reports", label: "Reports" },
+    { key: "accountreport", label: "Account Report" },
+
  
     { key: "Nurse_caretakerpay", label: "Nurse Caretaker Basepay" },
 

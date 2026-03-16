@@ -9,7 +9,9 @@ import {
   addDoc,
   query,
   where,
+  increment, arrayUnion
 } from "firebase/firestore";
+import { updateAccountReport } from "../utils/accountReport";
 import { useParams, useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
 import "./NursingOrderDetails.css";
@@ -1081,6 +1083,60 @@ const getSalaryRequest = (assignmentId) => {
         updatedAt: serverTimestamp()
 
       });
+   await updateAccountReport({
+
+/* ======================
+   REVENUE UPDATE
+====================== */
+
+totalRevenue: increment(extraAmount),
+
+[`${order.serviceType}Revenue`]: increment(extraAmount),
+
+pendingAmount: increment(extraAmount),
+
+/* ======================
+   EXTENSION COUNTERS
+====================== */
+
+totalExtensions: increment(1),
+
+[`${order.serviceType}Extensions`]: increment(1),
+
+/* ======================
+   EXTENSION REVENUE
+====================== */
+
+totalExtensionRevenue: increment(extraAmount),
+
+[`${order.serviceType}ExtensionRevenue`]: increment(extraAmount),
+
+/* ======================
+   EXTENSION EVENT LOG
+====================== */
+
+extensions: arrayUnion({
+
+orderId: order.id,
+orderNo: order.orderNo,
+
+serviceType: order.serviceType,
+
+serviceName: service.name,
+
+startDate: service.expectedStartDate,
+
+oldEndDate: service.expectedEndDate,
+
+newEndDate: updatedEndDate,
+
+extraAmount: extraAmount,
+
+date: new Date().toISOString()
+
+})
+
+});
 
       /* =====================
          UPDATE STAFF ASSIGNMENTS
@@ -1229,6 +1285,36 @@ const getSalaryRequest = (assignmentId) => {
         payments: updatedPayments,
         updatedAt: serverTimestamp(),
       });
+      const newBalance = orderTotal - (totalPaid + newPayment.amount);
+
+await updateAccountReport({
+
+totalCollected: increment(newPayment.amount),
+
+[`${order.serviceType}Collected`]: increment(newPayment.amount),
+
+pendingAmount: increment(-newPayment.amount),
+
+payments: arrayUnion({
+
+orderId: order.id,
+orderNo: order.orderNo,
+
+serviceType: order.serviceType,
+
+amount: newPayment.amount,
+
+orderTotal: orderTotal,
+
+balanceAfter: newBalance,
+
+method: newPayment.method,
+
+date: new Date().toISOString()
+
+})
+
+});
 
       setOrder((o) => ({
         ...o,

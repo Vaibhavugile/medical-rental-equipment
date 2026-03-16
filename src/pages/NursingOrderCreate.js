@@ -8,7 +8,9 @@ import {
   getDoc,
   updateDoc,
   serverTimestamp,
+  increment,
 } from "firebase/firestore";
+import { updateAccountReport } from "../utils/accountReport";
 import { useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
 import { makeHistoryEntry, propagateToLead } from "../utils/status";
@@ -539,6 +541,7 @@ const createOrder = async () => {
       createdAt: serverTimestamp(),
       createdBy: user.uid || "",
       createdByName: user.displayName || user.email || "",
+      reportDate: new Date().toISOString().slice(0,10),
     };
 
     // 1️⃣ Create order
@@ -548,6 +551,64 @@ const createOrder = async () => {
 );
 
     const orderId = ref.id;
+  await updateAccountReport({
+
+/* ORDERS */
+
+ordersCreated: increment(1),
+
+nursingOrders: draft.serviceType === "nursing"
+  ? increment(1)
+  : increment(0),
+
+caretakerOrders: draft.serviceType === "caretaker"
+  ? increment(1)
+  : increment(0),
+
+/* REVENUE */
+
+totalRevenue: increment(totals.total),
+
+[`${draft.serviceType}Revenue`]: increment(totals.total),
+
+subtotalTotal: increment(totals.subtotal || 0),
+
+taxTotal: increment(totals.totalTax || 0),
+
+discountTotal: increment(totals.discountAmount || 0),
+
+/* ORDER SNAPSHOT */
+
+orders: arrayUnion({
+
+  orderId: orderId,
+  orderNo: draft.orderNo,
+
+  customer: draft.customerName,
+
+  serviceType: draft.serviceType,
+
+  subtotal: totals.subtotal || 0,
+  tax: totals.totalTax || 0,
+  discount: totals.discountAmount || 0,
+
+  total: totals.total || 0,
+
+  items: draft.items.map(it => ({
+    name: it.name,
+    qty: it.qty,
+    rate: it.rate,
+    duration: it.duration,
+    rateType: it.rateType,
+    startDate: it.expectedStartDate,
+    endDate: it.expectedEndDate
+  })),
+
+  createdAt: new Date()
+
+})
+
+});
 
     // 2️⃣ Update quotation
     if (draft.quotationId) {
