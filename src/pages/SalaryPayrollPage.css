@@ -1,124 +1,228 @@
-.salary-page{
-padding:24px;
+/* PAGE */
+
+.payroll-page{
+padding:28px;
+background:#f6f8fb;
+min-height:100vh;
 }
 
-/* Header */
+/* HEADER */
 
-.salary-page h2{
-margin-bottom:20px;
+.payroll-header{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:25px;
+}
+
+.payroll-header h2{
 font-size:26px;
-font-weight:600;
-color:#1f2937;
-}
-
-/* Toolbar */
-
-.toolbar{
+font-weight:700;
 display:flex;
 align-items:center;
+gap:8px;
+}
+
+/* TOOLBAR */
+
+.payroll-toolbar{
+display:flex;
 gap:12px;
-margin-bottom:20px;
-background:#ffffff;
-padding:12px 16px;
+}
+
+.payroll-select,
+.payroll-date{
+padding:9px 12px;
 border-radius:10px;
-border:1px solid #e5e7eb;
-}
-
-.toolbar input[type="month"]{
-padding:8px 12px;
-border:1px solid #d1d5db;
-border-radius:6px;
-font-size:14px;
-background:#f9fafb;
-}
-
-/* Table */
-
-.salary-table{
-width:100%;
-border-collapse:collapse;
-background:#ffffff;
-border-radius:10px;
-overflow:hidden;
-border:1px solid #e5e7eb;
-}
-
-/* Table header */
-
-.salary-table thead{
-background:#f3f4f6;
-}
-
-.salary-table th{
-text-align:left;
-padding:14px;
+border:1px solid #d8dee8;
+background:white;
 font-size:13px;
+transition:all .2s;
+}
+
+.payroll-select:focus,
+.payroll-date:focus{
+outline:none;
+border-color:#1b6ef3;
+box-shadow:0 0 0 2px rgba(27,110,243,.15);
+}
+
+/* GRID */
+
+.payroll-grid{
+display:grid;
+grid-template-columns:repeat(auto-fill,minmax(320px,1fr));
+gap:20px;
+}
+
+/* CARD */
+
+.payroll-card{
+background:white;
+border-radius:14px;
+padding:20px;
+box-shadow:0 4px 16px rgba(0,0,0,0.06);
+transition:all .2s ease;
+display:flex;
+flex-direction:column;
+justify-content:space-between;
+min-height:220px;
+border:1px solid #eef1f6;
+}
+
+.payroll-card:hover{
+transform:translateY(-3px);
+box-shadow:0 10px 30px rgba(0,0,0,0.08);
+}
+
+/* HEADER */
+
+.payroll-card-header{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-bottom:12px;
+}
+
+.payroll-name{
+font-size:15px;
 font-weight:600;
-color:#374151;
-border-bottom:1px solid #e5e7eb;
+color:#222;
 }
 
-/* Table rows */
+/* BADGES */
 
-.salary-table td{
-padding:14px;
-font-size:14px;
-color:#374151;
-border-bottom:1px solid #f1f5f9;
-}
-
-/* Row hover */
-
-.salary-table tr:hover
-
-/* Buttons */
-
-.salary-table button{
-background:#2563eb;
-color:white;
-border:none;
-padding:7px 14px;
-font-size:13px;
-border-radius:6px;
-cursor:pointer;
-transition:all 0.2s ease;
-}
-
-.salary-table button:hover
-
-/* Paid label */
-
-.salary-paid{
-color:#16a34a;
-font-weight:600;
-}
-
-/* Pending */
-
-.salary-pending{
-color:#dc2626;
-font-weight:600;
-}
-
-/* Responsive */
-
-@media (max-width:900px){
-
-.salary-page{
-padding:16px;
-}
-
-.toolbar{
-flex-wrap:wrap;
-}
-
-.salary-table{
+.badge-paid{
+background:#e7f8ec;
+color:#1f8b4c;
+padding:4px 10px;
+border-radius:8px;
 font-size:12px;
+font-weight:600;
 }
 
-.salary-table th,
-.salary-table td{
-padding:10px;
+.badge-unpaid{
+background:#ffe9e9;
+color:#d22;
+padding:4px 10px;
+border-radius:8px;
+font-size:12px;
+font-weight:600;
+}
+
+/* STATS */
+
+.payroll-stats{
+display:flex;
+flex-wrap:wrap;
+gap:8px;
+margin-bottom:12px;
+}
+
+.stat-pill{
+background:#eef2f8;
+padding:6px 10px;
+border-radius:8px;
+font-size:12px;
+color:#333;
+}
+
+.stat-pill.grace{
+background:#fff3cd;
+color:#856404;
+font-weight:600;
+}
+
+/* SALARY */
+
+.salary-box{
+font-size:26px;
+font-weight:700;
+margin:10px 0;
+color:#1b6ef3;
+}
+
+/* ACTION BUTTONS */
+
+.payroll-actions{
+display:flex;
+gap:10px;
+margin-top:12px;
+}
+
+/* FIX GLOBAL BTN CONFLICT */
+
+.payroll-actions .btn{
+position:relative;
+width:auto;
+height:auto;
+border-radius:8px;
+padding:8px 12px;
+font-size:13px;
+font-weight:600;
+display:flex;
+align-items:center;
+justify-content:center;
+cursor:pointer;
+border:none;
+transition:all .2s ease;
+flex:1;
+}
+
+/* MARK PAID */
+
+.btn-pay{
+background:#1b6ef3;
+color:white;
+}
+
+.btn-pay:hover{
+background:#1559c8;
+}
+
+/* UNDO */
+
+.btn-paid{
+background:#f1f3f7;
+color:#333;
+}
+
+.btn-paid:hover{
+background:#e4e7ee;
+}
+
+/* PDF */
+
+.btn-pdf{
+background:#eef2f8;
+color:#333;
+}
+
+.btn-pdf:hover{
+background:#dde3ee;
+}
+
+/* LOADING */
+
+.loading-box{
+padding:30px;
+text-align:center;
+color:#666;
+font-size:15px;
+}
+
+/* RESPONSIVE */
+
+@media(max-width:900px){
+
+.payroll-grid{
+grid-template-columns:repeat(auto-fill,minmax(260px,1fr));
+}
+
+.payroll-header{
+flex-direction:column;
+align-items:flex-start;
+gap:10px;
 }
 
 }

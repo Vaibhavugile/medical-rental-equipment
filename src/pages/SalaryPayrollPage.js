@@ -1,275 +1,495 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
-collection,
-getDocs,
-doc,
-getDoc,
-setDoc
+  collection,
+  getDocs,
+  doc,
+  setDoc,
+  Timestamp
 } from "firebase/firestore";
 import { db } from "../firebase";
+import jsPDF from "jspdf";
 import "./SalaryPayrollPage.css";
-
-const WORKING_DAYS = 26;
-
+import autoTable from "jspdf-autotable";
 export default function SalaryPayrollPage(){
 
-const [people,setPeople] = useState([]);
-const [attendanceTotals,setAttendanceTotals] = useState({});
-const [payroll,setPayroll] = useState({});
-const [month,setMonth] = useState(new Date().toISOString().slice(0,7));
+const [role,setRole] = useState("drivers")
+const [people,setPeople] = useState([])
+const [records,setRecords] = useState([])
+const [payStatus,setPayStatus] = useState({})
+const [loading,setLoading] = useState(true)
+
+const [dateFrom,setDateFrom] = useState(firstDay())
+const [dateTo,setDateTo] = useState(today())
 
 useEffect(()=>{
-loadPeople();
-},[]);
 
-useEffect(()=>{
-if(people.length){
-loadAttendanceTotals();
-loadPayrollForMonth();
-}
-},[people,month]);
+async function load(){
 
-async function loadPeople(){
+setLoading(true)
 
-const snap = await getDocs(collection(db,"marketing"));
+const base =
+  role === "marketing"
+    ? "marketing"
+    : role === "staff"
+    ? "staff"
+    : "drivers"
 
-const rows = snap.docs.map(d=>({
-id:d.id,
-...(d.data()||{})
-}));
+const peopleSnap = await getDocs(collection(db,base))
 
-setPeople(rows);
+const users = peopleSnap.docs.map(d=>({
+ id:d.id,
+ ...d.data()
+}))
 
-}
+setPeople(users)
 
-async function loadPayrollForMonth(){
+const allRecords=[]
 
-const map = {};
+await Promise.all(
+users.map(async (p)=>{
 
-for(const p of people){
+const attSnap = await getDocs(
+collection(db,base,p.id,"attendance")
+)
 
-const ref = doc(db,"payroll",month,"employees",p.id);
+const days = getDaysBetween(dateFrom, dateTo)
 
-const snap = await getDoc(ref);
+days.forEach(dayId => {
 
-if(snap.exists()){
-map[p.id] = snap.data();
-}
+const docSnap = attSnap.docs.find(d => d.id === dayId)
 
-}
-
-setPayroll(map);
-
-}
-
-async function loadAttendanceTotals(){
-
-const map = {};
-
-for(const p of people){
-
-const attendanceSnap = await getDocs(
-collection(db,"marketing",p.id,"attendance")
-);
-
-let present = 0;
-let half = 0;
-let absent = 0;
-
-const graceState = {};
-
-attendanceSnap.forEach(docSnap=>{
-
-const d = docSnap.data();
-
-const date = d.date || docSnap.id;
-
-if(!date || !date.startsWith(month)) return;
-
-const checkIn = d.checkInServer?.toDate?.();
-const checkOut = d.checkOutServer?.toDate?.();
-
-if(!checkIn || !checkOut){
-absent++;
-return;
+if(!docSnap){
+  // ❗ NO RECORD = ABSENT
+  allRecords.push({
+    id:`${p.id}_${dayId}`,
+    personId:p.id,
+    dayId,
+    durationMinutes:0
+  })
+  return
 }
 
-const minutes = (checkOut - checkIn) / 60000;
+const raw = docSnap.data()
+
+const checkIn = raw.checkInServer ?? raw.checkInMs ?? null
+const checkOut = raw.checkOutServer ?? raw.checkOutMs ?? null
+
+allRecords.push({
+  id:`${p.id}_${dayId}`,
+  personId:p.id,
+  dayId,
+  durationMinutes:durationInMinutes(checkIn,checkOut)
+})
+
+})
+
+})
+)
+
+setRecords(allRecords)
+
+const statusSnap = await getDocs(collection(db,"payrollStatus"))
+
+const map={}
+
+statusSnap.docs.forEach(d=>{
+ map[d.id]=d.data()
+})
+
+setPayStatus(map)
+
+setLoading(false)
+
+}
+
+load()
+
+},[role,dateFrom,dateTo])
+
+const peopleById = useMemo(()=>{
+return Object.fromEntries(people.map(p=>[p.id,p]))
+},[people])
+
+const totals = useMemo(()=>{
+
+const map = new Map()
+const graceState = {}
+
+for(const r of records){
 
 const type = getAttendanceType(
-minutes,
-p.id,
-date,
-graceState
-);
+ r.durationMinutes,
+ r.personId,
+ r.dayId,
+ graceState
+)
 
-if(type === "present") present++;
-else if(type === "half") half++;
-else absent++;
+const prev = map.get(r.personId) || {
+ present:0,
+ grace:0,
+ half:0,
+ absent:0,
+ minutes:0
+}
 
-});
+if(type==="present") prev.present++
+if(type==="grace") prev.grace++
+if(type==="half") prev.half++
+if(type==="absent") prev.absent++
 
-map[p.id] = {
-present,
-half,
-absent
-};
+prev.minutes += r.durationMinutes
+
+map.set(r.personId,prev)
 
 }
 
-setAttendanceTotals(map);
+return map
 
-}
+},[records])
 
-async function markPaid(personId,amount){
+async function markPaid(userId){
 
-const ref = doc(db,"payroll",month,"employees",personId);
+const month = dateFrom.slice(0,7)
 
-await setDoc(ref,{
+await setDoc(
+doc(db,"payrollStatus",`${userId}_${month}`),
+{
+userId,
+month,
 paid:true,
-paidAmount:amount,
-paidAt:new Date()
-},{merge:true});
+paidAt:Timestamp.now()
+},
+{merge:true}
+)
 
-alert("Salary marked as paid");
-
-loadPayrollForMonth();
+alert("Salary marked paid")
 
 }
 
-return(
+async function markUnpaid(userId){
 
-<div className="salary-page">
+const month = dateFrom.slice(0,7)
 
-<h2>Salary Payroll</h2>
+await setDoc(
+doc(db,"payrollStatus",`${userId}_${month}`),
+{
+userId,
+month,
+paid:false
+},
+{merge:true}
+)
 
-<div className="toolbar">
-<input
-type="month"
-value={month}
-onChange={(e)=>setMonth(e.target.value)}
-/>
-</div>
+alert("Marked unpaid")
 
-<table className="salary-table">
+}
 
-<thead>
-<tr>
-<th>Name</th>
-<th>Present</th>
-<th>Half</th>
-<th>Absent</th>
-<th>Monthly Salary</th>
-<th>Calculated Salary</th>
-<th>Paid</th>
-<th>Pending</th>
-<th>Action</th>
-</tr>
-</thead>
+function downloadPDF(userId, data){
 
-<tbody>
+const person = peopleById[userId]
 
-{people.map(p=>{
-
-const totals = attendanceTotals[p.id] || {
-present:0,
-half:0,
-absent:0
-};
-
-const monthly = p.salaryMonthly || 0;
-
-const perDay = monthly / WORKING_DAYS;
+const monthlySalary = person?.salaryMonthly || 0
+const perDaySalary = monthlySalary / 26
 
 const salary =
-(totals.present * perDay) +
-(totals.half * (perDay/2));
+((data.present + data.grace) * perDaySalary) +
+(data.half * (perDaySalary / 2))
 
-const paid = payroll[p.id]?.paidAmount || 0;
+const doc = new jsPDF()
 
-const pending = salary - paid;
+// ================= HEADER =================
+
+doc.setFontSize(14)
+doc.text("BookMyMedicare Pvt. Ltd", 105, 15, { align: "center" })
+
+doc.setFontSize(9)
+doc.text(
+"SHOP NO 10 Sun and Moon Building, Borivali East, Mumbai - 400066",
+105, 22, { align: "center" }
+)
+
+doc.text(
+"Tel: +91 7777066885 | Email: bookmymedicare@gmail.com",
+105, 27, { align: "center" }
+)
+
+doc.text("GSTIN: XXXXXXX | ISO Certified", 105, 32, { align: "center" })
+
+doc.line(10, 36, 200, 36)
+
+doc.setFontSize(11)
+doc.text(`Payslip for ${dateFrom.slice(0,7)}`, 105, 42, { align: "center" })
+
+// ================= EMPLOYEE TABLE =================
+
+autoTable(doc,{
+startY: 48,
+theme: "grid",
+styles:{ fontSize:9 },
+body: [
+
+["Employee Name", person?.name, "Employee ID", person?.id],
+["Designation", role, "Pay Period", dateFrom.slice(0,7)],
+["Present Days", data.present, "Grace Days", data.grace],
+["Half Days", data.half, "Absent Days", data.absent],
+["Total Hours", minsToHhmm(data.minutes), "", ""],
+
+]
+})
+
+// ================= SALARY TABLE =================
+
+autoTable(doc,{
+startY: doc.lastAutoTable.finalY + 5,
+theme: "grid",
+styles:{ fontSize:9 },
+head: [
+["EARNINGS", "AMOUNT", "DEDUCTIONS", "AMOUNT"]
+],
+body: [
+
+["Basic Salary", `₹${Math.round(salary)}`, "PF", "₹0"],
+["HRA", "₹0", "Professional Tax", "₹0"],
+["Other Allowances", "₹0", "TDS", "₹0"],
+["", "", "Other Deduction", "₹0"],
+
+["GROSS EARNINGS", `₹${Math.round(salary)}`, "TOTAL DEDUCTIONS", "₹0"],
+
+]
+})
+
+// ================= FINAL TOTAL =================
+
+autoTable(doc,{
+startY: doc.lastAutoTable.finalY + 5,
+theme: "grid",
+styles:{ fontSize:10, halign:"right" },
+body: [
+
+["Net Salary", `₹${Math.round(salary)}`]
+
+]
+})
+
+// ================= FOOTER =================
+
+doc.setFontSize(9)
+doc.text(
+"This is a system generated payslip",
+105,
+doc.lastAutoTable.finalY + 15,
+{ align:"center" }
+)
+
+doc.save(`${person?.name}-salary.pdf`)
+}
+return (
+
+<div className="payroll-page">
+
+<div className="payroll-header">
+
+<h2>💰 Salary Payroll</h2>
+
+<div className="payroll-toolbar">
+
+<select
+value={role}
+onChange={e=>setRole(e.target.value)}
+className="payroll-select"
+>
+<option value="drivers">Drivers</option>
+<option value="marketing">Marketing</option>
+<option value="staff">Staff</option>
+</select>
+
+<input
+type="date"
+value={dateFrom}
+onChange={e=>setDateFrom(e.target.value)}
+className="payroll-date"
+/>
+
+<input
+type="date"
+value={dateTo}
+onChange={e=>setDateTo(e.target.value)}
+className="payroll-date"
+/>
+
+</div>
+
+</div>
+
+{loading && (
+<div className="loading-box">
+Loading payroll...
+</div>
+)}
+
+<div className="payroll-grid">
+
+{[...totals.entries()].map(([id,t])=>{
+
+const person = peopleById[id]
+
+const monthlySalary = person?.salaryMonthly || 0
+const perDaySalary = monthlySalary/26
+
+const salary =
+((t.present + t.grace)*perDaySalary) +
+(t.half*(perDaySalary/2))
+
+const key = `${id}_${dateFrom.slice(0,7)}`
+const paid = payStatus[key]?.paid
 
 return(
 
-<tr key={p.id}>
+<div className="payroll-card" key={id}>
 
-<td>{p.name || "-"}</td>
+<div className="payroll-card-header">
 
-<td>{totals.present}</td>
+<div className="payroll-name">
+{person?.name}
+</div>
 
-<td>{totals.half}</td>
+{paid ? (
+<div className="badge-paid">PAID</div>
+) : (
+<div className="badge-unpaid">UNPAID</div>
+)}
 
-<td>{totals.absent}</td>
+</div>
 
-<td>₹{monthly}</td>
+<div className="payroll-stats">
 
-<td>₹{Math.round(salary)}</td>
+<div className="stat-pill">Present {t.present}</div>
 
-<td>₹{paid}</td>
+{t.grace>0 &&
+<div className="stat-pill grace">Grace {t.grace}</div>
+}
 
-<td>₹{Math.round(pending)}</td>
+<div className="stat-pill">Half {t.half}</div>
 
-<td>
+<div className="stat-pill">Absent {t.absent}</div>
 
-{pending > 0 ? (
+<div className="stat-pill">
+Hours {minsToHhmm(t.minutes)}
+</div>
+
+</div>
+
+<div className="salary-box">
+₹{Math.round(salary)}
+</div>
+
+<div className="payroll-actions">
+
+{paid ? (
 
 <button
-onClick={()=>markPaid(p.id,Math.round(salary))}
-
+className="btn btn-paid"
+onClick={()=>markUnpaid(id)}
 >
-
-Mark Paid </button>
+Undo Payment
+</button>
 
 ) : (
 
-<span style={{color:"green"}}>Paid</span>
+<button
+className="btn btn-pay"
+onClick={()=>markPaid(id)}
+>
+Mark Paid
+</button>
 
 )}
 
-</td>
-
-</tr>
-
-);
-
-})}
-
-</tbody>
-
-</table>
+<button
+className="btn btn-pdf"
+onClick={()=>downloadPDF(id,t)}
+>
+Download PDF
+</button>
 
 </div>
 
-);
+</div>
+
+)
+
+})}
+
+</div>
+
+</div>
+
+)
+}
+
+function today(){
+const d=new Date()
+return d.toISOString().slice(0,10)
+}
+
+function firstDay(){
+const d=new Date()
+d.setDate(1)
+return d.toISOString().slice(0,10)
+}
+
+function minsToHhmm(mins){
+const h=Math.floor(mins/60)
+const m=String(mins%60).padStart(2,"0")
+return `${h}:${m}`
+}
+
+function durationInMinutes(a,b){
+
+if(!a) return 0
+
+const start = a?.toDate ? a.toDate() : new Date(a)
+const end = b?.toDate ? b.toDate() : new Date()
+
+return Math.max(0,Math.round((end-start)/60000))
 
 }
 
-function getAttendanceType(durationMinutes,personId,dayId,graceState){
+function getAttendanceType(duration,personId,dayId,graceState){
 
-const month = dayId.slice(0,7);
+const month = dayId.slice(0,7)
 
-if(!graceState[personId]) graceState[personId] = {};
-if(!graceState[personId][month]) graceState[personId][month] = 0;
+if(!graceState[personId]) graceState[personId]={}
+if(!graceState[personId][month]) graceState[personId][month]=0
 
-if(durationMinutes >= 525){
-return "present";
+if(duration>=525) return "present"
+
+if(duration>=480){
+
+if(graceState[personId][month]<2){
+graceState[personId][month]+=1
+return "grace"
 }
 
-if(durationMinutes >= 480){
-
-if(graceState[personId][month] < 2){
-graceState[personId][month] += 1;
-return "present";
-}
-
-return "half";
+return "half"
 
 }
 
-if(durationMinutes >= 240){
-return "half";
+if(duration>=240) return "half"
+
+return "absent"
+
 }
 
-return "absent";
+function getDaysBetween(from,to){
 
+const res=[]
+const start = new Date(from)
+const end = new Date(to)
+
+for(let d=new Date(start); d<=end; d.setDate(d.getDate()+1)){
+  res.push(d.toISOString().slice(0,10))
+}
+
+return res
 }

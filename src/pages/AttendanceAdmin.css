@@ -32,6 +32,16 @@
   color: #065f46;
   font-weight: 600;
 }
+.chip.grace {
+  background: #ffe7a0;
+  color: #7a5c00;
+  font-weight: 600;
+}
+.pill.grace {
+  background: #fff3cd;
+  color: #856404;
+  font-weight: 600;
+}
 /* Filters / Toolbar */
 .toolbar {
   display: flex;

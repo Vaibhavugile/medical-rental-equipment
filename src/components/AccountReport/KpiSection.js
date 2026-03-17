@@ -6,7 +6,7 @@ export default function KpiSection({ report }) {
 const totalRevenue = report?.totalRevenue || 0;
 const collected = report?.totalCollected || 0;
 const pending = report?.pendingAmount || 0;
-const orders = report?.ordersCreated || 0;
+const orders = report?.ordersCreated ?? report?.totalOrders ?? 0;
 const extensions = report?.totalExtensions || 0;
 const extensionRevenue = report?.totalExtensionRevenue || 0;
 

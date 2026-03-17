@@ -26,6 +26,7 @@ const SIDEBAR_OPTIONS = [
   { key: "marketing", label: "Marketing" },
   { key: "runners", label: "Runners" },
   { key: "payroll", label: "Payroll" },
+    { key: "salarypayroll", label: "Salary" },
   { key: "caretakers_report", label: "Caretakers Report" },
   { key: "reports", label: "Reports" },
     { key: "accountreport", label: "Account Report" },
@@ -49,7 +50,8 @@ export default function RolesUsers() {
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
+const [editingUserId,setEditingUserId] = useState(null)
+const [editingName,setEditingName] = useState("")
   /* 🔍 Search */
   const [userSearch, setUserSearch] = useState("");
 
@@ -130,6 +132,31 @@ export default function RolesUsers() {
       setSaving(false);
     }
   };
+  async function updateUserName(userId, name){
+
+  if(!userId || !name) return
+
+  try{
+    setSaving(true)
+
+    await updateDoc(doc(db,"users",userId),{
+      name,
+      updatedAt:new Date()
+    })
+
+    setUsers(prev =>
+      prev.map(u =>
+        u.id === userId ? { ...u, name } : u
+      )
+    )
+
+  }catch(e){
+    console.error(e)
+    alert("Failed to update name")
+  }finally{
+    setSaving(false)
+  }
+}
 
   /* =========================
      ROLE DRAWER
@@ -316,7 +343,54 @@ export default function RolesUsers() {
         <tbody>
           {filteredUsers.map(u => (
             <tr key={u.id}>
-              <td>{u.name || "—"}</td>
+              <td>
+  {editingUserId === u.id ? (
+
+    <div style={{display:"flex", gap:6}}>
+      <input
+        className="cp-input"
+        value={editingName}
+        onChange={(e)=>setEditingName(e.target.value)}
+      />
+
+      <button
+        className="cp-btn"
+        onClick={()=>{
+          updateUserName(u.id, editingName)
+          setEditingUserId(null)
+        }}
+      >
+        Save
+      </button>
+
+      <button
+        className="cp-btn ghost"
+        onClick={()=>setEditingUserId(null)}
+      >
+        Cancel
+      </button>
+    </div>
+
+  ) : (
+
+    <div style={{display:"flex", alignItems:"center", gap:8}}>
+
+      <span>{u.name || "—"}</span>
+
+      <button
+        className="cp-link"
+        onClick={()=>{
+          setEditingUserId(u.id)
+          setEditingName(u.name || "")
+        }}
+      >
+        Edit
+      </button>
+
+    </div>
+
+  )}
+</td>
               <td>{u.email || "—"}</td>
               <td>
                 <select

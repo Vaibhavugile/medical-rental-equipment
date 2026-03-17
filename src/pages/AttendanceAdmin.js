@@ -128,7 +128,19 @@ const base =
         for (const item of results) {
           if (!item) continue;
           const { snap, p, dayId } = item;
-          if (!snap || !snap.exists()) continue;
+          if (!snap || !snap.exists()) {
+  out.push({
+    id: `${p.id}_${dayId}`,
+    personId: p.id,
+    dayId,
+    checkInAt: null,
+    checkOutAt: null,
+    durationMinutes: 0,
+    notes: "",
+    status: "absent",
+  });
+  continue;
+}
           const raw = snap.data() || {};
           const rec = mapDayDoc({ id: `${p.id}_${dayId}`, personId: p.id, dayId, raw });
           out.push(rec);
@@ -253,16 +265,18 @@ useEffect(() => {
       graceState
     );
 
-    const prev = map.get(id) || {
-      present: 0,
-      half: 0,
-      absent: 0,
-      minutes: 0
-    };
+   const prev = map.get(id) || {
+  present: 0,
+  grace: 0,
+  half: 0,
+  absent: 0,
+  minutes: 0
+};
 
     if (type === "present") prev.present++;
-    if (type === "half") prev.half++;
-    if (type === "absent") prev.absent++;
+if (type === "grace") prev.grace++;
+if (type === "half") prev.half++;
+if (type === "absent") prev.absent++;
 
     prev.minutes += r.durationMinutes || 0;
 
@@ -505,7 +519,13 @@ useEffect(() => {
 
                   <td>{minsToHhmm(r.durationMinutes || 0)}</td>
 
-                  <td>{attendance}</td>
+                  <td>
+  {attendance === "grace" ? (
+    <span className="chip grace">Grace</span>
+  ) : (
+    attendance
+  )}
+</td>
 
                   <td
                     style={{
@@ -559,14 +579,19 @@ useEffect(() => {
   const monthlySalary = peopleById[id]?.salaryMonthly || 0;
   const perDaySalary = monthlySalary / 26;
 
-  const salary =
-    (t.present * perDaySalary) +
-    (t.half * (perDaySalary / 2));
+const salary =
+  ((t.present + (t.grace || 0)) * perDaySalary) +
+  (t.half * (perDaySalary / 2));
           return (
             <div className="total-row" key={id}>
               <div className="name">{peopleById[id]?.name || id}</div>
               <div className="muted">{peopleById[id]?.loginEmail || peopleById[id]?.email || ""}</div>
-           <div className="pill">Present {t.present}</div>
+          <div className="pill">Present {t.present}</div>
+
+{t.grace > 0 && (
+  <div className="pill grace">Grace {t.grace}</div>
+)}
+
 <div className="pill">Half {t.half}</div>
 <div className="pill">Absent {t.absent}</div>
 
@@ -818,12 +843,12 @@ function getAttendanceType(durationMinutes, personId, dayId, graceState) {
     return "present";
   }
 
-  // 8–8.74 hrs
+  // 8 – 8.74 hrs
   if (durationMinutes >= 480) {
 
     if (graceState[personId][month] < 2) {
       graceState[personId][month] += 1;
-      return "present";
+      return "grace";   // ⭐ return grace instead of present
     }
 
     return "half";
@@ -834,6 +859,5 @@ function getAttendanceType(durationMinutes, personId, dayId, graceState) {
     return "half";
   }
 
-  // ABSENT
   return "absent";
 }

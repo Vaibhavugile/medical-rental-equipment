@@ -10,7 +10,7 @@ import OrderActivityFeed from "../components/OrderActivityFeed";
 
 import { migrateOrders } from "../utils/migrateOrders";
 import { migrateNursingOrders } from "../utils/migrateNursingOrders";
-
+import { migrateEquipmentReports } from "../utils/migrateEquipmentReports";
 import "./AccountDashboard.css";
 
 export default function AccountDashboard(){
@@ -180,6 +180,14 @@ alert("Nursing migration finished");
 Run Nursing Orders Migration
 </button>
 */}
+<button
+onClick={async ()=>{
+await migrateEquipmentReports();
+alert("Equipment reports migrated");
+}}
+>
+Run Equipment Migration
+</button>
 
 </>
 

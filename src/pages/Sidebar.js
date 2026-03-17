@@ -167,6 +167,13 @@ const SECTIONS = [
         path: "/crm/salaryrequest",
         icon: BarChart3,
       },
+       {
+        key: "salarypayroll",            // ✅
+        label: "Salary",
+        path: "/crm/salarypayroll",
+        icon: BarChart3,
+      },
+      
       
     ],
   },
