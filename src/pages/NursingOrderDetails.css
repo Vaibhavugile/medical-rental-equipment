@@ -536,6 +536,144 @@ width:100%;
 }
 
 }
+/* =========================
+   CUSTOMER CARD
+========================= */
+
+.nod-card.editing {
+  border: 1px solid #e5e7eb;
+  background: #fafafa;
+  transition: all 0.2s ease;
+}
+
+/* Header row */
+.nod-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+/* =========================
+   INPUTS
+========================= */
+
+.nod-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.15s ease;
+  background: #fff;
+}
+
+/* focus */
+.nod-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+/* disabled */
+.nod-input:disabled {
+  background: #f3f4f6;
+  cursor: not-allowed;
+  color: #6b7280;
+}
+
+/* textarea */
+textarea.nod-input {
+  min-height: 70px;
+  resize: vertical;
+}
+
+/* =========================
+   ERROR STATE
+========================= */
+
+.nod-input.error {
+  border-color: #ef4444;
+  background: #fff5f5;
+}
+
+.nod-error-text {
+  color: #ef4444;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* =========================
+   BUTTONS
+========================= */
+
+.nod-btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: none;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+/* Primary */
+.nod-btn-primary {
+  background: #2563eb;
+  color: #fff;
+}
+
+.nod-btn-primary:hover {
+  background: #1d4ed8;
+}
+
+/* Secondary */
+.nod-btn-secondary {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.nod-btn-secondary:hover {
+  background: #e5e7eb;
+}
+
+/* =========================
+   CUSTOMER FIELD GROUP
+========================= */
+
+.nod-card input,
+.nod-card textarea {
+  margin-top: 8px;
+}
+
+/* phone + email row */
+.nod-card > div[style*="flex"] {
+  margin-top: 10px;
+}
+
+/* =========================
+   CUSTOMER DISPLAY MODE
+========================= */
+
+.nod-card strong {
+  font-size: 16px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.nod-muted {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+/* =========================
+   SMOOTH TRANSITIONS
+========================= */
+
+.nod-card,
+.nod-input,
+.nod-btn {
+  transition: all 0.2s ease;
+}
 /* ===============================
    PREMIUM ASSIGN NURSE MODAL
 ================================ */

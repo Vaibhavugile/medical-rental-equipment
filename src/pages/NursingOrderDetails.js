@@ -52,6 +52,10 @@ const [salaryRequests, setSalaryRequests] = useState([]);
     careType: "base",
     shift: "day"
   });
+
+  const [isEditingCustomer, setIsEditingCustomer] = useState(false);
+const [customerDraft, setCustomerDraft] = useState(null);
+const [customerErrors, setCustomerErrors] = useState({});
   const [staffFilters, setStaffFilters] = useState({
     staffType: "all",
     shiftType: "all",
@@ -79,6 +83,80 @@ const [salaryRequests, setSalaryRequests] = useState([]);
     });
 
   };
+  const startEditingCustomer = () => {
+  setCustomerDraft({
+    customerName: order.customerName || "",
+    customerPhone: order.customerPhone || "",
+    customerEmail: order.customerEmail || "",
+    deliveryAddress: order.deliveryAddress || "",
+    deliveryContact: {
+      ...(order.deliveryContact || {}),
+    },
+  });
+
+  setIsEditingCustomer(true);
+};
+
+const cancelEditingCustomer = () => {
+  setIsEditingCustomer(false);
+  setCustomerDraft(null);
+};
+
+const validateCustomer = () => {
+  const errors = {};
+
+  const name = customerDraft?.customerName?.trim();
+  const phone = (customerDraft?.customerPhone || "").replace(/\D/g, "");
+
+  if (!name) errors.customerName = "Name is required";
+  if (!phone) errors.customerPhone = "Phone is required";
+  else if (phone.length !== 10)
+    errors.customerPhone = "Phone must be 10 digits";
+
+  if (!customerDraft?.deliveryAddress?.trim()) {
+    errors.deliveryAddress = "Address required";
+  }
+
+  setCustomerErrors(errors);
+
+  return Object.keys(errors).length === 0;
+};
+
+const saveCustomerDetails = async () => {
+  const isValid = validateCustomer();
+  if (!isValid) return;
+
+  try {
+    const payload = {
+      customerName: customerDraft.customerName,
+      customerPhone: customerDraft.customerPhone,
+      customerEmail: customerDraft.customerEmail,
+      deliveryAddress: customerDraft.deliveryAddress,
+
+      deliveryContact: {
+        ...(customerDraft.deliveryContact || {}),
+        name: customerDraft.customerName,
+        phone: customerDraft.customerPhone,
+        email: customerDraft.customerEmail,
+      },
+
+      updatedAt: serverTimestamp(),
+    };
+
+    await updateDoc(doc(db, "nursingOrders", id), payload);
+
+    setOrder((prev) => ({
+      ...prev,
+      ...payload,
+    }));
+
+    setIsEditingCustomer(false);
+    setCustomerErrors({});
+  } catch (e) {
+    console.error(e);
+    alert("Failed to update customer");
+  }
+};
   const openExtendServiceModal = (serviceIndex) => {
 
     const service = editableItems?.[serviceIndex];
@@ -1789,14 +1867,110 @@ date: new Date().toISOString()
       </div>
 
       {/* CUSTOMER */}
-      <div className="nod-card">
-        <h3>Customer</h3>
-        <strong>{order.customerName}</strong>
-        <div className="nod-muted">{order.deliveryAddress}</div>
-        <div className="nod-muted">
-          {order.deliveryContact?.name} · {order.deliveryContact?.phone}
-        </div>
+      <div className={`nod-card ${isEditingCustomer ? "editing" : ""}`}>
+
+  <div className="nod-row" style={{ justifyContent: "space-between" }}>
+    <h3>Customer</h3>
+
+    {!isEditingCustomer ? (
+      <button className="nod-btn nod-btn-secondary" onClick={startEditingCustomer}>
+        Edit
+      </button>
+    ) : (
+      <div style={{ display: "flex", gap: 8 }}>
+        <button className="nod-btn nod-btn-primary" onClick={saveCustomerDetails}>
+          Save
+        </button>
+        <button className="nod-btn nod-btn-secondary" onClick={cancelEditingCustomer}>
+          Cancel
+        </button>
       </div>
+    )}
+  </div>
+
+  {/* NAME */}
+  <input
+    className={`nod-input ${customerErrors.customerName ? "error" : ""}`}
+    placeholder="Customer Name"
+    disabled={!isEditingCustomer}
+    value={
+      isEditingCustomer
+        ? customerDraft?.customerName || ""
+        : order.customerName || ""
+    }
+    onChange={(e) =>
+      setCustomerDraft((d) => ({
+        ...(d || {}),
+        customerName: e.target.value,
+      }))
+    }
+  />
+  {customerErrors.customerName && (
+    <div className="nod-error-text">{customerErrors.customerName}</div>
+  )}
+
+  {/* ADDRESS */}
+  <textarea
+    className={`nod-input ${customerErrors.deliveryAddress ? "error" : ""}`}
+    placeholder="Address"
+    disabled={!isEditingCustomer}
+    value={
+      isEditingCustomer
+        ? customerDraft?.deliveryAddress || ""
+        : order.deliveryAddress || ""
+    }
+    onChange={(e) =>
+      setCustomerDraft((d) => ({
+        ...(d || {}),
+        deliveryAddress: e.target.value,
+      }))
+    }
+  />
+  {customerErrors.deliveryAddress && (
+    <div className="nod-error-text">{customerErrors.deliveryAddress}</div>
+  )}
+
+  {/* PHONE + EMAIL */}
+  <div style={{ display: "flex", gap: 8 }}>
+
+    <input
+      className={`nod-input ${customerErrors.customerPhone ? "error" : ""}`}
+      placeholder="Phone"
+      disabled={!isEditingCustomer}
+      value={
+        isEditingCustomer
+          ? customerDraft?.customerPhone || ""
+          : order.customerPhone || ""
+      }
+      onChange={(e) => {
+        const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+        setCustomerDraft((d) => ({
+          ...(d || {}),
+          customerPhone: value,
+        }));
+      }}
+    />
+
+    <input
+      className="nod-input"
+      placeholder="Email"
+      disabled={!isEditingCustomer}
+      value={
+        isEditingCustomer
+          ? customerDraft?.customerEmail || ""
+          : order.customerEmail || ""
+      }
+      onChange={(e) =>
+        setCustomerDraft((d) => ({
+          ...(d || {}),
+          customerEmail: e.target.value,
+        }))
+      }
+    />
+
+  </div>
+
+</div>
 
       {/* SERVICES */}
       <div className="nod-card">
