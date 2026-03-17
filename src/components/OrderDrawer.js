@@ -8,7 +8,8 @@ import {
 import { doc, onSnapshot, increment, arrayUnion, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { updateAccountReport } from "../utils/accountReport";
-
+import AssetPickerModal from "./AssetPickerModal";
+import { assignAssetsWithLimit } from "../utils/assetAssignment";
 export default function OrderDrawer({
   // state
   selectedOrder,
@@ -197,80 +198,103 @@ export default function OrderDrawer({
   // ====== SAME-AS-OrderCreate reserve flow ======
 
   // Confirm from picker: add selected IDs then reserve each (no checkout)
-  const confirmAssignAndReserve = async () => {
-    console.log("🔥 confirmAssignAndReserve() clicked");
+const confirmAssignAndReserve = async () => {
+  try {
+    const idx = assetPicker.itemIndex;
+    const item = selectedOrder.items[idx];
 
-    try {
-      const idx = assetPicker.itemIndex;
-      console.log("Item index:", idx);
+    if (!item) return;
 
-      if (idx == null) {
-        console.log("No item index, closing modal.");
-        confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
-        return;
-      }
+    const picked = Object.keys(assetPicker.selected || {}).filter(
+      (id) => assetPicker.selected[id]
+    );
 
-      const picked = Object.keys(assetPicker.selected || {}).filter(
-        (id) => assetPicker.selected[id]
-      );
-
-      console.log("Picked assets:", picked);
-
-      if (!picked.length) {
-        console.log("No assets selected, closing modal.");
-        confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
-        return;
-      }
-
-      const item = selectedOrder.items?.[idx];
-      if (!item) {
-        console.warn("Item not found for index:", idx);
-        return;
-      }
-
-      const orderId = selectedOrder.id || selectedOrder.orderNo;
-      console.log("Order ID used for reservation:", orderId);
-      console.log("Item expectedStartDate:", item?.expectedStartDate);
-      console.log("Item expectedEndDate:", item?.expectedEndDate);
-
-      // 1️⃣ Update assigned assets in order
-      const existing = Array.isArray(item.assignedAssets)
-        ? item.assignedAssets
-        : [];
-
-      const merged = Array.from(new Set([...existing, ...picked]));
-      console.log("Merged assignedAssets:", merged);
-
-      updateOrderItem?.(idx, { assignedAssets: merged });
-
-      // 2️⃣ Reserve each selected asset with DATE RANGE
-      for (const assetDocId of picked) {
-        console.log(`⚙️ Reserving asset ${assetDocId}...`);
-
-        try {
-          const result = await reserveAsset(assetDocId, {
-            reservationId: orderId,
-            orderId: orderId,
-            customer: selectedOrder.customerName || "",
-            from: item?.expectedStartDate || null,
-            to: item?.expectedEndDate || null,
-            note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
-          });
-
-          console.log(`✅ reserveAsset success for ${assetDocId}`, result);
-        } catch (err) {
-          console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
-        }
-      }
-
-      console.log("✅ All reserve attempts complete, closing picker.");
-      confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
-
-    } catch (e) {
-      console.error("🔥 Assign & reserve error:", e);
-      alert(e?.message || "Failed to reserve selected assets");
+    if (!picked.length) {
+      // nothing selected → just close
+      setAssetPicker({
+        open: false,
+        itemIndex: null,
+        assets: [],
+        selected: {},
+        loading: false,
+      });
+      return;
     }
-  };
+
+    // ✅ apply same logic as OrderCreate
+    const existing = item.assignedAssets || [];
+
+    const result = assignAssetsWithLimit({
+      existing,
+      selected: picked,
+      qty: Number(item.qty || 0),
+    });
+
+    if (result.overflow) {
+      alert(`Max ${item.qty} assets allowed`);
+    }
+
+    // ✅ find only NEW assets (important fix)
+    const newlyAdded = result.merged.filter(
+      (id) => !existing.includes(id)
+    );
+
+    // ✅ OPTIONAL SAFETY (recommended)
+    if (newlyAdded.length) {
+      const latest = await listAvailableAssetsForRange({
+        productId: item.productId,
+        branchId: item.branchId,
+        from: item.expectedStartDate,
+        to: item.expectedEndDate,
+      });
+
+      const latestIds = new Set(latest.map((a) => a.id));
+
+      const invalid = newlyAdded.filter((id) => !latestIds.has(id));
+
+      if (invalid.length) {
+        alert("Some selected assets are no longer available");
+        return;
+      }
+    }
+
+    // ✅ update UI first
+    updateOrderItem(idx, {
+      assignedAssets: result.merged,
+    });
+
+    // ✅ reserve ONLY new assets (critical fix)
+    for (const id of newlyAdded) {
+      try {
+        await reserveAsset(id, {
+         reservationId: selectedOrder.id,
+      orderId: selectedOrder.id,
+      customer: selectedOrder.customerName || "",
+      from: item.expectedStartDate || null,
+      to: item.expectedEndDate || null,
+      note: `Reserved for order ${
+        selectedOrder.orderNo || selectedOrder.id
+      }`,
+        });
+      } catch (err) {
+        console.error("Reserve failed for:", id, err);
+      }
+    }
+
+    // ✅ close modal
+    setAssetPicker({
+      open: false,
+      itemIndex: null,
+      assets: [],
+      selected: {},
+      loading: false,
+    });
+
+  } catch (e) {
+    console.error("Assign & reserve failed:", e);
+    alert(e?.message || "Failed to assign assets");
+  }
+};
   const updateCustomerField = async (field, value) => {
     try {
       const orderRef = doc(db, "orders", selectedOrder.id);
@@ -360,79 +384,97 @@ export default function OrderDrawer({
 
 
   // Auto-assign N: pick in-stock assets for product+branch, set & reserve (no checkout)
-  const autoAssignAndReserve = async (itemIndex, count = 1) => {
-    console.log("🔥 autoAssignAndReserve()", { itemIndex, count });
+ const autoAssignAndReserve = async (idx) => {
+  try {
+    const item = selectedOrder.items[idx];
 
-    try {
-      const it = selectedOrder.items?.[itemIndex];
-      console.log("Item:", it);
-
-      if (!it?.productId) {
-        alert("Select a product first");
-        return;
-      }
-
-      const assets = await listAvailableAssetsForRange({
-        productId: it.productId || null,
-        branchId: it.branchId || null,
-        from: it.expectedStartDate || null,
-        to: it.expectedEndDate || null,
-      });
-
-
-      console.log("Available assets from listAssets:", assets);
-
-      if (!assets?.length) {
-        alert("No assets available to auto-assign");
-        return;
-      }
-
-      const pick = assets
-        .slice(0, Number(count || 1))
-        .map((a) => a.id);
-
-      console.log("Auto-picked assets:", pick);
-
-      const existing = Array.isArray(it.assignedAssets)
-        ? it.assignedAssets
-        : [];
-
-      const merged = Array.from(new Set([...existing, ...pick]));
-      console.log("Merged assignedAssets:", merged);
-
-      // 1️⃣ Update order item
-      updateOrderItem?.(itemIndex, {
-        assignedAssets: merged,
-        autoAssigned: true,
-      });
-
-      const orderId = selectedOrder.id || selectedOrder.orderNo;
-
-      // 2️⃣ Reserve each asset with DATE RANGE
-      for (const assetDocId of pick) {
-        console.log(`⚙️ Reserving auto-picked asset ${assetDocId}`);
-
-        try {
-          const result = await reserveAsset(assetDocId, {
-            reservationId: orderId,
-            orderId: orderId,
-            customer: selectedOrder.customerName || "",
-            from: it?.expectedStartDate || null, // ✅ FIXED
-            to: it?.expectedEndDate || null,     // ✅ FIXED
-            note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
-          });
-
-          console.log(`✅ reserveAsset success for ${assetDocId}`, result);
-        } catch (err) {
-          console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
-        }
-      }
-    } catch (e) {
-      console.error("🔥 autoAssignAndReserve error:", e);
-      alert(e?.message || "Auto-assign failed");
+    if (!item?.productId) {
+      alert("Select a product first");
+      return;
     }
-  };
 
+    // 🔍 fetch available assets (date-aware)
+    const assets = await listAvailableAssetsForRange({
+      productId: item.productId,
+      branchId: item.branchId,
+      from: item.expectedStartDate,
+      to: item.expectedEndDate,
+    });
+
+    if (!assets?.length) {
+      alert("No assets available");
+      return;
+    }
+
+    const existing = item.assignedAssets || [];
+
+    const availableIds = assets.map((a) => a.id);
+
+    // ✅ same logic as OrderCreate
+    const result = assignAssetsWithLimit({
+      existing,
+      selected: availableIds,
+      qty: Number(item.qty || 0),
+    });
+
+    if (result.merged.length === existing.length) {
+      alert("Already fully assigned");
+      return;
+    }
+
+    // ✅ find only NEW assets (critical)
+    const newlyAdded = result.merged.filter(
+      (id) => !existing.includes(id)
+    );
+
+    // ✅ SAFETY CHECK (prevent stale / race condition)
+    if (newlyAdded.length) {
+      const latest = await listAvailableAssetsForRange({
+        productId: item.productId,
+        branchId: item.branchId,
+        from: item.expectedStartDate,
+        to: item.expectedEndDate,
+      });
+
+      const latestIds = new Set(latest.map((a) => a.id));
+
+      const invalid = newlyAdded.filter((id) => !latestIds.has(id));
+
+      if (invalid.length) {
+        alert("Some assets are no longer available");
+        return;
+      }
+    }
+
+    // ✅ update UI
+    updateOrderItem(idx, {
+      assignedAssets: result.merged,
+      autoAssigned: true,
+    });
+
+    // ✅ reserve ONLY new assets
+    for (const id of newlyAdded) {
+      try {
+        await reserveAsset(id, {
+            reservationId: selectedOrder.id,
+      orderId: selectedOrder.id,
+      customer: selectedOrder.customerName || "",
+      from: item.expectedStartDate || null,
+      to: item.expectedEndDate || null,
+      note: `Reserved for order ${
+        selectedOrder.orderNo || selectedOrder.id
+      }`,
+        });
+      } catch (err) {
+        console.error("Auto reserve failed for:", id, err);
+      }
+    }
+
+  } catch (e) {
+    console.error("Auto assign failed:", e);
+    alert(e?.message || "Auto-assign failed");
+  }
+};
 
 
   // Unassign chip: remove from item + unreserve (return to in_stock)
@@ -1360,192 +1402,32 @@ export default function OrderDrawer({
         </div>
 
         {/* Asset picker modal */}
-        {assetPicker.open && assetPicker.itemIndex !== null && (
-          <div
-            className="cp-modal"
-            onClick={() =>
-              confirmAssignAssetsFromPicker("__CLOSE_ONLY__")
-            }
-          >
-            <div className="cp-modal-card" onClick={(e) => e.stopPropagation()}>
-              <h4>Select assets for item #{assetPicker.itemIndex + 1}</h4>
-
-              {assetPicker.loading && <div className="muted">Loading…</div>}
-
-              {!assetPicker.loading && (
-                <>
-                  {/* Header info */}
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginTop: 8,
-                      gap: 8,
-                    }}
-                  >
-                    <div className="muted">
-                      Assets: {assetPicker.assets.length}
-                    </div>
-                    <div className="muted">
-                      Product:{" "}
-                      {productsMap[
-                        selectedOrder.items?.[assetPicker.itemIndex]?.productId
-                      ]?.name ||
-                        selectedOrder.items?.[assetPicker.itemIndex]?.productId ||
-                        "—"}
-                    </div>
-                  </div>
-
-                  {/* 🔹 Company filter */}
-                  <div style={{ marginTop: 8 }}>
-                    <select
-                      className="cp-input"
-                      value={assetCompanyFilter}
-                      onChange={(e) => setAssetCompanyFilter(e.target.value)}
-                    >
-                      <option value="">All companies</option>
-                      {assetCompanies.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
-
-              {/* 🔹 Asset list grouped by company */}
-              <div style={{ maxHeight: 340, overflowY: "auto", marginTop: 10 }}>
-                {Object.keys(groupedAssets).length === 0 && (
-                  <div className="muted">No assets found.</div>
-                )}
-
-                {Object.entries(groupedAssets).map(([company, assets]) => {
-                  const allSelected = assets.every(
-                    (a) => assetPicker.selected[a.id]
-                  );
-
-                  return (
-                    <div key={company} style={{ marginBottom: 12 }}>
-                      {/* Company header */}
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          marginBottom: 6,
-                        }}
-                      >
-                        <strong>🏢 {company}</strong>
-                        <button
-                          className="cp-link"
-                          onClick={() => {
-                            setAssetPicker((s) => {
-                              const sel = { ...(s.selected || {}) };
-                              assets.forEach((a) => {
-                                if (allSelected) delete sel[a.id];
-                                else sel[a.id] = true;
-                              });
-                              return { ...s, selected: sel };
-                            });
-                          }}
-                        >
-                          {allSelected ? "Unselect all" : "Select all"}
-                        </button>
-                      </div>
-
-                      {/* Assets */}
-                      {assets.map((a) => (
-                        <div
-                          key={a.id}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: 8,
-                            borderBottom: "1px solid #eef2f7",
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={!!assetPicker.selected[a.id]}
-                            onChange={() => togglePickerSelect(a.id)}
-                          />
-
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontWeight: 700 }}>
-                              {a.assetId || a.id}
-                            </div>
-
-                            <div className="muted" style={{ fontSize: 12 }}>
-                              {a.metadata?.model || a.productId} ·{" "}
-                              {(branches.find((b) => b.id === a.branchId) || {}).name ||
-                                a.branchId ||
-                                "—"}
-                            </div>
-
-                            {/* 🔶 Show reservation date range if reserved */}
-                            {a.status === "reserved" &&
-                              a.reservation?.from &&
-                              a.reservation?.to && (
-                                <div
-                                  style={{
-                                    marginTop: 4,
-                                    fontSize: 12,
-                                    color: "#92400e",
-                                    background: "#fff7ed",
-                                    padding: "2px 6px",
-                                    borderRadius: 6,
-                                    display: "inline-block",
-                                  }}
-                                >
-                                  Reserved: {fmtDate(a.reservation.from)} →{" "}
-                                  {fmtDate(a.reservation.to)}
-                                </div>
-                              )}
-                          </div>
-
-                          <div className="muted" style={{ fontSize: 12 }}>
-                            <strong style={{ textTransform: "capitalize" }}>
-                              {a.status}
-                            </strong>
-                          </div>
-                        </div>
-                      ))}
-
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Actions */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  justifyContent: "flex-end",
-                  marginTop: 12,
-                }}
-              >
-                <button
-                  className="cp-btn ghost"
-                  onClick={() =>
-                    confirmAssignAssetsFromPicker("__CLOSE_ONLY__")
-                  }
-                >
-                  Cancel
-                </button>
-                <button
-                  className="cp-btn"
-                  onClick={confirmAssignAndReserve}
-                >
-                  Assign & Reserve
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <AssetPickerModal
+  open={assetPicker.open}
+  assets={assetPicker.assets}
+  selected={assetPicker.selected}
+ setSelected={(updater) =>
+  setAssetPicker((p) => ({
+    ...p,
+    selected:
+      typeof updater === "function"
+        ? updater(p.selected || {})
+        : updater,
+  }))
+}
+  loading={assetPicker.loading}
+  branches={branches}
+  onClose={() =>
+    setAssetPicker({
+      open: false,
+      itemIndex: null,
+      assets: [],
+      selected: {},
+      loading: false,
+    })
+  }
+  onConfirm={confirmAssignAndReserve}
+/>
         {extendService.open && (
           <div className="cp-modal" onClick={() => setExtendService({ open: false })}>
             <div className="cp-modal-card" onClick={(e) => e.stopPropagation()}>
