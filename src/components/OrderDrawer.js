@@ -5,7 +5,7 @@ import {
   reserveAsset,
   unreserveAsset,
 } from "../utils/inventory";
-import { doc, onSnapshot,increment, arrayUnion,updateDoc,serverTimestamp  } from "firebase/firestore";
+import { doc, onSnapshot, increment, arrayUnion, updateDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../firebase";
 import { updateAccountReport } from "../utils/accountReport";
 
@@ -55,11 +55,15 @@ export default function OrderDrawer({
   navigate,
 }) {
   const [extendService, setExtendService] = useState({
-  open: false,
-  itemIndex: null,
-  newEndDate: "",
-  extraPrice: "",
-});
+    open: false,
+    itemIndex: null,
+    newEndDate: "",
+    extraPrice: "",
+  });
+
+  const [isEditingCustomer, setIsEditingCustomer] = useState(false);
+  const [customerDraft, setCustomerDraft] = useState(null);
+  const [customerErrors, setCustomerErrors] = useState({});
   // --- local helpers (UI-only) ---
   const fmtCurrency = (v) => {
     try {
@@ -71,24 +75,53 @@ export default function OrderDrawer({
       return v ?? "0.00";
     }
   };
-const confirmAndChangeStatus = async (newStatus) => {
-  let msg = "";
+  const validateCustomer = () => {
+  const errors = {};
 
-  if (newStatus === "completed") {
-    msg = "Are you sure you want to mark this order as COMPLETED?\n\nThis action cannot be undone.";
+  const name = customerDraft?.customerName?.trim();
+  const phoneRaw = customerDraft?.customerPhone || "";
+  const phone = phoneRaw.replace(/\D/g, ""); // ✅ remove spaces, +, etc
+  const email = customerDraft?.customerEmail?.trim();
+
+  // NAME
+  if (!name) {
+    errors.customerName = "Name is required";
   }
 
-  if (newStatus === "cancelled") {
-    msg = "Are you sure you want to CANCEL this order?\n\nThis action cannot be undone.";
+  // PHONE
+  if (!phone) {
+    errors.customerPhone = "Phone is required";
+  } else if (phone.length !== 10) {
+    errors.customerPhone = "Phone must be exactly 10 digits";
   }
 
-  if (!msg) return;
+  // ADDRESS
+  if (!customerDraft?.deliveryAddress?.trim()) {
+    errors.deliveryAddress = "Address is required";
+  }
 
-  const ok = window.confirm(msg);
-  if (!ok) return;
+  setCustomerErrors(errors);
 
-  await changeOrderStatus(newStatus);
+  return Object.keys(errors).length === 0;
 };
+  const confirmAndChangeStatus = async (newStatus) => {
+    let msg = "";
+
+    if (newStatus === "completed") {
+      msg = "Are you sure you want to mark this order as COMPLETED?\n\nThis action cannot be undone.";
+    }
+
+    if (newStatus === "cancelled") {
+      msg = "Are you sure you want to CANCEL this order?\n\nThis action cannot be undone.";
+    }
+
+    if (!msg) return;
+
+    const ok = window.confirm(msg);
+    if (!ok) return;
+
+    await changeOrderStatus(newStatus);
+  };
 
   const isFullyAssigned = (item) => {
     if (!item) return false;
@@ -134,22 +167,22 @@ const confirmAndChangeStatus = async (newStatus) => {
   }, [
     selectedOrder,
   ]);
-useEffect(() => {
-  if (!activeDelivery?.deliveryId) {
-    setLiveDelivery(null);
-    return;
-  }
-
-  const ref = doc(db, "deliveries", activeDelivery.deliveryId);
-
-  const unsubscribe = onSnapshot(ref, (snap) => {
-    if (snap.exists()) {
-      setLiveDelivery({ id: snap.id, ...snap.data() });
+  useEffect(() => {
+    if (!activeDelivery?.deliveryId) {
+      setLiveDelivery(null);
+      return;
     }
-  });
 
-  return () => unsubscribe();
-}, [activeDelivery?.deliveryId]);
+    const ref = doc(db, "deliveries", activeDelivery.deliveryId);
+
+    const unsubscribe = onSnapshot(ref, (snap) => {
+      if (snap.exists()) {
+        setLiveDelivery({ id: snap.id, ...snap.data() });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [activeDelivery?.deliveryId]);
 
   // ⛔ early return comes AFTER hooks
   if (!selectedOrder) return null;
@@ -165,167 +198,240 @@ useEffect(() => {
 
   // Confirm from picker: add selected IDs then reserve each (no checkout)
   const confirmAssignAndReserve = async () => {
-  console.log("🔥 confirmAssignAndReserve() clicked");
+    console.log("🔥 confirmAssignAndReserve() clicked");
 
-  try {
-    const idx = assetPicker.itemIndex;
-    console.log("Item index:", idx);
+    try {
+      const idx = assetPicker.itemIndex;
+      console.log("Item index:", idx);
 
-    if (idx == null) {
-      console.log("No item index, closing modal.");
-      confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
-      return;
-    }
-
-    const picked = Object.keys(assetPicker.selected || {}).filter(
-      (id) => assetPicker.selected[id]
-    );
-
-    console.log("Picked assets:", picked);
-
-    if (!picked.length) {
-      console.log("No assets selected, closing modal.");
-      confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
-      return;
-    }
-
-    const item = selectedOrder.items?.[idx];
-    if (!item) {
-      console.warn("Item not found for index:", idx);
-      return;
-    }
-
-    const orderId = selectedOrder.id || selectedOrder.orderNo;
-    console.log("Order ID used for reservation:", orderId);
-    console.log("Item expectedStartDate:", item?.expectedStartDate);
-    console.log("Item expectedEndDate:", item?.expectedEndDate);
-
-    // 1️⃣ Update assigned assets in order
-    const existing = Array.isArray(item.assignedAssets)
-      ? item.assignedAssets
-      : [];
-
-    const merged = Array.from(new Set([...existing, ...picked]));
-    console.log("Merged assignedAssets:", merged);
-
-    updateOrderItem?.(idx, { assignedAssets: merged });
-
-    // 2️⃣ Reserve each selected asset with DATE RANGE
-    for (const assetDocId of picked) {
-      console.log(`⚙️ Reserving asset ${assetDocId}...`);
-
-      try {
-        const result = await reserveAsset(assetDocId, {
-          reservationId: orderId,
-          orderId: orderId,
-          customer: selectedOrder.customerName || "",
-          from: item?.expectedStartDate || null,
-          to: item?.expectedEndDate || null,
-          note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
-        });
-
-        console.log(`✅ reserveAsset success for ${assetDocId}`, result);
-      } catch (err) {
-        console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
+      if (idx == null) {
+        console.log("No item index, closing modal.");
+        confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
+        return;
       }
+
+      const picked = Object.keys(assetPicker.selected || {}).filter(
+        (id) => assetPicker.selected[id]
+      );
+
+      console.log("Picked assets:", picked);
+
+      if (!picked.length) {
+        console.log("No assets selected, closing modal.");
+        confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
+        return;
+      }
+
+      const item = selectedOrder.items?.[idx];
+      if (!item) {
+        console.warn("Item not found for index:", idx);
+        return;
+      }
+
+      const orderId = selectedOrder.id || selectedOrder.orderNo;
+      console.log("Order ID used for reservation:", orderId);
+      console.log("Item expectedStartDate:", item?.expectedStartDate);
+      console.log("Item expectedEndDate:", item?.expectedEndDate);
+
+      // 1️⃣ Update assigned assets in order
+      const existing = Array.isArray(item.assignedAssets)
+        ? item.assignedAssets
+        : [];
+
+      const merged = Array.from(new Set([...existing, ...picked]));
+      console.log("Merged assignedAssets:", merged);
+
+      updateOrderItem?.(idx, { assignedAssets: merged });
+
+      // 2️⃣ Reserve each selected asset with DATE RANGE
+      for (const assetDocId of picked) {
+        console.log(`⚙️ Reserving asset ${assetDocId}...`);
+
+        try {
+          const result = await reserveAsset(assetDocId, {
+            reservationId: orderId,
+            orderId: orderId,
+            customer: selectedOrder.customerName || "",
+            from: item?.expectedStartDate || null,
+            to: item?.expectedEndDate || null,
+            note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
+          });
+
+          console.log(`✅ reserveAsset success for ${assetDocId}`, result);
+        } catch (err) {
+          console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
+        }
+      }
+
+      console.log("✅ All reserve attempts complete, closing picker.");
+      confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
+
+    } catch (e) {
+      console.error("🔥 Assign & reserve error:", e);
+      alert(e?.message || "Failed to reserve selected assets");
     }
+  };
+  const updateCustomerField = async (field, value) => {
+    try {
+      const orderRef = doc(db, "orders", selectedOrder.id);
 
-    console.log("✅ All reserve attempts complete, closing picker.");
-    confirmAssignAssetsFromPicker?.("__CLOSE_ONLY__");
+      await updateDoc(orderRef, {
+        [field]: value,
+        updatedAt: serverTimestamp(),
+      });
 
-  } catch (e) {
-    console.error("🔥 Assign & reserve error:", e);
-    alert(e?.message || "Failed to reserve selected assets");
-  }
-};
-
-const fmtDate = (d) => {
-  if (!d) return "";
-  try {
-    return new Date(d).toLocaleDateString(undefined, {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
+      // update local state instantly (UI feel)
+      setSelectedOrder((prev) => ({
+        ...prev,
+        [field]: value,
+      }));
+    } catch (e) {
+      console.error("Customer update failed", e);
+      alert("Failed to update");
+    }
+  };
+  const startEditingCustomer = () => {
+    setCustomerDraft({
+      customerName: selectedOrder.customerName || "",
+      customerPhone: selectedOrder.customerPhone || "",
+      customerEmail: selectedOrder.customerEmail || "",
+      deliveryAddress: selectedOrder.deliveryAddress || "",
+      deliveryContact: {
+        ...(selectedOrder.deliveryContact || {}),
+      },
     });
-  } catch {
-    return d;
-  }
-};
+
+    setIsEditingCustomer(true);
+  };
+  const saveCustomerDetails = async () => {
+    const isValid = validateCustomer();
+
+    if (!isValid) return; // 🚫 STOP SAVE
+
+    try {
+      const ref = doc(db, "orders", selectedOrder.id);
+
+      const payload = {
+        customerName: customerDraft.customerName,
+        customerPhone: customerDraft.customerPhone,
+        customerEmail: customerDraft.customerEmail,
+        deliveryAddress: customerDraft.deliveryAddress,
+
+        deliveryContact: {
+          ...(customerDraft.deliveryContact || {}),
+          name: customerDraft.customerName,
+          phone: customerDraft.customerPhone,
+          email: customerDraft.customerEmail,
+        },
+
+        updatedAt: serverTimestamp(),
+      };
+
+      await updateDoc(ref, payload);
+
+      setSelectedOrder((prev) => ({
+        ...prev,
+        ...payload,
+      }));
+
+      setIsEditingCustomer(false);
+      setCustomerErrors({}); // clear errors
+
+    } catch (e) {
+      console.error(e);
+    }
+  };
+  const cancelEditingCustomer = () => {
+    setIsEditingCustomer(false);
+    setCustomerDraft(null);
+  };
+  const fmtDate = (d) => {
+    if (!d) return "";
+    try {
+      return new Date(d).toLocaleDateString(undefined, {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return d;
+    }
+  };
 
 
   // Auto-assign N: pick in-stock assets for product+branch, set & reserve (no checkout)
   const autoAssignAndReserve = async (itemIndex, count = 1) => {
-  console.log("🔥 autoAssignAndReserve()", { itemIndex, count });
+    console.log("🔥 autoAssignAndReserve()", { itemIndex, count });
 
-  try {
-    const it = selectedOrder.items?.[itemIndex];
-    console.log("Item:", it);
+    try {
+      const it = selectedOrder.items?.[itemIndex];
+      console.log("Item:", it);
 
-    if (!it?.productId) {
-      alert("Select a product first");
-      return;
-    }
-
-   const assets = await listAvailableAssetsForRange({
-  productId: it.productId || null,
-  branchId: it.branchId || null,
-  from: it.expectedStartDate || null,
-  to: it.expectedEndDate || null,
-});
-
-
-    console.log("Available assets from listAssets:", assets);
-
-    if (!assets?.length) {
-      alert("No assets available to auto-assign");
-      return;
-    }
-
-    const pick = assets
-      .slice(0, Number(count || 1))
-      .map((a) => a.id);
-
-    console.log("Auto-picked assets:", pick);
-
-    const existing = Array.isArray(it.assignedAssets)
-      ? it.assignedAssets
-      : [];
-
-    const merged = Array.from(new Set([...existing, ...pick]));
-    console.log("Merged assignedAssets:", merged);
-
-    // 1️⃣ Update order item
-    updateOrderItem?.(itemIndex, {
-      assignedAssets: merged,
-      autoAssigned: true,
-    });
-
-    const orderId = selectedOrder.id || selectedOrder.orderNo;
-
-    // 2️⃣ Reserve each asset with DATE RANGE
-    for (const assetDocId of pick) {
-      console.log(`⚙️ Reserving auto-picked asset ${assetDocId}`);
-
-      try {
-        const result = await reserveAsset(assetDocId, {
-          reservationId: orderId,
-          orderId: orderId,
-          customer: selectedOrder.customerName || "",
-          from: it?.expectedStartDate || null, // ✅ FIXED
-          to: it?.expectedEndDate || null,     // ✅ FIXED
-          note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
-        });
-
-        console.log(`✅ reserveAsset success for ${assetDocId}`, result);
-      } catch (err) {
-        console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
+      if (!it?.productId) {
+        alert("Select a product first");
+        return;
       }
+
+      const assets = await listAvailableAssetsForRange({
+        productId: it.productId || null,
+        branchId: it.branchId || null,
+        from: it.expectedStartDate || null,
+        to: it.expectedEndDate || null,
+      });
+
+
+      console.log("Available assets from listAssets:", assets);
+
+      if (!assets?.length) {
+        alert("No assets available to auto-assign");
+        return;
+      }
+
+      const pick = assets
+        .slice(0, Number(count || 1))
+        .map((a) => a.id);
+
+      console.log("Auto-picked assets:", pick);
+
+      const existing = Array.isArray(it.assignedAssets)
+        ? it.assignedAssets
+        : [];
+
+      const merged = Array.from(new Set([...existing, ...pick]));
+      console.log("Merged assignedAssets:", merged);
+
+      // 1️⃣ Update order item
+      updateOrderItem?.(itemIndex, {
+        assignedAssets: merged,
+        autoAssigned: true,
+      });
+
+      const orderId = selectedOrder.id || selectedOrder.orderNo;
+
+      // 2️⃣ Reserve each asset with DATE RANGE
+      for (const assetDocId of pick) {
+        console.log(`⚙️ Reserving auto-picked asset ${assetDocId}`);
+
+        try {
+          const result = await reserveAsset(assetDocId, {
+            reservationId: orderId,
+            orderId: orderId,
+            customer: selectedOrder.customerName || "",
+            from: it?.expectedStartDate || null, // ✅ FIXED
+            to: it?.expectedEndDate || null,     // ✅ FIXED
+            note: `Reserved for order ${selectedOrder.orderNo || orderId}`,
+          });
+
+          console.log(`✅ reserveAsset success for ${assetDocId}`, result);
+        } catch (err) {
+          console.error(`❌ reserveAsset FAILED for ${assetDocId}`, err);
+        }
+      }
+    } catch (e) {
+      console.error("🔥 autoAssignAndReserve error:", e);
+      alert(e?.message || "Auto-assign failed");
     }
-  } catch (e) {
-    console.error("🔥 autoAssignAndReserve error:", e);
-    alert(e?.message || "Auto-assign failed");
-  }
-};
+  };
 
 
 
@@ -387,21 +493,21 @@ const fmtDate = (d) => {
             >
               Activate
             </button> */}
-           <button
-  className="cp-btn ghost"
-  onClick={() => confirmAndChangeStatus("completed")}
-  disabled={selectedOrder.status === "completed"}
->
-  Complete
-</button>
+            <button
+              className="cp-btn ghost"
+              onClick={() => confirmAndChangeStatus("completed")}
+              disabled={selectedOrder.status === "completed"}
+            >
+              Complete
+            </button>
 
-<button
-  className="cp-btn ghost"
-  onClick={() => confirmAndChangeStatus("cancelled")}
-  disabled={selectedOrder.status === "cancelled"}
->
-  Cancel
-</button>
+            <button
+              className="cp-btn ghost"
+              onClick={() => confirmAndChangeStatus("cancelled")}
+              disabled={selectedOrder.status === "cancelled"}
+            >
+              Cancel
+            </button>
 
             <button className="cp-btn" onClick={closeOrder}>
               Close
@@ -420,12 +526,123 @@ const fmtDate = (d) => {
         >
           {/* Left — items */}
           <div>
-            <div style={{ marginBottom: 12 }}>
-              <div className="label">Customer</div>
-              <div style={{ fontWeight: 700 }}>
-                {selectedOrder.customerName || "—"}
+            <div className={`customer-box ${isEditingCustomer ? "editing" : ""}`}>
+
+              {/* HEADER */}
+              <div className="customer-header">
+                <div className="label">Customer</div>
+
+                {!isEditingCustomer ? (
+                  <button className="btn-edit" onClick={startEditingCustomer}>
+                    ✏️ Edit
+                  </button>
+                ) : (
+                  <div className="customer-actions">
+                    <button className="btn-save" onClick={saveCustomerDetails}>
+                      Save
+                    </button>
+                    <button className="btn-cancel" onClick={cancelEditingCustomer}>
+                      Cancel
+                    </button>
+                  </div>
+                )}
               </div>
-              <div className="muted">{selectedOrder.deliveryAddress || "—"}</div>
+
+              {/* NAME */}
+              <input
+                className={`customer-input ${customerErrors.customerName ? "error" : ""}`}
+                placeholder="Customer name"
+                disabled={!isEditingCustomer}
+                value={
+                  isEditingCustomer
+                    ? customerDraft?.customerName || ""
+                    : selectedOrder?.customerName || ""
+                }
+                onChange={(e) =>
+                  setCustomerDraft((d) => ({
+                    ...(d || {}),
+                    customerName: e.target.value,
+                  }))
+                }
+              />
+              {customerErrors.customerName && (
+                <div className="error-text">{customerErrors.customerName}</div>
+              )}
+
+              {/* ADDRESS */}
+              <textarea
+                className={`customer-input ${customerErrors.deliveryAddress ? "error" : ""}`}
+                placeholder="Address"
+                disabled={!isEditingCustomer}
+                value={
+                  isEditingCustomer
+                    ? customerDraft?.deliveryAddress || ""
+                    : selectedOrder?.deliveryAddress || ""
+                }
+                onChange={(e) =>
+                  setCustomerDraft((d) => ({
+                    ...(d || {}),
+                    deliveryAddress: e.target.value,
+                  }))
+                }
+              />
+              {customerErrors.deliveryAddress && (
+                <div className="error-text">{customerErrors.deliveryAddress}</div>
+              )}
+
+              {/* PHONE + EMAIL */}
+              <div className="customer-row">
+
+                {/* PHONE */}
+                <div style={{ flex: 1 }}>
+                  <input
+                    className={`customer-input ${customerErrors.customerPhone ? "error" : ""}`}
+                    placeholder="Phone"
+                    disabled={!isEditingCustomer}
+                    value={
+                      isEditingCustomer
+                        ? customerDraft?.customerPhone || ""
+                        : selectedOrder?.customerPhone || ""
+                    }
+                   onChange={(e) => {
+  const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+
+  setCustomerDraft((d) => ({
+    ...(d || {}),
+    customerPhone: value,
+  }));
+}}
+                  />
+                  {customerErrors.customerPhone && (
+                    <div className="error-text">{customerErrors.customerPhone}</div>
+                  )}
+                </div>
+
+                {/* EMAIL */}
+                <div style={{ flex: 1 }}>
+                  <input
+                    className={`customer-input ${customerErrors.customerEmail ? "error" : ""}`}
+                    placeholder="Email"
+                    disabled={!isEditingCustomer}
+                    value={
+                      isEditingCustomer
+                        ? customerDraft?.customerEmail || ""
+                        : selectedOrder?.customerEmail || ""
+                    }
+                    onChange={(e) =>
+                      setCustomerDraft((d) => ({
+                        ...(d || {}),
+                        customerEmail: e.target.value,
+                      }))
+                    }
+                  />
+                  {customerErrors.customerEmail && (
+                    <div className="error-text">{customerErrors.customerEmail}</div>
+                  )}
+                </div>
+
+              </div>
+
             </div>
 
             <div>
@@ -526,25 +743,25 @@ const fmtDate = (d) => {
                                 }
                               />
                             </div>
-              <button
-  className="cp-btn ghost"
-  style={{
-    marginTop: 18,
-    padding: "4px 10px",
-    fontSize: "12px",
-    width: "auto"
-  }}
-  onClick={() =>
-    setExtendService({
-      open: true,
-      itemIndex: idx,
-      newEndDate: it.expectedEndDate || "",
-      extraPrice: "",
-    })
-  }
->
-  Extend Service
-</button>
+                            <button
+                              className="cp-btn ghost"
+                              style={{
+                                marginTop: 18,
+                                padding: "4px 10px",
+                                fontSize: "12px",
+                                width: "auto"
+                              }}
+                              onClick={() =>
+                                setExtendService({
+                                  open: true,
+                                  itemIndex: idx,
+                                  newEndDate: it.expectedEndDate || "",
+                                  extraPrice: "",
+                                })
+                              }
+                            >
+                              Extend Service
+                            </button>
                           </div>
 
                           <div
@@ -706,49 +923,49 @@ const fmtDate = (d) => {
                             </div>
                           )}
                           {(it.extensionHistory || []).length > 0 && (
-  <div style={{ marginTop: 12 }}>
+                            <div style={{ marginTop: 12 }}>
 
-    <div className="muted" style={{ fontWeight: 600 }}>
-      Extension History
-    </div>
+                              <div className="muted" style={{ fontWeight: 600 }}>
+                                Extension History
+                              </div>
 
-    <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 6 }}>
+                              <div style={{ marginTop: 6, display: "flex", flexDirection: "column", gap: 6 }}>
 
-      {(it.extensionHistory || []).map((ext, i) => (
+                                {(it.extensionHistory || []).map((ext, i) => (
 
-        <div
-          key={i}
-          style={{
-            background: "#f9fafb",
-            border: "1px solid #e5e7eb",
-            borderRadius: 6,
-            padding: 6,
-            fontSize: 12
-          }}
-        >
+                                  <div
+                                    key={i}
+                                    style={{
+                                      background: "#f9fafb",
+                                      border: "1px solid #e5e7eb",
+                                      borderRadius: 6,
+                                      padding: 6,
+                                      fontSize: 12
+                                    }}
+                                  >
 
-          <div>
-            <strong>
-              {fmtDate(ext.previousEndDate)} → {fmtDate(ext.newEndDate)}
-            </strong>
-          </div>
+                                    <div>
+                                      <strong>
+                                        {fmtDate(ext.previousEndDate)} → {fmtDate(ext.newEndDate)}
+                                      </strong>
+                                    </div>
 
-          <div className="muted">
-            Extra: ₹{fmtCurrency(ext.extraPrice || 0)}
-          </div>
+                                    <div className="muted">
+                                      Extra: ₹{fmtCurrency(ext.extraPrice || 0)}
+                                    </div>
 
-          <div className="muted">
-            {ext.date ? new Date(ext.date).toLocaleString() : ""}
-          </div>
+                                    <div className="muted">
+                                      {ext.date ? new Date(ext.date).toLocaleString() : ""}
+                                    </div>
 
-        </div>
+                                  </div>
 
-      ))}
+                                ))}
 
-    </div>
+                              </div>
 
-  </div>
-)}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -907,8 +1124,8 @@ const fmtDate = (d) => {
                     }}
                   >
                     {liveDelivery?.status ||
-  selectedOrder.deliveryStatus ||
-  "—"}
+                      selectedOrder.deliveryStatus ||
+                      "—"}
 
                   </div>
 
@@ -963,28 +1180,28 @@ const fmtDate = (d) => {
                     </div>
                   </div>
                   {/* Tax Breakdown */}
-{(selectedOrder.totals?.taxes || []).length > 0 && (
-  <div style={{ marginTop: 6 }}>
-    {(selectedOrder.totals.taxes || []).map((t, i) => (
-      <div className="meta-row" key={i}>
-        <div className="label">
-          {t.name || "Tax"}
-        </div>
-        <div className="value">
-          {fmtCurrency(t.amount || 0)}
-        </div>
-      </div>
-    ))}
-  </div>
-)}
+                  {(selectedOrder.totals?.taxes || []).length > 0 && (
+                    <div style={{ marginTop: 6 }}>
+                      {(selectedOrder.totals.taxes || []).map((t, i) => (
+                        <div className="meta-row" key={i}>
+                          <div className="label">
+                            {t.name || "Tax"}
+                          </div>
+                          <div className="value">
+                            {fmtCurrency(t.amount || 0)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
-{/* Total Tax */}
-<div className="meta-row">
-  <div className="label">Total Tax</div>
-  <div className="value">
-    {fmtCurrency(selectedOrder.totals?.totalTax || 0)}
-  </div>
-</div>
+                  {/* Total Tax */}
+                  <div className="meta-row">
+                    <div className="label">Total Tax</div>
+                    <div className="value">
+                      {fmtCurrency(selectedOrder.totals?.totalTax || 0)}
+                    </div>
+                  </div>
                   <div className="meta-row">
                     <div className="label strong">Total</div>
                     <div className="value strong">
@@ -1143,331 +1360,331 @@ const fmtDate = (d) => {
         </div>
 
         {/* Asset picker modal */}
-       {assetPicker.open && assetPicker.itemIndex !== null && (
-  <div
-    className="cp-modal"
-    onClick={() =>
-      confirmAssignAssetsFromPicker("__CLOSE_ONLY__")
-    }
-  >
-    <div className="cp-modal-card" onClick={(e) => e.stopPropagation()}>
-      <h4>Select assets for item #{assetPicker.itemIndex + 1}</h4>
-
-      {assetPicker.loading && <div className="muted">Loading…</div>}
-
-      {!assetPicker.loading && (
-        <>
-          {/* Header info */}
+        {assetPicker.open && assetPicker.itemIndex !== null && (
           <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginTop: 8,
-              gap: 8,
-            }}
+            className="cp-modal"
+            onClick={() =>
+              confirmAssignAssetsFromPicker("__CLOSE_ONLY__")
+            }
           >
-            <div className="muted">
-              Assets: {assetPicker.assets.length}
-            </div>
-            <div className="muted">
-              Product:{" "}
-              {productsMap[
-                selectedOrder.items?.[assetPicker.itemIndex]?.productId
-              ]?.name ||
-                selectedOrder.items?.[assetPicker.itemIndex]?.productId ||
-                "—"}
-            </div>
-          </div>
+            <div className="cp-modal-card" onClick={(e) => e.stopPropagation()}>
+              <h4>Select assets for item #{assetPicker.itemIndex + 1}</h4>
 
-          {/* 🔹 Company filter */}
-          <div style={{ marginTop: 8 }}>
-            <select
-              className="cp-input"
-              value={assetCompanyFilter}
-              onChange={(e) => setAssetCompanyFilter(e.target.value)}
-            >
-              <option value="">All companies</option>
-              {assetCompanies.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-        </>
-      )}
+              {assetPicker.loading && <div className="muted">Loading…</div>}
 
-      {/* 🔹 Asset list grouped by company */}
-      <div style={{ maxHeight: 340, overflowY: "auto", marginTop: 10 }}>
-        {Object.keys(groupedAssets).length === 0 && (
-          <div className="muted">No assets found.</div>
-        )}
+              {!assetPicker.loading && (
+                <>
+                  {/* Header info */}
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginTop: 8,
+                      gap: 8,
+                    }}
+                  >
+                    <div className="muted">
+                      Assets: {assetPicker.assets.length}
+                    </div>
+                    <div className="muted">
+                      Product:{" "}
+                      {productsMap[
+                        selectedOrder.items?.[assetPicker.itemIndex]?.productId
+                      ]?.name ||
+                        selectedOrder.items?.[assetPicker.itemIndex]?.productId ||
+                        "—"}
+                    </div>
+                  </div>
 
-        {Object.entries(groupedAssets).map(([company, assets]) => {
-          const allSelected = assets.every(
-            (a) => assetPicker.selected[a.id]
-          );
+                  {/* 🔹 Company filter */}
+                  <div style={{ marginTop: 8 }}>
+                    <select
+                      className="cp-input"
+                      value={assetCompanyFilter}
+                      onChange={(e) => setAssetCompanyFilter(e.target.value)}
+                    >
+                      <option value="">All companies</option>
+                      {assetCompanies.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
 
-          return (
-            <div key={company} style={{ marginBottom: 12 }}>
-              {/* Company header */}
+              {/* 🔹 Asset list grouped by company */}
+              <div style={{ maxHeight: 340, overflowY: "auto", marginTop: 10 }}>
+                {Object.keys(groupedAssets).length === 0 && (
+                  <div className="muted">No assets found.</div>
+                )}
+
+                {Object.entries(groupedAssets).map(([company, assets]) => {
+                  const allSelected = assets.every(
+                    (a) => assetPicker.selected[a.id]
+                  );
+
+                  return (
+                    <div key={company} style={{ marginBottom: 12 }}>
+                      {/* Company header */}
+                      <div
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          marginBottom: 6,
+                        }}
+                      >
+                        <strong>🏢 {company}</strong>
+                        <button
+                          className="cp-link"
+                          onClick={() => {
+                            setAssetPicker((s) => {
+                              const sel = { ...(s.selected || {}) };
+                              assets.forEach((a) => {
+                                if (allSelected) delete sel[a.id];
+                                else sel[a.id] = true;
+                              });
+                              return { ...s, selected: sel };
+                            });
+                          }}
+                        >
+                          {allSelected ? "Unselect all" : "Select all"}
+                        </button>
+                      </div>
+
+                      {/* Assets */}
+                      {assets.map((a) => (
+                        <div
+                          key={a.id}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 8,
+                            padding: 8,
+                            borderBottom: "1px solid #eef2f7",
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={!!assetPicker.selected[a.id]}
+                            onChange={() => togglePickerSelect(a.id)}
+                          />
+
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 700 }}>
+                              {a.assetId || a.id}
+                            </div>
+
+                            <div className="muted" style={{ fontSize: 12 }}>
+                              {a.metadata?.model || a.productId} ·{" "}
+                              {(branches.find((b) => b.id === a.branchId) || {}).name ||
+                                a.branchId ||
+                                "—"}
+                            </div>
+
+                            {/* 🔶 Show reservation date range if reserved */}
+                            {a.status === "reserved" &&
+                              a.reservation?.from &&
+                              a.reservation?.to && (
+                                <div
+                                  style={{
+                                    marginTop: 4,
+                                    fontSize: 12,
+                                    color: "#92400e",
+                                    background: "#fff7ed",
+                                    padding: "2px 6px",
+                                    borderRadius: 6,
+                                    display: "inline-block",
+                                  }}
+                                >
+                                  Reserved: {fmtDate(a.reservation.from)} →{" "}
+                                  {fmtDate(a.reservation.to)}
+                                </div>
+                              )}
+                          </div>
+
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            <strong style={{ textTransform: "capitalize" }}>
+                              {a.status}
+                            </strong>
+                          </div>
+                        </div>
+                      ))}
+
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Actions */}
               <div
                 style={{
                   display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 6,
+                  gap: 8,
+                  justifyContent: "flex-end",
+                  marginTop: 12,
                 }}
               >
-                <strong>🏢 {company}</strong>
                 <button
-                  className="cp-link"
-                  onClick={() => {
-                    setAssetPicker((s) => {
-                      const sel = { ...(s.selected || {}) };
-                      assets.forEach((a) => {
-                        if (allSelected) delete sel[a.id];
-                        else sel[a.id] = true;
-                      });
-                      return { ...s, selected: sel };
-                    });
-                  }}
+                  className="cp-btn ghost"
+                  onClick={() =>
+                    confirmAssignAssetsFromPicker("__CLOSE_ONLY__")
+                  }
                 >
-                  {allSelected ? "Unselect all" : "Select all"}
+                  Cancel
+                </button>
+                <button
+                  className="cp-btn"
+                  onClick={confirmAssignAndReserve}
+                >
+                  Assign & Reserve
                 </button>
               </div>
-
-              {/* Assets */}
-              {assets.map((a) => (
-  <div
-    key={a.id}
-    style={{
-      display: "flex",
-      alignItems: "center",
-      gap: 8,
-      padding: 8,
-      borderBottom: "1px solid #eef2f7",
-    }}
-  >
-    <input
-      type="checkbox"
-      checked={!!assetPicker.selected[a.id]}
-      onChange={() => togglePickerSelect(a.id)}
-    />
-
-    <div style={{ flex: 1 }}>
-      <div style={{ fontWeight: 700 }}>
-        {a.assetId || a.id}
-      </div>
-
-      <div className="muted" style={{ fontSize: 12 }}>
-        {a.metadata?.model || a.productId} ·{" "}
-        {(branches.find((b) => b.id === a.branchId) || {}).name ||
-          a.branchId ||
-          "—"}
-      </div>
-
-      {/* 🔶 Show reservation date range if reserved */}
-      {a.status === "reserved" &&
-        a.reservation?.from &&
-        a.reservation?.to && (
-          <div
-            style={{
-              marginTop: 4,
-              fontSize: 12,
-              color: "#92400e",
-              background: "#fff7ed",
-              padding: "2px 6px",
-              borderRadius: 6,
-              display: "inline-block",
-            }}
-          >
-            Reserved: {fmtDate(a.reservation.from)} →{" "}
-            {fmtDate(a.reservation.to)}
+            </div>
           </div>
         )}
-    </div>
+        {extendService.open && (
+          <div className="cp-modal" onClick={() => setExtendService({ open: false })}>
+            <div className="cp-modal-card" onClick={(e) => e.stopPropagation()}>
 
-    <div className="muted" style={{ fontSize: 12 }}>
-      <strong style={{ textTransform: "capitalize" }}>
-        {a.status}
-      </strong>
-    </div>
-  </div>
-))}
+              <h4>Extend Service</h4>
+
+              <div style={{ marginTop: 12 }}>
+                <div className="label muted">New End Date</div>
+
+                <input
+                  type="date"
+                  className="cp-input"
+                  value={extendService.newEndDate}
+                  onChange={(e) =>
+                    setExtendService(s => ({
+                      ...s,
+                      newEndDate: e.target.value
+                    }))
+                  }
+                />
+              </div>
+
+              <div style={{ marginTop: 10 }}>
+                <div className="label muted">Additional Price</div>
+
+                <input
+                  className="cp-input"
+                  placeholder="Enter extension price"
+                  value={extendService.extraPrice}
+                  onChange={(e) =>
+                    setExtendService(s => ({
+                      ...s,
+                      extraPrice: e.target.value
+                    }))
+                  }
+                />
+              </div>
+
+              <div style={{
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 8,
+                marginTop: 16
+              }}>
+
+                <button
+                  className="cp-btn ghost"
+                  onClick={() => setExtendService({ open: false })}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  className="cp-btn"
+                  onClick={async () => {
+
+                    const idx = extendService.itemIndex;
+                    const item = selectedOrder.items[idx];
+
+                    const extra = Number(extendService.extraPrice || 0);
+
+                    const oldEnd = item.expectedEndDate;
+                    const newEnd = extendService.newEndDate;
+
+                    await updateOrderItem(idx, {
+                      expectedEndDate: newEnd,
+                      rate: Number(item.rate || 0) + extra,
+
+                      extensionHistory: [
+                        ...(item.extensionHistory || []),
+                        {
+                          previousEndDate: oldEnd,
+                          newEndDate: newEnd,
+                          extraPrice: extra,
+                          date: new Date().toISOString()
+                        }
+                      ]
+                    });
+                    await updateDoc(doc(db, "orders", selectedOrder.id), {
+                      lastExtendedAt: serverTimestamp()
+                    });
+
+                    /* 🔥 ACCOUNT REPORT UPDATE */
+
+                    await updateAccountReport({
+
+                      totalRevenue: increment(extra),
+                      totalExtensions: increment(1),
+
+
+                      /* ======================
+                         EXTENSION REVENUE
+                      ====================== */
+
+                      totalExtensionRevenue: increment(extra),
+
+                      equipmentRevenue: increment(extra),
+
+                      pendingAmount: increment(extra),
+
+                      equipmentExtensionsCount: increment(1),
+
+                      equipmentExtensionsAmount: increment(extra),
+
+                      extensions: arrayUnion({
+
+                        orderId: selectedOrder.id,
+                        orderNo: selectedOrder.orderNo,
+
+                        serviceType: "equipment",
+
+                        serviceName: item.name || "",
+
+                        startDate: item.expectedStartDate,
+
+                        oldEndDate: oldEnd,
+
+                        newEndDate: newEnd,
+
+                        extraAmount: extra,
+
+                        date: new Date().toISOString()
+
+                      })
+
+                    });
+
+                    setExtendService({ open: false });
+
+                  }}
+                >
+                  Save Extension
+                </button>
+
+              </div>
 
             </div>
-          );
-        })}
-      </div>
-
-      {/* Actions */}
-      <div
-        style={{
-          display: "flex",
-          gap: 8,
-          justifyContent: "flex-end",
-          marginTop: 12,
-        }}
-      >
-        <button
-          className="cp-btn ghost"
-          onClick={() =>
-            confirmAssignAssetsFromPicker("__CLOSE_ONLY__")
-          }
-        >
-          Cancel
-        </button>
-        <button
-          className="cp-btn"
-          onClick={confirmAssignAndReserve}
-        >
-          Assign & Reserve
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-{extendService.open && (
-  <div className="cp-modal" onClick={() => setExtendService({ open:false })}>
-    <div className="cp-modal-card" onClick={(e)=>e.stopPropagation()}>
-
-      <h4>Extend Service</h4>
-
-      <div style={{marginTop:12}}>
-        <div className="label muted">New End Date</div>
-
-        <input
-          type="date"
-          className="cp-input"
-          value={extendService.newEndDate}
-          onChange={(e)=>
-            setExtendService(s=>({
-              ...s,
-              newEndDate:e.target.value
-            }))
-          }
-        />
-      </div>
-
-      <div style={{marginTop:10}}>
-        <div className="label muted">Additional Price</div>
-
-        <input
-          className="cp-input"
-          placeholder="Enter extension price"
-          value={extendService.extraPrice}
-          onChange={(e)=>
-            setExtendService(s=>({
-              ...s,
-              extraPrice:e.target.value
-            }))
-          }
-        />
-      </div>
-
-      <div style={{
-        display:"flex",
-        justifyContent:"flex-end",
-        gap:8,
-        marginTop:16
-      }}>
-
-        <button
-          className="cp-btn ghost"
-          onClick={()=>setExtendService({open:false})}
-        >
-          Cancel
-        </button>
-
-        <button
-          className="cp-btn"
-          onClick={async () => {
-
-  const idx = extendService.itemIndex;
-  const item = selectedOrder.items[idx];
-
-  const extra = Number(extendService.extraPrice || 0);
-
-  const oldEnd = item.expectedEndDate;
-  const newEnd = extendService.newEndDate;
-
-  await updateOrderItem(idx,{
-    expectedEndDate: newEnd,
-    rate: Number(item.rate || 0) + extra,
-
-    extensionHistory:[
-      ...(item.extensionHistory || []),
-      {
-        previousEndDate: oldEnd,
-        newEndDate: newEnd,
-        extraPrice: extra,
-        date: new Date().toISOString()
-      }
-    ]
-  });
-  await updateDoc(doc(db,"orders",selectedOrder.id),{
-  lastExtendedAt: serverTimestamp()
-});
-
-  /* 🔥 ACCOUNT REPORT UPDATE */
-
-  await updateAccountReport({
-
-    totalRevenue: increment(extra),
-    totalExtensions: increment(1),
-    
-    
-    /* ======================
-       EXTENSION REVENUE
-    ====================== */
-    
-    totalExtensionRevenue: increment(extra),
-
-    equipmentRevenue: increment(extra),
-
-    pendingAmount: increment(extra),
-
-    equipmentExtensionsCount: increment(1),
-
-    equipmentExtensionsAmount: increment(extra),
-
-    extensions: arrayUnion({
-
-      orderId: selectedOrder.id,
-      orderNo: selectedOrder.orderNo,
-
-      serviceType: "equipment",
-
-      serviceName: item.name || "",
-
-      startDate: item.expectedStartDate,
-
-      oldEndDate: oldEnd,
-
-      newEndDate: newEnd,
-
-      extraAmount: extra,
-
-      date: new Date().toISOString()
-
-    })
-
-  });
-
-  setExtendService({open:false});
-
-}}
-        >
-          Save Extension
-        </button>
-
-      </div>
-
-    </div>
-  </div>
-)}
+          </div>
+        )}
 
         {/* Payment modal */}
         {paymentModal.open && paymentModal.form && (

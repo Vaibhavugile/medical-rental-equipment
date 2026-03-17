@@ -67,6 +67,94 @@ background:#d1fae5;
   margin: 0;
 }
 
+/* Container */
+.customer-box {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 12px;
+  background: #fafafa;
+  transition: all 0.2s ease;
+}
+
+/* Editing highlight */
+.customer-box.editing {
+  background: #ffffff;
+  border: 1px solid #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59,130,246,0.1);
+}
+
+/* Header */
+.customer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+/* Row */
+.customer-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* Inputs */
+.customer-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+/* Disabled */
+.customer-input:disabled {
+  background: #f3f4f6;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+/* Active editing */
+.customer-box.editing .customer-input {
+  background: #fff;
+  border: 1px solid #3b82f6;
+}
+
+/* Buttons */
+.btn-edit {
+  background: #eef2ff !important;
+  color: #3730a3;
+  width: 90px;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-save {
+  background: #2563eb;
+  color: white;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.btn-cancel {
+  background: #f3f4f6;
+  color: #374151;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.customer-actions {
+  display: flex;
+  gap: 6px;
+}
+
 .orders-card, .orders-error { padding: 12px; background: #fff; border-radius: 10px; border: 1px solid #eef2f7; }
 
 .orders-table {
