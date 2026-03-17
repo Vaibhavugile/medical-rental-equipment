@@ -62,21 +62,33 @@ function calcTotals(
   const taxable = Math.max(0, subtotal - discountAmount);
 
   const taxBreakdown = (taxes || []).map((t) => {
-    const type = (t.type || "percent").toLowerCase();
-    const value = safeNum(t.rate ?? t.value);
 
-    const amount =
-      type === "fixed"
-        ? value
-        : taxable * (value / 100);
-
+  // ✅ already locked → reuse
+  if (t.locked === true) {
     return {
-      name: t.name || "",
-      type,
-      value,
-      amount,
+      ...t,
+      amount: Number(t.amount || t.value || 0)
     };
-  });
+  }
+
+  const type = (t.type || "percent").toLowerCase();
+  const value = safeNum(t.rate ?? t.value);
+
+  let amount =
+    type === "fixed"
+      ? value
+      : taxable * (value / 100);
+
+  // 🔥 LOCK TAX HERE
+  return {
+    name: t.name || "",
+    value,
+    amount,
+
+    type: "fixed",   // convert to fixed
+    locked: true     // 🔒 lock forever
+  };
+});
 
   const totalTax = taxBreakdown.reduce(
     (s, t) => s + safeNum(t.amount),

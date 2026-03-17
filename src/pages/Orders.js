@@ -48,7 +48,7 @@ const fmtCurrency = (v) => {
 function calcTotals(
   items = [],
   discount = { type: "percent", value: 0 },
-  taxes = []
+  existingTaxes  = []
 ) {
   const subtotal = (items || []).reduce((s, it) => {
     const q = Number(it?.qty || 0);
@@ -72,19 +72,36 @@ function calcTotals(
 
   const taxableAmount = Math.max(0, subtotal - discountAmount);
 
-  const taxBreakdown = (taxes || []).map((t) => {
-    const tType = ((t.type || "percent") + "").toLowerCase();
-    const tValue = Number(t.value ?? t.rate ?? 0);
-    let amount = 0;
-    if (tType === "percent") amount = taxableAmount * (tValue / 100);
-    else amount = tValue;
+  const taxBreakdown = (existingTaxes  || []).map((t) => {
+
+  // ✅ LOCKED TAX → DO NOT RECALCULATE
+  if (t.locked === true) {
     return {
-      id: t.id || t.name || "",
-      name: t.name || "",
-      value: tValue,
-      amount: Number((amount || 0).toFixed(2)),
+      ...t,
+      amount: Number(t.amount || t.value || 0),
+      type: "fixed"
     };
-  });
+  }
+
+  const tType = ((t.type || "percent") + "").toLowerCase();
+  const tValue = Number(t.value ?? t.rate ?? 0);
+
+  let amount =
+    tType === "percent"
+      ? taxableAmount * (tValue / 100)
+      : tValue;
+
+  // 🔥 LOCK AFTER FIRST CALC
+  return {
+    id: t.id || t.name || "",
+    name: t.name || "",
+    value: tValue,
+    amount: Number((amount || 0).toFixed(2)),
+
+    locked: true,   // 🔒 IMPORTANT
+    type: "fixed"   // convert to fixed
+  };
+});
 
   const totalTax = taxBreakdown.reduce((s, tt) => s + Number(tt.amount || 0), 0);
   const total = Number((taxableAmount + totalTax).toFixed(2));
@@ -709,7 +726,7 @@ const filtered = useMemo(() => {
       const totals = calcTotals(
         clone.items || [],
         clone.discount || selectedOrder?.discount || { type: "percent", value: 0 },
-        clone.taxes || selectedOrder?.taxes || []
+        selectedOrder?.totals?.taxes || clone.taxes || []
       );
 
       await updateDoc(doc(db, "orders", selectedOrder.id), {

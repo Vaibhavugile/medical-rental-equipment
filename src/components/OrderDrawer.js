@@ -962,12 +962,29 @@ const fmtDate = (d) => {
                         : fmtCurrency(selectedOrder.discount?.value || 0)}
                     </div>
                   </div>
-                  <div className="meta-row">
-                    <div className="label">Tax</div>
-                    <div className="value">
-                      {fmtCurrency(selectedOrder.totals?.totalTax || 0)}
-                    </div>
-                  </div>
+                  {/* Tax Breakdown */}
+{(selectedOrder.totals?.taxes || []).length > 0 && (
+  <div style={{ marginTop: 6 }}>
+    {(selectedOrder.totals.taxes || []).map((t, i) => (
+      <div className="meta-row" key={i}>
+        <div className="label">
+          {t.name || "Tax"}
+        </div>
+        <div className="value">
+          {fmtCurrency(t.amount || 0)}
+        </div>
+      </div>
+    ))}
+  </div>
+)}
+
+{/* Total Tax */}
+<div className="meta-row">
+  <div className="label">Total Tax</div>
+  <div className="value">
+    {fmtCurrency(selectedOrder.totals?.totalTax || 0)}
+  </div>
+</div>
                   <div className="meta-row">
                     <div className="label strong">Total</div>
                     <div className="value strong">

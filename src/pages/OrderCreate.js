@@ -61,24 +61,26 @@ function calcTotals(
   let amount = 0;
 
   if (type === "fixed") {
-    // Fixed tax = direct amount
     amount = value;
   } else {
-    // Percent tax
     amount = taxable * (value / 100);
   }
 
   return {
+    id: t.id || t.name || "",
     name: t.name || "",
-    type,
-    value,
-    amount,
+
+    value,                     // original %
+    amount: Number(amount.toFixed(2)),
+
+    type: "fixed",             // 🔥 convert to fixed
+    locked: true               // 🔒 LOCK IT
   };
 });
 
   const totalTax = taxBreakdown.reduce((s, t) => s + safeNum(t.amount), 0);
   const total = Math.max(0, taxable + totalTax);
-  return { subtotal, discountAmount, taxBreakdown, totalTax, total };
+  return { subtotal, discountAmount, taxes: taxBreakdown, totalTax, total };
 }
 
 // days between two dates (inclusive)

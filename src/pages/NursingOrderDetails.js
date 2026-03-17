@@ -240,35 +240,71 @@ const openAssignModal = (serviceIndex) => {
   const displayUser = (uid, name) =>
     uid === auth.currentUser?.uid ? "You" : name;
   const calculateTotals = (items, discountAmount = 0, taxBreakdown = []) => {
-    const subtotal = items.reduce(
-      (sum, it) => sum + Number(it.amount || 0),
-      0
-    );
 
-    const taxes = taxBreakdown.map((t) => {
-      const amount = (subtotal * Number(t.value || 0)) / 100;
-      return { ...t, amount };
-    });
-
-    const taxTotal = taxes.reduce(
-      (sum, t) => sum + Number(t.amount || 0),
-      0
-    );
-
-    const total = subtotal - Number(discountAmount || 0) + taxTotal;
-
-    return {
-      subtotal,
-      discountAmount,
-      taxBreakdown: taxes,
-      total,
-    };
-  };
-  const derivedTotals = calculateTotals(
-    editableItems,
-    order?.totals?.discountAmount || 0,
-    order?.totals?.taxBreakdown || []
+  const subtotal = items.reduce(
+    (sum, it) => sum + Number(it.amount || 0),
+    0
   );
+
+const taxes = taxBreakdown.map((t) => {
+
+  let amount = 0;
+
+  if (t.locked === true) {
+    amount = Number(t.amount || t.value || 0);
+    return { ...t, amount };
+  }
+
+  if (t.type === "fixed") {
+    amount = Number(t.value || 0);
+  } else {
+    amount = (subtotal * Number(t.value || 0)) / 100;
+  }
+
+  return {
+    ...t,
+    amount,
+    locked: true,
+    type: "fixed"
+  };
+});
+
+  const taxTotal = taxes.reduce(
+    (sum, t) => sum + Number(t.amount || 0),
+    0
+  );
+
+  const total = subtotal - Number(discountAmount || 0) + taxTotal;
+
+  return {
+    subtotal,
+    discountAmount,
+    taxBreakdown: taxes,
+    total,
+  };
+};
+  const derivedTotals = (() => {
+  const existing = order?.totals;
+
+  if (!existing) return calculateTotals(editableItems, 0, []);
+
+  // 🔒 IF TAX ALREADY LOCKED → JUST UPDATE SUBTOTAL
+  const subtotal = editableItems.reduce(
+    (sum, it) => sum + Number(it.amount || 0),
+    0
+  );
+
+  const taxTotal = (existing.taxBreakdown || []).reduce(
+    (sum, t) => sum + Number(t.amount || 0),
+    0
+  );
+
+  return {
+    ...existing,
+    subtotal,
+    total: subtotal - (existing.discountAmount || 0) + taxTotal
+  };
+})();
   const [staffPaymentModal, setStaffPaymentModal] = useState({
     open: false,
     assignment: null,
@@ -654,44 +690,55 @@ const getSalaryRequest = (assignmentId) => {
     }));
   };
   const saveServices = async () => {
-    try {
-      const activityLogs = buildActivityLogs(
-        order.items || [],
-        editableItems
-      );
+  try {
+    const activityLogs = buildActivityLogs(
+      order.items || [],
+      editableItems
+    );
 
-      const newTotals = calculateTotals(
-        editableItems,
-        order?.totals?.discountAmount || 0,
-        order?.totals?.taxBreakdown || []
-      );
+    const existingTaxes = order?.totals?.taxBreakdown || [];
 
-      const updatedActivityLog = [
-        ...(order.activityLog || []),
-        ...activityLogs,
-      ];
+    const preparedTaxes = existingTaxes.map(t => {
+      if (t.locked) return t;
+      return t;
+    });
 
-      await updateDoc(doc(db, "nursingOrders", id), {
-        items: editableItems,
-        totals: newTotals,
-        activityLog: updatedActivityLog,
-        updatedAt: serverTimestamp(),
-        updatedBy: auth.currentUser?.uid || "",
-      });
+    const newTotals = calculateTotals(
+      editableItems,
+      order?.totals?.discountAmount || 0,
+      preparedTaxes
+    );
 
-      setOrder((o) => ({
-        ...o,
-        items: editableItems,
-        totals: newTotals,
-        activityLog: updatedActivityLog,
-      }));
+    const updatedActivityLog = [
+      ...(order.activityLog || []),
+      ...activityLogs,
+    ];
 
-      setServicesEditing(false);
-    } catch (e) {
-      console.error("saveServices error", e);
-      alert("Failed to save services");
-    }
-  };
+    await updateDoc(doc(db, "nursingOrders", id), {
+      items: editableItems,
+      totals: {
+        ...newTotals,
+        taxBreakdown: newTotals.taxBreakdown // 🔥 CRITICAL
+      },
+      activityLog: updatedActivityLog,
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser?.uid || "",
+    });
+
+    setOrder((o) => ({
+      ...o,
+      items: editableItems,
+      totals: newTotals,
+      activityLog: updatedActivityLog,
+    }));
+
+    setServicesEditing(false);
+
+  } catch (e) {
+    console.error("saveServices error", e);
+    alert("Failed to save services");
+  }
+};
 
 
 
@@ -1048,16 +1095,27 @@ const getSalaryRequest = (assignmentId) => {
         amount: Number(service.amount || 0) + extraAmount
       };
 
-      const newTotals = calculateTotals(
-        updatedItems,
-        order?.totals?.discountAmount || 0,
-        order?.totals?.taxBreakdown || []
-      );
+      const existingTaxes = order?.totals?.taxBreakdown || [];
+
+// 🔒 KEEP LOCKED TAXES SAME
+const preparedTaxes = existingTaxes.map(t => {
+  if (t.locked) return t;
+  return t;
+});
+
+const newTotals = calculateTotals(
+  updatedItems,
+  order?.totals?.discountAmount || 0,
+  preparedTaxes
+);
 
       await updateDoc(doc(db, "nursingOrders", id), {
 
         items: updatedItems,
-        totals: newTotals,
+        totals: {
+  ...newTotals,
+  taxBreakdown: newTotals.taxBreakdown // 🔥 MUST SAVE LOCK
+},
         lastExtendedAt: serverTimestamp(),
 
         extensionHistory: [
@@ -1937,7 +1995,7 @@ date: new Date().toISOString()
         {derivedTotals.taxBreakdown.map((t, i) => (
           <div key={i} className="nod-row">
             <span>
-              {t.name} ({t.value}%)
+            {t.name} {t.locked ? "(Locked)" : `(${t.value}%)`}
             </span>
             <strong>
               ₹ {fmtCurrency(t.amount)}
