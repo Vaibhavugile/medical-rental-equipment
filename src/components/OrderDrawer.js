@@ -65,6 +65,19 @@ export default function OrderDrawer({
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [customerDraft, setCustomerDraft] = useState(null);
   const [customerErrors, setCustomerErrors] = useState({});
+  const diffDaysInclusive = (start, end) => {
+  if (!start || !end) return 0;
+
+  const s = new Date(start);
+  const e = new Date(end);
+
+  if (isNaN(s) || isNaN(e)) return 0;
+
+  const msPerDay = 24 * 60 * 60 * 1000;
+  const diff = Math.round((e - s) / msPerDay) + 1;
+
+  return diff > 0 ? diff : 0;
+};
   // --- local helpers (UI-only) ---
   const fmtCurrency = (v) => {
     try {
@@ -76,6 +89,34 @@ export default function OrderDrawer({
       return v ?? "0.00";
     }
   };
+  const addItem = () => {
+  setSelectedOrder((prev) => {
+    if (!prev) return prev;
+
+    const items = Array.isArray(prev.items) ? [...prev.items] : [];
+
+    items.push({
+      id: `i-${Date.now()}-${items.length}`,
+      name: "",
+      qty: 1,
+      rate: 0,
+      amount: 0,
+      notes: "",
+      days: 0,
+      expectedStartDate: "",
+      expectedEndDate: "",
+      productId: "",
+      branchId: "",
+      assignedAssets: [],
+      autoAssigned: false,
+    });
+
+    return {
+      ...prev,
+      items,
+    };
+  });
+};
   const validateCustomer = () => {
   const errors = {};
 
@@ -688,7 +729,22 @@ const confirmAssignAndReserve = async () => {
             </div>
 
             <div>
-              <h3>Items</h3>
+              <div
+  style={{
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+  }}
+>
+  <h3>Items</h3>
+
+  <button
+    className="cp-btn ghost"
+    onClick={addItem}
+  >
+    + Add item
+  </button>
+</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {(selectedOrder.items || []).map((it, idx) => {
                   const fullyAssigned = isFullyAssigned(it);
@@ -759,32 +815,79 @@ const confirmAssignAndReserve = async () => {
                             </div>
 
                             <div>
-                              <div className="muted">From</div>
-                              <input
-                                className="cp-input"
-                                style={{ width: 140 }}
-                                value={it.expectedStartDate || ""}
-                                onChange={(e) =>
-                                  updateOrderItem(idx, {
-                                    expectedStartDate: e.target.value,
-                                  })
-                                }
-                              />
-                            </div>
+  <div className="muted">From</div>
+  <input
+    type="date"
+    className="cp-input"
+    style={{ width: 140 }}
+    value={it.expectedStartDate || ""}
+    onChange={(e) => {
+      const newStart = e.target.value;
 
-                            <div>
-                              <div className="muted">To</div>
-                              <input
-                                className="cp-input"
-                                style={{ width: 140 }}
-                                value={it.expectedEndDate || ""}
-                                onChange={(e) =>
-                                  updateOrderItem(idx, {
-                                    expectedEndDate: e.target.value,
-                                  })
-                                }
-                              />
-                            </div>
+      const days =
+        newStart && it.expectedEndDate
+          ? Math.max(
+              0,
+              Math.round(
+                (new Date(it.expectedEndDate) - new Date(newStart)) /
+                  (1000 * 60 * 60 * 24)
+              ) + 1
+            )
+          : 0;
+
+      updateOrderItem(idx, {
+        expectedStartDate: newStart,
+        days,
+      });
+    }}
+  />
+</div>
+
+<div>
+  <div className="muted">To</div>
+  <input
+    type="date"
+    className="cp-input"
+    style={{ width: 140 }}
+    value={it.expectedEndDate || ""}
+    onChange={(e) => {
+      const newEnd = e.target.value;
+
+      // 🔴 prevent invalid range
+      if (it.expectedStartDate && newEnd < it.expectedStartDate) {
+        alert("End date cannot be before start date");
+        return;
+      }
+
+      const days =
+        it.expectedStartDate && newEnd
+          ? Math.max(
+              0,
+              Math.round(
+                (new Date(newEnd) - new Date(it.expectedStartDate)) /
+                  (1000 * 60 * 60 * 24)
+              ) + 1
+            )
+          : 0;
+
+      updateOrderItem(idx, {
+        expectedEndDate: newEnd,
+        days,
+      });
+    }}
+  />
+</div>
+
+{/* ✅ AUTO DAYS FIELD */}
+<div>
+  <div className="muted">Days</div>
+  <input
+    className="cp-input"
+    style={{ width: 100 }}
+    value={it.days || 0}
+    disabled
+  />
+</div>
                             <button
                               className="cp-btn ghost"
                               style={{
@@ -1488,7 +1591,9 @@ const confirmAssignAndReserve = async () => {
                     const item = selectedOrder.items[idx];
 
                     const extra = Number(extendService.extraPrice || 0);
+const qty = Number(item.qty || 0);
 
+const extraTotal = extra * qty;
                     const oldEnd = item.expectedEndDate;
                     const newEnd = extendService.newEndDate;
 
@@ -1501,7 +1606,7 @@ const confirmAssignAndReserve = async () => {
                         {
                           previousEndDate: oldEnd,
                           newEndDate: newEnd,
-                          extraPrice: extra,
+                          extraPrice: extraTotal,
                           date: new Date().toISOString()
                         }
                       ]
@@ -1514,7 +1619,7 @@ const confirmAssignAndReserve = async () => {
 
                     await updateAccountReport({
 
-                      totalRevenue: increment(extra),
+                      totalRevenue: increment(extraTotal),
                       totalExtensions: increment(1),
 
 
@@ -1522,15 +1627,15 @@ const confirmAssignAndReserve = async () => {
                          EXTENSION REVENUE
                       ====================== */
 
-                      totalExtensionRevenue: increment(extra),
+                      totalExtensionRevenue: increment(extraTotal),
 
-                      equipmentRevenue: increment(extra),
+                      equipmentRevenue: increment(extraTotal),
 
-                      pendingAmount: increment(extra),
+                      pendingAmount: increment(extraTotal),
 
                       equipmentExtensionsCount: increment(1),
 
-                      equipmentExtensionsAmount: increment(extra),
+                      equipmentExtensionsAmount: increment(extraTotal),
 
                       extensions: arrayUnion({
 
@@ -1547,7 +1652,7 @@ const confirmAssignAndReserve = async () => {
 
                         newEndDate: newEnd,
 
-                        extraAmount: extra,
+                        extraAmount: extraTotal,
 
                         date: new Date().toISOString()
 
