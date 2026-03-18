@@ -13,20 +13,14 @@ const [loading,setLoading]=useState(false);
 
 const [selected,setSelected]=useState(null);
 
-/* =========================
-LOAD DATA WHEN DATE CHANGES
-========================= */
-
 useEffect(()=>{
-
 if(start && end){
 load();
 }
-
 },[start,end]);
 
 /* =========================
-LOAD ORDERS
+LOAD
 ========================= */
 
 const load = async()=>{
@@ -35,8 +29,7 @@ setLoading(true);
 
 try{
 
-const snap =
-await getDocs(collection(db,"nursingOrders"));
+const snap = await getDocs(collection(db,"nursingOrders"));
 
 const orders =
 snap.docs.map(d=>({
@@ -47,10 +40,12 @@ id:d.id,
 const map = {};
 
 /* =========================
-PROCESS PAYMENTS
+PROCESS
 ========================= */
 
 orders.forEach(o=>{
+
+/* PAYMENTS */
 
 (o.payments || []).forEach(p=>{
 
@@ -61,15 +56,11 @@ p.date
 
 if(!date) return;
 
-const day =
-date.toISOString().slice(0,10);
-
-/* DATE FILTER */
+const day = date.toISOString().slice(0,10);
 
 if(day < start || day > end) return;
 
 if(!map[day]){
-
 map[day]={
 date:day,
 cash:0,
@@ -77,31 +68,77 @@ upi:0,
 card:0,
 bank:0,
 other:0,
+refund:0,
 total:0,
 orders:[]
 };
-
 }
 
-const amount =
-Number(p.amount || 0);
+const amount = Number(p.amount || 0);
+const method = (p.method || "other").toLowerCase();
 
-const method =
-(p.method || "other").toLowerCase();
-
-map[day][method] =
-(map[day][method] || 0) + amount;
-
+/* ✅ ONLY ADD (no subtraction) */
+map[day][method] += amount;
 map[day].total += amount;
 
 map[day].orders.push({
-
 orderId:o.id,
 orderNo:o.orderNo,
 customer:o.customerName,
+type:"payment",
 method,
 amount
+});
 
+});
+
+/* REFUNDS */
+
+(o.refunds || []).forEach(r=>{
+
+if(r.status !== "paid") return;
+
+const date =
+r.date
+? new Date(r.date)
+: new Date(r.createdAt || o.createdAt);
+
+if(!date) return;
+
+const day = date.toISOString().slice(0,10);
+
+if(day < start || day > end) return;
+
+if(!map[day]){
+map[day]={
+date:day,
+cash:0,
+upi:0,
+card:0,
+bank:0,
+other:0,
+refund:0,
+total:0,
+orders:[]
+};
+}
+
+const amount = Number(r.amount || 0);
+const method = (r.method || "other").toLowerCase();
+
+/* ✅ DO NOT TOUCH METHOD COLUMNS */
+map[day].refund += amount;
+
+/* ✅ ONLY SUBTRACT FROM TOTAL */
+map[day].total -= amount;
+
+map[day].orders.push({
+orderId:o.id,
+orderNo:o.orderNo,
+customer:o.customerName,
+type:"refund",
+method,
+amount
 });
 
 });
@@ -109,7 +146,7 @@ amount
 });
 
 /* =========================
-CONVERT TO ARRAY
+FINAL
 ========================= */
 
 const result =
@@ -119,9 +156,7 @@ Object.values(map)
 setData(result);
 
 }catch(err){
-
 console.error(err);
-
 }
 
 setLoading(false);
@@ -137,10 +172,8 @@ return(
 <div className="nor-block">
 
 <h2 className="nor-section-title">
-Daily Revenue Collection
+Daily Cash Flow
 </h2>
-
-{/* DATE FILTER */}
 
 <div className="nor-filter-row">
 
@@ -163,18 +196,15 @@ onChange={e=>setEnd(e.target.value)}
 <table className="nor-table">
 
 <thead>
-
 <tr>
-
 <th>Date</th>
 <th>Cash</th>
 <th>UPI</th>
 <th>Card</th>
 <th>Bank</th>
-<th>Total</th>
-
+<th style={{color:"#dc2626"}}>Refund</th>
+<th>Total (Net)</th>
 </tr>
-
 </thead>
 
 <tbody>
@@ -190,14 +220,19 @@ className="nor-clickable"
 <td>{d.date}</td>
 
 <td>₹ {d.cash}</td>
-
 <td>₹ {d.upi}</td>
-
 <td>₹ {d.card}</td>
-
 <td>₹ {d.bank}</td>
 
-<td><strong>₹ {d.total}</strong></td>
+<td style={{color:"#dc2626"}}>
+₹ {d.refund}
+</td>
+
+<td>
+<strong style={{color:d.total>=0 ? "#16a34a" : "#dc2626"}}>
+₹ {d.total}
+</strong>
+</td>
 
 </tr>
 
@@ -207,9 +242,6 @@ className="nor-clickable"
 
 </table>
 
-{/* =========================
-ORDER MODAL
-========================= */}
 
 {selected && (
 
@@ -217,23 +249,18 @@ ORDER MODAL
 
 <div className="nor-modal-card">
 
-<h3>
-Orders for {selected.date}
-</h3>
+<h3>Transactions for {selected.date}</h3>
 
 <table className="nor-table">
 
 <thead>
-
 <tr>
-
 <th>Order</th>
 <th>Customer</th>
+<th>Type</th>
 <th>Method</th>
 <th>Amount</th>
-
 </tr>
-
 </thead>
 
 <tbody>
@@ -243,12 +270,22 @@ Orders for {selected.date}
 <tr key={i}>
 
 <td>{o.orderNo}</td>
-
 <td>{o.customer}</td>
+
+<td style={{
+color:o.type==="refund" ? "#dc2626" : "#16a34a",
+fontWeight:600
+}}>
+{o.type}
+</td>
 
 <td>{o.method}</td>
 
-<td>₹ {o.amount}</td>
+<td style={{
+color:o.type==="refund" ? "#dc2626" : "#16a34a"
+}}>
+₹ {o.amount}
+</td>
 
 </tr>
 
@@ -261,9 +298,10 @@ Orders for {selected.date}
 <button
 className="nor-btn"
 onClick={()=>setSelected(null)}
+
 >
-Close
-</button>
+
+Close </button>
 
 </div>
 

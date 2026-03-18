@@ -87,7 +87,7 @@ id:d.id,
 }));
 
 /* =========================
-FILTER BY DATE + SERVICE TYPE
+FILTER
 ========================= */
 
 const filteredOrders =
@@ -137,6 +137,9 @@ let discountTotal=0;
 let revenueCollected=0;
 let revenuePending=0;
 
+let refundPaidTotal = 0;
+let refundPendingTotal = 0;
+
 const paymentMap={};
 
 /* =========================
@@ -176,14 +179,48 @@ paid+=amount;
 revenueCollected+=amount;
 
 const method=(p.method||"other").toLowerCase();
-
 paymentMap[method]=(paymentMap[method]||0)+amount;
 
 });
 
-const pending=Math.max(total-paid,0);
+/* =========================
+REFUNDS
+========================= */
 
-revenuePending+=pending;
+let refundPaid = 0;
+let refundPending = 0;
+
+(o.refunds || []).forEach(r => {
+
+const amt = Number(r.amount || 0);
+
+if (r.status === "paid") {
+refundPaid += amt;
+refundPaidTotal += amt;
+
+// subtract from payment method
+const method=(r.method||"other").toLowerCase();
+paymentMap[method]=(paymentMap[method]||0)-amt;
+
+} else {
+refundPending += amt;
+refundPendingTotal += amt;
+}
+
+});
+
+/* =========================
+ADJUST COLLECTION
+========================= */
+
+revenueCollected -= refundPaid;
+
+/* =========================
+PENDING
+========================= */
+
+const pending = Math.max(total - paid + refundPending, 0);
+revenuePending += pending;
 
 /* =========================
 SAVE ORDER
@@ -198,8 +235,11 @@ customer:o.customerName,
 createdAt:o.createdAt,
 
 invoiceTotal:total,
-collected:paid,
+collected:paid - refundPaid,
 pending:pending,
+
+refundPaid,
+refundPending,
 
 staffCost:0
 
@@ -232,7 +272,7 @@ orderMap[a.orderId].staffCost+=amount;
 });
 
 /* =========================
-ORDER PROFIT
+ORDER PROFIT (YOUR LOGIC)
 ========================= */
 
 const orderData =
@@ -240,8 +280,7 @@ Object.values(orderMap).map(o=>({
 
 ...o,
 
-revenue:o.invoiceTotal,
-
+revenue:o.invoiceTotal, // ✅ NO REFUND IMPACT
 profit:o.invoiceTotal - o.staffCost
 
 }));
@@ -358,15 +397,19 @@ let activityLogs=[];
 
 filteredOrders.forEach(o=>{
 (o.activityLog||[])
-.forEach(a=>activityLogs.push(a));
+.forEach(a=>{
+if(inRange(a.editedAt)){
+activityLogs.push(a);
+}
+});
 });
 
 /* =========================
-PROFIT SUMMARY
+PROFIT SUMMARY (FINAL)
 ========================= */
 
-const revenue = invoiceTotal;
-const profit = revenue - salaryTotal;
+const revenue = invoiceTotal; // ✅ FINAL
+const profit = revenue - salaryTotal; // ✅ FINAL
 
 /* =========================
 SET STATE
@@ -383,14 +426,17 @@ discountTotal,
 revenueCollected,
 revenuePending,
 
+refundPaid: refundPaidTotal,
+refundPending: refundPendingTotal,
+
 salaryTotal,
 salaryPaid,
 salaryPending,
 
 profit,
 
-orders:filteredOrders.length,
-staff:staffData.length
+orders: filteredOrders.length,
+staff: staffData.length
 
 });
 
@@ -404,9 +450,7 @@ setExtensions(extensionData);
 setActivity(activityLogs);
 
 }catch(err){
-
 console.error(err);
-
 }
 
 setLoading(false);

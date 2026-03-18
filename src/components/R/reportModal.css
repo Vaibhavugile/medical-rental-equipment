@@ -6,7 +6,6 @@ MODAL OVERLAY
 position:fixed;
 top:0;
 left:0;
-
 width:100%;
 height:100%;
 
@@ -17,29 +16,25 @@ align-items:center;
 justify-content:center;
 
 z-index:1000;
-
 padding:40px;
 
-backdrop-filter:blur(4px);
+backdrop-filter:blur(6px);
 }
-
 
 /* =========================
 MODAL CONTAINER
 ========================= */
 
 .report-modal-container{
-
 background:#ffffff;
 
 width:96vw;
 max-width:1150px;
 
-border-radius:12px;
+border-radius:14px;
+padding:28px;
 
-padding:30px;
-
-box-shadow:0 30px 70px rgba(0,0,0,0.25);
+box-shadow:0 35px 80px rgba(0,0,0,0.25);
 
 max-height:85vh;
 overflow:auto;
@@ -48,147 +43,119 @@ animation:reportModalFade .25s ease;
 
 display:flex;
 flex-direction:column;
+gap:10px;
 }
-
 
 /* =========================
 TITLE
 ========================= */
 
 .report-modal-title{
-
 font-size:20px;
 font-weight:600;
-
 color:#111827;
-
-margin-bottom:6px;
+margin-bottom:4px;
 }
-
 
 /* =========================
 SUMMARY TEXT
 ========================= */
 
 .report-modal-summary{
-
 font-size:14px;
 color:#6b7280;
-
-margin-bottom:20px;
-
+margin-bottom:18px;
 font-weight:500;
 }
-
 
 /* =========================
 SEARCH BOX
 ========================= */
 
 .report-modal-search{
-
 width:100%;
-
 padding:10px 12px;
 
 border:1px solid #e5e7eb;
-border-radius:6px;
+border-radius:8px;
 
 font-size:14px;
-
 margin-bottom:18px;
 
 outline:none;
 
-transition:border .2s ease, box-shadow .2s ease;
-
+transition:all .2s ease;
 }
 
 .report-modal-search:focus{
-
 border-color:#2563eb;
-
 box-shadow:0 0 0 2px rgba(37,99,235,0.15);
-
 }
 
-
 /* =========================
-TABLE WRAPPER
+TABLE
 ========================= */
 
 .report-modal-table{
 width:100%;
-border-collapse:collapse;
+border-collapse:separate;
+border-spacing:0;
 font-size:14px;
 min-width:720px;
 }
-
 
 /* =========================
 TABLE HEADER
 ========================= */
 
 .report-modal-table thead{
-
 background:#f8fafc;
-
 position:sticky;
 top:0;
 z-index:2;
-
 border-bottom:1px solid #e5e7eb;
 }
 
 .report-modal-table th{
-
 padding:14px 16px;
 
-font-size:12px;
+font-size:11px;
 font-weight:600;
 
 color:#6b7280;
-
 text-align:left;
 
 text-transform:uppercase;
-letter-spacing:0.05em;
+letter-spacing:0.06em;
 
 cursor:pointer;
+white-space:nowrap;
 }
 
-
 /* =========================
-TABLE ROWS
+TABLE CELLS
 ========================= */
 
 .report-modal-table td{
-
 padding:14px 16px;
-
 border-bottom:1px solid #f1f5f9;
-
 color:#374151;
 }
-
 
 /* =========================
 ROW HOVER
 ========================= */
 
 .report-modal-table tbody tr:hover{
-
 background:#f9fafb;
 transition:background .15s ease;
 }
-
 
 /* =========================
 ORDER COLUMN
 ========================= */
 
 .report-modal-order{
-
 font-weight:600;
 color:#2563eb;
 cursor:pointer;
@@ -198,76 +165,77 @@ cursor:pointer;
 text-decoration:underline;
 }
 
-
 /* =========================
 MONEY COLUMNS
 ========================= */
 
 .report-modal-money{
-
 font-weight:600;
 color:#111827;
-
 text-align:right;
-
 font-variant-numeric:tabular-nums;
+white-space:nowrap;
 }
 
-
 /* =========================
-MONEY STATES
+FINANCIAL COLORS
 ========================= */
 
+/* cash in */
 .collected{
 color:#16a34a;
 }
 
-.pending{
+/* refund / outgoing */
+.red{
 color:#dc2626;
 }
 
+/* pending / liability */
+.pending{
+color:#ea580c;
+}
+
+/* profit */
 .profit{
 color:#059669;
 }
 
+/* loss */
 .loss{
 color:#dc2626;
 }
 
+/* invoice / neutral */
+.invoice{
+color:#2563eb;
+}
 
 /* =========================
 EMPTY STATE
 ========================= */
 
 .report-modal-empty{
-
 padding:40px;
-
 text-align:center;
-
 color:#9ca3af;
-
 font-size:14px;
 }
-
 
 /* =========================
 CLOSE BUTTON
 ========================= */
 
 .report-modal-close{
-
 margin-top:24px;
 
 width:100%;
-
 padding:14px;
 
 border:none;
-border-radius:8px;
+border-radius:10px;
 
 background:#2563eb;
-
 color:white;
 
 font-size:14px;
@@ -279,7 +247,6 @@ transition:all .2s ease;
 }
 
 .report-modal-close:hover{
-
 background:#1d4ed8;
 transform:translateY(-1px);
 }
@@ -287,7 +254,6 @@ transform:translateY(-1px);
 .report-modal-close:active{
 transform:translateY(0);
 }
-
 
 /* =========================
 SCROLLBAR
@@ -306,29 +272,22 @@ background:#cbd5f5;
 border-radius:20px;
 }
 
-.report-modal-container::-webkit-scrollbar-thumb:hover{
-background:#94a3b8;
-}
-
+.report-modal-container::-webkit-scrollbar-thumb:hover{}
 
 /* =========================
 MODAL ANIMATION
 ========================= */
 
 @keyframes reportModalFade{
-
 from{
 opacity:0;
 transform:translateY(-15px) scale(.98);
 }
-
 to{
 opacity:1;
 transform:translateY(0) scale(1);
 }
-
 }
-
 
 /* =========================
 RESPONSIVE
@@ -338,11 +297,11 @@ RESPONSIVE
 
 .report-modal-container{
 width:96%;
-padding:22px;
+padding:20px;
 }
 
 .report-modal-table{
-min-width:620px;
+min-width:600px;
 }
 
 .report-modal-title{
@@ -350,6 +309,28 @@ font-size:18px;
 }
 
 .report-modal-summary{
+font-size:13px;
+}
+
+}
+
+@media (max-width:600px){
+
+.report-modal-overlay{
+padding:16px;
+}
+
+.report-modal-container{
+padding:16px;
+border-radius:10px;
+}
+
+.report-modal-table{
+min-width:520px;
+font-size:13px;
+}
+
+.report-modal-search{
 font-size:13px;
 }
 

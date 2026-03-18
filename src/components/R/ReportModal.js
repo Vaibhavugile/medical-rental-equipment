@@ -1,8 +1,7 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import "./reportModal.css";
 
 export default function ReportModal({ type, data = {}, onClose }) {
-
 
 const orders = data.orders || [];
 const staff = data.staff || [];
@@ -11,8 +10,8 @@ const summary = data.summary || {};
 const [search,setSearch] = useState("");
 const [sortKey,setSortKey] = useState("");
 const [sortDir,setSortDir] = useState("desc");
-if (!type) return null;
 
+if (!type) return null;
 
 /* =========================
 UTIL
@@ -21,25 +20,19 @@ UTIL
 const formatCurrency = v =>
 Number(v || 0).toLocaleString("en-IN");
 
-
 const handleSort = key => {
-
 if(sortKey === key){
 setSortDir(sortDir === "asc" ? "desc" : "asc");
 }else{
 setSortKey(key);
 setSortDir("desc");
 }
-
 };
 
-
 const applySort = (arr) => {
-
 if(!sortKey) return arr;
 
 return [...arr].sort((a,b)=>{
-
 let A = a[sortKey] || 0;
 let B = b[sortKey] || 0;
 
@@ -48,60 +41,49 @@ if(typeof B === "string") B = B.toLowerCase();
 
 if(A > B) return sortDir === "asc" ? 1 : -1;
 if(A < B) return sortDir === "asc" ? -1 : 1;
-
 return 0;
-
 });
-
 };
 
-
-
 /* =========================
-SEARCH FILTER
+FILTER
 ========================= */
 
 const filterOrders = (list) => {
-
 if(!search) return list;
 
 return list.filter(o =>
 (o.orderNo || "").toLowerCase().includes(search.toLowerCase()) ||
 (o.customer || "").toLowerCase().includes(search.toLowerCase())
 );
-
 };
 
-
 const filterStaff = (list) => {
-
 if(!search) return list;
 
 return list.filter(s =>
 (s.staffName || "").toLowerCase().includes(search.toLowerCase())
 );
-
 };
 
-
-
 /* =========================
-REVENUE COLLECTED
+CASH COLLECTED
 ========================= */
 
 const renderRevenueCollected = () => {
 
-let collected = orders.filter(o => Number(o.collected) > 0);
+let list = orders.filter(o => Number(o.collected) > 0);
 
-collected = filterOrders(collected);
-collected = applySort(collected);
+list = filterOrders(list);
+list = applySort(list);
 
 return (
 <>
-<h2 className="report-modal-title">Revenue Collected</h2>
+
+<h2 className="report-modal-title">Cash Collected</h2>
 
 <div className="report-modal-summary">
-Total Collected: ₹ {formatCurrency(summary.revenueCollected)}
+Total Cash: ₹ {formatCurrency(summary.revenueCollected)}
 </div>
 
 <input
@@ -115,48 +97,36 @@ onChange={e=>setSearch(e.target.value)}
 
 <thead>
 <tr>
-
 <th onClick={()=>handleSort("orderNo")}>Order</th>
-
 <th onClick={()=>handleSort("customer")}>Customer</th>
-
-<th className="report-modal-money"
-onClick={()=>handleSort("collected")}
->
-Collected
+<th onClick={()=>handleSort("invoiceTotal")}>Invoice</th>
+<th className="report-modal-money" onClick={()=>handleSort("collected")}>
+Cash
 </th>
-
-<th className="report-modal-money"
-onClick={()=>handleSort("staffCost")}
->
-Staff Cost
-</th>
-
-<th className="report-modal-money"
-onClick={()=>handleSort("profit")}
->
-Profit
-</th>
-
+<th className="report-modal-money">Refund Paid</th>
+<th className="report-modal-money">Profit</th>
 </tr>
 </thead>
 
 <tbody>
 
-{collected.map(o => (
+{list.map(o => (
 
 <tr key={o.orderId}>
 
 <td className="report-modal-order">{o.orderNo}</td>
-
 <td>{o.customer}</td>
+
+<td className="report-modal-money">
+₹ {formatCurrency(o.invoiceTotal)}
+</td>
 
 <td className="report-modal-money collected">
 ₹ {formatCurrency(o.collected)}
 </td>
 
-<td className="report-modal-money">
-₹ {formatCurrency(o.staffCost)}
+<td className="report-modal-money red">
+₹ {formatCurrency(o.refundPaid)}
 </td>
 
 <td className="report-modal-money">
@@ -175,22 +145,21 @@ Profit
 
 };
 
-
-
 /* =========================
-REVENUE PENDING
+CUSTOMER PENDING
 ========================= */
 
 const renderRevenuePending = () => {
 
-let pending = orders.filter(o => Number(o.pending) > 0);
+let list = orders.filter(o => Number(o.pending) > 0);
 
-pending = filterOrders(pending);
-pending = applySort(pending);
+list = filterOrders(list);
+list = applySort(list);
 
 return (
 <>
-<h2 className="report-modal-title">Revenue Pending</h2>
+
+<h2 className="report-modal-title">Customer Pending</h2>
 
 <div className="report-modal-summary">
 Total Pending: ₹ {formatCurrency(summary.revenuePending)}
@@ -207,51 +176,35 @@ onChange={e=>setSearch(e.target.value)}
 
 <thead>
 <tr>
-
 <th onClick={()=>handleSort("orderNo")}>Order</th>
-
 <th onClick={()=>handleSort("customer")}>Customer</th>
-
-<th className="report-modal-money"
-onClick={()=>handleSort("invoiceTotal")}
->
-Invoice
-</th>
-
-<th className="report-modal-money"
-onClick={()=>handleSort("collected")}
->
-Collected
-</th>
-
-<th className="report-modal-money"
-onClick={()=>handleSort("pending")}
->
-Pending
-</th>
-
+<th>Invoice</th>
+<th>Collected</th>
+<th>Refund Pending</th>
+<th>Pending</th>
 </tr>
 </thead>
 
 <tbody>
 
-{pending.map(o => (
+{list.map(o => (
 
 <tr key={o.orderId}>
 
 <td className="report-modal-order">{o.orderNo}</td>
-
 <td>{o.customer}</td>
 
-<td className="report-modal-money">
-₹ {formatCurrency(o.invoiceTotal)}
-</td>
+<td>₹ {formatCurrency(o.invoiceTotal)}</td>
 
-<td className="report-modal-money collected">
+<td className="collected">
 ₹ {formatCurrency(o.collected)}
 </td>
 
-<td className="report-modal-money pending">
+<td className="pending">
+₹ {formatCurrency(o.refundPending)}
+</td>
+
+<td className="pending">
 ₹ {formatCurrency(o.pending)}
 </td>
 
@@ -267,154 +220,196 @@ Pending
 
 };
 
+/* =========================
+REFUND PAID
+========================= */
 
+const renderRefundPaid = () => {
+
+let list = orders.filter(o => Number(o.refundPaid) > 0);
+
+list = filterOrders(list);
+
+return (
+<>
+
+<h2 className="report-modal-title">Refund Paid</h2>
+
+<div className="report-modal-summary">
+Total Refund Paid: ₹ {formatCurrency(summary.refundPaid)}
+</div>
+
+<table className="report-modal-table">
+
+<thead>
+<tr>
+<th>Order</th>
+<th>Customer</th>
+<th>Refund Paid</th>
+</tr>
+</thead>
+
+<tbody>
+
+{list.map(o => (
+
+<tr key={o.orderId}>
+<td>{o.orderNo}</td>
+<td>{o.customer}</td>
+<td className="report-modal-money red">
+₹ {formatCurrency(o.refundPaid)}
+</td>
+</tr>
+))}
+
+</tbody>
+
+</table>
+</>
+);
+
+};
 
 /* =========================
-SALARY PAID
+REFUND PENDING
+========================= */
+
+const renderRefundPending = () => {
+
+let list = orders.filter(o => Number(o.refundPending) > 0);
+
+list = filterOrders(list);
+
+return (
+<>
+
+<h2 className="report-modal-title">Refund Pending</h2>
+
+<div className="report-modal-summary">
+Total Refund Pending: ₹ {formatCurrency(summary.refundPending)}
+</div>
+
+<table className="report-modal-table">
+
+<thead>
+<tr>
+<th>Order</th>
+<th>Customer</th>
+<th>Refund Pending</th>
+</tr>
+</thead>
+
+<tbody>
+
+{list.map(o => (
+
+<tr key={o.orderId}>
+<td>{o.orderNo}</td>
+<td>{o.customer}</td>
+<td className="report-modal-money pending">
+₹ {formatCurrency(o.refundPending)}
+</td>
+</tr>
+))}
+
+</tbody>
+
+</table>
+</>
+);
+
+};
+
+/* =========================
+SALARY
 ========================= */
 
 const renderSalaryPaid = () => {
 
-let paid = staff.filter(s => Number(s.paid) > 0);
+let list = staff.filter(s => Number(s.paid) > 0);
 
-paid = filterStaff(paid);
-paid = applySort(paid);
+list = filterStaff(list);
+list = applySort(list);
 
 return (
 <>
+
 <h2 className="report-modal-title">Salary Paid</h2>
 
 <div className="report-modal-summary">
 Total Paid: ₹ {formatCurrency(summary.salaryPaid)}
 </div>
 
-<input
-className="report-modal-search"
-placeholder="Search staff..."
-value={search}
-onChange={e=>setSearch(e.target.value)}
-/>
-
 <table className="report-modal-table">
-
 <thead>
 <tr>
-
-<th onClick={()=>handleSort("staffName")}>Staff</th>
-
-<th onClick={()=>handleSort("orders")}>Orders</th>
-
-<th className="report-modal-money"
-onClick={()=>handleSort("paid")}
->
-Paid
-</th>
-
+<th>Staff</th>
+<th>Orders</th>
+<th>Paid</th>
 </tr>
 </thead>
-
 <tbody>
 
-{paid.map(s => (
+{list.map(s => (
 
 <tr key={s.staffId}>
-
 <td>{s.staffName}</td>
-
 <td>{s.orders}</td>
-
-<td className="report-modal-money">
-₹ {formatCurrency(s.paid)}
-</td>
-
+<td>₹ {formatCurrency(s.paid)}</td>
 </tr>
-
 ))}
 
 </tbody>
-
 </table>
 </>
 );
 
 };
 
-
-
-/* =========================
-SALARY PENDING
-========================= */
-
 const renderSalaryPending = () => {
 
-let pending = staff.filter(s => Number(s.pending) > 0);
+let list = staff.filter(s => Number(s.pending) > 0);
 
-pending = filterStaff(pending);
-pending = applySort(pending);
+list = filterStaff(list);
+list = applySort(list);
 
 return (
 <>
+
 <h2 className="report-modal-title">Salary Pending</h2>
 
 <div className="report-modal-summary">
 Total Pending: ₹ {formatCurrency(summary.salaryPending)}
 </div>
 
-<input
-className="report-modal-search"
-placeholder="Search staff..."
-value={search}
-onChange={e=>setSearch(e.target.value)}
-/>
-
 <table className="report-modal-table">
-
 <thead>
 <tr>
-
-<th onClick={()=>handleSort("staffName")}>Staff</th>
-
-<th onClick={()=>handleSort("orders")}>Orders</th>
-
-<th className="report-modal-money"
-onClick={()=>handleSort("pending")}
->
-Pending
-</th>
-
+<th>Staff</th>
+<th>Orders</th>
+<th>Pending</th>
 </tr>
 </thead>
-
 <tbody>
 
-{pending.map(s => (
+{list.map(s => (
 
 <tr key={s.staffId}>
-
 <td>{s.staffName}</td>
-
 <td>{s.orders}</td>
-
-<td className="report-modal-money pending">
-₹ {formatCurrency(s.pending)}
-</td>
-
+<td>₹ {formatCurrency(s.pending)}</td>
 </tr>
-
 ))}
 
 </tbody>
-
 </table>
 </>
 );
 
 };
 
-
-
 /* =========================
-CONTENT SWITCH
+SWITCH
 ========================= */
 
 const renderContent = () => {
@@ -426,6 +421,12 @@ return renderRevenueCollected();
 
 case "revenuePending":
 return renderRevenuePending();
+
+case "refundPaid":
+return renderRefundPaid();
+
+case "refundPending":
+return renderRefundPending();
 
 case "salaryPaid":
 return renderSalaryPaid();
@@ -440,12 +441,9 @@ return null;
 
 };
 
-
-
 return (
 
 <div className="report-modal-overlay">
-
 <div className="report-modal-container">
 
 {renderContent()}
@@ -453,12 +451,12 @@ return (
 <button
 className="report-modal-close"
 onClick={onClose}
+
 >
-Close
-</button>
+
+Close </button>
 
 </div>
-
 </div>
 
 );

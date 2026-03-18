@@ -7,13 +7,14 @@ return(
 <div className="nor-filters">
 
 <select
-value={filters.type}
+value={filters.type || "today"}
 onChange={e=>
 setFilters({
 ...filters,
 type:e.target.value
 })
 }
+
 >
 
 <option value="today">Today</option>
@@ -29,6 +30,7 @@ type:e.target.value
 
 <input
 type="date"
+value={filters.start || ""}   // ✅ FIX
 onChange={e=>
 setFilters({
 ...filters,
@@ -39,6 +41,7 @@ start:e.target.value
 
 <input
 type="date"
+value={filters.end || ""}     // ✅ FIX
 onChange={e=>
 setFilters({
 ...filters,

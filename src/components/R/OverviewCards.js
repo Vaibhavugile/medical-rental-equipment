@@ -21,34 +21,58 @@ onClick={()=>onCardClick("orders")}
 onClick={()=>onCardClick("staff")}
 />
 
-<Card title="Subtotal" value={`₹ ${formatCurrency(data.subtotal)}`} color="gray"
-/>
+<Card title="Subtotal" value={`₹ ${formatCurrency(data.subtotal)}`} color="gray" />
 
-<Card title="Tax" value={`₹ ${formatCurrency(data.taxTotal)}`} color="orange"
-/>
+<Card title="Tax" value={`₹ ${formatCurrency(data.taxTotal)}`} color="orange" />
 
-<Card title="Discount" value={`₹ ${formatCurrency(data.discountTotal)}`} color="pink"
-/>
+<Card title="Discount" value={`₹ ${formatCurrency(data.discountTotal)}`} color="pink" />
 
-<Card title="Invoice Total"
+{/* 📦 INVOICE */}
+<Card
+title="Invoice Total"
 value={`₹ ${formatCurrency(data.invoiceTotal)}`}
-color="orange"
+color="gray"
+/>
+
+{/* 💰 REVENUE (FINAL BUSINESS VALUE) */}
+<Card
+title="Revenue"
+value={`₹ ${formatCurrency(data.revenue)}`}
+color="green"
+onClick={()=>onCardClick("revenue")}
+/>
+
+{/* 🔁 REFUNDS */}
+<Card
+title="Refund Paid"
+value={`₹ ${formatCurrency(data.refundPaid)}`}
+color="red"
+onClick={()=>onCardClick("refundPaid")}
 />
 
 <Card
-title="Revenue Collected"
+title="Refund Pending"
+value={`₹ ${formatCurrency(data.refundPending)}`}
+color="orange"
+onClick={()=>onCardClick("refundPending")}
+/>
+
+{/* 💵 CASHFLOW */}
+<Card
+title="Cash Collected"
 value={`₹ ${formatCurrency(data.revenueCollected)}`}
 color="green"
 onClick={()=>onCardClick("revenueCollected")}
 />
 
 <Card
-title="Revenue Pending"
+title="Customer Pending"
 value={`₹ ${formatCurrency(data.revenuePending)}`}
 color="yellow"
 onClick={()=>onCardClick("revenuePending")}
 />
 
+{/* 👨‍⚕️ SALARY */}
 <Card
 title="Salary Total"
 value={`₹ ${formatCurrency(data.salaryTotal)}`}
@@ -69,8 +93,9 @@ color="yellow"
 onClick={()=>onCardClick("salaryPending")}
 />
 
+{/* 📊 PROFIT */}
 <Card
-title="Profit"
+title="Profit (Service Based)"
 value={`₹ ${formatCurrency(data.profit)}`}
 color={data.profit >=0 ? "green" : "red"}
 />

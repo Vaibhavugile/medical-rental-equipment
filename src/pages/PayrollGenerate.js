@@ -20,11 +20,10 @@ import ActivityAnalytics from "../components/R/ActivityAnalytics";
 export default function PayrollGenerate({ serviceType="nursing" }){
 
 const [filters,setFilters] = useState({
-type:"month",
-start:null,
-end:null
+  type: "today",
+  start: "",
+  end: ""
 });
-
 const report = useNursingReportData(filters,serviceType);
 
 const [modal,setModal]=useState(null);
