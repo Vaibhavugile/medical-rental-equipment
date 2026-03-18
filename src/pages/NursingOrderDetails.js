@@ -2225,7 +2225,7 @@ const handleCustomerRefund = async (
 
     await updateDoc(doc(db, "nursingOrders", id), {
       refunds: updatedRefunds,
-      lastStoppedAt: stopDate || new Date().toISOString(),
+      lastStoppedAt: serverTimestamp(),
       activityLog: arrayUnion(log),
       updatedAt: serverTimestamp(),
     });

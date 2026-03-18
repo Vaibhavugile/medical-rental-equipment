@@ -488,6 +488,16 @@ useEffect(() => {
   });
   return () => unsub();
 }, []);
+const getRefundPending = (order) => {
+  const refunds = order?.refunds || [];
+
+  return refunds.reduce((sum, r) => {
+    const remaining =
+      Number(r.amount || 0) - Number(r.paidAmount || 0);
+
+    return sum + Math.max(0, remaining);
+  }, 0);
+};
 
 const derivedCounts = useMemo(() => {
   const m = {
@@ -500,6 +510,7 @@ const derivedCounts = useMemo(() => {
     starts_today: 0,
     on_rent: 0,
     ending_today: 0,
+    refund_pending: 0,
     in_transit: 0,
     delivered: 0,
     active: 0,
@@ -512,6 +523,9 @@ const derivedCounts = useMemo(() => {
  for (const o of orders) {
   const k = deriveDetailedStatus(o, deliveriesByOrder) || "all";
   if (m[k] != null) m[k] += 1;
+  if (getRefundPending(o) > 0) {
+  m.refund_pending += 1;
+}
 }
 
 
@@ -687,13 +701,20 @@ const filtered = useMemo(() => {
   }
 
   // 3️⃣ DERIVED STATUS FILTER
-  if (filterDerived !== "all") {
+// 3️⃣ DERIVED STATUS FILTER
+if (filterDerived !== "all") {
+
+  // ✅ NEW: refund pending filter
+  if (filterDerived === "refund_pending") {
+    arr = arr.filter((o) => getRefundPending(o) > 0);
+  } else {
     arr = arr.filter(
       (o) =>
         deriveDetailedStatus(o, deliveriesByOrder) ===
         filterDerived
     );
   }
+}
 
   return arr;
 }, [
@@ -1296,6 +1317,7 @@ const assignDriversToOrder = async (driverIds = []) => {
     setSaving(false);
   }
 };
+
 
 async function updateOrderPaymentSummary(orderId) {
   const paymentsCol = collection(db, "orders", orderId, "payments");
@@ -1927,6 +1949,7 @@ if (payment) {
               <th>Order No</th>
               <th>Customer</th>
               <th>Status</th>
+              <th>Refund Pending</th>
               <th>Delivery</th>
               <th>Start Date</th> 
               <th>End Date</th>
@@ -2006,6 +2029,24 @@ const badgeText = getDeliveryBadgeText(o, deliveriesByOrder);
       })}
     </div>
   </td>
+  <td>
+  {(() => {
+    const pending = getRefundPending(o);
+
+    if (!pending) return "—";
+
+    return (
+      <span
+        style={{
+          color: "#b91c1c",
+          fontWeight: 700,
+        }}
+      >
+        ₹{fmtCurrency(pending)}
+      </span>
+    );
+  })()}
+</td>
 
   {/* ❌ REMOVE raw delivery status column */}
   <td style={{ fontSize: 12 }}>

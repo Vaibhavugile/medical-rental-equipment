@@ -121,6 +121,11 @@ const caretakerCount = orders.filter((o) =>
 ).length;
 
 const allCount = orders.length;
+const getRefundPending = (order) => {
+  return (order.refunds || [])
+    .filter(r => r.status === "pending")
+    .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+};
 
 const filteredOrders = pageOrders.filter((o) => {
 
@@ -200,6 +205,10 @@ const filteredOrders = pageOrders.filter((o) => {
 
     matchesKpi = diff > 0 && diff <= 5;
   }
+  if (kpiFilter === "refundPending") {
+  const refundPending = getRefundPending(o);
+  matchesKpi = refundPending > 0;
+}
 
   return (
     matchesSearch &&
@@ -265,6 +274,13 @@ const endingSoonCount = serviceRanges.filter((o) => {
 
   return diff > 0 && diff <= 5; // next 3 days
 }).length;
+const refundPendingCount = serviceRanges.filter((o) => {
+  const refundPending = (o.refunds || [])
+    .filter(r => r.status === "pending")
+    .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+
+  return refundPending > 0;
+}).length;
 
   return (
     <div className="no-wrap">
@@ -321,6 +337,15 @@ const endingSoonCount = serviceRanges.filter((o) => {
     <div className="no-kpi-label">Ending Soon</div>
     <div className="no-kpi-value">{endingSoonCount}</div>
   </div>
+  <div
+  className={`no-kpi danger ${kpiFilter === "refundPending" ? "active" : ""}`}
+  onClick={() =>
+    setKpiFilter(kpiFilter === "refundPending" ? "all" : "refundPending")
+  }
+>
+  <div className="no-kpi-label">Refund Pending</div>
+  <div className="no-kpi-value">{refundPendingCount}</div>
+</div>
 
 </div>
   <div className="no-head-top">

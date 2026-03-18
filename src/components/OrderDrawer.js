@@ -62,22 +62,89 @@ export default function OrderDrawer({
     extraPrice: "",
   });
 
+  const [stopItemModal, setStopItemModal] = useState({
+    open: false,
+    itemIndex: null,
+    stopDate: "",
+    amountOverride: "",
+  });
+
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [customerDraft, setCustomerDraft] = useState(null);
   const [customerErrors, setCustomerErrors] = useState({});
+  const [refundModal, setRefundModal] = useState({
+  open: false,
+  refundIndex: null,
+  amount: "",
+  method: "cash",
+  note: "",
+});
   const diffDaysInclusive = (start, end) => {
-  if (!start || !end) return 0;
+    if (!start || !end) return 0;
 
-  const s = new Date(start);
-  const e = new Date(end);
+    const s = new Date(start);
+    const e = new Date(end);
 
-  if (isNaN(s) || isNaN(e)) return 0;
+    if (isNaN(s) || isNaN(e)) return 0;
 
-  const msPerDay = 24 * 60 * 60 * 1000;
-  const diff = Math.round((e - s) / msPerDay) + 1;
+    const msPerDay = 24 * 60 * 60 * 1000;
+    const diff = Math.round((e - s) / msPerDay) + 1;
 
-  return diff > 0 ? diff : 0;
-};
+    return diff > 0 ? diff : 0;
+  };
+
+  const getItemStopPreview = () => {
+    if (
+      stopItemModal.itemIndex === null ||
+      !stopItemModal.stopDate
+    )
+      return null;
+
+    const item = selectedOrder.items[stopItemModal.itemIndex];
+    if (!item) return null;
+
+    const start = new Date(item.expectedStartDate);
+    const oldEnd = new Date(item.expectedEndDate);
+    const newEnd = new Date(stopItemModal.stopDate);
+
+    if (newEnd >= oldEnd) return null;
+
+    const totalDays =
+      Math.round((oldEnd - start) / (1000 * 60 * 60 * 24)) + 1;
+
+    const newDays =
+      Math.round((newEnd - start) / (1000 * 60 * 60 * 24)) + 1;
+
+    const qty = Number(item.qty || 1);
+    const oldAmount = Number(item.amount || 0);
+
+    // 🔥 per day
+    const perDayRate = oldAmount / totalDays;
+
+    // 🔥 auto amount
+    const calculatedAmount = Math.round(
+      perDayRate * newDays * qty
+    );
+
+    // 🔥 override
+    const finalAmount =
+      stopItemModal.amountOverride !== ""
+        ? Number(stopItemModal.amountOverride)
+        : calculatedAmount;
+
+    // 🔥 derive new rate
+    const finalRate =
+      newDays > 0 ? finalAmount / newDays / qty : 0;
+
+    return {
+      newDays,
+      calculatedAmount,
+      finalAmount,
+      finalRate,
+    };
+  };
+
+  const stopItemPreview = getItemStopPreview();
   // --- local helpers (UI-only) ---
   const fmtCurrency = (v) => {
     try {
@@ -90,62 +157,62 @@ export default function OrderDrawer({
     }
   };
   const addItem = () => {
-  setSelectedOrder((prev) => {
-    if (!prev) return prev;
+    setSelectedOrder((prev) => {
+      if (!prev) return prev;
 
-    const items = Array.isArray(prev.items) ? [...prev.items] : [];
+      const items = Array.isArray(prev.items) ? [...prev.items] : [];
 
-    items.push({
-      id: `i-${Date.now()}-${items.length}`,
-      name: "",
-      qty: 1,
-      rate: 0,
-      amount: 0,
-      notes: "",
-      days: 0,
-      expectedStartDate: "",
-      expectedEndDate: "",
-      productId: "",
-      branchId: "",
-      assignedAssets: [],
-      autoAssigned: false,
+      items.push({
+        id: `i-${Date.now()}-${items.length}`,
+        name: "",
+        qty: 1,
+        rate: 0,
+        amount: 0,
+        notes: "",
+        days: 0,
+        expectedStartDate: "",
+        expectedEndDate: "",
+        productId: "",
+        branchId: "",
+        assignedAssets: [],
+        autoAssigned: false,
+      });
+
+      return {
+        ...prev,
+        items,
+      };
     });
-
-    return {
-      ...prev,
-      items,
-    };
-  });
-};
+  };
   const validateCustomer = () => {
-  const errors = {};
+    const errors = {};
 
-  const name = customerDraft?.customerName?.trim();
-  const phoneRaw = customerDraft?.customerPhone || "";
-  const phone = phoneRaw.replace(/\D/g, ""); // ✅ remove spaces, +, etc
-  const email = customerDraft?.customerEmail?.trim();
+    const name = customerDraft?.customerName?.trim();
+    const phoneRaw = customerDraft?.customerPhone || "";
+    const phone = phoneRaw.replace(/\D/g, ""); // ✅ remove spaces, +, etc
+    const email = customerDraft?.customerEmail?.trim();
 
-  // NAME
-  if (!name) {
-    errors.customerName = "Name is required";
-  }
+    // NAME
+    if (!name) {
+      errors.customerName = "Name is required";
+    }
 
-  // PHONE
-  if (!phone) {
-    errors.customerPhone = "Phone is required";
-  } else if (phone.length !== 10) {
-    errors.customerPhone = "Phone must be exactly 10 digits";
-  }
+    // PHONE
+    if (!phone) {
+      errors.customerPhone = "Phone is required";
+    } else if (phone.length !== 10) {
+      errors.customerPhone = "Phone must be exactly 10 digits";
+    }
 
-  // ADDRESS
-  if (!customerDraft?.deliveryAddress?.trim()) {
-    errors.deliveryAddress = "Address is required";
-  }
+    // ADDRESS
+    if (!customerDraft?.deliveryAddress?.trim()) {
+      errors.deliveryAddress = "Address is required";
+    }
 
-  setCustomerErrors(errors);
+    setCustomerErrors(errors);
 
-  return Object.keys(errors).length === 0;
-};
+    return Object.keys(errors).length === 0;
+  };
   const confirmAndChangeStatus = async (newStatus) => {
     let msg = "";
 
@@ -239,19 +306,89 @@ export default function OrderDrawer({
   // ====== SAME-AS-OrderCreate reserve flow ======
 
   // Confirm from picker: add selected IDs then reserve each (no checkout)
-const confirmAssignAndReserve = async () => {
-  try {
-    const idx = assetPicker.itemIndex;
-    const item = selectedOrder.items[idx];
+  const confirmAssignAndReserve = async () => {
+    try {
+      const idx = assetPicker.itemIndex;
+      const item = selectedOrder.items[idx];
 
-    if (!item) return;
+      if (!item) return;
 
-    const picked = Object.keys(assetPicker.selected || {}).filter(
-      (id) => assetPicker.selected[id]
-    );
+      const picked = Object.keys(assetPicker.selected || {}).filter(
+        (id) => assetPicker.selected[id]
+      );
 
-    if (!picked.length) {
-      // nothing selected → just close
+      if (!picked.length) {
+        // nothing selected → just close
+        setAssetPicker({
+          open: false,
+          itemIndex: null,
+          assets: [],
+          selected: {},
+          loading: false,
+        });
+        return;
+      }
+
+      // ✅ apply same logic as OrderCreate
+      const existing = item.assignedAssets || [];
+
+      const result = assignAssetsWithLimit({
+        existing,
+        selected: picked,
+        qty: Number(item.qty || 0),
+      });
+
+      if (result.overflow) {
+        alert(`Max ${item.qty} assets allowed`);
+      }
+
+      // ✅ find only NEW assets (important fix)
+      const newlyAdded = result.merged.filter(
+        (id) => !existing.includes(id)
+      );
+
+      // ✅ OPTIONAL SAFETY (recommended)
+      if (newlyAdded.length) {
+        const latest = await listAvailableAssetsForRange({
+          productId: item.productId,
+          branchId: item.branchId,
+          from: item.expectedStartDate,
+          to: item.expectedEndDate,
+        });
+
+        const latestIds = new Set(latest.map((a) => a.id));
+
+        const invalid = newlyAdded.filter((id) => !latestIds.has(id));
+
+        if (invalid.length) {
+          alert("Some selected assets are no longer available");
+          return;
+        }
+      }
+
+      // ✅ update UI first
+      updateOrderItem(idx, {
+        assignedAssets: result.merged,
+      });
+
+      // ✅ reserve ONLY new assets (critical fix)
+      for (const id of newlyAdded) {
+        try {
+          await reserveAsset(id, {
+            reservationId: selectedOrder.id,
+            orderId: selectedOrder.id,
+            customer: selectedOrder.customerName || "",
+            from: item.expectedStartDate || null,
+            to: item.expectedEndDate || null,
+            note: `Reserved for order ${selectedOrder.orderNo || selectedOrder.id
+              }`,
+          });
+        } catch (err) {
+          console.error("Reserve failed for:", id, err);
+        }
+      }
+
+      // ✅ close modal
       setAssetPicker({
         open: false,
         itemIndex: null,
@@ -259,83 +396,12 @@ const confirmAssignAndReserve = async () => {
         selected: {},
         loading: false,
       });
-      return;
+
+    } catch (e) {
+      console.error("Assign & reserve failed:", e);
+      alert(e?.message || "Failed to assign assets");
     }
-
-    // ✅ apply same logic as OrderCreate
-    const existing = item.assignedAssets || [];
-
-    const result = assignAssetsWithLimit({
-      existing,
-      selected: picked,
-      qty: Number(item.qty || 0),
-    });
-
-    if (result.overflow) {
-      alert(`Max ${item.qty} assets allowed`);
-    }
-
-    // ✅ find only NEW assets (important fix)
-    const newlyAdded = result.merged.filter(
-      (id) => !existing.includes(id)
-    );
-
-    // ✅ OPTIONAL SAFETY (recommended)
-    if (newlyAdded.length) {
-      const latest = await listAvailableAssetsForRange({
-        productId: item.productId,
-        branchId: item.branchId,
-        from: item.expectedStartDate,
-        to: item.expectedEndDate,
-      });
-
-      const latestIds = new Set(latest.map((a) => a.id));
-
-      const invalid = newlyAdded.filter((id) => !latestIds.has(id));
-
-      if (invalid.length) {
-        alert("Some selected assets are no longer available");
-        return;
-      }
-    }
-
-    // ✅ update UI first
-    updateOrderItem(idx, {
-      assignedAssets: result.merged,
-    });
-
-    // ✅ reserve ONLY new assets (critical fix)
-    for (const id of newlyAdded) {
-      try {
-        await reserveAsset(id, {
-         reservationId: selectedOrder.id,
-      orderId: selectedOrder.id,
-      customer: selectedOrder.customerName || "",
-      from: item.expectedStartDate || null,
-      to: item.expectedEndDate || null,
-      note: `Reserved for order ${
-        selectedOrder.orderNo || selectedOrder.id
-      }`,
-        });
-      } catch (err) {
-        console.error("Reserve failed for:", id, err);
-      }
-    }
-
-    // ✅ close modal
-    setAssetPicker({
-      open: false,
-      itemIndex: null,
-      assets: [],
-      selected: {},
-      loading: false,
-    });
-
-  } catch (e) {
-    console.error("Assign & reserve failed:", e);
-    alert(e?.message || "Failed to assign assets");
-  }
-};
+  };
   const updateCustomerField = async (field, value) => {
     try {
       const orderRef = doc(db, "orders", selectedOrder.id);
@@ -422,98 +488,359 @@ const confirmAssignAndReserve = async () => {
       return d;
     }
   };
+  const handleStopItem = async (preview) => {
+    try {
+      const idx = stopItemModal.itemIndex;
 
+      const oldItem = selectedOrder.items[idx];
+      const updatedItems = [...selectedOrder.items];
+
+      /* =========================
+         1️⃣ UPDATE ITEM + STOP HISTORY
+      ========================= */
+
+      updatedItems[idx] = {
+        ...oldItem,
+
+        expectedEndDate: stopItemModal.stopDate,
+        days: preview.newDays,
+        amount: Math.round(preview.finalAmount),
+        rate: Math.round(preview.finalRate),
+
+        // ✅ STOP HISTORY
+        stopHistory: [
+          ...(oldItem.stopHistory || []),
+          {
+            oldEndDate: oldItem.expectedEndDate,
+            newEndDate: stopItemModal.stopDate,
+
+            oldAmount: oldItem.amount,
+            newAmount: preview.finalAmount,
+
+            stoppedAt: new Date().toISOString(),
+          },
+        ],
+      };
+
+      /* =========================
+         2️⃣ RECALCULATE TOTALS
+      ========================= */
+
+      const newSubtotal = updatedItems.reduce(
+        (sum, it) => sum + Number(it.amount || 0),
+        0
+      );
+
+      const discount = Number(selectedOrder.totals?.discountAmount || 0);
+      const tax = Number(selectedOrder.totals?.totalTax || 0);
+
+      const newTotal = newSubtotal - discount + tax;
+
+      /* =========================
+         3️⃣ CALCULATE REFUND
+      ========================= */
+
+      const totalPaid = (selectedOrder.payments || []).reduce(
+        (s, p) => s + Number(p.amount || 0),
+        0
+      );
+
+      const refundAmount = Math.max(0, totalPaid - newTotal);
+
+      /* =========================
+         4️⃣ BUILD UPDATE PAYLOAD
+      ========================= */
+
+      let updatePayload = {
+        items: updatedItems,
+
+        totals: {
+          ...selectedOrder.totals,
+          subtotal: newSubtotal,
+          total: newTotal,
+        },
+
+        lastStoppedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      };
+
+      /* =========================
+         5️⃣ ADD REFUND IF EXISTS
+      ========================= */
+
+      if (refundAmount > 0) {
+  updatePayload = {
+    ...updatePayload,
+
+    refunds: arrayUnion({
+      id: `refund-${Date.now()}`,
+
+      amount: refundAmount,
+      paidAmount: 0,
+      status: "pending",
+
+      payments: [],
+
+      createdAt: new Date().toISOString(),
+      reason: "Service stopped early",
+    }),
+
+    // ✅ IMPORTANT
+    lastRefundedAt: serverTimestamp(),
+  };
+}
+
+      /* =========================
+         6️⃣ SAVE TO FIRESTORE
+      ========================= */
+
+      await updateDoc(
+        doc(db, "orders", selectedOrder.id),
+        updatePayload
+      );
+
+      /* =========================
+         7️⃣ UPDATE LOCAL STATE
+      ========================= */
+
+      setSelectedOrder((o) => ({
+        ...o,
+        items: updatedItems,
+        totals: {
+          ...o.totals,
+          subtotal: newSubtotal,
+          total: newTotal,
+        },
+
+        ...(refundAmount > 0 && {
+          refunds: [
+            ...(o.refunds || []),
+            {
+              amount: refundAmount,
+              status: "pending",
+              createdAt: new Date().toISOString(),
+            },
+          ],
+        }),
+      }));
+
+      /* =========================
+         8️⃣ RESET MODAL
+      ========================= */
+
+      setStopItemModal({
+        open: false,
+        itemIndex: null,
+        stopDate: "",
+        amountOverride: "",
+      });
+
+      alert(
+        refundAmount > 0
+          ? `Item stopped. Refund ₹${refundAmount} pending`
+          : "Item stopped"
+      );
+
+    } catch (err) {
+      console.error(err);
+      alert("Failed");
+    }
+  };
 
   // Auto-assign N: pick in-stock assets for product+branch, set & reserve (no checkout)
- const autoAssignAndReserve = async (idx) => {
-  try {
-    const item = selectedOrder.items[idx];
+  const autoAssignAndReserve = async (idx) => {
+    try {
+      const item = selectedOrder.items[idx];
 
-    if (!item?.productId) {
-      alert("Select a product first");
-      return;
-    }
+      if (!item?.productId) {
+        alert("Select a product first");
+        return;
+      }
 
-    // 🔍 fetch available assets (date-aware)
-    const assets = await listAvailableAssetsForRange({
-      productId: item.productId,
-      branchId: item.branchId,
-      from: item.expectedStartDate,
-      to: item.expectedEndDate,
-    });
-
-    if (!assets?.length) {
-      alert("No assets available");
-      return;
-    }
-
-    const existing = item.assignedAssets || [];
-
-    const availableIds = assets.map((a) => a.id);
-
-    // ✅ same logic as OrderCreate
-    const result = assignAssetsWithLimit({
-      existing,
-      selected: availableIds,
-      qty: Number(item.qty || 0),
-    });
-
-    if (result.merged.length === existing.length) {
-      alert("Already fully assigned");
-      return;
-    }
-
-    // ✅ find only NEW assets (critical)
-    const newlyAdded = result.merged.filter(
-      (id) => !existing.includes(id)
-    );
-
-    // ✅ SAFETY CHECK (prevent stale / race condition)
-    if (newlyAdded.length) {
-      const latest = await listAvailableAssetsForRange({
+      // 🔍 fetch available assets (date-aware)
+      const assets = await listAvailableAssetsForRange({
         productId: item.productId,
         branchId: item.branchId,
         from: item.expectedStartDate,
         to: item.expectedEndDate,
       });
 
-      const latestIds = new Set(latest.map((a) => a.id));
-
-      const invalid = newlyAdded.filter((id) => !latestIds.has(id));
-
-      if (invalid.length) {
-        alert("Some assets are no longer available");
+      if (!assets?.length) {
+        alert("No assets available");
         return;
       }
+
+      const existing = item.assignedAssets || [];
+
+      const availableIds = assets.map((a) => a.id);
+
+      // ✅ same logic as OrderCreate
+      const result = assignAssetsWithLimit({
+        existing,
+        selected: availableIds,
+        qty: Number(item.qty || 0),
+      });
+
+      if (result.merged.length === existing.length) {
+        alert("Already fully assigned");
+        return;
+      }
+
+      // ✅ find only NEW assets (critical)
+      const newlyAdded = result.merged.filter(
+        (id) => !existing.includes(id)
+      );
+
+      // ✅ SAFETY CHECK (prevent stale / race condition)
+      if (newlyAdded.length) {
+        const latest = await listAvailableAssetsForRange({
+          productId: item.productId,
+          branchId: item.branchId,
+          from: item.expectedStartDate,
+          to: item.expectedEndDate,
+        });
+
+        const latestIds = new Set(latest.map((a) => a.id));
+
+        const invalid = newlyAdded.filter((id) => !latestIds.has(id));
+
+        if (invalid.length) {
+          alert("Some assets are no longer available");
+          return;
+        }
+      }
+
+      // ✅ update UI
+      updateOrderItem(idx, {
+        assignedAssets: result.merged,
+        autoAssigned: true,
+      });
+
+      // ✅ reserve ONLY new assets
+      for (const id of newlyAdded) {
+        try {
+          await reserveAsset(id, {
+            reservationId: selectedOrder.id,
+            orderId: selectedOrder.id,
+            customer: selectedOrder.customerName || "",
+            from: item.expectedStartDate || null,
+            to: item.expectedEndDate || null,
+            note: `Reserved for order ${selectedOrder.orderNo || selectedOrder.id
+              }`,
+          });
+        } catch (err) {
+          console.error("Auto reserve failed for:", id, err);
+        }
+      }
+
+    } catch (e) {
+      console.error("Auto assign failed:", e);
+      alert(e?.message || "Auto-assign failed");
+    }
+  };
+
+  const markRefundPaid = async (refundIndex) => {
+    try {
+      const updatedRefunds = (selectedOrder.refunds || []).map((r, i) =>
+        i === refundIndex
+          ? {
+            ...r,
+            status: "paid",
+            paidAt: new Date().toISOString(),
+          }
+          : r
+      );
+
+      await updateDoc(doc(db, "orders", selectedOrder.id), {
+        refunds: updatedRefunds,
+        lastRefundedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      // ✅ update UI instantly
+      setSelectedOrder((o) => ({
+        ...o,
+        refunds: updatedRefunds,
+      }));
+
+    } catch (err) {
+      console.error(err);
+      alert("Failed to mark refund paid");
+    }
+  };
+  const saveRefundPayment = async () => {
+  try {
+    const rIndex = refundModal.refundIndex;
+    const refund = selectedOrder.refunds[rIndex];
+
+    const payAmount = Number(refundModal.amount || 0);
+
+    if (!payAmount || payAmount <= 0) {
+      alert("Enter valid amount");
+      return;
     }
 
-    // ✅ update UI
-    updateOrderItem(idx, {
-      assignedAssets: result.merged,
-      autoAssigned: true,
+    const remaining = refund.amount - (refund.paidAmount || 0);
+
+    if (payAmount > remaining) {
+      alert(`Cannot exceed remaining ₹${remaining}`);
+      return;
+    }
+
+    const newPaid = (refund.paidAmount || 0) + payAmount;
+
+    const newStatus =
+      newPaid === refund.amount
+        ? "paid"
+        : newPaid > 0
+        ? "partial"
+        : "pending";
+
+    const updatedRefunds = selectedOrder.refunds.map((r, i) =>
+      i === rIndex
+        ? {
+            ...r,
+            paidAmount: newPaid,
+            status: newStatus,
+
+            payments: [
+              ...(r.payments || []),
+              {
+                amount: payAmount,
+                method: refundModal.method,
+                note: refundModal.note,
+                date: new Date().toISOString(),
+              },
+            ],
+          }
+        : r
+    );
+
+    await updateDoc(doc(db, "orders", selectedOrder.id), {
+      refunds: updatedRefunds,
+
+      // ✅ IMPORTANT (update on payment also)
+      lastRefundedAt: serverTimestamp(),
+
+      updatedAt: serverTimestamp(),
     });
 
-    // ✅ reserve ONLY new assets
-    for (const id of newlyAdded) {
-      try {
-        await reserveAsset(id, {
-            reservationId: selectedOrder.id,
-      orderId: selectedOrder.id,
-      customer: selectedOrder.customerName || "",
-      from: item.expectedStartDate || null,
-      to: item.expectedEndDate || null,
-      note: `Reserved for order ${
-        selectedOrder.orderNo || selectedOrder.id
-      }`,
-        });
-      } catch (err) {
-        console.error("Auto reserve failed for:", id, err);
-      }
-    }
+    setSelectedOrder((o) => ({
+      ...o,
+      refunds: updatedRefunds,
+    }));
 
-  } catch (e) {
-    console.error("Auto assign failed:", e);
-    alert(e?.message || "Auto-assign failed");
+    setRefundModal({
+      open: false,
+      refundIndex: null,
+      amount: "",
+      method: "cash",
+      note: "",
+    });
+
+  } catch (err) {
+    console.error(err);
+    alert("Failed to save refund");
   }
 };
 
@@ -687,14 +1014,14 @@ const confirmAssignAndReserve = async () => {
                         ? customerDraft?.customerPhone || ""
                         : selectedOrder?.customerPhone || ""
                     }
-                   onChange={(e) => {
-  const value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\D/g, "").slice(0, 10);
 
-  setCustomerDraft((d) => ({
-    ...(d || {}),
-    customerPhone: value,
-  }));
-}}
+                      setCustomerDraft((d) => ({
+                        ...(d || {}),
+                        customerPhone: value,
+                      }));
+                    }}
                   />
                   {customerErrors.customerPhone && (
                     <div className="error-text">{customerErrors.customerPhone}</div>
@@ -730,21 +1057,22 @@ const confirmAssignAndReserve = async () => {
 
             <div>
               <div
-  style={{
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  }}
->
-  <h3>Items</h3>
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <h3>Items</h3>
 
-  <button
-    className="cp-btn ghost"
-    onClick={addItem}
-  >
-    + Add item
-  </button>
-</div>
+                <button
+                  className="cp-btn ghost"
+                  onClick={addItem}
+                >
+                  + Add item
+                </button>
+
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
                 {(selectedOrder.items || []).map((it, idx) => {
                   const fullyAssigned = isFullyAssigned(it);
@@ -815,79 +1143,79 @@ const confirmAssignAndReserve = async () => {
                             </div>
 
                             <div>
-  <div className="muted">From</div>
-  <input
-    type="date"
-    className="cp-input"
-    style={{ width: 140 }}
-    value={it.expectedStartDate || ""}
-    onChange={(e) => {
-      const newStart = e.target.value;
+                              <div className="muted">From</div>
+                              <input
+                                type="date"
+                                className="cp-input"
+                                style={{ width: 140 }}
+                                value={it.expectedStartDate || ""}
+                                onChange={(e) => {
+                                  const newStart = e.target.value;
 
-      const days =
-        newStart && it.expectedEndDate
-          ? Math.max(
-              0,
-              Math.round(
-                (new Date(it.expectedEndDate) - new Date(newStart)) /
-                  (1000 * 60 * 60 * 24)
-              ) + 1
-            )
-          : 0;
+                                  const days =
+                                    newStart && it.expectedEndDate
+                                      ? Math.max(
+                                        0,
+                                        Math.round(
+                                          (new Date(it.expectedEndDate) - new Date(newStart)) /
+                                          (1000 * 60 * 60 * 24)
+                                        ) + 1
+                                      )
+                                      : 0;
 
-      updateOrderItem(idx, {
-        expectedStartDate: newStart,
-        days,
-      });
-    }}
-  />
-</div>
+                                  updateOrderItem(idx, {
+                                    expectedStartDate: newStart,
+                                    days,
+                                  });
+                                }}
+                              />
+                            </div>
 
-<div>
-  <div className="muted">To</div>
-  <input
-    type="date"
-    className="cp-input"
-    style={{ width: 140 }}
-    value={it.expectedEndDate || ""}
-    onChange={(e) => {
-      const newEnd = e.target.value;
+                            <div>
+                              <div className="muted">To</div>
+                              <input
+                                type="date"
+                                className="cp-input"
+                                style={{ width: 140 }}
+                                value={it.expectedEndDate || ""}
+                                onChange={(e) => {
+                                  const newEnd = e.target.value;
 
-      // 🔴 prevent invalid range
-      if (it.expectedStartDate && newEnd < it.expectedStartDate) {
-        alert("End date cannot be before start date");
-        return;
-      }
+                                  // 🔴 prevent invalid range
+                                  if (it.expectedStartDate && newEnd < it.expectedStartDate) {
+                                    alert("End date cannot be before start date");
+                                    return;
+                                  }
 
-      const days =
-        it.expectedStartDate && newEnd
-          ? Math.max(
-              0,
-              Math.round(
-                (new Date(newEnd) - new Date(it.expectedStartDate)) /
-                  (1000 * 60 * 60 * 24)
-              ) + 1
-            )
-          : 0;
+                                  const days =
+                                    it.expectedStartDate && newEnd
+                                      ? Math.max(
+                                        0,
+                                        Math.round(
+                                          (new Date(newEnd) - new Date(it.expectedStartDate)) /
+                                          (1000 * 60 * 60 * 24)
+                                        ) + 1
+                                      )
+                                      : 0;
 
-      updateOrderItem(idx, {
-        expectedEndDate: newEnd,
-        days,
-      });
-    }}
-  />
-</div>
+                                  updateOrderItem(idx, {
+                                    expectedEndDate: newEnd,
+                                    days,
+                                  });
+                                }}
+                              />
+                            </div>
 
-{/* ✅ AUTO DAYS FIELD */}
-<div>
-  <div className="muted">Days</div>
-  <input
-    className="cp-input"
-    style={{ width: 100 }}
-    value={it.days || 0}
-    disabled
-  />
-</div>
+                            {/* ✅ AUTO DAYS FIELD */}
+                            <div>
+                              <div className="muted">Days</div>
+                              <input
+                                className="cp-input"
+                                style={{ width: 100 }}
+                                value={it.days || 0}
+                                disabled
+                              />
+                            </div>
                             <button
                               className="cp-btn ghost"
                               style={{
@@ -907,6 +1235,19 @@ const confirmAssignAndReserve = async () => {
                             >
                               Extend Service
                             </button>
+                            {/* <button
+                              className="cp-btn ghost"
+                              onClick={() =>
+                                setStopItemModal({
+                                  open: true,
+                                  itemIndex: idx,
+                                  stopDate: "",
+                                  amountOverride: "",
+                                })
+                              }
+                            >
+                              Stop Service
+                            </button> */}
                           </div>
 
                           <div
@@ -1111,6 +1452,49 @@ const confirmAssignAndReserve = async () => {
 
                             </div>
                           )}
+                          {(it.stopHistory || []).length > 0 && (
+  <div style={{ marginTop: 12 }}>
+    <div className="muted" style={{ fontWeight: 600 }}>
+      Stop History
+    </div>
+
+    <div
+      style={{
+        marginTop: 6,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      }}
+    >
+      {it.stopHistory.map((s, i) => (
+        <div
+          key={i}
+          style={{
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            borderRadius: 6,
+            padding: 6,
+            fontSize: 12,
+          }}
+        >
+          <div>
+            <strong>
+              {fmtDate(s.oldEndDate)} → {fmtDate(s.newEndDate)}
+            </strong>
+          </div>
+
+          <div className="muted">
+            ₹{fmtCurrency(s.oldAmount)} → ₹{fmtCurrency(s.newAmount)}
+          </div>
+
+          <div className="muted">
+            {new Date(s.stoppedAt).toLocaleString()}
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
                         </div>
                       </div>
                     </div>
@@ -1473,6 +1857,129 @@ const confirmAssignAndReserve = async () => {
                     ))}
                   </div>
                 </div>
+                {(selectedOrder.refunds || []).length > 0 && (
+  <div style={{ marginTop: 16 }}>
+    <h4>Refunds</h4>
+
+    {(selectedOrder.refunds || []).map((r, i) => (
+      <div
+        key={i}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: 10,
+          borderBottom: "1px solid #f3f6f9",
+          background: r.status === "pending" ? "#fff7ed" : "#ecfdf5",
+          borderRadius: 6,
+          marginTop: 6,
+        }}
+      >
+        {/* LEFT */}
+        <div>
+         <div style={{ fontWeight: 700 }}>
+  ₹{fmtCurrency(r.paidAmount || 0)} / ₹{fmtCurrency(r.amount)}
+</div>
+
+<div className="muted" style={{ fontSize: 12 }}>
+  Remaining: ₹{fmtCurrency((r.amount || 0) - (r.paidAmount || 0))}
+</div>
+
+          <div className="muted" style={{ fontSize: 12 }}>
+            {r.reason || "Refund"} •{" "}
+            {new Date(r.createdAt).toLocaleDateString()}
+          </div>
+        </div>
+
+        {/* RIGHT */}
+        <div style={{ textAlign: "right" }}>
+          <div
+            style={{
+              fontSize: 12,
+              fontWeight: 600,
+             color:
+  r.status === "pending"
+    ? "#b45309"
+    : r.status === "partial"
+    ? "#2563eb"
+    : "#065f46",
+            }}
+          >
+            {r.status}
+          </div>
+
+         {r.status !== "paid" && (
+  <button
+    className="cp-btn ghost"
+    onClick={() =>
+      setRefundModal({
+        open: true,
+        refundIndex: i,
+        amount: "",
+        method: "cash",
+        note: "",
+      })
+    }
+  >
+    {r.status === "pending"
+      ? "Pay Refund"
+      : `Add More (₹${fmtCurrency((r.amount || 0) - (r.paidAmount || 0))})`}
+  </button>
+)}
+{/* 🔥 REFUND PAYMENT HISTORY */}
+{(r.payments || []).length > 0 && (
+  <div style={{ marginTop: 8 }}>
+    <div className="muted" style={{ fontWeight: 600 }}>
+      Refund Payments
+    </div>
+
+    <div
+      style={{
+        marginTop: 6,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+      }}
+    >
+      {(r.payments || []).map((p, idx) => (
+        <div
+          key={idx}
+          style={{
+            background: "#f1f5f9",
+            border: "1px solid #e2e8f0",
+            borderRadius: 6,
+            padding: 6,
+            fontSize: 12,
+          }}
+        >
+          <div style={{ fontWeight: 600 }}>
+            ₹{fmtCurrency(p.amount)}
+          </div>
+
+          <div className="muted">
+            {p.method || "—"} •{" "}
+            {p.date
+              ? new Date(p.date).toLocaleDateString()
+              : ""}
+          </div>
+
+          {p.note && (
+            <div className="muted">
+              {p.note}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </div>
+)}
+        </div>
+      </div>
+    ))}
+    
+  </div>
+)}
+
 
                 <div style={{ marginTop: 16 }}>
                   {/* <button
@@ -1506,31 +2013,31 @@ const confirmAssignAndReserve = async () => {
 
         {/* Asset picker modal */}
         <AssetPickerModal
-  open={assetPicker.open}
-  assets={assetPicker.assets}
-  selected={assetPicker.selected}
- setSelected={(updater) =>
-  setAssetPicker((p) => ({
-    ...p,
-    selected:
-      typeof updater === "function"
-        ? updater(p.selected || {})
-        : updater,
-  }))
-}
-  loading={assetPicker.loading}
-  branches={branches}
-  onClose={() =>
-    setAssetPicker({
-      open: false,
-      itemIndex: null,
-      assets: [],
-      selected: {},
-      loading: false,
-    })
-  }
-  onConfirm={confirmAssignAndReserve}
-/>
+          open={assetPicker.open}
+          assets={assetPicker.assets}
+          selected={assetPicker.selected}
+          setSelected={(updater) =>
+            setAssetPicker((p) => ({
+              ...p,
+              selected:
+                typeof updater === "function"
+                  ? updater(p.selected || {})
+                  : updater,
+            }))
+          }
+          loading={assetPicker.loading}
+          branches={branches}
+          onClose={() =>
+            setAssetPicker({
+              open: false,
+              itemIndex: null,
+              assets: [],
+              selected: {},
+              loading: false,
+            })
+          }
+          onConfirm={confirmAssignAndReserve}
+        />
         {extendService.open && (
           <div className="cp-modal" onClick={() => setExtendService({ open: false })}>
             <div className="cp-modal-card" onClick={(e) => e.stopPropagation()}>
@@ -1591,9 +2098,9 @@ const confirmAssignAndReserve = async () => {
                     const item = selectedOrder.items[idx];
 
                     const extra = Number(extendService.extraPrice || 0);
-const qty = Number(item.qty || 0);
+                    const qty = Number(item.qty || 0);
 
-const extraTotal = extra * qty;
+                    const extraTotal = extra * qty;
                     const oldEnd = item.expectedEndDate;
                     const newEnd = extendService.newEndDate;
 
@@ -1672,6 +2179,102 @@ const extraTotal = extra * qty;
             </div>
           </div>
         )}
+        {stopItemModal.open && (
+          <div
+            className="cp-modal"
+            onClick={() =>
+              setStopItemModal({
+                open: false,
+                itemIndex: null,
+                stopDate: "",
+                amountOverride: "",
+              })
+            }
+          >
+            <div
+              className="cp-modal-card"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3>Stop Item</h3>
+
+              {/* DATE INPUT */}
+              <input
+                type="date"
+                className="cp-input"
+                value={stopItemModal.stopDate}
+                onChange={(e) =>
+                  setStopItemModal((s) => ({
+                    ...s,
+                    stopDate: e.target.value,
+                  }))
+                }
+              />
+
+              {/* 👇 IF NO DATE SELECTED */}
+              {!stopItemPreview && (
+                <div style={{ marginTop: 12 }} className="muted">
+                  Select stop date to see calculation
+                </div>
+              )}
+
+              {/* 👇 PREVIEW ONLY WHEN AVAILABLE */}
+              {stopItemPreview && (
+                <>
+                  <div style={{ marginTop: 12 }}>
+                    Calculated: ₹{fmtCurrency(stopItemPreview.calculatedAmount)}
+                  </div>
+
+                  <div style={{ marginTop: 6 }}>
+                    New Amount:
+                    <input
+                      className="cp-input"
+                      type="number"
+                      value={
+                        stopItemModal.amountOverride ||
+                        stopItemPreview.calculatedAmount
+                      }
+                      onChange={(e) =>
+                        setStopItemModal((s) => ({
+                          ...s,
+                          amountOverride: e.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+
+                  <div style={{ marginTop: 6 }}>
+                    New Rate: ₹{stopItemPreview.finalRate.toFixed(2)}
+                  </div>
+
+                  <button
+                    className="cp-btn"
+                    style={{ marginTop: 12 }}
+                    onClick={() => handleStopItem(stopItemPreview)}
+                  >
+                    Confirm Stop
+                  </button>
+                </>
+              )}
+
+              {/* CANCEL BUTTON */}
+              <button
+                className="cp-btn ghost"
+                style={{ marginTop: 8 }}
+                onClick={() =>
+                  setStopItemModal({
+                    open: false,
+                    itemIndex: null,
+                    stopDate: "",
+                    amountOverride: "",
+                  })
+                }
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+      
 
         {/* Payment modal */}
         {paymentModal.open && paymentModal.form && (
@@ -1782,6 +2385,116 @@ const extraTotal = extra * qty;
             </div>
           </div>
         )}
+        {refundModal.open && (
+  <div
+    className="cp-modal"
+    onClick={() =>
+      setRefundModal({
+        open: false,
+        refundIndex: null,
+        amount: "",
+        method: "cash",
+        note: "",
+      })
+    }
+  >
+    <div
+      className="cp-modal-card"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h4>Pay Refund</h4>
+
+      {/* ✅ REMAINING AMOUNT */}
+      {(() => {
+        const r = selectedOrder.refunds[refundModal.refundIndex];
+        const remaining =
+          (r?.amount || 0) - (r?.paidAmount || 0);
+
+        return (
+          <div style={{ marginBottom: 10 }}>
+            <div className="muted">Remaining</div>
+            <div style={{ fontWeight: 700 }}>
+              ₹{fmtCurrency(remaining)}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* AMOUNT */}
+      <div className="label muted">Amount</div>
+      <input
+        className="cp-input"
+        type="number"
+        value={refundModal.amount}
+        onChange={(e) =>
+          setRefundModal((s) => ({
+            ...s,
+            amount: e.target.value,
+          }))
+        }
+      />
+
+      {/* METHOD */}
+      <div className="label muted">Method</div>
+      <select
+        className="cp-input"
+        value={refundModal.method}
+        onChange={(e) =>
+          setRefundModal((s) => ({
+            ...s,
+            method: e.target.value,
+          }))
+        }
+      >
+        <option value="cash">Cash</option>
+        <option value="upi">UPI</option>
+        <option value="bank">Bank</option>
+      </select>
+
+      {/* NOTE */}
+      <div className="label muted">Note</div>
+      <input
+        className="cp-input"
+        value={refundModal.note}
+        onChange={(e) =>
+          setRefundModal((s) => ({
+            ...s,
+            note: e.target.value,
+          }))
+        }
+      />
+
+      {/* ACTIONS */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 8,
+          marginTop: 12,
+        }}
+      >
+        <button
+          className="cp-btn ghost"
+          onClick={() =>
+            setRefundModal({
+              open: false,
+              refundIndex: null,
+              amount: "",
+              method: "cash",
+              note: "",
+            })
+          }
+        >
+          Cancel
+        </button>
+
+        <button className="cp-btn" onClick={saveRefundPayment}>
+          Save Refund
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       </div>
 
       <style jsx>{`

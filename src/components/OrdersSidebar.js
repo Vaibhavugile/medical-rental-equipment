@@ -24,6 +24,7 @@ export default function OrdersSidebar({
     ["on_rent", "On Rent", derivedCounts.on_rent],
         ["completed", "Completed", derivedCounts.completed],
     ["cancelled", "Cancelled", derivedCounts.cancelled],
+    ["refund_pending", "Refund Pending", derivedCounts.refund_pending],
 
   ];
 
