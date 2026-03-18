@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import {
-collection,
-getDocs,
-query,
-where
+    collection,
+    getDocs,
+    query,
+    where
 } from "firebase/firestore";
 
 import { db } from "../firebase";
@@ -11,382 +11,426 @@ import OrderActivityModal from "../components/OrderActivityModal";
 
 import "./OrderActivityFeed.css";
 
-export default function OrderActivityFeed({ startDate, endDate }){
+export default function OrderActivityFeed({ startDate, endDate }) {
+
+    const [activities, setActivities] = useState([]);
+    const [filtered, setFiltered] = useState([]);
+
+    const [loading, setLoading] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState(null);
+
+    /* FILTER STATES */
+
+    const [search, setSearch] = useState("");
+    const [serviceFilter, setServiceFilter] = useState("all");
+    const [eventFilter, setEventFilter] = useState("all");
+    const [sortBy, setSortBy] = useState("latest");
+
+    /* LOAD DATA */
+
+    useEffect(() => {
+        if (startDate && endDate) {
+            loadActivities();
+        }
+    }, [startDate, endDate]);
+
+    /* APPLY FILTERS */
+
+    useEffect(() => {
+        applyFilters();
+    }, [activities, search, serviceFilter, eventFilter, sortBy]);
 
-const [activities,setActivities] = useState([]);
-const [filtered,setFiltered] = useState([]);
+    /* ===============================
+    LOAD ACTIVITIES
+    ================================ */
 
-const [loading,setLoading] = useState(false);
-const [selectedOrder,setSelectedOrder] = useState(null);
+    const loadActivities = async () => {
+
+        setLoading(true);
+
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
 
-/* FILTER STATES */
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
 
-const [search,setSearch] = useState("");
-const [serviceFilter,setServiceFilter] = useState("all");
-const [eventFilter,setEventFilter] = useState("all");
-const [sortBy,setSortBy] = useState("latest");
+        try {
 
-/* LOAD DATA */
+            const queries = [
 
-useEffect(()=>{
-if(startDate && endDate){
-loadActivities();
-}
-},[startDate,endDate]);
+                // EQUIPMENT
+                query(collection(db, "orders"),
+                    where("createdAt", ">=", start),
+                    where("createdAt", "<=", end)
+                ),
+                query(collection(db, "orders"),
+                    where("lastPaymentAt", ">=", start),
+                    where("lastPaymentAt", "<=", end)
+                ),
+                query(collection(db, "orders"),
+                    where("lastExtendedAt", ">=", start),
+                    where("lastExtendedAt", "<=", end)
+                ),
+                query(collection(db, "orders"),
+                    where("lastStoppedAt", ">=", start),
+                    where("lastStoppedAt", "<=", end)
+                ),
+                query(collection(db, "orders"),
+                    where("lastRefundedAt", ">=", start),
+                    where("lastRefundedAt", "<=", end)
+                ),
 
-/* APPLY FILTERS */
+                // NURSING
+                query(collection(db, "nursingOrders"),
+                    where("createdAt", ">=", start),
+                    where("createdAt", "<=", end)
+                ),
+                query(collection(db, "nursingOrders"),
+                    where("lastPaymentAt", ">=", start),
+                    where("lastPaymentAt", "<=", end)
+                ),
+                query(collection(db, "nursingOrders"),
+                    where("lastExtendedAt", ">=", start),
+                    where("lastExtendedAt", "<=", end)
+                ),
+                query(collection(db, "nursingOrders"),
+                    where("lastStoppedAt", ">=", start),
+                    where("lastStoppedAt", "<=", end)
+                ),
+                query(collection(db, "nursingOrders"),
+                    where("lastRefundedAt", ">=", start),
+                    where("lastRefundedAt", "<=", end)
+                )
+
+            ];
+
+            const snaps = await Promise.all(
+                queries.map(q => getDocs(q))
+            );
+
+            let raw = [];
+
+            snaps.forEach((snap, index) => {
 
-useEffect(()=>{
-applyFilters();
-},[activities,search,serviceFilter,eventFilter,sortBy]);
+                snap.forEach(docSnap => {
 
-/* ===============================
-LOAD ACTIVITIES
-================================ */
+                    const o = docSnap.data();
 
-const loadActivities = async ()=>{
+                    const collectionName =
+                        index < 5 ? "orders" : "nursingOrders";
 
-setLoading(true);
+                    const serviceType =
+                        collectionName === "orders"
+                            ? "equipment"
+                            : (o.serviceType || "nursing");
 
-const start = new Date(startDate);
-start.setHours(0,0,0,0);
+                    raw.push({
 
-const end = new Date(endDate);
-end.setHours(23,59,59,999);
+                        id: docSnap.id,
+                        collection: collectionName,
 
-try{
+                        orderNo: o.orderNo,
 
-const queries = [
+                        customerName: o.customerName,
+                        customerPhone: o.customerPhone,
 
-query(collection(db,"orders"),
-where("createdAt",">=",start),
-where("createdAt","<=",end)),
+                        start: o.items?.[0]?.expectedStartDate || "",
+                        end: o.items?.[0]?.expectedEndDate || "",
 
-query(collection(db,"orders"),
-where("lastPaymentAt",">=",start),
-where("lastPaymentAt","<=",end)),
+                        total: o.totals?.total || 0,
 
-query(collection(db,"orders"),
-where("lastExtendedAt",">=",start),
-where("lastExtendedAt","<=",end)),
+                        serviceType,
 
-query(collection(db,"nursingOrders"),
-where("createdAt",">=",start),
-where("createdAt","<=",end)),
+                        createdAt: o.createdAt?.toDate?.(),
+                        lastPaymentAt: o.lastPaymentAt?.toDate?.(),
+                        lastExtendedAt: o.lastExtendedAt?.toDate?.(),
+                        lastStoppedAt: o.lastStoppedAt?.toDate?.(),
+                        lastRefundedAt: o.lastRefundedAt?.toDate?.(),
+                    });
 
-query(collection(db,"nursingOrders"),
-where("lastPaymentAt",">=",start),
-where("lastPaymentAt","<=",end)),
+                });
 
-query(collection(db,"nursingOrders"),
-where("lastExtendedAt",">=",start),
-where("lastExtendedAt","<=",end))
+            });
 
-];
+            /* PICK LATEST EVENT */
 
-const snaps = await Promise.all(
-queries.map(q=>getDocs(q))
-);
+            const map = {};
 
-let raw=[];
+            raw.forEach(o => {
 
-snaps.forEach((snap,index)=>{
+                let latest = null;
+                let label = "";
 
-snap.forEach(docSnap=>{
+                if (o.createdAt && o.createdAt >= start && o.createdAt <= end) {
+                    latest = o.createdAt;
+                    label = "created";
+                }
 
-const o = docSnap.data();
+                if (o.lastPaymentAt && o.lastPaymentAt >= start && o.lastPaymentAt <= end) {
+                    if (!latest || o.lastPaymentAt > latest) {
+                        latest = o.lastPaymentAt;
+                        label = "payment";
+                    }
+                }
 
-const collectionName =
-index<3 ? "orders" : "nursingOrders";
+                if (o.lastExtendedAt && o.lastExtendedAt >= start && o.lastExtendedAt <= end) {
+                    if (!latest || o.lastExtendedAt > latest) {
+                        latest = o.lastExtendedAt;
+                        label = "extended";
+                    }
+                }
+                /* 🔥 STOPPED */
+                if (o.lastStoppedAt && o.lastStoppedAt >= start && o.lastStoppedAt <= end) {
+                    if (!latest || o.lastStoppedAt > latest) {
+                        latest = o.lastStoppedAt;
+                        label = "stopped";
+                    }
+                }
 
-const serviceType =
-collectionName==="orders"
-? "equipment"
-: (o.serviceType || "nursing");
+                /* 🔥 REFUND */
+                if (o.lastRefundedAt && o.lastRefundedAt >= start && o.lastRefundedAt <= end) {
+                    if (!latest || o.lastRefundedAt > latest) {
+                        latest = o.lastRefundedAt;
+                        label = "refund";
+                    }
+                }
 
-raw.push({
+                if (!latest) return;
 
-id:docSnap.id,
-collection:collectionName,
+                const key = o.orderNo;
 
-orderNo:o.orderNo,
+                if (!map[key] || map[key].date < latest) {
 
-customerName:o.customerName,
-customerPhone:o.customerPhone,
+                    map[key] = {
+                        ...o,
+                        label,
+                        date: latest
+                    };
 
-start:o.items?.[0]?.expectedStartDate || "",
-end:o.items?.[0]?.expectedEndDate || "",
+                }
 
-total:o.totals?.total || 0,
+            });
 
-serviceType,
+            const result = Object.values(map);
 
-createdAt:o.createdAt?.toDate?.(),
-lastPaymentAt:o.lastPaymentAt?.toDate?.(),
-lastExtendedAt:o.lastExtendedAt?.toDate?.()
+            result.sort((a, b) => b.date - a.date);
 
-});
+            setActivities(result);
 
-});
+        } catch (err) {
+            console.error(err);
+        }
 
-});
+        setLoading(false);
 
-/* PICK LATEST EVENT */
+    };
 
-const map = {};
+    /* ===============================
+    FILTER + SEARCH + SORT
+    ================================ */
 
-raw.forEach(o=>{
+    const applyFilters = () => {
 
-let latest=null;
-let label="";
+        let data = [...activities];
 
-if(o.createdAt && o.createdAt>=start && o.createdAt<=end){
-latest=o.createdAt;
-label="created";
-}
+        /* SEARCH */
 
-if(o.lastPaymentAt && o.lastPaymentAt>=start && o.lastPaymentAt<=end){
-if(!latest || o.lastPaymentAt>latest){
-latest=o.lastPaymentAt;
-label="payment";
-}
-}
+        if (search) {
 
-if(o.lastExtendedAt && o.lastExtendedAt>=start && o.lastExtendedAt<=end){
-if(!latest || o.lastExtendedAt>latest){
-latest=o.lastExtendedAt;
-label="extended";
-}
-}
+            const s = search.toLowerCase();
 
-if(!latest) return;
+            data = data.filter(a =>
+                a.orderNo?.toLowerCase().includes(s) ||
+                a.customerName?.toLowerCase().includes(s) ||
+                a.customerPhone?.includes(s)
+            );
 
-const key=o.orderNo;
+        }
 
-if(!map[key] || map[key].date<latest){
+        /* SERVICE FILTER */
 
-map[key]={
-...o,
-label,
-date:latest
-};
+        if (serviceFilter !== "all") {
+            data = data.filter(a => a.serviceType === serviceFilter);
+        }
 
-}
+        /* EVENT FILTER */
 
-});
+        if (eventFilter !== "all") {
+            data = data.filter(a => a.label === eventFilter);
+        }
 
-const result = Object.values(map);
+        /* SORTING */
 
-result.sort((a,b)=>b.date-a.date);
+        if (sortBy === "latest") {
+            data.sort((a, b) => b.date - a.date);
+        }
 
-setActivities(result);
+        if (sortBy === "oldest") {
+            data.sort((a, b) => a.date - b.date);
+        }
 
-}catch(err){
-console.error(err);
-}
+        if (sortBy === "highest") {
+            data.sort((a, b) => b.total - a.total);
+        }
 
-setLoading(false);
+        if (sortBy === "lowest") {
+            data.sort((a, b) => a.total - b.total);
+        }
 
-};
+        setFiltered(data);
 
-/* ===============================
-FILTER + SEARCH + SORT
-================================ */
+    };
 
-const applyFilters = ()=>{
+    /* ===============================
+    HELPERS
+    ================================ */
 
-let data=[...activities];
+    const fmt = d => new Date(d).toLocaleString();
 
-/* SEARCH */
+    const getLabel = type => {
 
-if(search){
+        if (type === "created")
+            return <span className="badge created">Created</span>;
 
-const s = search.toLowerCase();
+        if (type === "payment")
+            return <span className="badge payment">Payment</span>;
 
-data = data.filter(a =>
-a.orderNo?.toLowerCase().includes(s) ||
-a.customerName?.toLowerCase().includes(s) ||
-a.customerPhone?.includes(s)
-);
+        if (type === "extended")
+            return <span className="badge extended">Extended</span>;
+        if (type === "stopped")
+            return <span className="badge stopped">Stopped</span>;
 
-}
+        if (type === "refund")
+            return <span className="badge refund">Refund</span>;
 
-/* SERVICE FILTER */
 
-if(serviceFilter!=="all"){
-data = data.filter(a=>a.serviceType===serviceFilter);
-}
+    };
 
-/* EVENT FILTER */
+    /* ===============================
+    UI
+    ================================ */
 
-if(eventFilter!=="all"){
-data = data.filter(a=>a.label===eventFilter);
-}
+    return (
 
-/* SORTING */
+        <div className="activity-card">
 
-if(sortBy==="latest"){
-data.sort((a,b)=>b.date-a.date);
-}
+            <h2 className="activity-title">Order Activity</h2>
 
-if(sortBy==="oldest"){
-data.sort((a,b)=>a.date-b.date);
-}
+            {/* FILTER BAR */}
 
-if(sortBy==="highest"){
-data.sort((a,b)=>b.total-a.total);
-}
+            <div className="activity-toolbar">
 
-if(sortBy==="lowest"){
-data.sort((a,b)=>a.total-b.total);
-}
+                <input
+                    type="text"
+                    placeholder="Search order / customer / phone"
+                    value={search}
+                    onChange={e => setSearch(e.target.value)}
+                    className="activity-search"
+                />
 
-setFiltered(data);
+                <select
+                    value={serviceFilter}
+                    onChange={e => setServiceFilter(e.target.value)}
+                >
 
-};
+                    <option value="all">All Services</option>
+                    <option value="equipment">Equipment</option>
+                    <option value="nursing">Nursing</option>
+                    <option value="caretaker">Caretaker</option>
 
-/* ===============================
-HELPERS
-================================ */
+                </select>
 
-const fmt = d => new Date(d).toLocaleString();
+                <select
+                    value={eventFilter}
+                    onChange={e => setEventFilter(e.target.value)}
+                >
 
-const getLabel = type => {
+                    <option value="all">All Events</option>
+                    <option value="created">Created</option>
+                    <option value="payment">Payment</option>
+                    <option value="extended">Extended</option>
+                    <option value="stopped">Stopped</option>
+                    <option value="refund">Refund</option>
 
-if(type==="created")
-return <span className="badge created">Created</span>;
+                </select>
 
-if(type==="payment")
-return <span className="badge payment">Payment</span>;
+                <select
+                    value={sortBy}
+                    onChange={e => setSortBy(e.target.value)}
+                >
 
-if(type==="extended")
-return <span className="badge extended">Extended</span>;
+                    <option value="latest">Latest</option>
+                    <option value="oldest">Oldest</option>
+                    <option value="highest">Highest Value</option>
+                    <option value="lowest">Lowest Value</option>
 
-};
+                </select>
 
-/* ===============================
-UI
-================================ */
+            </div>
 
-return(
+            {loading && <div>Loading...</div>}
 
-<div className="activity-card">
+            <table className="activity-table">
 
-<h2 className="activity-title">Order Activity</h2>
+                <thead>
 
-{/* FILTER BAR */}
+                    <tr>
+                        <th>Order</th>
+                        <th>Customer</th>
+                        <th>Service</th>
+                        <th>Start</th>
+                        <th>End</th>
+                        <th>Total</th>
+                        <th>Event</th>
+                        <th>Date</th>
+                    </tr>
 
-<div className="activity-toolbar">
+                </thead>
 
-<input
-type="text"
-placeholder="Search order / customer / phone"
-value={search}
-onChange={e=>setSearch(e.target.value)}
-className="activity-search"
-/>
+                <tbody>
 
-<select
-value={serviceFilter}
-onChange={e=>setServiceFilter(e.target.value)}
->
+                    {filtered.map((a, i) => (
 
-<option value="all">All Services</option>
-<option value="equipment">Equipment</option>
-<option value="nursing">Nursing</option>
-<option value="caretaker">Caretaker</option>
+                        <tr
+                            key={i}
+                            className="activity-row"
+                            onClick={() => setSelectedOrder(a)}
+                        >
 
-</select>
+                            <td>{a.orderNo}</td>
 
-<select
-value={eventFilter}
-onChange={e=>setEventFilter(e.target.value)}
->
+                            <td>
+                                <div>{a.customerName}</div>
+                                <div className="cust-phone">{a.customerPhone}</div>
+                            </td>
 
-<option value="all">All Events</option>
-<option value="created">Created</option>
-<option value="payment">Payment</option>
-<option value="extended">Extended</option>
+                            <td>{a.serviceType}</td>
 
-</select>
+                            <td>{a.start}</td>
 
-<select
-value={sortBy}
-onChange={e=>setSortBy(e.target.value)}
->
+                            <td>{a.end}</td>
 
-<option value="latest">Latest</option>
-<option value="oldest">Oldest</option>
-<option value="highest">Highest Value</option>
-<option value="lowest">Lowest Value</option>
+                            <td className="amount">₹{a.total}</td>
 
-</select>
+                            <td>{getLabel(a.label)}</td>
 
-</div>
+                            <td>{fmt(a.date)}</td>
 
-{loading && <div>Loading...</div>}
+                        </tr>
 
-<table className="activity-table">
+                    ))}
 
-<thead>
+                </tbody>
 
-<tr>
-<th>Order</th>
-<th>Customer</th>
-<th>Service</th>
-<th>Start</th>
-<th>End</th>
-<th>Total</th>
-<th>Event</th>
-<th>Date</th>
-</tr>
+            </table>
 
-</thead>
+            <OrderActivityModal
+                order={selectedOrder}
+                onClose={() => setSelectedOrder(null)}
+            />
 
-<tbody>
+        </div>
 
-{filtered.map((a,i)=>(
-
-<tr
-key={i}
-className="activity-row"
-onClick={()=>setSelectedOrder(a)}
->
-
-<td>{a.orderNo}</td>
-
-<td>
-<div>{a.customerName}</div>
-<div className="cust-phone">{a.customerPhone}</div>
-</td>
-
-<td>{a.serviceType}</td>
-
-<td>{a.start}</td>
-
-<td>{a.end}</td>
-
-<td className="amount">₹{a.total}</td>
-
-<td>{getLabel(a.label)}</td>
-
-<td>{fmt(a.date)}</td>
-
-</tr>
-
-))}
-
-</tbody>
-
-</table>
-
-<OrderActivityModal
-order={selectedOrder}
-onClose={()=>setSelectedOrder(null)}
-/>
-
-</div>
-
-);
+    );
 
 }

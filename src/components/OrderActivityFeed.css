@@ -184,3 +184,12 @@ padding:8px;
 border-radius:6px;
 border:1px solid #ddd;
 }
+.badge.stopped {
+  background: #ffe0e0;
+  color: #c62828;
+}
+
+.badge.refund {
+  background: #fff3cd;
+  color: #ff9800;
+}
