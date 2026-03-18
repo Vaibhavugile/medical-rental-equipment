@@ -1216,14 +1216,30 @@ export default function OrderDrawer({
                                 disabled
                               />
                             </div>
+                            <div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: "6px",
+    marginTop: 10,
+    alignItems: "flex-start" // 👈 keeps width tight (not full width)
+  }}
+>
                             <button
-                              className="cp-btn ghost"
-                              style={{
-                                marginTop: 18,
-                                padding: "4px 10px",
-                                fontSize: "12px",
-                                width: "auto"
-                              }}
+                               style={{
+    padding: "4px 10px",
+    fontSize: "12px",
+
+    borderRadius: "8px",
+    border: "1px solid #bfdbfe",
+    background: "#eff6ff",
+    color: "#1d4ed8",
+
+    cursor: "pointer",
+    fontWeight: 600,
+
+    width: "fit-content" // 👈 IMPORTANT
+  }}
                               onClick={() =>
                                 setExtendService({
                                   open: true,
@@ -1235,19 +1251,33 @@ export default function OrderDrawer({
                             >
                               Extend Service
                             </button>
-                            {/* <button
-                              className="cp-btn ghost"
+                             <button
+                                style={{
+    padding: "4px 10px",
+    fontSize: "12px",
+
+    borderRadius: "8px",
+    border: "1px solid #fecaca",
+    background: "#fef2f2",
+    color: "#b91c1c",
+
+    cursor: "pointer",
+    fontWeight: 600,
+
+    width: "fit-content" // 👈 IMPORTANT
+  }}
                               onClick={() =>
                                 setStopItemModal({
                                   open: true,
                                   itemIndex: idx,
-                                  stopDate: "",
+                                  stopDate: it.expectedEndDate || "",
                                   amountOverride: "",
                                 })
                               }
                             >
                               Stop Service
-                            </button> */}
+                            </button> 
+                            </div>
                           </div>
 
                           <div
