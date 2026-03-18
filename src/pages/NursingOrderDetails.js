@@ -52,7 +52,20 @@ const [salaryRequests, setSalaryRequests] = useState([]);
     careType: "base",
     shift: "day"
   });
+const [refundModal, setRefundModal] = useState({
+  open: false,
+  refund: null,
+  amount: "",
+  method: "cash",
+});
+const [stopPreviewOverride, setStopPreviewOverride] = useState({
+  newSubtotal: "",
+});
 
+const [stopFullModal, setStopFullModal] = useState({
+  open: false,
+  stopDate: "",
+});
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
 const [customerDraft, setCustomerDraft] = useState(null);
 const [customerErrors, setCustomerErrors] = useState({});
@@ -817,9 +830,141 @@ const getSalaryRequest = (assignmentId) => {
     alert("Failed to save services");
   }
 };
+const submitRefundPayment = async () => {
+  try {
+    const r = refundModal.refund;
+    const payAmount = Number(refundModal.amount || 0);
+
+    if (!payAmount || payAmount <= 0) {
+      alert("Enter valid refund amount");
+      return;
+    }
+
+    if (payAmount > r.amount) {
+      alert("Cannot refund more than pending");
+      return;
+    }
+
+    const remaining = r.amount - payAmount;
+
+    /* =========================
+       UPDATE REFUND ENTRY
+    ========================= */
+
+    let updatedRefunds = [];
+
+    if (remaining === 0) {
+      // fully paid
+      updatedRefunds = order.refunds.map(x =>
+        x.id === r.id
+          ? {
+              ...x,
+              status: "paid",
+              paidAmount: payAmount,
+              method: refundModal.method,
+              paidAt: new Date().toISOString()
+            }
+          : x
+      );
+    } else {
+      // 🔥 PARTIAL REFUND
+      updatedRefunds = order.refunds.map(x =>
+        x.id === r.id
+          ? {
+              ...x,
+              amount: remaining, // reduce pending
+            }
+          : x
+      );
+
+      // add new paid record
+      updatedRefunds.push({
+        id: `refund-paid-${Date.now()}`,
+        amount: payAmount,
+        status: "paid",
+        method: refundModal.method,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
+    /* =========================
+       ACTIVITY LOG
+    ========================= */
+
+    const log = {
+      action: "REFUND_PAYMENT",
+      amount: payAmount,
+      method: refundModal.method,
+      refundId: r.id,
+      editedByUid: auth.currentUser?.uid || "",
+      editedByName:
+        auth.currentUser?.displayName ||
+        auth.currentUser?.email ||
+        "Admin",
+      editedAt: new Date().toISOString(),
+    };
+
+    /* =========================
+       SAVE
+    ========================= */
+
+    await updateDoc(doc(db, "nursingOrders", id), {
+      refunds: updatedRefunds,
+      activityLog: arrayUnion(log),
+      lastRefundedAt: serverTimestamp(), // 🔥 NEW
+      updatedAt: serverTimestamp(),
+    });
+
+    /* =========================
+       ACCOUNT REPORT
+    ========================= */
+
+    await updateAccountReport({
+      totalRefundsPaid: increment(payAmount),
+
+      pendingAmount: increment(payAmount),
+
+      refundsPaid: arrayUnion({
+        orderId: order.id,
+        orderNo: order.orderNo,
+        amount: payAmount,
+        method: refundModal.method,
+        date: new Date().toISOString(),
+      }),
+    });
+
+    /* =========================
+       UPDATE UI
+    ========================= */
+
+    setOrder(o => ({
+      ...o,
+      refunds: updatedRefunds,
+      lastRefundedAt: new Date().toISOString(), 
+      activityLog: [...(o.activityLog || []), log],
+    }));
+
+    setRefundModal({ open: false });
+
+    alert(`Refund paid: ₹${payAmount}`);
+
+  } catch (err) {
+    console.error(err);
+    alert("Refund failed");
+  }
+};
 
 
+const getMaxEndDate = () => {
+  const dates = (order.items || [])
+    .map(i => i.expectedEndDate)
+    .filter(Boolean)
+    .map(d => new Date(d));
 
+  if (!dates.length) return formatDateTimeLocal(new Date());
+
+  return formatDateTimeLocal(new Date(Math.max(...dates)));
+};
 
   /* ======================
      Assign Staff (CORRECT)
@@ -1470,6 +1615,70 @@ date: new Date().toISOString()
       alert(e.message || "Failed to save payment");
     }
   };
+  const stopAllActiveStaff = async (stopDate) => {
+  try {
+    const q = query(
+      collection(db, "staffAssignments"),
+      where("orderId", "==", id),
+      where("status", "in", ["assigned", "active"])
+    );
+
+    const snap = await getDocs(q);
+
+    for (const d of snap.docs) {
+      const a = d.data();
+
+      // 🛑 Skip if already ended before stopDate
+      if (a.endDate && new Date(a.endDate) <= new Date(stopDate)) {
+        continue;
+      }
+
+      /* =========================
+         RECALCULATE SALARY
+      ========================= */
+
+      const salary = calculateStaffSalary(
+        a.startDate,
+        stopDate,
+        Number(a.rate || 0),
+        a.rateType
+      );
+
+      const newAmount = salary.amount;
+      const paidAmount = Number(a.paidAmount || 0);
+
+      const newBalance = Math.max(0, newAmount - paidAmount);
+
+      /* =========================
+         UPDATE FIRESTORE
+      ========================= */
+
+      await updateDoc(doc(db, "staffAssignments", d.id), {
+        endDate: stopDate,
+
+        hours: salary.hours,
+        days: salary.days,
+        months: salary.months,
+
+        amount: newAmount,
+        balanceAmount: newBalance,
+
+        status: "completed",
+
+        stoppedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    alert("All staff updated correctly");
+
+    await loadAssignments();
+
+  } catch (err) {
+    console.error(err);
+    alert("Failed to update staff");
+  }
+};
   const stopStaffService = async () => {
 
     const assignment = stopServiceModal.assignment;
@@ -1614,17 +1823,42 @@ date: new Date().toISOString()
   };
 
 
-  const payments = order?.payments || [];
+const payments = order?.payments || [];
+const refunds = order?.refunds || [];
 
-  const totalPaid = payments
-    .filter(Boolean)
-    .reduce((sum, p) => sum + Number(p?.amount || 0), 0);
+/* =========================
+   TOTAL PAID (money IN)
+========================= */
+const totalPaid = payments.reduce(
+  (sum, p) => sum + Number(p.amount || 0),
+  0
+);
 
+/* =========================
+   REFUND PENDING
+========================= */
+const refundPending = refunds
+  .filter(r => r.status === "pending")
+  .reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
-  const orderTotal = Number(order?.totals?.total || 0);
+/* =========================
+   REFUND PAID
+========================= */
+const refundPaid = refunds
+  .filter(r => r.status === "paid")
+  .reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
-  const balance = Math.max(0, orderTotal - totalPaid);
+/* =========================
+   NET RECEIVED
+========================= */
+const netPaid = totalPaid - refundPaid;
 
+/* =========================
+   FINAL BALANCE
+========================= */
+const orderTotal = Number(order?.totals?.total || 0);
+
+const balance = Math.max(0, orderTotal - netPaid);
   /* ======================
      Status Updates
   ====================== */
@@ -1701,6 +1935,413 @@ date: new Date().toISOString()
     }
 
   };
+
+   const stopOrderServicesOnly = async (stopDate, overrideSubtotal = null) => {
+  if (!stopDate) {
+    alert("Select stop date");
+    return;
+  }
+
+  try {
+    let updatedItems = [...(order.items || [])];
+
+    /* =========================
+       1️⃣ UPDATE EACH SERVICE (PRORATE)
+    ========================= */
+
+    updatedItems = updatedItems.map((it) => {
+      if (!it.expectedStartDate || !it.expectedEndDate) return it;
+
+      const start = new Date(it.expectedStartDate);
+      const oldEnd = new Date(it.expectedEndDate);
+      const newEnd = new Date(stopDate);
+
+      if (isNaN(start) || isNaN(oldEnd) || isNaN(newEnd)) return it;
+
+      if (newEnd >= oldEnd) return it;
+
+      const totalDays =
+        (oldEnd - start) / (1000 * 60 * 60 * 24) + 1;
+
+      const usedDays =
+        (newEnd - start) / (1000 * 60 * 60 * 24) + 1;
+
+      if (totalDays <= 0 || usedDays <= 0) return it;
+
+      const newAmount =
+        (Number(it.amount || 0) / totalDays) * usedDays;
+
+      return {
+        ...it,
+        expectedEndDate: stopDate,
+        amount: Math.round(newAmount),
+      };
+    });
+
+    /* =========================
+       2️⃣ CALCULATE SUBTOTAL
+    ========================= */
+
+    const oldTotals = order?.totals || {};
+
+    const calculatedSubtotal = updatedItems.reduce(
+      (sum, it) => sum + Number(it.amount || 0),
+      0
+    );
+
+    /* =========================
+       3️⃣ APPLY OVERRIDE 🔥
+    ========================= */
+
+    let newSubtotal =
+      overrideSubtotal !== null && overrideSubtotal !== ""
+        ? Number(overrideSubtotal)
+        : calculatedSubtotal;
+
+    /* =========================
+       🔥 3.1 DISTRIBUTE OVERRIDE INTO ITEMS
+    ========================= */
+
+    if (
+      overrideSubtotal !== null &&
+      overrideSubtotal !== "" &&
+      calculatedSubtotal > 0
+    ) {
+      const ratio = newSubtotal / calculatedSubtotal;
+
+      updatedItems = updatedItems.map((it) => ({
+        ...it,
+        amount: Math.round(Number(it.amount || 0) * ratio),
+      }));
+    }
+
+    /* =========================
+       🔥 3.2 RECALCULATE FINAL SUBTOTAL FROM ITEMS
+    ========================= */
+
+    const finalSubtotalFromItems = updatedItems.reduce(
+      (sum, it) => sum + Number(it.amount || 0),
+      0
+    );
+
+    /* =========================
+       4️⃣ KEEP TAX + DISCOUNT LOCKED
+    ========================= */
+
+    const taxTotal = (oldTotals.taxBreakdown || []).reduce(
+      (sum, t) => sum + Number(t.amount || 0),
+      0
+    );
+
+    const discount = Number(oldTotals.discountAmount || 0);
+
+    const finalTotal = Math.max(
+      0,
+      finalSubtotalFromItems - discount + taxTotal
+    );
+
+    const newTotals = {
+      ...oldTotals,
+      subtotal: finalSubtotalFromItems,
+      total: finalTotal,
+      taxBreakdown: oldTotals.taxBreakdown,
+    };
+
+    /* =========================
+       5️⃣ BUILD LOGS
+    ========================= */
+
+    const logs = [];
+    const stopHistory = [];
+
+    (order.items || []).forEach((oldItem, i) => {
+      const newItem = updatedItems[i];
+
+      if (!oldItem || !newItem) return;
+
+      if (
+        oldItem.expectedEndDate !== newItem.expectedEndDate ||
+        Number(oldItem.amount) !== Number(newItem.amount)
+      ) {
+        logs.push({
+          action: "STOP_SERVICE",
+          oldValue: {
+            endDate: oldItem.expectedEndDate,
+            amount: oldItem.amount,
+          },
+          newValue: {
+            endDate: newItem.expectedEndDate,
+            amount: newItem.amount,
+          },
+          editedByUid: auth.currentUser?.uid || "",
+          editedByName:
+            auth.currentUser?.displayName ||
+            auth.currentUser?.email ||
+            "Admin",
+          editedAt: new Date().toISOString(),
+        });
+
+        stopHistory.push({
+          serviceIndex: i,
+          serviceName: oldItem.name,
+          oldEndDate: oldItem.expectedEndDate,
+          newEndDate: newItem.expectedEndDate,
+          oldAmount: oldItem.amount,
+          newAmount: newItem.amount,
+          stoppedByUid: auth.currentUser?.uid || "",
+          stoppedByName:
+            auth.currentUser?.displayName ||
+            auth.currentUser?.email ||
+            "Admin",
+          stoppedAt: new Date().toISOString(),
+        });
+      }
+    });
+
+    /* =========================
+       6️⃣ SAVE TO FIRESTORE
+    ========================= */
+
+    await updateDoc(doc(db, "nursingOrders", id), {
+      items: updatedItems,
+      totals: newTotals,
+      stopHistory: [
+        ...(order.stopHistory || []),
+        ...stopHistory,
+      ],
+      activityLog:
+        logs.length > 0
+          ? arrayUnion(...logs)
+          : order.activityLog || [],
+      stoppedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    /* =========================
+       7️⃣ UPDATE UI
+    ========================= */
+
+    setOrder((o) => ({
+      ...o,
+      items: updatedItems,
+      totals: newTotals,
+    }));
+
+    alert("Services updated successfully");
+
+  } catch (err) {
+    console.error(err);
+    alert("Failed to stop services");
+  }
+};
+
+const handleCustomerRefund = async (
+  newTotals,
+  stopDate,
+  latestOrder = order
+) => {
+  try {
+    /* =========================
+       1️⃣ USE LATEST DATA
+    ========================= */
+    const payments = latestOrder.payments || [];
+    const refunds = latestOrder.refunds || [];
+
+    /* =========================
+       2️⃣ TOTAL PAID
+    ========================= */
+    const totalPaid = payments.reduce(
+      (sum, p) => sum + Number(p.amount || 0),
+      0
+    );
+
+    /* =========================
+       3️⃣ FINAL TOTAL (SAFE)
+    ========================= */
+    const finalTotal =
+      Number(newTotals?.total ?? newTotals?.finalTotal ?? 0);
+
+    /* =========================
+       4️⃣ REFUND CALCULATION ✅
+    ========================= */
+    const refundAmount = Math.max(0, totalPaid - finalTotal);
+
+    if (refundAmount <= 0) return;
+
+    /* =========================
+       5️⃣ PREVENT DUPLICATE
+    ========================= */
+    const alreadyRefunded = refunds.some(
+      (r) => r.note === "Service stopped early refund"
+    );
+
+    if (alreadyRefunded) {
+      console.warn("Refund already created");
+      return;
+    }
+
+    /* =========================
+       6️⃣ CREATE REFUND
+    ========================= */
+    const refundEntry = {
+      id: `refund-${Date.now()}`,
+      amount: refundAmount,
+      status: "pending",
+
+      createdAt: new Date().toISOString(),
+
+      createdByUid: auth.currentUser?.uid || "",
+      createdByName:
+        auth.currentUser?.displayName ||
+        auth.currentUser?.email ||
+        "Admin",
+
+      note: "Service stopped early refund",
+    };
+
+    /* =========================
+       7️⃣ ACTIVITY LOG
+    ========================= */
+    const log = {
+      action: "CREATE_REFUND",
+      amount: refundAmount,
+
+      oldTotal: latestOrder?.totals?.total || 0,
+      newTotal: finalTotal,
+
+      editedByUid: auth.currentUser?.uid || "",
+      editedByName:
+        auth.currentUser?.displayName ||
+        auth.currentUser?.email ||
+        "Admin",
+
+      editedAt: new Date().toISOString(),
+    };
+
+    /* =========================
+       8️⃣ SAVE TO FIRESTORE
+    ========================= */
+    const updatedRefunds = [...refunds, refundEntry];
+
+    await updateDoc(doc(db, "nursingOrders", id), {
+      refunds: updatedRefunds,
+      lastStoppedAt: stopDate || new Date().toISOString(),
+      activityLog: arrayUnion(log),
+      updatedAt: serverTimestamp(),
+    });
+
+    /* =========================
+       9️⃣ ACCOUNT REPORT
+    ========================= */
+    await updateAccountReport({
+      totalRefunds: increment(refundAmount),
+
+      [`${latestOrder.serviceType}Refunds`]: increment(refundAmount),
+
+      pendingAmount: increment(-refundAmount),
+
+      refunds: arrayUnion({
+        orderId: latestOrder.id,
+        orderNo: latestOrder.orderNo,
+        serviceType: latestOrder.serviceType,
+        amount: refundAmount,
+        reason: "Service stopped early",
+        date: new Date().toISOString(),
+      }),
+    });
+
+    /* =========================
+       🔟 UPDATE UI
+    ========================= */
+    setOrder((o) => ({
+      ...o,
+      refunds: updatedRefunds,
+      lastStoppedAt: stopDate,
+    }));
+
+    alert(`Refund pending: ₹${refundAmount}`);
+
+  } catch (err) {
+    console.error(err);
+    alert("Refund handling failed");
+  }
+};
+const handleStopFullService = async (stopDate, preview) => {
+
+  if (order?.lastStoppedAt) {
+    alert("Service already stopped");
+    return;
+  }
+
+  if (!stopDate) {
+    alert("Select stop date");
+    return;
+  }
+
+  if (!preview) {
+    alert("Preview missing");
+    return;
+  }
+
+  const confirmStop = window.confirm(
+    "Are you sure you want to stop full service?"
+  );
+
+  if (!confirmStop) return;
+
+  try {
+
+    /* =========================
+       1️⃣ STOP SERVICES
+    ========================= */
+    await stopOrderServicesOnly(
+  stopDate,
+  preview.finalSubtotal // ✅ VERY IMPORTANT
+);
+
+    /* =========================
+       2️⃣ GET LATEST ORDER 🔥
+    ========================= */
+    const snap = await getDoc(doc(db, "nursingOrders", id));
+    const updatedOrder = {
+      id: snap.id,
+      ...(snap.data() || {}),
+    };
+
+    /* =========================
+       3️⃣ STOP STAFF
+    ========================= */
+    await stopAllActiveStaff(stopDate);
+
+    /* =========================
+       4️⃣ FINAL TOTAL (FROM PREVIEW)
+    ========================= */
+    const finalTotals = {
+      total: Number(preview.finalTotal || 0),
+    };
+
+    /* =========================
+       5️⃣ HANDLE REFUND
+    ========================= */
+    await handleCustomerRefund(
+      finalTotals,
+      stopDate,
+      updatedOrder
+    );
+
+    /* =========================
+       6️⃣ RESET UI
+    ========================= */
+    setStopFullModal({ open: false, stopDate: "" });
+    setStopPreviewOverride({ newSubtotal: "" });
+
+    alert("Service stopped successfully");
+
+  } catch (err) {
+    console.error("STOP SERVICE ERROR:", err);
+    alert("Failed to stop service");
+  }
+};
   const buildStaffActivityLog = (oldA, newA) => {
     if (!oldA || !newA) return null;
 
@@ -1778,7 +2419,70 @@ date: new Date().toISOString()
       alert("Failed to save staff salary");
     }
   };
+const payRefund = async (refund) => {
+  try {
+    const updatedRefunds = (order.refunds || []).map(r =>
+      r.id === refund.id
+        ? {
+            ...r,
+            status: "paid",
+            paidAt: new Date().toISOString(),
 
+            paidByUid: auth.currentUser?.uid || "",
+            paidByName:
+              auth.currentUser?.displayName ||
+              auth.currentUser?.email ||
+              "Admin"
+          }
+        : r
+    );
+
+    /* =========================
+       UPDATE ORDER
+    ========================= */
+
+    await updateDoc(doc(db, "nursingOrders", id), {
+      refunds: updatedRefunds,
+      updatedAt: serverTimestamp(),
+    });
+
+    /* =========================
+       UPDATE ACCOUNT REPORT
+    ========================= */
+
+    await updateAccountReport({
+      totalRefundsPaid: increment(refund.amount),
+
+      pendingAmount: increment(refund.amount), // reversing previous deduction
+
+      refundsPaid: arrayUnion({
+        orderId: order.id,
+        orderNo: order.orderNo,
+
+        serviceType: order.serviceType,
+
+        amount: refund.amount,
+
+        date: new Date().toISOString()
+      }),
+    });
+
+    /* =========================
+       UPDATE UI
+    ========================= */
+
+    setOrder((o) => ({
+      ...o,
+      refunds: updatedRefunds,
+    }));
+
+    alert(`Refund paid: ₹${refund.amount}`);
+
+  } catch (err) {
+    console.error(err);
+    alert("Failed to pay refund");
+  }
+};
 
   const saveStaffPayment = async () => {
 
@@ -1842,7 +2546,115 @@ date: new Date().toISOString()
     }
 
   };
+const getStopPreview = () => {
+  if (!stopFullModal.stopDate || !order) return null;
 
+  /* =========================
+     1️⃣ UPDATE ITEMS (PRORATE)
+  ========================= */
+
+  let updatedItems = [...order.items];
+
+  updatedItems = updatedItems.map((it) => {
+    if (!it.expectedStartDate || !it.expectedEndDate) return it;
+
+    const start = new Date(it.expectedStartDate);
+    const oldEnd = new Date(it.expectedEndDate);
+    const newEnd = new Date(stopFullModal.stopDate);
+
+    // if stop after end → no change
+    if (newEnd >= oldEnd) return it;
+
+    const totalDays =
+      (oldEnd - start) / (1000 * 60 * 60 * 24) + 1;
+
+    const usedDays =
+      (newEnd - start) / (1000 * 60 * 60 * 24) + 1;
+
+    const newAmount = (it.amount / totalDays) * usedDays;
+
+    return {
+      ...it,
+      expectedEndDate: stopFullModal.stopDate,
+      amount: Math.round(newAmount),
+    };
+  });
+
+  /* =========================
+     2️⃣ CALCULATE SUBTOTAL ONLY
+  ========================= */
+
+  const oldTotals = order?.totals || {};
+
+  const newSubtotal = updatedItems.reduce(
+    (sum, it) => sum + Number(it.amount || 0),
+    0
+  );
+
+  /* =========================
+     3️⃣ KEEP TAX LOCKED
+  ========================= */
+
+  const taxTotal = (oldTotals.taxBreakdown || []).reduce(
+    (sum, t) => sum + Number(t.amount || 0),
+    0
+  );
+
+  const discount = Number(oldTotals.discountAmount || 0);
+
+  /* =========================
+     4️⃣ APPLY ADMIN OVERRIDE
+  ========================= */
+
+  let finalSubtotal = newSubtotal;
+
+  if (stopPreviewOverride.newSubtotal) {
+    finalSubtotal = Number(stopPreviewOverride.newSubtotal);
+  }
+
+  /* =========================
+     5️⃣ FINAL TOTAL
+  ========================= */
+
+  const finalTotal = finalSubtotal - discount + taxTotal;
+
+  /* =========================
+     6️⃣ TOTAL PAID
+  ========================= */
+
+  const totalPaid = (order.payments || []).reduce(
+    (sum, p) => sum + Number(p.amount || 0),
+    0
+  );
+
+  /* =========================
+     7️⃣ REFUND CALCULATION
+  ========================= */
+
+  const refund = Math.max(0, totalPaid - finalTotal);
+
+  /* =========================
+     RETURN
+  ========================= */
+
+  return {
+    updatedItems,
+
+    // 🔥 KEY VALUES
+    oldSubtotal: oldTotals.subtotal || 0,
+    newSubtotal,
+
+    finalSubtotal,
+
+    taxTotal,
+    discount,
+
+    finalTotal,
+
+    refund,
+  };
+};
+const stopPreview = getStopPreview();
 
   /* ======================
      UI
@@ -2110,6 +2922,23 @@ date: new Date().toISOString()
               >
                 Extend Service
               </button>
+        {order?.lastStoppedAt ? (
+  <div className="nod-badge nod-badge-blue">
+    Service Stopped
+  </div>
+) : (
+  <button
+    className="nod-btn nod-btn-danger"
+    onClick={() =>
+  setStopFullModal({
+    open: true,
+    stopDate: getMaxEndDate() // default NOW
+  })
+}
+  >
+    Stop Full Service
+  </button>
+)}
 
               {servicesEditing && (
                 <button
@@ -2189,19 +3018,79 @@ date: new Date().toISOString()
         <h3>Payments</h3>
 
         <div className="nod-row">
-          <div>
-            <div className="nod-muted">Total Paid</div>
-            <strong className="nod-green">
-              ₹ {fmtCurrency(totalPaid)}
-            </strong>
+        <div className="nod-row">
+
+  <div>
+    <div className="nod-muted">Total Paid</div>
+    <strong className="nod-green">
+      ₹ {fmtCurrency(totalPaid)}
+    </strong>
+  </div>
+
+  <div>
+    <div className="nod-muted">Refund Pending</div>
+    <strong className="nod-red">
+      ₹ {fmtCurrency(refundPending)}
+    </strong>
+  </div>
+
+  <div>
+    <div className="nod-muted">Balance</div>
+    <strong className={balance > 0 ? "nod-red" : "nod-green"}>
+      ₹ {fmtCurrency(balance)}
+    </strong>
+  </div>
+
+</div>
+{(order?.refunds || []).length > 0 && (
+  <div style={{ marginTop: 16 }}>
+    <h4>Refunds</h4>
+
+    {(order.refunds || []).map((r) => (
+      <div key={r.id} className="nod-row nod-payment-row">
+
+        {/* LEFT */}
+        <div>
+          <strong>₹ {fmtCurrency(r.amount)}</strong>
+
+          <div className="nod-muted">
+            {r.status === "pending" ? "Refund Pending" : "Refund Paid"}
           </div>
 
-          <div>
-            <div className="nod-muted">Balance</div>
-            <strong className={balance > 0 ? "nod-red" : "nod-green"}>
-              ₹ {fmtCurrency(balance)}
-            </strong>
+          <div className="nod-muted small">
+            {new Date(r.createdAt).toLocaleString()}
           </div>
+
+          {r.note && (
+            <div className="nod-muted small">
+              {r.note}
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT */}
+        <div>
+          {r.status === "pending" && (
+            <button
+              className="nod-btn nod-btn-danger"
+              onClick={() =>
+  setRefundModal({
+    open: true,
+    refund: r,
+    amount: r.amount, // default full
+    method: "cash",
+  })
+}
+            >
+              Pay Refund
+            </button>
+          )}
+        </div>
+
+      </div>
+    ))}
+  </div>
+)}
 
           <button
             className="nod-btn nod-btn-primary"
@@ -2591,30 +3480,114 @@ date: new Date().toISOString()
         </button>
       </div>
       <div className="nod-card">
-        <h3>Activity Log</h3>
+  <h3>Activity Log</h3>
 
-        {(order.activityLog || []).length === 0 && (
-          <div className="nod-muted">No activity yet</div>
-        )}
+  {(order.activityLog || []).length === 0 && (
+    <div className="nod-muted">No activity yet</div>
+  )}
 
-        {(order.activityLog || [])
-          .slice()
-          .reverse()
-          .map((log, i) => (
-            <div key={i} className="nod-muted small">
-              <strong>{log.editedByName}</strong>{" "}
-              {log.action.replace("_", " ").toLowerCase()} <br />
+  {(order.activityLog || [])
+    .slice()
+    .reverse()
+    .map((log, i) => {
 
-              <span>
+      return (
+        <div key={i} className="nod-activity-item">
+
+          <div className="nod-activity-header">
+            <strong>{log.editedByName}</strong>{" "}
+            {log.action.replace(/_/g, " ").toLowerCase()}
+          </div>
+
+          {/* =========================
+              SERVICE STOP LOG
+          ========================= */}
+          {log.action === "STOP_SERVICE" && (
+            <div className="nod-activity-body">
+              <div>
+                End Date: {log.oldValue?.endDate} →{" "}
+                <strong>{log.newValue?.endDate}</strong>
+              </div>
+
+              <div>
+                Amount: ₹{fmtCurrency(log.oldValue?.amount)} →{" "}
+                <strong>₹{fmtCurrency(log.newValue?.amount)}</strong>
+              </div>
+            </div>
+          )}
+
+          {/* =========================
+              SERVICE UPDATE (GENERAL)
+          ========================= */}
+          {log.action === "UPDATE_SERVICE" && (
+            <div className="nod-activity-body">
+              <div>
+                {log.field}:{" "}
                 {String(log.oldValue)} →{" "}
                 <strong>{String(log.newValue)}</strong>
-              </span>
-              <br />
-
-              <span>{fmtDateTime(log.editedAt)}</span>
+              </div>
             </div>
-          ))}
-      </div>
+          )}
+
+          {/* =========================
+              REFUND CREATED
+          ========================= */}
+          {log.action === "CREATE_REFUND" && (
+            <div className="nod-activity-body">
+              <div>
+                Refund Pending: ₹{fmtCurrency(log.amount)}
+              </div>
+            </div>
+          )}
+
+          {/* =========================
+              REFUND PAYMENT
+          ========================= */}
+          {log.action === "REFUND_PAYMENT" && (
+            <div className="nod-activity-body">
+              <div>
+                Refund Paid: ₹{fmtCurrency(log.amount)}
+              </div>
+              <div>Method: {log.method}</div>
+            </div>
+          )}
+
+          {/* =========================
+              STAFF SALARY UPDATE
+          ========================= */}
+          {log.action === "UPDATE_STAFF_SALARY" && (
+            <div className="nod-activity-body">
+              <div>
+                Salary: ₹{fmtCurrency(log.oldValue)} →{" "}
+                <strong>₹{fmtCurrency(log.newValue)}</strong>
+              </div>
+            </div>
+          )}
+
+          {/* =========================
+              DEFAULT FALLBACK
+          ========================= */}
+          {![
+            "STOP_SERVICE",
+            "UPDATE_SERVICE",
+            "CREATE_REFUND",
+            "REFUND_PAYMENT",
+            "UPDATE_STAFF_SALARY"
+          ].includes(log.action) && (
+            <div className="nod-activity-body">
+              {String(log.oldValue)} →{" "}
+              <strong>{String(log.newValue)}</strong>
+            </div>
+          )}
+
+          <div className="nod-activity-time">
+            {fmtDateTime(log.editedAt)}
+          </div>
+
+        </div>
+      );
+    })}
+</div>
 
       <div className="nod-card">
 
@@ -2658,6 +3631,50 @@ date: new Date().toISOString()
           ))}
 
       </div>
+      <div className="nod-card">
+  <h3>Service Stop History</h3>
+
+  {(order.stopHistory || []).length === 0 && (
+    <div className="nod-muted">
+      No service stops recorded
+    </div>
+  )}
+
+  {(order.stopHistory || [])
+    .slice()
+    .reverse()
+    .map((s, i) => (
+      <div key={i} className="nod-row nod-extension-row">
+
+        <div>
+
+          <strong>{s.serviceName}</strong>
+
+          <div className="nod-muted small">
+            {s.oldEndDate} → {s.newEndDate}
+          </div>
+
+          <div className="nod-muted small">
+            Amount: ₹{fmtCurrency(s.oldAmount)} → ₹{fmtCurrency(s.newAmount)}
+          </div>
+
+          <div className="nod-muted small">
+            Stopped by {s.stoppedByName}
+          </div>
+
+          <div className="nod-muted small">
+            {new Date(s.stoppedAt).toLocaleString()}
+          </div>
+
+        </div>
+
+        <div className="nod-red">
+          − ₹{fmtCurrency(s.oldAmount - s.newAmount)}
+        </div>
+
+      </div>
+    ))}
+</div>
 
 
       {/* ASSIGN MODAL */}
@@ -3295,6 +4312,214 @@ date: new Date().toISOString()
 
   </div>
 
+)}
+{stopFullModal.open && (
+  <div className="nod-modal">
+    <div className="nod-modal-card">
+
+      <h4>Stop Full Service</h4>
+
+      <div className="nod-muted">
+        This will stop all services & staff
+      </div>
+
+      <label>Stop Date / Time</label>
+
+      <input
+        type="datetime-local"
+        className="nod-input"
+        value={stopFullModal.stopDate}
+        onChange={(e) =>
+          setStopFullModal((p) => ({
+            ...p,
+            stopDate: e.target.value,
+          }))
+        }
+      />
+
+      {/* 🔥 PREVIEW */}
+      {stopPreview && (
+  <div className="nod-preview-box">
+
+    {/* OLD SUBTOTAL */}
+    <div className="nod-row">
+      <span>Old Subtotal</span>
+      <strong>
+        ₹ {fmtCurrency(stopPreview.oldSubtotal)}
+      </strong>
+    </div>
+
+    {/* 🔥 EDITABLE SUBTOTAL */}
+    <div className="nod-row">
+      <span>New Subtotal</span>
+
+      <input
+        type="number"
+        className="nod-input small"
+        value={
+          stopPreviewOverride.newSubtotal ||
+          stopPreview.finalSubtotal
+        }
+        onChange={(e) =>
+          setStopPreviewOverride({
+            newSubtotal: e.target.value,
+          })
+        }
+      />
+    </div>
+
+    {/* TAX (LOCKED) */}
+    <div className="nod-row">
+      <span>Tax (Locked)</span>
+      <strong>
+        ₹ {fmtCurrency(stopPreview.taxTotal)}
+      </strong>
+    </div>
+
+    {/* DISCOUNT (IF ANY) */}
+    {stopPreview.discount > 0 && (
+      <div className="nod-row">
+        <span>Discount</span>
+        <strong className="nod-red">
+          − ₹ {fmtCurrency(stopPreview.discount)}
+        </strong>
+      </div>
+    )}
+
+    {/* FINAL TOTAL */}
+    <div className="nod-row nod-total">
+      <span>Total</span>
+      <strong>
+        ₹{" "}
+        {fmtCurrency(
+          (stopPreviewOverride.newSubtotall
+            ? Number(stopPreviewOverride.newSubtotal)
+            : stopPreview.finalSubtotal) -
+            stopPreview.discount +
+            stopPreview.taxTotal
+        )}
+      </strong>
+    </div>
+
+    {/* REFUND */}
+    <div className="nod-row">
+      <span>Refund</span>
+      <strong className="nod-red">
+        ₹ {fmtCurrency(
+  Math.max(
+    0,
+    totalPaid -
+      (
+        (stopPreviewOverride.newSubtotal
+          ? Number(stopPreviewOverride.newSubtotal)
+          : stopPreview.finalSubtotal) -
+        stopPreview.discount +
+        stopPreview.taxTotal
+      )
+  )
+)}
+      </strong>
+    </div>
+
+  </div>
+)}
+
+      <div className="nod-row">
+
+        <button
+          className="nod-btn nod-btn-secondary"
+          onClick={() => {
+            setStopFullModal({ open: false, stopDate: "" });
+            setStopPreviewOverride({ newSubtotal: "" });
+          }}
+        >
+          Cancel
+        </button>
+
+        <button
+          className="nod-btn nod-btn-danger"
+          onClick={() => {
+  const overrideSubtotal = stopPreviewOverride.newSubtotal
+    ? Number(stopPreviewOverride.newSubtotal)
+    : stopPreview.finalSubtotal;
+
+  const finalTotal =
+    overrideSubtotal -
+    stopPreview.discount +
+    stopPreview.taxTotal;
+
+  handleStopFullService(stopFullModal.stopDate, {
+    finalSubtotal: overrideSubtotal,
+    finalTotal,
+  });
+}}
+        >
+          Confirm Stop
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+)}
+{refundModal.open && (
+  <div className="nod-modal">
+    <div className="nod-modal-card">
+
+      <h4>Pay Refund</h4>
+
+      <div className="nod-muted">
+        Total Refund: ₹{fmtCurrency(refundModal.refund?.amount)}
+      </div>
+
+      <input
+        type="number"
+        className="nod-input"
+        placeholder="Refund Amount"
+        value={refundModal.amount}
+        onChange={(e) =>
+          setRefundModal(p => ({
+            ...p,
+            amount: e.target.value
+          }))
+        }
+      />
+
+      <select
+        className="nod-input"
+        value={refundModal.method}
+        onChange={(e) =>
+          setRefundModal(p => ({
+            ...p,
+            method: e.target.value
+          }))
+        }
+      >
+        <option value="cash">Cash</option>
+        <option value="upi">UPI</option>
+        <option value="bank">Bank</option>
+      </select>
+
+      <div className="nod-row">
+
+        <button
+          className="nod-btn nod-btn-secondary"
+          onClick={() => setRefundModal({ open: false })}
+        >
+          Cancel
+        </button>
+
+        <button
+          className="nod-btn nod-btn-danger"
+          onClick={submitRefundPayment}
+        >
+          Pay Refund
+        </button>
+
+      </div>
+
+    </div>
+  </div>
 )}
     </div>
   );
