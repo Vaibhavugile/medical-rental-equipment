@@ -40,7 +40,14 @@ const defaultQuotation = {
     },
   ],
   discount: { type: "percent", value: 0 },
-  taxes: [{ name: "GST", rate: 18 }],
+  taxes: [
+  {
+    id: "t1",
+    name: "GST",
+    type: "percent",
+    value: 18
+  }
+],
   notes: "",
   status: "sent",
   createdAt: null,
@@ -64,23 +71,46 @@ const calcAmounts = (items, discount, taxes) => {
     (s, it) => s + Number(it.qty || 0) * Number(it.rate || 0),
     0
   );
+
+  // ✅ Discount
   let discountAmount = 0;
   if (discount) {
-    discountAmount =
-      discount.type === "percent"
-        ? subtotal * (Number(discount.value || 0) / 100)
-        : Number(discount.value || 0);
+    if ((discount.type || "").toLowerCase() === "percent") {
+      discountAmount = subtotal * (Number(discount.value || 0) / 100);
+    } else {
+      discountAmount = Number(discount.value || 0);
+    }
   }
+
   const taxable = Math.max(0, subtotal - discountAmount);
-  const taxBreakdown = (taxes || []).map((t) => ({
-    ...t,
-    amount: taxable * (Number(t.rate || 0) / 100),
-  }));
+
+  // ✅ Taxes (fixed + percent support)
+  const taxBreakdown = (taxes || []).map((t) => {
+    const type = (t.type || "percent").toLowerCase();
+    const value = Number(t.value ?? t.rate ?? 0);
+
+    let amount = 0;
+
+    if (type === "fixed") {
+      amount = value;
+    } else {
+      amount = taxable * (value / 100);
+    }
+
+    return {
+      ...t,
+      value,
+      amount: Number(amount.toFixed(2)),
+        // 🔥 lock like order
+      locked: true,
+    };
+  });
+
   const totalTax = taxBreakdown.reduce((s, t) => s + (t.amount || 0), 0);
   const total = Math.max(0, taxable + totalTax);
+
   return { subtotal, discountAmount, taxBreakdown, totalTax, total };
 };
-
 const parseDateForDisplay = (ts) => {
   try {
     if (!ts) return "—";
@@ -249,12 +279,24 @@ const openCreateQuotation = async (req) => {
       };
     });
   }
+  // ✅ Normalize taxes (FIX OLD rate → value issue)
+const normalizeTaxes = (taxes = []) =>
+  taxes.map((t, i) => ({
+    id: t.id || `t-${i}`,
+    name: t.name || "Tax",
+    type: t.type || "percent",
+    value: Number(t.value ?? t.rate ?? 0),
+  }));
 
   // ===============================
   // 📄 FINAL QUOTATION OBJECT
   // ===============================
   const base = {
     ...defaultQuotation,
+     taxes: normalizeTaxes(
+    req?.taxes ||
+    defaultQuotation.taxes
+  ),
     requirementId: req?.id || "",
     requirementNumber: req?.requirementNumber || "",
     quoNo: `Q-${Date.now()}`,
@@ -1355,20 +1397,36 @@ const openCreateQuotation = async (req) => {
                               }))
                             }
                           />
-                          <input
-                            className="cp-input"
-                            value={t.rate}
-                            onChange={(e) =>
-                              setQuotation((q) => ({
-                                ...q,
-                                taxes: q.taxes.map((tt, ii) =>
-                                  ii === i
-                                    ? { ...tt, rate: Number(e.target.value || 0) }
-                                    : tt
-                                ),
-                              }))
-                            }
-                          />
+                         <select
+  className="cp-input"
+  value={t.type || "percent"}
+  onChange={(e) =>
+    setQuotation((q) => ({
+      ...q,
+      taxes: q.taxes.map((tt, ii) =>
+        ii === i ? { ...tt, type: e.target.value } : tt
+      ),
+    }))
+  }
+>
+  <option value="percent">%</option>
+  <option value="fixed">Fixed</option>
+</select>
+
+<input
+  className="cp-input"
+  value={t.value ?? t.rate ?? 0}
+  onChange={(e) =>
+    setQuotation((q) => ({
+      ...q,
+      taxes: q.taxes.map((tt, ii) =>
+        ii === i
+          ? { ...tt, value: Number(e.target.value || 0) }
+          : tt
+      ),
+    }))
+  }
+/>
                         </div>
                       ))}
                       <button
@@ -1376,7 +1434,7 @@ const openCreateQuotation = async (req) => {
                         onClick={() =>
                           setQuotation((q) => ({
                             ...q,
-                            taxes: [...(q.taxes || []), { name: "New Tax", rate: 0 }],
+                            taxes: [...(q.taxes || []), { id: `t-${Date.now()}`, name: "New Tax", type: "percent", value: 0 }],
                           }))
                         }
                         type="button"

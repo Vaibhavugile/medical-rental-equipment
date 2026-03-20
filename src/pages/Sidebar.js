@@ -149,7 +149,7 @@ const SECTIONS = [
       
       {
         key: "reports",            // ✅
-        label: " Euipment Reports",
+        label: "Equipment Reports",
         path: "/crm/reports",
         icon: BarChart3,
       },

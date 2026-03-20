@@ -44,18 +44,46 @@ const parseDate = (ts) => {
 
 const calcAmounts = (items, discount, taxes) => {
   const subtotal = (items || []).reduce(
-    (s, it) => s + Number(Number(it.qty || 0) * Number(it.rate || 0)),
+    (s, it) => s + Number(it.qty || 0) * Number(it.rate || 0),
     0
   );
+
+  // ✅ Discount
   let discountAmount = 0;
   if (discount) {
-    if (discount.type === "percent") discountAmount = subtotal * (Number(discount.value || 0) / 100);
-    else discountAmount = Number(discount.value || 0);
+    if ((discount.type || "").toLowerCase() === "percent") {
+      discountAmount = subtotal * (Number(discount.value || 0) / 100);
+    } else {
+      discountAmount = Number(discount.value || 0);
+    }
   }
+
   const taxable = Math.max(0, subtotal - discountAmount);
-  const taxBreakdown = (taxes || []).map((t) => ({ ...t, amount: taxable * (Number(t.rate || 0) / 100) }));
+
+  // ✅ Taxes (fixed + percent)
+  const taxBreakdown = (taxes || []).map((t) => {
+    const type = (t.type || "percent").toLowerCase();
+    const value = Number(t.value ?? t.rate ?? 0);
+
+    let amount = 0;
+
+    if (type === "fixed") {
+      amount = value;
+    } else {
+      amount = taxable * (value / 100);
+    }
+
+    return {
+      ...t,
+      value,
+      amount: Number(amount.toFixed(2)),
+      type, // ✅ DON'T override
+    };
+  });
+
   const totalTax = taxBreakdown.reduce((s, t) => s + (t.amount || 0), 0);
   const total = Math.max(0, taxable + totalTax);
+
   return { subtotal, discountAmount, taxBreakdown, totalTax, total };
 };
 
@@ -251,6 +279,12 @@ const [typeFilter, setTypeFilter] = useState("all");
 
     // normalize older item keys
     const clone = JSON.parse(JSON.stringify(details || {}));
+    clone.taxes = (clone.taxes || []).map((t, i) => ({
+  id: t.id || `t-${i}`,
+  name: t.name || "Tax",
+  type: t.type || "percent",
+  value: Number(t.value ?? t.rate ?? 0),
+}));
     clone.items = (clone.items || []).map((it) => {
       const qty = Number(it.qty ?? it.quantity ?? 1);
       const rate = Number(it.rate ?? 0);
@@ -344,7 +378,7 @@ const [typeFilter, setTypeFilter] = useState("all");
     setEditQuotation((q) => {
       const clone = JSON.parse(JSON.stringify(q || {}));
       clone.taxes = clone.taxes || [];
-      clone.taxes.push({ name: "New Tax", rate: 0 });
+      clone.taxes.push({ id: `t-${Date.now()}`, name: "New Tax", type: "percent", value: 0 });
       return clone;
     });
   };
@@ -585,19 +619,32 @@ if (newStatus === "rejected") {
 const convertToOrder = (quote) => {
   setError("");
 
+  // 🔥 Convert taxes to FIXED before sending
+  const fixedTaxes = (quote.taxes || []).map((t, i) => {
+    const amount =
+      quote.totals?.taxBreakdown?.[i]?.amount || 0;
+
+    return {
+      id: t.id || `t-${i}`,
+      name: t.name,
+      value: amount,     // ✅ FINAL AMOUNT
+      type: "fixed",     // ✅ IMPORTANT
+      locked: true       // 🔒 prevent recalculation
+    };
+  });
+
   const isNursing =
-  quote?.serviceType === "nursing" ||
-  quote?.serviceType === "caretaker" ||
-  quote?.items?.some((it) =>
-    /nurse|caretaker|care staff/i.test(it.name || "")
-  );
+    quote?.serviceType === "nursing" ||
+    quote?.serviceType === "caretaker" ||
+    quote?.items?.some((it) =>
+      /nurse|caretaker|care staff/i.test(it.name || "")
+    );
 
   setOrderModalQuote({
     ...quote,
-
-    // internal flag only for UI routing
+    taxes: fixedTaxes,   // ✅ OVERRIDE TAXES
     __orderType: isNursing ? "nursing" : "rental",
-serviceType: quote.serviceType || "rental",
+    serviceType: quote.serviceType || "rental",
   });
 };
 
@@ -1264,16 +1311,45 @@ serviceType: quote.serviceType || "rental",
                       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                         {(editQuotation.taxes || []).map((t, i) => (
                           <div key={i} style={{ display: "flex", gap: 8 }}>
-                            <input className="cp-input" value={t.name || ""} onChange={(e) => updateEditTax(i, { name: e.target.value })} />
-                            <input className="cp-input" value={t.rate || 0} onChange={(e) => updateEditTax(i, { rate: Number(e.target.value || 0) })} />
-                            <button className="cp-btn ghost" onClick={() => removeEditTax(i)}>Remove</button>
+<input
+  className="cp-input"
+  value={t.name || ""}
+  onChange={(e) => updateEditTax(i, { name: e.target.value })}
+/>
+
+<select
+  className="cp-input"
+  value={t.type || "percent"}
+  onChange={(e) => updateEditTax(i, { type: e.target.value })}
+>
+  <option value="percent">%</option>
+  <option value="fixed">Fixed</option>
+</select>
+
+<input
+  className="cp-input"
+  value={t.value ?? t.rate ?? 0}
+  onChange={(e) =>
+    updateEditTax(i, {
+      value: Number(e.target.value || 0),
+    })
+  }
+/>
+
+<button className="cp-btn ghost" onClick={() => removeEditTax(i)}>
+  Remove
+</button>                            
                           </div>
                         ))}
                         <button className="cp-btn ghost" onClick={addEditTax}>+ Add Tax</button>
                       </div>
                     ) : (
                       <div className="value">
-                        {(details.taxes || []).map((t, i) => <div key={i}>{t.name} — {t.rate}%</div>)}
+                        {(details.taxes || []).map((t, i) => <div key={i}>{t.name} — {
+  t.type === "fixed"
+    ? `₹${fmtCurrency(t.value)}`
+    : `${t.value}%`
+}</div>)}
                       </div>
                     )}
                   </div>

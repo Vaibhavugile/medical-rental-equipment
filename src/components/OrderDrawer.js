@@ -119,22 +119,27 @@ export default function OrderDrawer({
     const oldAmount = Number(item.amount || 0);
 
     // 🔥 per day
-    const perDayRate = oldAmount / totalDays;
+  const perDayRate = oldAmount / (totalDays * qty);
 
     // 🔥 auto amount
     const calculatedAmount = Math.round(
-      perDayRate * newDays * qty
-    );
+  perDayRate * newDays * qty
+);
+
 
     // 🔥 override
-    const finalAmount =
-      stopItemModal.amountOverride !== ""
-        ? Number(stopItemModal.amountOverride)
-        : calculatedAmount;
+    const hasOverride =
+  stopItemModal.amountOverride !== "" &&
+  stopItemModal.amountOverride !== null &&
+  stopItemModal.amountOverride !== undefined;
+
+const finalAmount = hasOverride
+  ? Number(stopItemModal.amountOverride)
+  : calculatedAmount;
 
     // 🔥 derive new rate
     const finalRate =
-      newDays > 0 ? finalAmount / newDays / qty : 0;
+  qty > 0 ? finalAmount / qty : 0;
 
     return {
       newDays,
@@ -2259,10 +2264,7 @@ export default function OrderDrawer({
                     <input
                       className="cp-input"
                       type="number"
-                      value={
-                        stopItemModal.amountOverride ||
-                        stopItemPreview.calculatedAmount
-                      }
+                    value={stopItemModal.amountOverride ?? stopItemPreview.calculatedAmount}
                       onChange={(e) =>
                         setStopItemModal((s) => ({
                           ...s,
@@ -2295,7 +2297,7 @@ export default function OrderDrawer({
                     open: false,
                     itemIndex: null,
                     stopDate: "",
-                    amountOverride: "",
+                    amountOverride: null,
                   })
                 }
               >
