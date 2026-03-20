@@ -73,12 +73,12 @@ export default function OrderDrawer({
   const [customerDraft, setCustomerDraft] = useState(null);
   const [customerErrors, setCustomerErrors] = useState({});
   const [refundModal, setRefundModal] = useState({
-  open: false,
-  refundIndex: null,
-  amount: "",
-  method: "cash",
-  note: "",
-});
+    open: false,
+    refundIndex: null,
+    amount: "",
+    method: "cash",
+    note: "",
+  });
   const diffDaysInclusive = (start, end) => {
     if (!start || !end) return 0;
 
@@ -119,27 +119,27 @@ export default function OrderDrawer({
     const oldAmount = Number(item.amount || 0);
 
     // 🔥 per day
-  const perDayRate = oldAmount / (totalDays * qty);
+    const perDayRate = oldAmount / (totalDays * qty);
 
     // 🔥 auto amount
     const calculatedAmount = Math.round(
-  perDayRate * newDays * qty
-);
+      perDayRate * newDays * qty
+    );
 
 
     // 🔥 override
     const hasOverride =
-  stopItemModal.amountOverride !== "" &&
-  stopItemModal.amountOverride !== null &&
-  stopItemModal.amountOverride !== undefined;
+      stopItemModal.amountOverride !== "" &&
+      stopItemModal.amountOverride !== null &&
+      stopItemModal.amountOverride !== undefined;
 
-const finalAmount = hasOverride
-  ? Number(stopItemModal.amountOverride)
-  : calculatedAmount;
+    const finalAmount = hasOverride
+      ? Number(stopItemModal.amountOverride)
+      : calculatedAmount;
 
     // 🔥 derive new rate
     const finalRate =
-  qty > 0 ? finalAmount / qty : 0;
+      qty > 0 ? finalAmount / qty : 0;
 
     return {
       newDays,
@@ -407,6 +407,9 @@ const finalAmount = hasOverride
       alert(e?.message || "Failed to assign assets");
     }
   };
+  const isItemStopped = (item) => {
+    return (item.stopHistory || []).length > 0;
+  };
   const updateCustomerField = async (field, value) => {
     try {
       const orderRef = doc(db, "orders", selectedOrder.id);
@@ -574,26 +577,26 @@ const finalAmount = hasOverride
       ========================= */
 
       if (refundAmount > 0) {
-  updatePayload = {
-    ...updatePayload,
+        updatePayload = {
+          ...updatePayload,
 
-    refunds: arrayUnion({
-      id: `refund-${Date.now()}`,
+          refunds: arrayUnion({
+            id: `refund-${Date.now()}`,
 
-      amount: refundAmount,
-      paidAmount: 0,
-      status: "pending",
+            amount: refundAmount,
+            paidAmount: 0,
+            status: "pending",
 
-      payments: [],
+            payments: [],
 
-      createdAt: new Date().toISOString(),
-      reason: "Service stopped early",
-    }),
+            createdAt: new Date().toISOString(),
+            reason: "Service stopped early",
+          }),
 
-    // ✅ IMPORTANT
-    lastRefundedAt: serverTimestamp(),
-  };
-}
+          // ✅ IMPORTANT
+          lastRefundedAt: serverTimestamp(),
+        };
+      }
 
       /* =========================
          6️⃣ SAVE TO FIRESTORE
@@ -774,36 +777,36 @@ const finalAmount = hasOverride
     }
   };
   const saveRefundPayment = async () => {
-  try {
-    const rIndex = refundModal.refundIndex;
-    const refund = selectedOrder.refunds[rIndex];
+    try {
+      const rIndex = refundModal.refundIndex;
+      const refund = selectedOrder.refunds[rIndex];
 
-    const payAmount = Number(refundModal.amount || 0);
+      const payAmount = Number(refundModal.amount || 0);
 
-    if (!payAmount || payAmount <= 0) {
-      alert("Enter valid amount");
-      return;
-    }
+      if (!payAmount || payAmount <= 0) {
+        alert("Enter valid amount");
+        return;
+      }
 
-    const remaining = refund.amount - (refund.paidAmount || 0);
+      const remaining = refund.amount - (refund.paidAmount || 0);
 
-    if (payAmount > remaining) {
-      alert(`Cannot exceed remaining ₹${remaining}`);
-      return;
-    }
+      if (payAmount > remaining) {
+        alert(`Cannot exceed remaining ₹${remaining}`);
+        return;
+      }
 
-    const newPaid = (refund.paidAmount || 0) + payAmount;
+      const newPaid = (refund.paidAmount || 0) + payAmount;
 
-    const newStatus =
-      newPaid === refund.amount
-        ? "paid"
-        : newPaid > 0
-        ? "partial"
-        : "pending";
+      const newStatus =
+        newPaid === refund.amount
+          ? "paid"
+          : newPaid > 0
+            ? "partial"
+            : "pending";
 
-    const updatedRefunds = selectedOrder.refunds.map((r, i) =>
-      i === rIndex
-        ? {
+      const updatedRefunds = selectedOrder.refunds.map((r, i) =>
+        i === rIndex
+          ? {
             ...r,
             paidAmount: newPaid,
             status: newStatus,
@@ -818,36 +821,36 @@ const finalAmount = hasOverride
               },
             ],
           }
-        : r
-    );
+          : r
+      );
 
-    await updateDoc(doc(db, "orders", selectedOrder.id), {
-      refunds: updatedRefunds,
+      await updateDoc(doc(db, "orders", selectedOrder.id), {
+        refunds: updatedRefunds,
 
-      // ✅ IMPORTANT (update on payment also)
-      lastRefundedAt: serverTimestamp(),
+        // ✅ IMPORTANT (update on payment also)
+        lastRefundedAt: serverTimestamp(),
 
-      updatedAt: serverTimestamp(),
-    });
+        updatedAt: serverTimestamp(),
+      });
 
-    setSelectedOrder((o) => ({
-      ...o,
-      refunds: updatedRefunds,
-    }));
+      setSelectedOrder((o) => ({
+        ...o,
+        refunds: updatedRefunds,
+      }));
 
-    setRefundModal({
-      open: false,
-      refundIndex: null,
-      amount: "",
-      method: "cash",
-      note: "",
-    });
+      setRefundModal({
+        open: false,
+        refundIndex: null,
+        amount: "",
+        method: "cash",
+        note: "",
+      });
 
-  } catch (err) {
-    console.error(err);
-    alert("Failed to save refund");
-  }
-};
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save refund");
+    }
+  };
 
 
   // Unassign chip: remove from item + unreserve (return to in_stock)
@@ -1222,66 +1225,65 @@ const finalAmount = hasOverride
                               />
                             </div>
                             <div
-  style={{
-    display: "flex",
-    flexDirection: "column",
-    gap: "6px",
-    marginTop: 10,
-    alignItems: "flex-start" // 👈 keeps width tight (not full width)
-  }}
->
-                            <button
-                               style={{
-    padding: "4px 10px",
-    fontSize: "12px",
-
-    borderRadius: "8px",
-    border: "1px solid #bfdbfe",
-    background: "#eff6ff",
-    color: "#1d4ed8",
-
-    cursor: "pointer",
-    fontWeight: 600,
-
-    width: "fit-content" // 👈 IMPORTANT
-  }}
-                              onClick={() =>
-                                setExtendService({
-                                  open: true,
-                                  itemIndex: idx,
-                                  newEndDate: it.expectedEndDate || "",
-                                  extraPrice: "",
-                                })
-                              }
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                gap: "6px",
+                                marginTop: 10,
+                                alignItems: "flex-start" // 👈 keeps width tight (not full width)
+                              }}
                             >
-                              Extend Service
-                            </button>
-                             <button
+                              <button
                                 style={{
+                                  padding: "4px 10px",
+                                  fontSize: "12px",
+
+                                  borderRadius: "8px",
+                                  border: "1px solid #bfdbfe",
+                                  background: "#eff6ff",
+                                  color: "#1d4ed8",
+
+                                  cursor: "pointer",
+                                  fontWeight: 600,
+
+                                  width: "fit-content" // 👈 IMPORTANT
+                                }}
+                                onClick={() =>
+                                  setExtendService({
+                                    open: true,
+                                    itemIndex: idx,
+                                    newEndDate: it.expectedEndDate || "",
+                                    extraPrice: "",
+                                  })
+                                }
+                              >
+                                Extend Service
+                              </button>
+                              <button
+                                 style={{
     padding: "4px 10px",
     fontSize: "12px",
-
     borderRadius: "8px",
     border: "1px solid #fecaca",
     background: "#fef2f2",
     color: "#b91c1c",
-
-    cursor: "pointer",
+    cursor: isItemStopped(it) ? "not-allowed" : "pointer",
     fontWeight: 600,
-
-    width: "fit-content" // 👈 IMPORTANT
+    width: "fit-content",
+    opacity: isItemStopped(it) ? 0.5 : 1
   }}
-                              onClick={() =>
-                                setStopItemModal({
-                                  open: true,
-                                  itemIndex: idx,
-                                  stopDate: it.expectedEndDate || "",
-                                  amountOverride: "",
-                                })
-                              }
-                            >
-                              Stop Service
-                            </button> 
+  disabled={isItemStopped(it)}  
+                                onClick={() =>
+                                  setStopItemModal({
+                                    open: true,
+                                    itemIndex: idx,
+                                    stopDate: it.expectedEndDate || "",
+                                    amountOverride: "",
+                                  })
+                                }
+                              >
+                                Stop Service
+                              </button>
                             </div>
                           </div>
 
@@ -1488,48 +1490,48 @@ const finalAmount = hasOverride
                             </div>
                           )}
                           {(it.stopHistory || []).length > 0 && (
-  <div style={{ marginTop: 12 }}>
-    <div className="muted" style={{ fontWeight: 600 }}>
-      Stop History
-    </div>
+                            <div style={{ marginTop: 12 }}>
+                              <div className="muted" style={{ fontWeight: 600 }}>
+                                Stop History
+                              </div>
 
-    <div
-      style={{
-        marginTop: 6,
-        display: "flex",
-        flexDirection: "column",
-        gap: 6,
-      }}
-    >
-      {it.stopHistory.map((s, i) => (
-        <div
-          key={i}
-          style={{
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            borderRadius: 6,
-            padding: 6,
-            fontSize: 12,
-          }}
-        >
-          <div>
-            <strong>
-              {fmtDate(s.oldEndDate)} → {fmtDate(s.newEndDate)}
-            </strong>
-          </div>
+                              <div
+                                style={{
+                                  marginTop: 6,
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 6,
+                                }}
+                              >
+                                {it.stopHistory.map((s, i) => (
+                                  <div
+                                    key={i}
+                                    style={{
+                                      background: "#fef2f2",
+                                      border: "1px solid #fecaca",
+                                      borderRadius: 6,
+                                      padding: 6,
+                                      fontSize: 12,
+                                    }}
+                                  >
+                                    <div>
+                                      <strong>
+                                        {fmtDate(s.oldEndDate)} → {fmtDate(s.newEndDate)}
+                                      </strong>
+                                    </div>
 
-          <div className="muted">
-            ₹{fmtCurrency(s.oldAmount)} → ₹{fmtCurrency(s.newAmount)}
-          </div>
+                                    <div className="muted">
+                                      ₹{fmtCurrency(s.oldAmount)} → ₹{fmtCurrency(s.newAmount)}
+                                    </div>
 
-          <div className="muted">
-            {new Date(s.stoppedAt).toLocaleString()}
-          </div>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+                                    <div className="muted">
+                                      {new Date(s.stoppedAt).toLocaleString()}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1893,127 +1895,127 @@ const finalAmount = hasOverride
                   </div>
                 </div>
                 {(selectedOrder.refunds || []).length > 0 && (
-  <div style={{ marginTop: 16 }}>
-    <h4>Refunds</h4>
+                  <div style={{ marginTop: 16 }}>
+                    <h4>Refunds</h4>
 
-    {(selectedOrder.refunds || []).map((r, i) => (
-      <div
-        key={i}
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: 10,
-          borderBottom: "1px solid #f3f6f9",
-          background: r.status === "pending" ? "#fff7ed" : "#ecfdf5",
-          borderRadius: 6,
-          marginTop: 6,
-        }}
-      >
-        {/* LEFT */}
-        <div>
-         <div style={{ fontWeight: 700 }}>
-  ₹{fmtCurrency(r.paidAmount || 0)} / ₹{fmtCurrency(r.amount)}
-</div>
+                    {(selectedOrder.refunds || []).map((r, i) => (
+                      <div
+                        key={i}
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          padding: 10,
+                          borderBottom: "1px solid #f3f6f9",
+                          background: r.status === "pending" ? "#fff7ed" : "#ecfdf5",
+                          borderRadius: 6,
+                          marginTop: 6,
+                        }}
+                      >
+                        {/* LEFT */}
+                        <div>
+                          <div style={{ fontWeight: 700 }}>
+                            ₹{fmtCurrency(r.paidAmount || 0)} / ₹{fmtCurrency(r.amount)}
+                          </div>
 
-<div className="muted" style={{ fontSize: 12 }}>
-  Remaining: ₹{fmtCurrency((r.amount || 0) - (r.paidAmount || 0))}
-</div>
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            Remaining: ₹{fmtCurrency((r.amount || 0) - (r.paidAmount || 0))}
+                          </div>
 
-          <div className="muted" style={{ fontSize: 12 }}>
-            {r.reason || "Refund"} •{" "}
-            {new Date(r.createdAt).toLocaleDateString()}
-          </div>
-        </div>
+                          <div className="muted" style={{ fontSize: 12 }}>
+                            {r.reason || "Refund"} •{" "}
+                            {new Date(r.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
 
-        {/* RIGHT */}
-        <div style={{ textAlign: "right" }}>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-             color:
-  r.status === "pending"
-    ? "#b45309"
-    : r.status === "partial"
-    ? "#2563eb"
-    : "#065f46",
-            }}
-          >
-            {r.status}
-          </div>
+                        {/* RIGHT */}
+                        <div style={{ textAlign: "right" }}>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color:
+                                r.status === "pending"
+                                  ? "#b45309"
+                                  : r.status === "partial"
+                                    ? "#2563eb"
+                                    : "#065f46",
+                            }}
+                          >
+                            {r.status}
+                          </div>
 
-         {r.status !== "paid" && (
-  <button
-    className="cp-btn ghost"
-    onClick={() =>
-      setRefundModal({
-        open: true,
-        refundIndex: i,
-        amount: "",
-        method: "cash",
-        note: "",
-      })
-    }
-  >
-    {r.status === "pending"
-      ? "Pay Refund"
-      : `Add More (₹${fmtCurrency((r.amount || 0) - (r.paidAmount || 0))})`}
-  </button>
-)}
-{/* 🔥 REFUND PAYMENT HISTORY */}
-{(r.payments || []).length > 0 && (
-  <div style={{ marginTop: 8 }}>
-    <div className="muted" style={{ fontWeight: 600 }}>
-      Refund Payments
-    </div>
+                          {r.status !== "paid" && (
+                            <button
+                              className="cp-btn ghost"
+                              onClick={() =>
+                                setRefundModal({
+                                  open: true,
+                                  refundIndex: i,
+                                  amount: "",
+                                  method: "cash",
+                                  note: "",
+                                })
+                              }
+                            >
+                              {r.status === "pending"
+                                ? "Pay Refund"
+                                : `Add More (₹${fmtCurrency((r.amount || 0) - (r.paidAmount || 0))})`}
+                            </button>
+                          )}
+                          {/* 🔥 REFUND PAYMENT HISTORY */}
+                          {(r.payments || []).length > 0 && (
+                            <div style={{ marginTop: 8 }}>
+                              <div className="muted" style={{ fontWeight: 600 }}>
+                                Refund Payments
+                              </div>
 
-    <div
-      style={{
-        marginTop: 6,
-        display: "flex",
-        flexDirection: "column",
-        gap: 6,
-      }}
-    >
-      {(r.payments || []).map((p, idx) => (
-        <div
-          key={idx}
-          style={{
-            background: "#f1f5f9",
-            border: "1px solid #e2e8f0",
-            borderRadius: 6,
-            padding: 6,
-            fontSize: 12,
-          }}
-        >
-          <div style={{ fontWeight: 600 }}>
-            ₹{fmtCurrency(p.amount)}
-          </div>
+                              <div
+                                style={{
+                                  marginTop: 6,
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: 6,
+                                }}
+                              >
+                                {(r.payments || []).map((p, idx) => (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      background: "#f1f5f9",
+                                      border: "1px solid #e2e8f0",
+                                      borderRadius: 6,
+                                      padding: 6,
+                                      fontSize: 12,
+                                    }}
+                                  >
+                                    <div style={{ fontWeight: 600 }}>
+                                      ₹{fmtCurrency(p.amount)}
+                                    </div>
 
-          <div className="muted">
-            {p.method || "—"} •{" "}
-            {p.date
-              ? new Date(p.date).toLocaleDateString()
-              : ""}
-          </div>
+                                    <div className="muted">
+                                      {p.method || "—"} •{" "}
+                                      {p.date
+                                        ? new Date(p.date).toLocaleDateString()
+                                        : ""}
+                                    </div>
 
-          {p.note && (
-            <div className="muted">
-              {p.note}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  </div>
-)}
-        </div>
-      </div>
-    ))}
-    
-  </div>
-)}
+                                    {p.note && (
+                                      <div className="muted">
+                                        {p.note}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                  </div>
+                )}
 
 
                 <div style={{ marginTop: 16 }}>
@@ -2264,7 +2266,7 @@ const finalAmount = hasOverride
                     <input
                       className="cp-input"
                       type="number"
-                    value={stopItemModal.amountOverride ?? stopItemPreview.calculatedAmount}
+                      value={stopItemModal.amountOverride ?? stopItemPreview.calculatedAmount}
                       onChange={(e) =>
                         setStopItemModal((s) => ({
                           ...s,
@@ -2306,7 +2308,7 @@ const finalAmount = hasOverride
             </div>
           </div>
         )}
-      
+
 
         {/* Payment modal */}
         {paymentModal.open && paymentModal.form && (
@@ -2418,115 +2420,115 @@ const finalAmount = hasOverride
           </div>
         )}
         {refundModal.open && (
-  <div
-    className="cp-modal"
-    onClick={() =>
-      setRefundModal({
-        open: false,
-        refundIndex: null,
-        amount: "",
-        method: "cash",
-        note: "",
-      })
-    }
-  >
-    <div
-      className="cp-modal-card"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <h4>Pay Refund</h4>
+          <div
+            className="cp-modal"
+            onClick={() =>
+              setRefundModal({
+                open: false,
+                refundIndex: null,
+                amount: "",
+                method: "cash",
+                note: "",
+              })
+            }
+          >
+            <div
+              className="cp-modal-card"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h4>Pay Refund</h4>
 
-      {/* ✅ REMAINING AMOUNT */}
-      {(() => {
-        const r = selectedOrder.refunds[refundModal.refundIndex];
-        const remaining =
-          (r?.amount || 0) - (r?.paidAmount || 0);
+              {/* ✅ REMAINING AMOUNT */}
+              {(() => {
+                const r = selectedOrder.refunds[refundModal.refundIndex];
+                const remaining =
+                  (r?.amount || 0) - (r?.paidAmount || 0);
 
-        return (
-          <div style={{ marginBottom: 10 }}>
-            <div className="muted">Remaining</div>
-            <div style={{ fontWeight: 700 }}>
-              ₹{fmtCurrency(remaining)}
+                return (
+                  <div style={{ marginBottom: 10 }}>
+                    <div className="muted">Remaining</div>
+                    <div style={{ fontWeight: 700 }}>
+                      ₹{fmtCurrency(remaining)}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* AMOUNT */}
+              <div className="label muted">Amount</div>
+              <input
+                className="cp-input"
+                type="number"
+                value={refundModal.amount}
+                onChange={(e) =>
+                  setRefundModal((s) => ({
+                    ...s,
+                    amount: e.target.value,
+                  }))
+                }
+              />
+
+              {/* METHOD */}
+              <div className="label muted">Method</div>
+              <select
+                className="cp-input"
+                value={refundModal.method}
+                onChange={(e) =>
+                  setRefundModal((s) => ({
+                    ...s,
+                    method: e.target.value,
+                  }))
+                }
+              >
+                <option value="cash">Cash</option>
+                <option value="upi">UPI</option>
+                <option value="bank">Bank</option>
+              </select>
+
+              {/* NOTE */}
+              <div className="label muted">Note</div>
+              <input
+                className="cp-input"
+                value={refundModal.note}
+                onChange={(e) =>
+                  setRefundModal((s) => ({
+                    ...s,
+                    note: e.target.value,
+                  }))
+                }
+              />
+
+              {/* ACTIONS */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: 8,
+                  marginTop: 12,
+                }}
+              >
+                <button
+                  className="cp-btn ghost"
+                  onClick={() =>
+                    setRefundModal({
+                      open: false,
+                      refundIndex: null,
+                      amount: "",
+                      method: "cash",
+                      note: "",
+                    })
+                  }
+                >
+                  Cancel
+                </button>
+
+                <button className="cp-btn" onClick={saveRefundPayment}>
+                  Save Refund
+                </button>
+              </div>
             </div>
           </div>
-        );
-      })()}
-
-      {/* AMOUNT */}
-      <div className="label muted">Amount</div>
-      <input
-        className="cp-input"
-        type="number"
-        value={refundModal.amount}
-        onChange={(e) =>
-          setRefundModal((s) => ({
-            ...s,
-            amount: e.target.value,
-          }))
-        }
-      />
-
-      {/* METHOD */}
-      <div className="label muted">Method</div>
-      <select
-        className="cp-input"
-        value={refundModal.method}
-        onChange={(e) =>
-          setRefundModal((s) => ({
-            ...s,
-            method: e.target.value,
-          }))
-        }
-      >
-        <option value="cash">Cash</option>
-        <option value="upi">UPI</option>
-        <option value="bank">Bank</option>
-      </select>
-
-      {/* NOTE */}
-      <div className="label muted">Note</div>
-      <input
-        className="cp-input"
-        value={refundModal.note}
-        onChange={(e) =>
-          setRefundModal((s) => ({
-            ...s,
-            note: e.target.value,
-          }))
-        }
-      />
-
-      {/* ACTIONS */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: 8,
-          marginTop: 12,
-        }}
-      >
-        <button
-          className="cp-btn ghost"
-          onClick={() =>
-            setRefundModal({
-              open: false,
-              refundIndex: null,
-              amount: "",
-              method: "cash",
-              note: "",
-            })
-          }
-        >
-          Cancel
-        </button>
-
-        <button className="cp-btn" onClick={saveRefundPayment}>
-          Save Refund
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+        )}
       </div>
 
       <style jsx>{`
