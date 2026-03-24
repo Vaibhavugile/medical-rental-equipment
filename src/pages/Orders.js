@@ -13,7 +13,8 @@ import {
   addDoc,
   deleteDoc,
   arrayUnion,
-  increment
+  increment,
+  setDoc
 } from "firebase/firestore";
 import { updateAccountReport } from "../utils/accountReport";
 import { db, auth } from "../firebase";
@@ -1796,6 +1797,72 @@ if (payment) {
     setSaving(false);
   }
 };
+const movePaymentsToRecycleBin = async (orderId) => {
+
+  const paymentsSnap = await getDocs(
+    collection(db,"orders",orderId,"payments")
+  );
+
+  for(const paymentDoc of paymentsSnap.docs){
+
+    await setDoc(
+      doc(
+        db,
+        "orders_recycle_bin",
+        orderId,
+        "payments",
+        paymentDoc.id
+      ),
+      paymentDoc.data()
+    );
+
+    await deleteDoc(
+      doc(db,"orders",orderId,"payments",paymentDoc.id)
+    );
+  }
+
+};
+
+const deleteOrder = async (order) => {
+
+  if (!order) return;
+
+  const ok = window.confirm(
+    `Move order ${order.orderNo || order.id} to Recycle Bin?`
+  );
+
+  if (!ok) return;
+
+  try {
+
+    const user = auth.currentUser || {};
+ await movePaymentsToRecycleBin(order.id);
+    // 1️⃣ Save order in recycle bin
+  await setDoc(
+  doc(db,"orders_recycle_bin",order.id),
+  {
+    ...order,
+    originalId: order.id,
+    deletedAt: serverTimestamp(),
+    deletedBy: user.uid || "",
+    deletedByName: user.displayName || user.email || ""
+  }
+);
+
+    // 2️⃣ Remove from active orders
+    await deleteDoc(doc(db, "orders", order.id));
+
+    // 3️⃣ Close drawer if open
+    if (selectedOrder?.id === order.id) {
+      closeOrder();
+    }
+
+  } catch (err) {
+    console.error("deleteOrder", err);
+    setError(err.message || "Failed to move order to recycle bin");
+  }
+
+};
 const markPaymentStatus = async (paymentId, status) => {
   if (!selectedOrder) return;
 
@@ -2092,6 +2159,12 @@ const badgeText = getDeliveryBadgeText(o, deliveriesByOrder);
     >
       View
     </button>
+    <button
+  className="order-action delete"
+  onClick={() => deleteOrder(o)}
+>
+  🗑
+</button>
 
     {o.forceOnRent !== true && (
       <button

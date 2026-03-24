@@ -87,6 +87,7 @@ import Caretakers from "./pages/Caretakers";
 import CaretakerPayrollGenerate from "./pages/CaretakerPayrollGenerate";
 import AccountDashboard from "./pages/AccountDashboard";
 import Employees from "./pages/Employees";
+import OrdersRecycleBin from "./pages/OrdersRecycleBin";
 /* ============================================================
    PRIVATE ROUTE (AUTH ONLY, SILENT)
 ============================================================ */
@@ -184,7 +185,7 @@ function CRMApp() {
             <Route path="attendance" element={<AttendanceAdmin />} />
             <Route path="payroll" element={<PayrollGenerate />} />
             <Route path="salarypayroll" element={<SalaryPayrollPage />} />
-
+<Route path="recycle-bin" element={<OrdersRecycleBin />} />
             <Route path="tracking" element={<TrackingPageWithParams />} />
            <Route path="employees" element={<Employees />} />
             <Route path="reports/products" element={<ProductReport />} />

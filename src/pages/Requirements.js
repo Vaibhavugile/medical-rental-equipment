@@ -17,7 +17,7 @@ import { updateAccountReport } from "../utils/accountReport";
 import { db, auth } from "../firebase";
 import "./Requirements.css";
 import { makeHistoryEntry, propagateToLead } from "../utils/status";
-
+import RequirementForm from "../data/RequirementForm";
 
 /* Quotation object — default */
 const defaultQuotation = {
@@ -143,7 +143,7 @@ export default function Requirements() {
 
   // Toolbar state
   const [statusFilter, setStatusFilter] = useState("all");
-
+const [editRequirement, setEditRequirement] = useState(null);
   // UI: details + quotation
   const [detailsReq, setDetailsReq] = useState(null);
   const [openQuotation, setOpenQuotation] = useState(false);
@@ -801,7 +801,13 @@ const normalizeTaxes = (taxes = []) =>
       Create Quotation
     </button>
   )}
-
+ <button
+    type="button"
+    className="row-btn edit"
+    onClick={() => setEditRequirement(r)}
+  >
+    Edit
+  </button>
   {/* Delete */}
   <button
     type="button"
@@ -1514,6 +1520,14 @@ Delete requirement “{confirmDelete.requirementNumber || confirmDelete.customer
           </div>
         </div>
       )}
+    {editRequirement && (
+  <RequirementForm
+    lead={null}
+    requirement={editRequirement}
+    onSaved={() => setEditRequirement(null)}
+    onCancel={() => setEditRequirement(null)}
+  />
+)}
     </div>
   );
 }

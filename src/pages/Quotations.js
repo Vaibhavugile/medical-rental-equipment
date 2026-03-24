@@ -12,6 +12,7 @@ import {
   updateDoc,
   getDoc, // ✅ added
   increment,
+    deleteDoc  ,
 } from "firebase/firestore";
 import { updateAccountReport } from "../utils/accountReport";
 import { db, auth } from "../firebase";
@@ -204,6 +205,21 @@ const [typeFilter, setTypeFilter] = useState("all");
       "";
     return { customerName, customerPhone };
   };
+  const deleteQuotation = async (quote) => {
+  if (!quote) return;
+
+  if (!window.confirm(`Delete quotation ${quote.quoNo || quote.id}?`)) {
+    return;
+  }
+
+  try {
+    await deleteDoc(doc(db, "quotations", quote.id));
+    closeDetails();
+  } catch (err) {
+    console.error("deleteQuotation", err);
+    setError(err.message || "Failed to delete quotation");
+  }
+};
 
   const openDetails = async (qDoc) => {
     setError("");
@@ -945,6 +961,7 @@ const convertToOrder = (quote) => {
   >
     View
   </button>
+  
 
   {(q.status || "").toLowerCase() === "draft" && (
     <button
@@ -988,15 +1005,21 @@ const convertToOrder = (quote) => {
     </button>
   )}
 
-  {(q.orderId ||
+  {/* {(q.orderId ||
     (q.status || "").toLowerCase() === "order_created") && (
     <button
       className="qp-btn orders"
-      onClick={() => navigate("/orders")}
+      onClick={() => navigate("/crm/orders")}
     >
       View Orders
     </button>
-  )}
+  )} */}
+  <button
+  className="qp-btn danger"
+  onClick={() => deleteQuotation(q)}
+>
+  Delete
+</button>
 
 </div>
                   </td>
@@ -1379,12 +1402,12 @@ const convertToOrder = (quote) => {
                         {(details.status || "").toLowerCase() === "accepted" && !details.orderId && <>
                           <button className="cp-btn primary" onClick={() => convertToOrder(details)}>Create Order</button>
                         </>}
-                        {(details.orderId || (details.status || "").toLowerCase() === "order_created") && (
+                        {/* {(details.orderId || (details.status || "").toLowerCase() === "order_created") && (
                           <button className="cp-btn ghost" onClick={() => navigate("/orders")}>View Orders</button>
-                        )}
+                        )} */}
 
                         <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                          <button className="cp-btn ghost" onClick={() => { navigator.clipboard && navigator.clipboard.writeText(JSON.stringify(details)); alert("Copied JSON to clipboard"); }}>Copy JSON</button>
+                          {/* <button className="cp-btn ghost" onClick={() => { navigator.clipboard && navigator.clipboard.writeText(JSON.stringify(details)); alert("Copied JSON to clipboard"); }}>Copy JSON</button> */}
                           {shareReady && (
                             <button className="cp-btn primary" onClick={() => {
                               if (window.confirm("Share the updated quotation and mark it as 'sent'?")) {
