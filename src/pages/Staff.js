@@ -10,6 +10,7 @@ import {
   deleteDoc,
   query,
   orderBy,
+  where,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useNavigate } from "react-router-dom";
@@ -99,27 +100,91 @@ upiId: "",
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  const emailExists = async (email) => {
+  const staffQuery = query(
+    collection(db, "staff"),
+    where("loginEmail", "==", email)
+  );
+
+  const userQuery = query(
+    collection(db, "users"),
+    where("email", "==", email)
+  );
+
+  const [staffSnap, userSnap] = await Promise.all([
+    getDocs(staffQuery),
+    getDocs(userQuery),
+  ]);
+
+  return !staffSnap.empty || !userSnap.empty;
+};
+
   /* ================= HELPERS ================= */
-  const validate = (p) => {
+ const validate = (p) => {
+
+  /* ================= NAME ================= */
   if (!p.name.trim()) return "Name is required";
+  if (!/^[A-Za-z\s]{3,50}$/.test(p.name))
+    return "Name should contain only letters and spaces";
 
+  /* ================= EMAIL ================= */
   if (!p.loginEmail.trim()) return "Email is required";
-  if (p.phone && !/^\d{10}$/.test(p.phone))
-  return "Phone number must be 10 digits";
-if (p.alternatePhone && !/^\d{10}$/.test(p.alternatePhone))
-  return "Alternate phone must be 10 digits";
-
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.loginEmail))
-    return "Invalid email";
+    return "Invalid email format";
 
-  if (p.aadharNumber && p.aadharNumber.length < 12)
-    return "Invalid Aadhaar number";
+  /* ================= PHONE ================= */
+  if (!p.phone) return "Phone number is required";
+  if (!/^[6-9]\d{9}$/.test(p.phone))
+    return "Invalid Indian phone number";
 
-  // IFSC validation
+  if (p.alternatePhone && !/^[6-9]\d{9}$/.test(p.alternatePhone))
+    return "Invalid alternate phone number";
+
+  /* ================= AADHAAR ================= */
+  if (p.aadharNumber && !/^\d{12}$/.test(p.aadharNumber))
+    return "Aadhaar must be exactly 12 digits";
+
+  /* ================= PAN ================= */
+  if (p.panNumber && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(p.panNumber))
+    return "Invalid PAN format (ABCDE1234F)";
+
+  /* ================= ADDRESS ================= */
+  if (p.address && p.address.length < 5)
+    return "Address is too short";
+
+  /* ================= EXPERIENCE ================= */
+  if (p.experienceYears && (p.experienceYears < 0 || p.experienceYears > 60))
+    return "Experience must be between 0 and 60 years";
+
+  /* ================= SERVICES ================= */
+  if (p.servicesOffered && p.servicesOffered.length > 200)
+    return "Services description too long";
+
+  /* ================= SHIFT ================= */
+  if (!p.shiftType) return "Please select shift type";
+
+  /* ================= RATE ================= */
+  if (p.baseRate && p.baseRate < 0)
+    return "Rate cannot be negative";
+
+  if (p.baseRate && !p.rateType)
+    return "Select rate type";
+
+  /* ================= EMERGENCY CONTACT ================= */
+  if (p.emergencyContactPhone && !/^[6-9]\d{9}$/.test(p.emergencyContactPhone))
+    return "Invalid emergency contact phone";
+
+  /* ================= BANK ACCOUNT ================= */
+  if (p.bankAccountNumber && !/^\d{9,18}$/.test(p.bankAccountNumber))
+    return "Invalid bank account number";
+
+  /* ================= IFSC ================= */
   if (p.bankIfsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(p.bankIfsc))
     return "Invalid IFSC code";
 
-  // UPI validation
+
+
+  /* ================= UPI ================= */
   if (p.upiId && !/^[\w.-]+@[\w.-]+$/.test(p.upiId))
     return "Invalid UPI ID";
 
@@ -177,11 +242,24 @@ upiId: p.upiId.trim().toLowerCase(),
     e.preventDefault();
     setError("");
 
-    const payload = normalize(form);
-    const msg = validate(payload);
-    if (msg) return setError(msg);
+   const msg = validate(form);
+if (msg) return setError(msg);
+
+const payload = normalize(form);
 
     try {
+
+  
+
+    // ✅ Check duplicate email only when creating new
+    if (!editingId) {
+      const exists = await emailExists(payload.loginEmail);
+
+      if (exists) {
+        setError("This email already exists in the system.");
+        return;
+      }
+    }
       if (editingId) {
         await updateDoc(doc(db, "staff", editingId), payload);
       } else {
@@ -339,7 +417,10 @@ upiId: p.upiId.trim().toLowerCase(),
 
         <form className="staff-form" onSubmit={save}>
           <input placeholder="Full Name *" value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            onChange={(e) => {
+  const value = e.target.value.replace(/[^A-Za-z\s]/g, "");
+  setForm({ ...form, name: value });
+}} />
 
           <input placeholder="Login Email *" value={form.loginEmail}
             onChange={(e) => setForm({ ...form, loginEmail: e.target.value })} />
@@ -368,10 +449,15 @@ upiId: p.upiId.trim().toLowerCase(),
   }}
 />
           <input placeholder="Aadhaar Number" value={form.aadharNumber}
-            onChange={(e) => setForm({ ...form, aadharNumber: e.target.value })} />
+           onChange={(e) => {
+  const value = e.target.value.replace(/[^A-Za-z\s]/g, "");
+  setForm({ ...form, name: value });
+}} />
 
           <input placeholder="PAN Number" value={form.panNumber}
-            onChange={(e) => setForm({ ...form, panNumber: e.target.value })} />
+            onChange={(e) =>
+  setForm({ ...form, panNumber: e.target.value.toUpperCase() })
+}/>
 
           <textarea placeholder="Address" value={form.address}
             onChange={(e) => setForm({ ...form, address: e.target.value })} />
@@ -438,21 +524,28 @@ upiId: p.upiId.trim().toLowerCase(),
     setForm({ ...form, bankName: e.target.value })
   }
 />
-
 <input
   placeholder="Account Number"
   value={form.bankAccountNumber}
-  onChange={(e) =>
-    setForm({ ...form, bankAccountNumber: e.target.value })
-  }
+  maxLength={18}
+  onChange={(e) => {
+    const value = e.target.value.replace(/\D/g, "");
+    if (value.length <= 18) {
+      setForm({ ...form, bankAccountNumber: value });
+    }
+  }}
 />
 
 <input
   placeholder="IFSC Code"
   value={form.bankIfsc}
-  onChange={(e) =>
-    setForm({ ...form, bankIfsc: e.target.value })
-  }
+  maxLength={11}
+  onChange={(e) => {
+    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (value.length <= 11) {
+      setForm({ ...form, bankIfsc: value });
+    }
+  }}
 />
 <input
   placeholder="UPI ID"

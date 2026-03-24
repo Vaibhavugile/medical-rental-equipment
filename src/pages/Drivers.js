@@ -8,6 +8,7 @@ import {
   doc,
   serverTimestamp,
   deleteDoc,
+    where,query
 } from "firebase/firestore";
 import { db } from "../firebase";
 import "./Drivers.css";
@@ -88,18 +89,91 @@ export default function Drivers() {
       return String(num);
     }
   };
+  const emailExists = async (email) => {
 
-  const validate = (payload) => {
-    if (!payload.name.trim()) return "Name is required.";
-    if (!payload.loginEmail.trim()) return "Email is required.";
-    const email = payload.loginEmail.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email.";
-    if (payload.salary !== "" && Number(payload.salary) < 0) return "Salary cannot be negative.";
-    if (payload.licenseExpiry && payload.joinDate && payload.licenseExpiry < payload.joinDate) {
-      return "License expiry cannot be before join date.";
-    }
-    return "";
-  };
+  const driversQuery = query(
+    collection(db, "drivers"),
+    where("loginEmail", "==", email)
+  );
+
+  const staffQuery = query(
+    collection(db, "staff"),
+    where("loginEmail", "==", email)
+  );
+
+  const marketingQuery = query(
+    collection(db, "marketing"),
+    where("loginEmail", "==", email)
+  );
+
+  const usersQuery = query(
+    collection(db, "users"),
+    where("email", "==", email)
+  );
+
+  const [driversSnap, staffSnap, marketingSnap, usersSnap] =
+    await Promise.all([
+      getDocs(driversQuery),
+      getDocs(staffQuery),
+      getDocs(marketingQuery),
+      getDocs(usersQuery),
+    ]);
+
+  return (
+    !driversSnap.empty ||
+    !staffSnap.empty ||
+    !marketingSnap.empty ||
+    !usersSnap.empty
+  );
+};
+
+ const validate = (payload) => {
+
+  /* NAME */
+  if (!payload.name.trim())
+    return "Name is required";
+
+  if (!/^[A-Za-z\s]{3,50}$/.test(payload.name))
+    return "Name should contain only letters";
+
+  /* EMAIL */
+  if (!payload.loginEmail.trim())
+    return "Email is required";
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.loginEmail))
+    return "Invalid email format";
+
+  /* PHONE */
+  if (payload.phone && !/^[6-9]\d{9}$/.test(payload.phone))
+    return "Invalid Indian phone number";
+
+  /* SALARY */
+  if (payload.salary !== "" && payload.salary < 0)
+    return "Salary cannot be negative";
+
+  if (payload.salary > 500000)
+    return "Salary seems unrealistic";
+
+  /* LICENSE */
+  if (payload.licenseNumber && payload.licenseNumber.length < 5)
+    return "License number too short";
+
+  if (
+    payload.licenseExpiry &&
+    payload.joinDate &&
+    payload.licenseExpiry < payload.joinDate
+  )
+    return "License expiry cannot be before join date";
+
+  /* EMERGENCY CONTACT */
+  if (
+    payload.emergencyContactPhone &&
+    !/^[6-9]\d{9}$/.test(payload.emergencyContactPhone)
+  )
+    return "Invalid emergency contact phone";
+
+  return "";
+};
 
   // Add or update driver
   const saveDriver = async (e) => {
@@ -131,6 +205,16 @@ export default function Drivers() {
       setError(msg);
       return;
     }
+    if (!editingId) {
+
+  const exists = await emailExists(normalized.loginEmail);
+
+  if (exists) {
+    setError("This email already exists in the system.");
+    return;
+  }
+
+}
 
     try {
       if (editingId) {

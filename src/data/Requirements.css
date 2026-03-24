@@ -183,7 +183,15 @@
   cursor: pointer !important;
   transition: background 120ms ease !important;
 }
-
+.req-drawer .equip-row .input {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+.req-drawer .input {
+  width: 80% !important;
+  max-width: 80% !important;
+  min-width: 0 !important;
+}
 /* Hover */
 .req-drawer .btn:hover {
   background: #f1f5f9 !important;

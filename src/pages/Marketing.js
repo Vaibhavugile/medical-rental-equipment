@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   collection, addDoc, getDocs, updateDoc, setDoc, doc,
-  serverTimestamp, deleteDoc, query, orderBy
+  serverTimestamp, deleteDoc, query, orderBy,where
 } from "firebase/firestore";
 import { db } from "../firebase";
 import "./Marketing.css";
@@ -54,15 +54,65 @@ export default function Marketing() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+const emailExists = async (email) => {
 
+  const marketingQuery = query(
+    collection(db, "marketing"),
+    where("loginEmail", "==", email)
+  );
+
+  const staffQuery = query(
+    collection(db, "staff"),
+    where("loginEmail", "==", email)
+  );
+
+  const usersQuery = query(
+    collection(db, "users"),
+    where("email", "==", email)
+  );
+
+  const [marketingSnap, staffSnap, usersSnap] = await Promise.all([
+    getDocs(marketingQuery),
+    getDocs(staffQuery),
+    getDocs(usersQuery)
+  ]);
+
+  return (
+    !marketingSnap.empty ||
+    !staffSnap.empty ||
+    !usersSnap.empty
+  );
+};
   // Validate & normalize
   const validate = (p) => {
-    if (!p.name.trim()) return "Name is required.";
-    if (!p.loginEmail.trim()) return "Email is required.";
-    const email = p.loginEmail.trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Enter a valid email.";
-    return "";
-  };
+
+  /* NAME */
+  if (!p.name.trim()) return "Name is required";
+  if (!/^[A-Za-z\s]{3,50}$/.test(p.name))
+    return "Name should contain only letters and spaces";
+
+  /* EMAIL */
+  if (!p.loginEmail.trim()) return "Email is required";
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.loginEmail))
+    return "Invalid email format";
+
+  /* PHONE */
+  if (p.phone && !/^[6-9]\d{9}$/.test(p.phone))
+    return "Invalid Indian phone number";
+
+  /* BRANCH */
+  if (p.branchId && p.branchId.length < 2)
+    return "Branch ID too short";
+
+  /* SALARY */
+  if (p.salaryMonthly && p.salaryMonthly < 0)
+    return "Salary cannot be negative";
+
+  if (p.salaryMonthly && p.salaryMonthly > 500000)
+    return "Salary seems unrealistic";
+
+  return "";
+};
 
   const normalize = (p) => ({
   name: p.name.trim(),
@@ -78,44 +128,69 @@ export default function Marketing() {
 
   // Save (add or update)
   const save = async (e) => {
-    e.preventDefault();
-    setError("");
 
-    const n = normalize(form);
-    const msg = validate(n);
-    if (msg) return setError(msg);
+  e.preventDefault();
+  setError("");
 
-    try {
-      if (editingId) {
-        // Update existing
-        await updateDoc(doc(db, "marketing", editingId), n);
+  const payload = normalize(form);
+
+  const msg = validate(payload);
+  if (msg) return setError(msg);
+
+  try {
+
+    /* CHECK DUPLICATE EMAIL */
+    if (!editingId) {
+      const exists = await emailExists(payload.loginEmail);
+
+      if (exists) {
+        setError("This email already exists in the system.");
+        return;
+      }
+    }
+
+    if (editingId) {
+
+      await updateDoc(doc(db, "marketing", editingId), payload);
+
+    } else {
+
+      if (payload.authUid) {
+
+        await setDoc(
+          doc(db, "marketing", payload.authUid),
+          {
+            ...payload,
+            uid: payload.authUid,
+            createdAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
+
       } else {
-        if (n.authUid) {
-          // Create/overwrite doc with provided Auth UID (so the app can route by uid immediately)
-          await setDoc(doc(db, "marketing", n.authUid), {
-            ...n,
-            uid: n.authUid,
-            createdAt: serverTimestamp(),
-          }, { merge: true });
-        } else {
-          // Normal add (docId auto). You can fill authUid later after user signs in.
-          await addDoc(collection(db, "marketing"), {
-            ...n,
-            createdAt: serverTimestamp(),
-          });
-        }
+
+        await addDoc(collection(db, "marketing"), {
+          ...payload,
+          createdAt: serverTimestamp(),
+        });
+
       }
 
-      // Reset & reload
-      setForm(empty);
-      setEditingId(null);
-      setShowForm(false);
-      await reload();
-    } catch (err) {
-      console.error("save marketing", err);
-      setError("Failed to save marketing user.");
     }
-  };
+
+    setForm(empty);
+    setEditingId(null);
+    setShowForm(false);
+    await reload();
+
+  } catch (err) {
+
+    console.error("save marketing", err);
+    setError("Failed to save marketing user.");
+
+  }
+
+};
 
   const editRow = (r) => {
     setEditingId(r.id);
