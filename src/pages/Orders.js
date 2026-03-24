@@ -2159,12 +2159,7 @@ const badgeText = getDeliveryBadgeText(o, deliveriesByOrder);
     >
       View
     </button>
-    <button
-  className="order-action delete"
-  onClick={() => deleteOrder(o)}
->
-  🗑
-</button>
+ 
 
     {o.forceOnRent !== true && (
       <button
@@ -2186,6 +2181,12 @@ const badgeText = getDeliveryBadgeText(o, deliveriesByOrder);
         Mark On Rent
       </button>
     )}
+       <button
+  className="order-action delete"
+  onClick={() => deleteOrder(o)}
+>
+  🗑
+</button>
 
   </div>
 </td>

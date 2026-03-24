@@ -49,44 +49,62 @@ function Login() {
     }
   };
 
-  return (
-    <div className="login-container">
-      <h2>MedRent Login</h2>
+ return (
+  <div className="login-page">
 
-      <form onSubmit={handleLogin}>
-        <input
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          autoComplete="username"
-        />
+    <div className="login-card">
 
-        <input
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-          autoComplete="current-password"
-        />
+      <div className="login-header">
+        <h1 className="login-title">BookMyMediCare</h1>
+        <p className="login-subtitle">Sign in to your dashboard</p>
+      </div>
 
-        <button type="submit" disabled={loading}>
+      <form className="login-form" onSubmit={handleLogin}>
+
+        <div className="login-field">
+          <input
+            className="login-input"
+            type="email"
+            placeholder="Email address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="username"
+          />
+        </div>
+
+        <div className="login-field">
+          <input
+            className="login-input"
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+          />
+        </div>
+
+        <button
+          className="login-button"
+          type="submit"
+          disabled={loading}
+        >
           {loading ? "Signing in…" : "Login"}
         </button>
+
       </form>
 
-      {error && <p className="error">{error}</p>}
+      {error && (
+        <div className="login-error">
+          {error}
+        </div>
+      )}
 
-      {/* <p style={{ marginTop: 12 }}>
-        Don’t have an account?{" "}
-        <a href="/signup" style={{ color: "#007bff" }}>
-          Sign Up
-        </a>
-      </p> */}
     </div>
-  );
+
+  </div>
+);
 }
 
 export default Login;
