@@ -130,16 +130,39 @@ export default function Marketing() {
 });
   };
 
-  const deleteRow = async (id) => {
-    if (!window.confirm("Delete this marketing user?")) return;
-    try {
-      await deleteDoc(doc(db, "marketing", id));
-      setRows((prev) => prev.filter((x) => x.id !== id));
-    } catch (err) {
-      console.error("delete marketing", err);
-      setError("Failed to delete marketing user.");
-    }
-  };
+ const deleteRow = async (user) => {
+
+  if (!window.confirm("Delete this marketing user permanently?")) return;
+
+  try {
+
+    const res = await fetch(
+      "https://us-central1-medrent-5d771.cloudfunctions.net/deleteUser",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          uid: user.authUid || user.uid || user.id
+        })
+      }
+    );
+
+    const data = await res.json();
+
+    console.log("delete response", data);
+
+    setRows(prev => prev.filter(x => x.id !== user.id));
+
+  } catch (err) {
+
+    console.error(err);
+    alert("Failed to delete marketing user");
+
+  }
+
+};
 
   // Quick toggle active
   const toggleActive = async (r, next) => {
@@ -310,7 +333,7 @@ export default function Marketing() {
       Edit
     </button>
 
-    <button className="mk-btn delete" onClick={() => deleteRow(r.id)}>
+    <button className="mk-btn delete" onClick={() => deleteRow(r)}>
       Delete
     </button>
 

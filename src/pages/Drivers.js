@@ -165,16 +165,39 @@ export default function Drivers() {
     });
   };
 
-  const deleteDriverById = async (id) => {
-    if (!window.confirm("Delete this driver?")) return;
-    try {
-      await deleteDoc(doc(db, "drivers", id));
-      setDrivers((prev) => prev.filter((d) => d.id !== id));
-    } catch (err) {
-      console.error("deleteDriver", err);
-      setError("Failed to delete driver.");
-    }
-  };
+  const deleteDriverById = async (driver) => {
+
+  if (!window.confirm("Delete this driver permanently?")) return;
+
+  try {
+
+    const uid = driver.authUid || driver.uid || driver.id;
+
+    await fetch(
+      "https://us-central1-medrent-5d771.cloudfunctions.net/deleteUser",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          uid
+        })
+      }
+    );
+
+    setDrivers(prev =>
+      prev.filter(d => d.id !== driver.id)
+    );
+
+  } catch (err) {
+
+    console.error("deleteDriver", err);
+    setError("Failed to delete driver.");
+
+  }
+
+};
 
   // Filtering & search
   const filtered = useMemo(() => {
@@ -352,7 +375,7 @@ export default function Drivers() {
 
       <button
         className="dr-btn delete"
-        onClick={() => deleteDriverById(d.id)}
+        onClick={() => deleteDriverById(d)}
       >
         Delete
       </button>

@@ -225,11 +225,39 @@ upiId: p.upiId.trim().toLowerCase(),
     });
   };
 
-  const remove = async (id) => {
-    if (!window.confirm("Delete this staff member?")) return;
-    await deleteDoc(doc(db, "staff", id));
-    setRows((p) => p.filter((x) => x.id !== id));
-  };
+  const remove = async (staff) => {
+
+  if (!window.confirm("Delete this staff member permanently?")) return;
+
+  try {
+
+    const uid = staff.authUid || staff.uid || staff.id;
+
+    await fetch(
+      "https://us-central1-medrent-5d771.cloudfunctions.net/deleteUser",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          uid
+        })
+      }
+    );
+
+    setRows(prev =>
+      prev.filter(x => x.id !== staff.id)
+    );
+
+  } catch (err) {
+
+    console.error("deleteStaff", err);
+    setError("Failed to delete staff member.");
+
+  }
+
+};
 
   /* ================= FILTER ================= */
   const filtered = useMemo(() => {
@@ -520,7 +548,7 @@ upiId: p.upiId.trim().toLowerCase(),
 
     <button
       className="st-btn delete"
-      onClick={() => remove(r.id)}
+      onClick={() => remove(r)}
     >
       Delete
     </button>

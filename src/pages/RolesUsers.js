@@ -25,6 +25,8 @@ const SIDEBAR_OPTIONS = [
 
   { key: "marketing", label: "Marketing" },
   { key: "runners", label: "Runners" },
+    { key: "employee", label: "Employees" },
+
   { key: "payroll", label: "Payroll" },
     { key: "salarypayroll", label: "Salary" },
   { key: "caretakers_report", label: "Caretakers Report" },
@@ -67,24 +69,29 @@ const [editingName,setEditingName] = useState("")
      LOAD USERS & ROLES
   ========================= */
   useEffect(() => {
-    const load = async () => {
-      const [userSnap, roleSnap] = await Promise.all([
-        getDocs(collection(db, "users")),
-        getDocs(collection(db, "roles")),
-      ]);
+  const load = async () => {
+    const [userSnap, roleSnap] = await Promise.all([
+      getDocs(collection(db, "users")),
+      getDocs(collection(db, "roles")),
+    ]);
 
-      setUsers(userSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-      setRoles(
-        roleSnap.docs
-          .map(d => ({ id: d.id, ...d.data() }))
-          .filter(r => !r.deleted)
-      );
+    const userRows = userSnap.docs
+      .map(d => ({ id: d.id, ...d.data() }))
+      .filter(u => !["driver", "marketing", "staff"].includes(u.role));
 
-      setLoading(false);
-    };
+    setUsers(userRows);
 
-    load();
-  }, []);
+    setRoles(
+      roleSnap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .filter(r => !r.deleted)
+    );
+
+    setLoading(false);
+  };
+
+  load();
+}, []);
 
   /* =========================
      DERIVED DATA

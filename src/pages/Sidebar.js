@@ -123,6 +123,13 @@ const SECTIONS = [
         path: "/crm/drivers",
         icon: Truck,
       },
+      
+       {
+        key: "employee",            // ✅
+        label: "Employees",
+        path: "/crm/employees",
+        icon: Truck,
+      },
     ],
   },
   {
