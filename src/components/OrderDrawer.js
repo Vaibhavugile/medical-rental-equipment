@@ -99,6 +99,106 @@ export default function OrderDrawer({
 
     return diff > 0 ? diff : 0;
   };
+ const updateTaxes = async (taxes) => {
+
+  const subtotal = (selectedOrder.items || []).reduce(
+    (s, it) => s + Number(it.amount || 0),
+    0
+  );
+
+  const discount = Number(selectedOrder.totals?.discountAmount || 0);
+
+  const taxable = Math.max(0, subtotal - discount);
+
+  const taxBreakdown = (taxes || []).map((t) => {
+
+    // 🔒 DO NOT RECALCULATE LOCKED TAXES
+    if (t.locked) {
+      return {
+        ...t,
+        amount: Number(t.amount || 0)
+      };
+    }
+
+    const type = (t.type || "percent").toLowerCase();
+
+    let amount = 0;
+
+    if (type === "fixed") {
+      amount = Number(t.value || 0);
+    } else {
+      const percent = Number(t.value || 0);
+      amount = taxable * percent / 100;
+    }
+
+    return {
+      ...t,
+      value: Number(t.value ?? t.rate ?? 0),
+      amount: Number(amount.toFixed(2))
+    };
+  });
+
+  const totalTax = taxBreakdown.reduce(
+    (s, t) => s + Number(t.amount || 0),
+    0
+  );
+
+  const total = taxable + totalTax;
+
+  const newTotals = {
+    ...selectedOrder.totals,
+    subtotal,
+    taxes: taxBreakdown,
+    totalTax,
+    total
+  };
+
+  await updateDoc(doc(db, "orders", selectedOrder.id), {
+    totals: newTotals,
+    updatedAt: serverTimestamp()
+  });
+
+  setSelectedOrder((o) => ({
+    ...o,
+    totals: newTotals
+  }));
+};
+const addTax = () => {
+  const taxes = [
+    ...(selectedOrder.totals?.taxes || []),
+    {
+      id:`t-${Date.now()}`,
+      name:"",
+      type:"percent",
+      value:0
+    }
+  ];
+
+  updateTaxes(taxes);
+};
+
+const updateTaxAt = (index, patch) => {
+
+  const taxes = [...(selectedOrder.totals?.taxes || [])];
+
+  taxes[index] = {
+    ...taxes[index],
+    ...patch
+  };
+
+  updateTaxes(taxes);
+
+};
+
+const removeTaxAt = (index) => {
+
+  const taxes = [...(selectedOrder.totals?.taxes || [])];
+
+  taxes.splice(index,1);
+
+  updateTaxes(taxes);
+
+};
 const syncDeliveryAssets = async (order) => {
   if (!order) return;
 
@@ -1808,6 +1908,88 @@ await syncDeliveryAssets({
                 {/* Totals */}
                 <div style={{ marginTop: 12 }}>
                   <h4>Totals</h4>
+                  {/* TAXES */}
+<div style={{marginTop:12}}>
+
+<div style={{
+display:"flex",
+justifyContent:"space-between",
+alignItems:"center"
+}}>
+<div className="label muted">Taxes</div>
+
+<button
+className="cp-btn ghost"
+onClick={addTax}
+>
++ Add tax
+</button>
+</div>
+
+<div style={{marginTop:8}}>
+
+{(selectedOrder.totals?.taxes || []).map((t,i)=>(
+
+<div
+key={t.id || i}
+style={{
+display:"flex",
+gap:8,
+alignItems:"center",
+marginBottom:6
+}}
+>
+
+<input
+className="cp-input"
+style={{width:120}}
+placeholder="Name"
+value={t.name || ""}
+disabled={t.locked}
+onChange={(e)=>
+updateTaxAt(i,{name:e.target.value})
+}
+/>
+
+<select
+className="cp-input"
+style={{width:100}}
+value={t.type || "percent"}
+disabled={t.locked}
+onChange={(e)=>
+updateTaxAt(i,{type:e.target.value})
+}
+>
+<option value="percent">Percent</option>
+<option value="fixed">Fixed</option>
+</select>
+
+<input
+className="cp-input"
+style={{ width: 80 }}
+value={t.locked ? (t.amount ?? 0) : (t.value ?? 0)}
+disabled={t.locked}
+onChange={(e)=>
+updateTaxAt(i,{
+value:Number(e.target.value)
+})
+}
+/>
+
+<button
+className="cp-btn ghost"
+onClick={()=>removeTaxAt(i)}
+>
+Remove
+</button>
+
+</div>
+
+))}
+
+</div>
+
+</div>
                   <div className="meta-row">
                     <div className="label">Subtotal</div>
                     <div className="value">
