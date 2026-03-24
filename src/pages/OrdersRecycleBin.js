@@ -58,7 +58,7 @@ export default function OrdersRecycleBin() {
 
   const [saving,setSaving] = useState(false);
   const [error,setError] = useState("");
-
+const [search,setSearch] = useState("");
   /* ---------------------------------------------------- */
   /* LOAD DELETED ORDERS                                  */
   /* ---------------------------------------------------- */
@@ -199,7 +199,19 @@ const restorePayments = async (orderId) => {
   }
 
 };
+const filteredOrders = orders.filter((o)=>{
 
+  if(!search.trim()) return true;
+
+  const term = search.toLowerCase();
+
+  return (
+    (o.orderNo || "").toLowerCase().includes(term) ||
+    (o.customerName || "").toLowerCase().includes(term) ||
+    (o.id || "").toLowerCase().includes(term)
+  );
+
+});
 const restoreOrder = async(order)=>{
 
   const ok = window.confirm(
@@ -309,24 +321,38 @@ const restoreOrder = async(order)=>{
     <div className="orders-wrap">
 
       <header
-        className="orders-header"
-        style={{
-          display:"flex",
-          justifyContent:"space-between",
-          alignItems:"center"
-        }}
-      >
+  className="orders-header"
+  style={{
+    display:"flex",
+    justifyContent:"space-between",
+    alignItems:"center"
+  }}
+>
 
-        <h1>Orders Recycle Bin</h1>
+<h1>Orders Recycle Bin</h1>
 
-        <button
-          className="cp-btn"
-          onClick={()=>navigate("/orders")}
-        >
-          ← Back to Orders
-        </button>
+<div style={{display:"flex",gap:10}}>
 
-      </header>
+<input
+  className="search-input"
+  placeholder="Search order no, customer..."
+  value={search}
+  onChange={(e)=>setSearch(e.target.value)}
+/>
+
+{/* <button
+  className="cp-btn"
+  onClick={()=>navigate("/orders")}
+>
+← Back to Orders
+</button> */}
+
+</div>
+<div className="muted" style={{marginBottom:10}}>
+Showing {filteredOrders.length} of {orders.length} deleted orders
+</div>
+
+</header>
 
       {error && <div className="orders-error">{error}</div>}
 
@@ -348,7 +374,7 @@ const restoreOrder = async(order)=>{
 
         <tbody>
 
-          {orders.map(o=>{
+          {filteredOrders.map(o=>{
 
             return(
 

@@ -736,7 +736,20 @@ margin-bottom:18px;
 }
 
 /* LABELS */
+/* =========================
+   READ ONLY MODE (TRASH)
+========================= */
 
+.nod-readonly button,
+.nod-readonly input,
+.nod-readonly textarea,
+.nod-readonly select {
+
+  pointer-events: none;
+  opacity: 0.6;
+  cursor: not-allowed;
+
+}
 .assign-rate-config label{
 display:block;
 font-size:13px;

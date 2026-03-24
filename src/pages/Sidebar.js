@@ -184,6 +184,25 @@ const SECTIONS = [
       
     ],
   },
+   {
+    title: "Recycle Bin",
+    items: [
+      {
+        key: "recycle-bin",            // ✅
+        label: "Equipment Recycle Orders",
+        path: "/crm/recycle-bin",
+        icon: BarChart3,
+      },
+      {
+        key: "nursing-recycle-bin",            // ✅
+        label: "Nurse & Caretaker Recycle Orders",
+        path: "/crm/nursing-orders/recycle-bin",
+        icon: Wallet,
+      },
+      
+      
+    ],
+  },
   {
     title: "Admin",
     items: [

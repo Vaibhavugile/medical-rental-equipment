@@ -4,6 +4,10 @@ import {
   getDocs,
   orderBy,
   query,
+  deleteDoc,
+setDoc,
+doc,
+serverTimestamp
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { db } from "../firebase";
@@ -281,6 +285,44 @@ const refundPendingCount = serviceRanges.filter((o) => {
 
   return refundPending > 0;
 }).length;
+const deleteNursingOrder = async (order) => {
+
+  const ok = window.confirm(
+    `Move order ${order.orderNo || order.id} to Recycle Bin?`
+  );
+
+  if (!ok) return;
+
+  try {
+
+    // 1️⃣ move order to recycle bin
+    await setDoc(
+      doc(db, "nursingOrders_recycle_bin", order.id),
+      {
+        ...order,
+        originalId: order.id,
+        deletedAt: serverTimestamp()
+      }
+    );
+
+    // 2️⃣ delete from main collection
+    await deleteDoc(
+      doc(db, "nursingOrders", order.id)
+    );
+
+    // 3️⃣ update local UI
+    setOrders(prev =>
+      prev.filter(o => o.id !== order.id)
+    );
+
+  } catch (err) {
+
+    console.error(err);
+    alert("Failed to delete nursing order");
+
+  }
+
+};
 
   return (
     <div className="no-wrap">
@@ -549,6 +591,12 @@ const endDate =
                       >
                         Open
                       </button>
+                      <button
+  className="link danger"
+  onClick={() => deleteNursingOrder(o)}
+>
+  Delete
+</button>
                     </td>
                   </tr>
                 );

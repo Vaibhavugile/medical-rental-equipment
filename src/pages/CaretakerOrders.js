@@ -4,6 +4,10 @@ import {
   getDocs,
   orderBy,
   query,
+  doc,
+  setDoc,
+  deleteDoc,
+  serverTimestamp
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { db } from "../firebase";
@@ -100,6 +104,46 @@ const [kpiFilter, setKpiFilter] = useState("all");
     load();
   }, []);
 
+  const deleteOrder = async (order) => {
+
+  const ok = window.confirm(
+    `Delete order ${order.orderNo || order.id}?`
+  );
+
+  if(!ok) return;
+
+  try{
+
+    const recycleData = {
+      ...order,
+      deletedAt: serverTimestamp(),
+      originalId: order.id
+    };
+
+    // move to recycle bin
+    await setDoc(
+      doc(db,"nursingOrders_recycle_bin",order.id),
+      recycleData
+    );
+
+    // delete from main collection
+    await deleteDoc(
+      doc(db,"nursingOrders",order.id)
+    );
+
+    // update UI
+    setOrders(prev =>
+      prev.filter(o => o.id !== order.id)
+    );
+
+  }catch(err){
+
+    console.error(err);
+    alert("Failed to delete order");
+
+  }
+
+};
   
 function getServiceType(order) {
   const name = order.items?.[0]?.name?.toLowerCase() || "";
@@ -549,6 +593,12 @@ const endDate =
                       >
                         Open
                       </button>
+                      <button
+  className="link danger"
+  onClick={() => deleteOrder(o)}
+>
+Delete
+</button>
                     </td>
                   </tr>
                 );

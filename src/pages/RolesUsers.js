@@ -26,6 +26,8 @@ const SIDEBAR_OPTIONS = [
   { key: "marketing", label: "Marketing" },
   { key: "runners", label: "Runners" },
     { key: "employee", label: "Employees" },
+        { key: "recycle-bin", label: "Equipment Recycle Order" },
+        { key: "nursing-recycle-bin", label: "Nurse & Caretaker Recycle Order" },
 
   { key: "payroll", label: "Payroll" },
     { key: "salarypayroll", label: "Salary" },
