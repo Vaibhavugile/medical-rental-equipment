@@ -24,6 +24,7 @@ import { collection, doc, onSnapshot, orderBy, query } from "firebase/firestore"
 const collectionByRole = (role) => {
   if (role === "marketing") return "marketing";
   if (role === "staff") return "staff";
+  if (role === "users") return "users";   // ✅ ADD THIS
   return "drivers";
 };
 

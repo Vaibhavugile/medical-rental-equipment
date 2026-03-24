@@ -16,9 +16,10 @@ export default function TrackingPage({ presetDriverId = "", presetDate, presetRo
     presetDate || new Date().toISOString().slice(0, 10)
   );
 
-  const collectionByRole = (role) => {
+ const collectionByRole = (role) => {
   if (role === "marketing") return "marketing";
   if (role === "staff") return "staff";
+  if (role === "users") return "users";
   return "drivers";
 };
 
@@ -29,7 +30,13 @@ export default function TrackingPage({ presetDriverId = "", presetDate, presetRo
       try {
 const base = collectionByRole(role);
 const snap = await getDocs(collection(db, base));
-        const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+      let rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+
+if (role === "users") {
+  rows = rows.filter(
+    (u) => !["driver", "marketing", "staff"].includes(u.role)
+  );
+}
         setPeople(rows);
 
         // If no preset id, default to first user (optional)
@@ -64,15 +71,19 @@ const label =
     ? "Marketing User"
     : role === "staff"
     ? "Staff"
+    : role === "users"
+    ? "User"
     : "Driver";
 
   return (
     <div style={{ padding: 16 }}>
-    <h1 style={{ marginBottom: 12 }}>
+  <h1 style={{ marginBottom: 12 }}>
   {role === "marketing"
     ? "Marketing Tracking"
     : role === "staff"
     ? "Staff Tracking"
+    : role === "users"
+    ? "User Tracking"
     : "Driver Tracking"}
 </h1>
 
@@ -88,16 +99,16 @@ const label =
       >
         <div style={{ display: "flex", flexDirection: "column" }}>
           <label>Role</label>
-          <select
-            style={{ padding: 8, minWidth: 180 }}
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-          >
-            <option value="drivers">Drivers</option>
-            <option value="marketing">Marketing</option>
-            <option value="staff">Nursing</option>
-
-          </select>
+         <select
+  style={{ padding: 8, minWidth: 180 }}
+  value={role}
+  onChange={(e) => setRole(e.target.value)}
+>
+  <option value="drivers">Drivers</option>
+  <option value="marketing">Marketing</option>
+  <option value="staff">Nursing</option>
+  <option value="users">Users</option>
+</select>
         </div>
 
         <div style={{ display: "flex", flexDirection: "column" }}>

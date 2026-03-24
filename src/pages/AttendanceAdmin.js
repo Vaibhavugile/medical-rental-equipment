@@ -74,11 +74,19 @@ const base =
     ? "marketing"
     : role === "staff"
     ? "staff"
+    : role === "users"
+    ? "users"
     : "drivers";
         log("people: fetching", base);
         const snap = await getDocs(collection(db, base));
         if (!mounted) return;
-        const rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+       let rows = snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
+
+if (role === "users") {
+  rows = rows.filter(
+    (u) => !["driver", "marketing", "staff"].includes(u.role)
+  );
+}
         if (DEBUG) console.table(rows.map(r => ({
           id: r.id, name: r.name, email: r.loginEmail || r.email, authUid: r.authUid
         })));
@@ -106,6 +114,8 @@ const base =
     ? "marketing"
     : role === "staff"
     ? "staff"
+    : role === "users"
+    ? "users"
     : "drivers";
         const list = personId === "all" ? people : people.filter(p => p.id === personId);
         if (!list.length) { setRecords([]); setLoading(false); return; }
@@ -334,12 +344,14 @@ if (type === "absent") prev.absent++;
 
     setSavingManual(true);
 
-    const base =
-      role === "marketing"
-        ? "marketing"
-        : role === "staff"
-        ? "staff"
-        : "drivers";
+   const base =
+  role === "marketing"
+    ? "marketing"
+    : role === "staff"
+    ? "staff"
+    : role === "users"
+    ? "users"
+    : "drivers";
 
     const dayId = manualDate;
 
@@ -382,7 +394,9 @@ if (type === "absent") prev.absent++;
   {role === "marketing"
     ? "Marketing Attendance"
     : role === "staff"
-    ? "Staff Attendance"
+    ? "Nurse & Caretaker Attendance"
+    : role === "users"
+    ? "User Attendance"
     : "Driver Attendance"}
 </h2>
 
@@ -392,11 +406,20 @@ if (type === "absent") prev.absent++;
         <select value={role} onChange={e => setRole(e.target.value)}>
   <option value="drivers">Drivers</option>
   <option value="marketing">Marketing</option>
-  <option value="staff">Staff (Nurses)</option>
+  <option value="staff">Nurses/Caretakers</option>
+  <option value="users">Users</option>   
 </select>
 
         <select value={personId} onChange={e => setPersonId(e.target.value)}>
-          <option value="all">{role === "marketing" ? "All marketing" : "All drivers"}</option>
+          <option value="all">
+  {role === "marketing"
+    ? "All marketing"
+    : role === "staff"
+    ? "All staff"
+    : role === "users"
+    ? "All users"
+    : "All drivers"}
+</option>
           {people.map(p => (
             <option key={p.id} value={p.id}>{p.name || p.loginEmail || p.email || p.id}</option>
           ))}
@@ -467,12 +490,14 @@ if (type === "absent") prev.absent++;
           <thead>
             <tr>
               <th>
-                {role === "marketing"
-                  ? "Marketing User"
-                  : role === "staff"
-                  ? "Staff"
-                  : "Driver"}
-              </th>
+  {role === "marketing"
+    ? "Marketing User"
+    : role === "staff"
+    ? "Nurse & Caretaker"
+    : role === "users"
+    ? "User"
+    : "Driver"}
+</th>
 
               <th>Date</th>
               <th>Check-in</th>
