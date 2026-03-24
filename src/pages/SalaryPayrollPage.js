@@ -300,7 +300,7 @@ className="payroll-select"
 >
 <option value="drivers">Drivers</option>
 <option value="marketing">Marketing</option>
-<option value="staff">Staff</option>
+<option value="staff">Nurse/caretaker</option>
 </select>
 
 <input

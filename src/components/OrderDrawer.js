@@ -79,6 +79,13 @@ export default function OrderDrawer({
     method: "cash",
     note: "",
   });
+  const deliveryStages = [
+  "assigned",
+  "accepted",
+  "in_transit",
+  "delivered",
+  "completed",
+];
   const diffDaysInclusive = (start, end) => {
     if (!start || !end) return 0;
 
@@ -92,7 +99,40 @@ export default function OrderDrawer({
 
     return diff > 0 ? diff : 0;
   };
+const syncDeliveryAssets = async (order) => {
+  if (!order) return;
 
+  const deliveryId =
+    order.deliveryType === "return"
+      ? order.returnDeliveryId
+      : order.pickupDeliveryId;
+
+  if (!deliveryId) return;
+
+  const items = (order.items || []).map((i) => ({
+    productId: i.productId,
+    name: i.name,
+    qty: i.qty,
+    assignedAssets: i.assignedAssets || [],
+    branchId: i.branchId || "",
+    expectedStartDate: i.expectedStartDate || "",
+    expectedEndDate: i.expectedEndDate || "",
+  }));
+
+  const assetIds = items
+    .flatMap((i) => i.assignedAssets)
+    .filter(Boolean);
+
+  try {
+    await updateDoc(doc(db, "deliveries", deliveryId), {
+      expectedAssetIds: assetIds,
+      items: items,   // 🔥 THIS WAS MISSING
+      updatedAt: serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn("syncDeliveryAssets failed", err);
+  }
+};
   const getItemStopPreview = () => {
     if (
       stopItemModal.itemIndex === null ||
@@ -148,6 +188,7 @@ export default function OrderDrawer({
       finalRate,
     };
   };
+
 
   const stopItemPreview = getItemStopPreview();
   // --- local helpers (UI-only) ---
@@ -246,6 +287,8 @@ export default function OrderDrawer({
     return qty > 0 && assigned >= qty;
   };
   const [liveDelivery, setLiveDelivery] = useState(null);
+  const stageTimes = liveDelivery?.stageTimes || {};
+
 
 
   const computePaymentsSummary = (payments = [], totalOrderAmount = 0) => {
@@ -372,9 +415,20 @@ export default function OrderDrawer({
       }
 
       // ✅ update UI first
-      updateOrderItem(idx, {
-        assignedAssets: result.merged,
-      });
+      const updatedItems = [...selectedOrder.items];
+updatedItems[idx] = {
+  ...updatedItems[idx],
+  assignedAssets: result.merged,
+};
+
+updateOrderItem(idx, {
+  assignedAssets: result.merged,
+});
+
+await syncDeliveryAssets({
+  ...selectedOrder,
+  items: updatedItems,
+});
 
       // ✅ reserve ONLY new assets (critical fix)
       for (const id of newlyAdded) {
@@ -719,10 +773,22 @@ export default function OrderDrawer({
       }
 
       // ✅ update UI
-      updateOrderItem(idx, {
-        assignedAssets: result.merged,
-        autoAssigned: true,
-      });
+      const updatedItems = [...selectedOrder.items];
+updatedItems[idx] = {
+  ...updatedItems[idx],
+  assignedAssets: result.merged,
+  autoAssigned: true,
+};
+
+updateOrderItem(idx, {
+  assignedAssets: result.merged,
+  autoAssigned: true,
+});
+
+await syncDeliveryAssets({
+  ...selectedOrder,
+  items: updatedItems,
+});
 
       // ✅ reserve ONLY new assets
       for (const id of newlyAdded) {
@@ -856,7 +922,18 @@ export default function OrderDrawer({
   // Unassign chip: remove from item + unreserve (return to in_stock)
   const unassignAndUnreserve = async (itemIndex, assetDocId) => {
     try {
-      await unassignAsset?.(itemIndex, assetDocId, false);
+     await unassignAsset?.(itemIndex, assetDocId, false);
+
+const updatedItems = [...selectedOrder.items];
+updatedItems[itemIndex].assignedAssets =
+  updatedItems[itemIndex].assignedAssets.filter(
+    (id) => id !== assetDocId
+  );
+
+await syncDeliveryAssets({
+  ...selectedOrder,
+  items: updatedItems,
+});
       await unreserveAsset(assetDocId, {
         note: `Unassigned from order ${selectedOrder.orderNo || selectedOrder.id}`,
       });
@@ -1357,7 +1434,7 @@ export default function OrderDrawer({
                                     disabled={
                                       !it.productId ||
                                       selectedOrder.deliveryType === "return" ||
-                                      !!activeDelivery?.deliveryId
+                                      liveDelivery?.status === "in_transit"
                                     }
 
                                   >
@@ -1371,7 +1448,7 @@ export default function OrderDrawer({
                                     disabled={
                                       !it.productId ||
                                       selectedOrder.deliveryType === "return" ||
-                                      !!activeDelivery?.deliveryId
+                                      liveDelivery?.status === "in_transit"
                                     }
 
                                   >
@@ -2529,7 +2606,76 @@ export default function OrderDrawer({
             </div>
           </div>
         )}
+        {liveDelivery?.status && (
+  <div style={{ marginTop: 12 }}>
+    <div className="label muted">Timeline</div>
+
+    <div
+      style={{
+        marginTop: 8,
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+        borderLeft: "2px solid #e5e7eb",
+        paddingLeft: 10,
+      }}
+    >
+      {deliveryStages.map((stage, i) => {
+        const isDone =
+          deliveryStages.indexOf(liveDelivery.status) >= i;
+
+        const isCurrent = liveDelivery.status === stage;
+
+        const time =
+  stage === "assigned"
+    ? liveDelivery?.createdAt
+    : stageTimes[stage];
+
+        return (
+          <div key={stage} style={{ display: "flex", gap: 10 }}>
+            
+            {/* DOT */}
+            <div
+              style={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                marginTop: 6,
+                background: isCurrent
+                  ? "#2563eb"
+                  : isDone
+                  ? "#16a34a"
+                  : "#d1d5db",
+              }}
+            />
+
+            {/* TEXT */}
+            <div>
+              <div
+                style={{
+                  fontWeight: isCurrent ? 700 : 500,
+                  color: isDone ? "#111827" : "#9ca3af",
+                  textTransform: "capitalize",
+                }}
+              >
+                {stage.replace("_", " ")}
+              </div>
+
+              {/* ✅ TIME */}
+              <div className="muted" style={{ fontSize: 12 }}>
+                {time?.seconds
+                  ? new Date(time.seconds * 1000).toLocaleString()
+                  : ""}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
       </div>
+
 
       <style jsx>{`
         .muted { color:#666; font-size:12px; }

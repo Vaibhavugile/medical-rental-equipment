@@ -65,7 +65,7 @@ color:#374151;
 .activity-table tr:hover{
 
 background:#f9fafb;
-
+cursor: pointer;
 }
 
 /* ORDER */

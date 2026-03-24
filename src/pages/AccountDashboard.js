@@ -180,14 +180,14 @@ alert("Nursing migration finished");
 Run Nursing Orders Migration
 </button>
 */}
-<button
+{/* <button
 onClick={async ()=>{
 await migrateEquipmentReports();
 alert("Equipment reports migrated");
 }}
 >
 Run Equipment Migration
-</button>
+</button> */}
 
 </>
 
