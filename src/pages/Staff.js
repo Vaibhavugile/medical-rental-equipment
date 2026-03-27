@@ -11,24 +11,27 @@ import {
   query,
   orderBy,
   where,
+  onSnapshot
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db, auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import "./Staff.css";
+import { useRef } from "react";
 
 export default function Staff({ defaultType = "all" }) {
   const navigate = useNavigate();
+const servicesRef = useRef(null);
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
+const [servicesOpen, setServicesOpen] = useState(false);
   const [search, setSearch] = useState("");
-const [typeFilter, setTypeFilter] = useState(defaultType);
+  const [typeFilter, setTypeFilter] = useState(defaultType);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-
-
+  const [careTypes, setCareTypes] = useState([]);
+  const [userRole, setUserRole] = useState(null);
   const empty = {
     name: "",
     loginEmail: "",
@@ -46,20 +49,19 @@ const [typeFilter, setTypeFilter] = useState(defaultType);
     staffType: defaultType === "all" ? "nurse" : defaultType,
     qualifications: "",
     experienceYears: "",
-    servicesOffered: "",
+   servicesOffered: [],
     shiftPreference: "day",
     shiftType: "day",
 
-    baseRate: "",
-    rateType: "daily",
+
 
     emergencyContactName: "",
     emergencyContactPhone: "",
     relation: "",
     bankName: "",
-bankAccountNumber: "",
-bankIfsc: "",
-upiId: "",
+    bankAccountNumber: "",
+    bankIfsc: "",
+    upiId: "",
 
     joiningDate: "",
 
@@ -70,7 +72,36 @@ upiId: "",
   };
 
   const [form, setForm] = useState(empty);
+  useEffect(() => {
+    const loadCareTypes = async () => {
+      const snap = await getDocs(collection(db, "careTypes"));
 
+      const list = snap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() || {})
+      }));
+
+      setCareTypes(list);
+    };
+
+    loadCareTypes();
+  }, []);
+  useEffect(() => {
+  const handleClickOutside = (event) => {
+    if (
+      servicesRef.current &&
+      !servicesRef.current.contains(event.target)
+    ) {
+      setServicesOpen(false);
+    }
+  };
+
+  document.addEventListener("mousedown", handleClickOutside);
+
+  return () => {
+    document.removeEventListener("mousedown", handleClickOutside);
+  };
+}, []);
   /* ================= FETCH ================= */
   const reload = async () => {
     setLoading(true);
@@ -85,6 +116,18 @@ upiId: "",
       setLoading(false);
     }
   };
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const unsub = onSnapshot(doc(db, "users", user.uid), (docSnap) => {
+      if (docSnap.exists()) {
+        setUserRole(docSnap.data().role);
+      }
+    });
+
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     reload();
@@ -101,95 +144,114 @@ upiId: "",
   }, []);
 
   const emailExists = async (email) => {
-  const staffQuery = query(
-    collection(db, "staff"),
-    where("loginEmail", "==", email)
-  );
+    const staffQuery = query(
+      collection(db, "staff"),
+      where("loginEmail", "==", email)
+    );
 
-  const userQuery = query(
-    collection(db, "users"),
-    where("email", "==", email)
-  );
+    const userQuery = query(
+      collection(db, "users"),
+      where("email", "==", email)
+    );
 
-  const [staffSnap, userSnap] = await Promise.all([
-    getDocs(staffQuery),
-    getDocs(userQuery),
-  ]);
+    const [staffSnap, userSnap] = await Promise.all([
+      getDocs(staffQuery),
+      getDocs(userQuery),
+    ]);
 
-  return !staffSnap.empty || !userSnap.empty;
-};
+    return !staffSnap.empty || !userSnap.empty;
+  };
 
   /* ================= HELPERS ================= */
- const validate = (p) => {
+  const validate = (p) => {
 
-  /* ================= NAME ================= */
-  if (!p.name.trim()) return "Name is required";
-  if (!/^[A-Za-z\s]{3,50}$/.test(p.name))
-    return "Name should contain only letters and spaces";
+    /* ================= NAME ================= */
+    if (!p.name.trim()) return "Name is required";
+    if (!/^[A-Za-z\s]{3,50}$/.test(p.name))
+      return "Name should contain only letters and spaces";
 
-  /* ================= EMAIL ================= */
-  if (!p.loginEmail.trim()) return "Email is required";
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.loginEmail))
-    return "Invalid email format";
+    /* ================= EMAIL ================= */
+    if (!p.loginEmail.trim()) return "Email is required";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.loginEmail))
+      return "Invalid email format";
 
-  /* ================= PHONE ================= */
-  if (!p.phone) return "Phone number is required";
-  if (!/^[6-9]\d{9}$/.test(p.phone))
-    return "Invalid Indian phone number";
+    /* ================= PHONE ================= */
+    if (!p.phone) return "Phone number is required";
+    if (!/^[6-9]\d{9}$/.test(p.phone))
+      return "Invalid Indian phone number";
 
-  if (p.alternatePhone && !/^[6-9]\d{9}$/.test(p.alternatePhone))
-    return "Invalid alternate phone number";
+    if (p.alternatePhone && !/^[6-9]\d{9}$/.test(p.alternatePhone))
+      return "Invalid alternate phone number";
 
-  /* ================= AADHAAR ================= */
-  if (p.aadharNumber && !/^\d{12}$/.test(p.aadharNumber))
-    return "Aadhaar must be exactly 12 digits";
+    /* ================= AADHAAR ================= */
+    if (p.aadharNumber && !/^\d{12}$/.test(p.aadharNumber))
+      return "Aadhaar must be exactly 12 digits";
 
-  /* ================= PAN ================= */
-  if (p.panNumber && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(p.panNumber))
-    return "Invalid PAN format (ABCDE1234F)";
+    /* ================= PAN ================= */
+    if (p.panNumber && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(p.panNumber))
+      return "Invalid PAN format (ABCDE1234F)";
 
-  /* ================= ADDRESS ================= */
-  if (p.address && p.address.length < 5)
-    return "Address is too short";
+    /* ================= ADDRESS ================= */
+    if (p.address && p.address.length < 5)
+      return "Address is too short";
 
-  /* ================= EXPERIENCE ================= */
-  if (p.experienceYears && (p.experienceYears < 0 || p.experienceYears > 60))
-    return "Experience must be between 0 and 60 years";
+    /* ================= EXPERIENCE ================= */
+    if (p.experienceYears && (p.experienceYears < 0 || p.experienceYears > 60))
+      return "Experience must be between 0 and 60 years";
 
-  /* ================= SERVICES ================= */
-  if (p.servicesOffered && p.servicesOffered.length > 200)
-    return "Services description too long";
+    /* ================= SERVICES ================= */
+    if (p.servicesOffered && p.servicesOffered.length > 200)
+      return "Services description too long";
 
-  /* ================= SHIFT ================= */
-  if (!p.shiftType) return "Please select shift type";
+    /* ================= SHIFT ================= */
+    if (!p.shiftType) return "Please select shift type";
 
-  /* ================= RATE ================= */
-  if (p.baseRate && p.baseRate < 0)
-    return "Rate cannot be negative";
+    /* ================= RATE ================= */
 
-  if (p.baseRate && !p.rateType)
-    return "Select rate type";
 
-  /* ================= EMERGENCY CONTACT ================= */
-  if (p.emergencyContactPhone && !/^[6-9]\d{9}$/.test(p.emergencyContactPhone))
-    return "Invalid emergency contact phone";
+    /* ================= EMERGENCY CONTACT ================= */
+    if (p.emergencyContactPhone && !/^[6-9]\d{9}$/.test(p.emergencyContactPhone))
+      return "Invalid emergency contact phone";
 
-  /* ================= BANK ACCOUNT ================= */
-  if (p.bankAccountNumber && !/^\d{9,18}$/.test(p.bankAccountNumber))
-    return "Invalid bank account number";
+    /* ================= BANK ACCOUNT ================= */
+    if (p.bankAccountNumber && !/^\d{9,18}$/.test(p.bankAccountNumber))
+      return "Invalid bank account number";
 
-  /* ================= IFSC ================= */
-  if (p.bankIfsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(p.bankIfsc))
-    return "Invalid IFSC code";
+    /* ================= IFSC ================= */
+    if (p.bankIfsc && !/^[A-Z]{4}0[A-Z0-9]{6}$/.test(p.bankIfsc))
+      return "Invalid IFSC code";
 
 
 
-  /* ================= UPI ================= */
-  if (p.upiId && !/^[\w.-]+@[\w.-]+$/.test(p.upiId))
-    return "Invalid UPI ID";
+    /* ================= UPI ================= */
+    if (p.upiId && !/^[\w.-]+@[\w.-]+$/.test(p.upiId))
+      return "Invalid UPI ID";
 
-  return "";
-};
+    return "";
+  };
+  useEffect(() => {
+    if (error) {
+      const alert = document.querySelector(".staff-alert");
+      if (alert) {
+        alert.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+      }
+    }
+  }, [error]);
+  const handleEnter = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+
+      const form = e.target.form;
+      const index = Array.prototype.indexOf.call(form, e.target);
+
+      if (form.elements[index + 1]) {
+        form.elements[index + 1].focus();
+      }
+    }
+  };
 
   const normalize = (p) => ({
     name: p.name.trim(),
@@ -210,16 +272,12 @@ upiId: "",
     experienceYears:
       p.experienceYears === "" ? "" : Number(p.experienceYears),
 
-    servicesOffered: p.servicesOffered
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean),
+   servicesOffered: p.servicesOffered || [],
 
     shiftPreference: p.shiftPreference,
     shiftType: p.shiftType,
 
-    baseRate: p.baseRate === "" ? "" : Number(p.baseRate),
-    rateType: p.rateType,
+
 
     emergencyContactName: p.emergencyContactName.trim(),
     emergencyContactPhone: p.emergencyContactPhone.trim(),
@@ -227,9 +285,9 @@ upiId: "",
 
     joiningDate: p.joiningDate || "",
     bankName: p.bankName.trim(),
-bankAccountNumber: p.bankAccountNumber.trim(),
-bankIfsc: p.bankIfsc.trim().toUpperCase(),
-upiId: p.upiId.trim().toLowerCase(),
+    bankAccountNumber: p.bankAccountNumber.trim(),
+    bankIfsc: p.bankIfsc.trim().toUpperCase(),
+    upiId: p.upiId.trim().toLowerCase(),
     available: !!p.available,
     active: !!p.active,
 
@@ -242,24 +300,24 @@ upiId: p.upiId.trim().toLowerCase(),
     e.preventDefault();
     setError("");
 
-   const msg = validate(form);
-if (msg) return setError(msg);
+    const msg = validate(form);
+    if (msg) return setError(msg);
 
-const payload = normalize(form);
+    const payload = normalize(form);
 
     try {
 
-  
 
-    // ✅ Check duplicate email only when creating new
-    if (!editingId) {
-      const exists = await emailExists(payload.loginEmail);
 
-      if (exists) {
-        setError("This email already exists in the system.");
-        return;
+      // ✅ Check duplicate email only when creating new
+      if (!editingId) {
+        const exists = await emailExists(payload.loginEmail);
+
+        if (exists) {
+          setError("This email already exists in the system.");
+          return;
+        }
       }
-    }
       if (editingId) {
         await updateDoc(doc(db, "staff", editingId), payload);
       } else {
@@ -296,46 +354,46 @@ const payload = normalize(form);
     setForm({
       ...empty,
       ...r,
-      servicesOffered: (r.servicesOffered || []).join(", "),
+     servicesOffered: r.servicesOffered || [],
       experienceYears: r.experienceYears ?? "",
-      baseRate: r.baseRate ?? "",
+
       authUid: r.uid || "",
     });
   };
 
   const remove = async (staff) => {
 
-  if (!window.confirm("Delete this staff member permanently?")) return;
+    if (!window.confirm("Delete this staff member permanently?")) return;
 
-  try {
+    try {
 
-    const uid = staff.authUid || staff.uid || staff.id;
+      const uid = staff.authUid || staff.uid || staff.id;
 
-    await fetch(
-      "https://us-central1-medrent-5d771.cloudfunctions.net/deleteUser",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          uid
-        })
-      }
-    );
+      await fetch(
+        "https://us-central1-medrent-5d771.cloudfunctions.net/deleteUser",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            uid
+          })
+        }
+      );
 
-    setRows(prev =>
-      prev.filter(x => x.id !== staff.id)
-    );
+      setRows(prev =>
+        prev.filter(x => x.id !== staff.id)
+      );
 
-  } catch (err) {
+    } catch (err) {
 
-    console.error("deleteStaff", err);
-    setError("Failed to delete staff member.");
+      console.error("deleteStaff", err);
+      setError("Failed to delete staff member.");
 
-  }
+    }
 
-};
+  };
 
   /* ================= FILTER ================= */
   const filtered = useMemo(() => {
@@ -361,12 +419,12 @@ const payload = normalize(form);
   return (
     <div className="staff-page">
       <h2>
-  {defaultType === "caretaker"
-    ? "Caretaker Management"
-    : defaultType === "nurse"
-    ? "Nursing Staff Management"
-    : "Nursing & Caretaker Management"}
-</h2>
+        {defaultType === "caretaker"
+          ? "Caretaker Management"
+          : defaultType === "nurse"
+            ? "Nursing Staff Management"
+            : "Nursing & Caretaker Management"}
+      </h2>
 
       <div className="staff-toolbar">
         <input
@@ -383,16 +441,16 @@ const payload = normalize(form);
           <option value="caretaker">Caretaker</option>
         </select>
         <button
-  className="cp-btn"
-  onClick={() => {
-    setForm(empty);
-    setEditingId(null);
-    setShowForm(true);
-  }}
->
-  {defaultType === "caretaker" ? "Add Caretaker" : "Add Nurse"}
-</button>
-       
+          className="cp-btn"
+          onClick={() => {
+            setForm(empty);
+            setEditingId(null);
+            setShowForm(true);
+          }}
+        >
+          {defaultType === "caretaker" ? "Add Caretaker" : "Add Nurse"}
+        </button>
+
 
       </div>
 
@@ -402,62 +460,73 @@ const payload = normalize(form);
       <div className={`drawer ${showForm ? "open" : ""}`}>
         <div className="drawer-header">
           <h3>
-  {editingId
-    ? defaultType === "caretaker"
-      ? "Edit Caretaker"
-      : "Edit Nurse"
-    : defaultType === "caretaker"
-    ? "Add Caretaker"
-    : "Add Nurse"}
-</h3>
+            {editingId
+              ? defaultType === "caretaker"
+                ? "Edit Caretaker"
+                : "Edit Nurse"
+              : defaultType === "caretaker"
+                ? "Add Caretaker"
+                : "Add Nurse"}
+          </h3>
           <button className="cp-btn ghost" onClick={() => setShowForm(false)}>
             Close
           </button>
         </div>
+        {error && (
+          <div className="staff-alert">
+            ⚠ {error}
+          </div>
+        )}
 
-        <form className="staff-form" onSubmit={save}>
+        <form className="staff-form" onSubmit={save} onKeyDown={handleEnter}>
           <input placeholder="Full Name *" value={form.name}
             onChange={(e) => {
-  const value = e.target.value.replace(/[^A-Za-z\s]/g, "");
-  setForm({ ...form, name: value });
-}} />
+              const value = e.target.value.replace(/[^A-Za-z\s]/g, "");
+              setForm({ ...form, name: value });
+            }} />
 
           <input placeholder="Login Email *" value={form.loginEmail}
             onChange={(e) => setForm({ ...form, loginEmail: e.target.value })} />
 
           <input
-  placeholder="Phone *"
-  value={form.phone}
-  maxLength={10}
-  onChange={(e) => {
-    const value = e.target.value.replace(/\D/g, ""); // numbers only
-    if (value.length <= 10) {
-      setForm({ ...form, phone: value });
-    }
-  }}
-/>
+            placeholder="Phone *"
+            value={form.phone}
+            maxLength={10}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, ""); // numbers only
+              if (value.length <= 10) {
+                setForm({ ...form, phone: value });
+              }
+            }}
+          />
 
-         <input
-  placeholder="Alternate Phone"
-  value={form.alternatePhone}
-  maxLength={10}
-  onChange={(e) => {
-    const value = e.target.value.replace(/\D/g, "");
-    if (value.length <= 10) {
-      setForm({ ...form, alternatePhone: value });
-    }
-  }}
-/>
-          <input placeholder="Aadhaar Number" value={form.aadharNumber}
-           onChange={(e) => {
-  const value = e.target.value.replace(/[^A-Za-z\s]/g, "");
-  setForm({ ...form, name: value });
-}} />
+          <input
+            placeholder="Alternate Phone"
+            value={form.alternatePhone}
+            maxLength={10}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, "");
+              if (value.length <= 10) {
+                setForm({ ...form, alternatePhone: value });
+              }
+            }}
+          />
+          <input
+            placeholder="Aadhaar Number"
+            value={form.aadharNumber}
+            maxLength={12}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, ""); // numbers only
+              if (value.length <= 12) {
+                setForm({ ...form, aadharNumber: value });
+              }
+            }}
+          />
 
           <input placeholder="PAN Number" value={form.panNumber}
             onChange={(e) =>
-  setForm({ ...form, panNumber: e.target.value.toUpperCase() })
-}/>
+              setForm({ ...form, panNumber: e.target.value.toUpperCase() })
+            } />
 
           <textarea placeholder="Address" value={form.address}
             onChange={(e) => setForm({ ...form, address: e.target.value })} />
@@ -475,34 +544,75 @@ const payload = normalize(form);
             value={form.experienceYears}
             onChange={(e) => setForm({ ...form, experienceYears: e.target.value })} />
 
-          <input placeholder="Services (comma separated)"
-            value={form.servicesOffered}
-            onChange={(e) => setForm({ ...form, servicesOffered: e.target.value })} />
-            <select
-  value={form.shiftType}
-  onChange={(e) =>
-    setForm({ ...form, shiftType: e.target.value })
-  }
->
-    <option value="">Select Shift</option>
+         <div className="services-dropdown" ref={servicesRef}>
 
-  <option value="day">Day Shift</option>
-  <option value="night">Night Shift</option>
-  <option value="full">Full Day (24hr)</option>
-  <option value="flexible">Flexible</option>
-</select>
+  {/* SELECT BOX */}
+  <div
+    className="services-select"
+    onClick={() => setServicesOpen(!servicesOpen)}
+  >
+    {form.servicesOffered.length
+      ? form.servicesOffered.join(", ")
+      : "Select Services"}
+  </div>
 
-          <input type="number" placeholder="Base Rate"
-            value={form.baseRate}
-            onChange={(e) => setForm({ ...form, baseRate: e.target.value })} />
+  {/* DROPDOWN */}
+  {servicesOpen && (
+    <div className="services-menu">
 
-          <select value={form.rateType}
-            onChange={(e) => setForm({ ...form, rateType: e.target.value })}>
-            <option value="">Select Rate Type</option>
-            <option value="hourly">Hourly</option>
-            <option value="daily">Daily</option>
-            <option value="monthly">Monthly</option>
+      {careTypes.map(c => {
+
+        const selected = form.servicesOffered.includes(c.name);
+
+        return (
+          <label key={c.id} className="service-option">
+
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={(e) => {
+
+                if (e.target.checked) {
+                  setForm({
+                    ...form,
+                    servicesOffered: [...form.servicesOffered, c.name]
+                  });
+                } else {
+                  setForm({
+                    ...form,
+                    servicesOffered: form.servicesOffered.filter(
+                      s => s !== c.name
+                    )
+                  });
+                }
+
+              }}
+            />
+
+            {c.name}
+
+          </label>
+        );
+      })}
+
+    </div>
+  )}
+
+</div>
+          <select
+            value={form.shiftType}
+            onChange={(e) =>
+              setForm({ ...form, shiftType: e.target.value })
+            }
+          >
+            <option value="">Select Shift</option>
+
+            <option value="day">Day Shift</option>
+            <option value="night">Night Shift</option>
+            <option value="full">Full Day (24hr)</option>
+            <option value="flexible">Flexible</option>
           </select>
+
 
           <input placeholder="Emergency Contact Name"
             value={form.emergencyContactName}
@@ -515,63 +625,63 @@ const payload = normalize(form);
             onChange={(e) =>
               setForm({ ...form, emergencyContactPhone: e.target.value })
             } />
-            <h4>Bank Details</h4>
+          <h4>Bank Details</h4>
 
-<input
-  placeholder="Bank Name"
-  value={form.bankName}
-  onChange={(e) =>
-    setForm({ ...form, bankName: e.target.value })
-  }
-/>
-<input
-  placeholder="Account Number"
-  value={form.bankAccountNumber}
-  maxLength={18}
-  onChange={(e) => {
-    const value = e.target.value.replace(/\D/g, "");
-    if (value.length <= 18) {
-      setForm({ ...form, bankAccountNumber: value });
-    }
-  }}
-/>
+          <input
+            placeholder="Bank Name"
+            value={form.bankName}
+            onChange={(e) =>
+              setForm({ ...form, bankName: e.target.value })
+            }
+          />
+          <input
+            placeholder="Account Number"
+            value={form.bankAccountNumber}
+            maxLength={18}
+            onChange={(e) => {
+              const value = e.target.value.replace(/\D/g, "");
+              if (value.length <= 18) {
+                setForm({ ...form, bankAccountNumber: value });
+              }
+            }}
+          />
 
-<input
-  placeholder="IFSC Code"
-  value={form.bankIfsc}
-  maxLength={11}
-  onChange={(e) => {
-    const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    if (value.length <= 11) {
-      setForm({ ...form, bankIfsc: value });
-    }
-  }}
-/>
-<input
-  placeholder="UPI ID"
-  value={form.upiId}
-  onChange={(e) =>
-    setForm({ ...form, upiId: e.target.value })
-  }
-/>
+          <input
+            placeholder="IFSC Code"
+            value={form.bankIfsc}
+            maxLength={11}
+            onChange={(e) => {
+              const value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+              if (value.length <= 11) {
+                setForm({ ...form, bankIfsc: value });
+              }
+            }}
+          />
+          <input
+            placeholder="UPI ID"
+            value={form.upiId}
+            onChange={(e) =>
+              setForm({ ...form, upiId: e.target.value })
+            }
+          />
 
           <div className="actions-row">
             <button className="cp-btn">
-  {editingId
-    ? defaultType === "caretaker"
-      ? "Update Caretaker"
-      : "Update Nurse"
-    : defaultType === "caretaker"
-    ? "Add Caretaker"
-    : "Add Nurse"}
-</button>
+              {editingId
+                ? defaultType === "caretaker"
+                  ? "Update Caretaker"
+                  : "Update Nurse"
+                : defaultType === "caretaker"
+                  ? "Add Caretaker"
+                  : "Add Nurse"}
+            </button>
             <button type="button" className="cp-btn ghost"
               onClick={() => setShowForm(false)}>
               Cancel
             </button>
           </div>
 
-          {error && <div className="error">{error}</div>}
+          {/* {error && <div className="error">{error}</div}> */}
         </form>
       </div>
 
@@ -584,11 +694,10 @@ const payload = normalize(form);
               <tr>
                 <th>Name</th>
                 <th>Type</th>
-                    <th>Shift</th>
+                <th>Shift</th>
                 <th>Phone</th>
                 <th>Aadhaar</th>
                 <th>Services</th>
-                <th>Rate</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -596,19 +705,19 @@ const payload = normalize(form);
               {filtered.map((r) => (
                 <tr key={r.id}>
                   <td
-  className="staff-name-link"
-  onClick={() => navigate(`/crm/staff/${r.id}`)}
->
-  {r.name}
-</td>
+                    className="staff-name-link"
+                    onClick={() => navigate(`/crm/staff/${r.id}`)}
+                  >
+                    {r.name}
+                  </td>
 
                   <td>{r.staffType}</td>
 
-<td>
-  {r.shiftType
-    ? r.shiftType.charAt(0).toUpperCase() + r.shiftType.slice(1)
-    : "-"}
-</td>
+                  <td>
+                    {r.shiftType
+                      ? r.shiftType.charAt(0).toUpperCase() + r.shiftType.slice(1)
+                      : "-"}
+                  </td>
 
                   <td>{r.phone || "-"}</td>
                   <td>
@@ -617,46 +726,43 @@ const payload = normalize(form);
                       : "-"}
                   </td>
                   <td>{(r.servicesOffered || []).join(", ")}</td>
+
                   <td>
-                    {r.baseRate
-                      ? `₹${r.baseRate}/${r.rateType}`
-                      : "-"}
+                    <div className="staff-actions">
+
+                      <button
+                        className="st-btn view"
+                        onClick={() => navigate(`/crm/staff/${r.id}`)}
+                      >
+                        View
+                      </button>
+
+                      <button
+                        className="st-btn edit"
+                        onClick={() => editRow(r)}
+                      >
+                        Edit
+                      </button>
+                      {userRole === "superadmin" && (
+                        <button
+                          className="st-btn delete"
+                          onClick={() => remove(r)}
+                        >
+                          Delete
+                        </button>
+                      )}
+
+                      <button
+                        className="st-btn attendance"
+                        onClick={() =>
+                          navigate(`/crm/attendance?role=staff&userId=${r.id}`)
+                        }
+                      >
+                        Attendance
+                      </button>
+
+                    </div>
                   </td>
-                 <td>
-  <div className="staff-actions">
-
-    <button
-      className="st-btn view"
-      onClick={() => navigate(`/crm/staff/${r.id}`)}
-    >
-      View
-    </button>
-
-    <button
-      className="st-btn edit"
-      onClick={() => editRow(r)}
-    >
-      Edit
-    </button>
-
-    <button
-      className="st-btn delete"
-      onClick={() => remove(r)}
-    >
-      Delete
-    </button>
-
-    <button
-      className="st-btn attendance"
-      onClick={() =>
-        navigate(`/crm/attendance?role=staff&userId=${r.id}`)
-      }
-    >
-      Attendance
-    </button>
-
-  </div>
-</td>
 
                 </tr>
               ))}

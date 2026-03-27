@@ -7,10 +7,11 @@ import {
   doc,
   setDoc,
   deleteDoc,
-  serverTimestamp
+  serverTimestamp,
+   onSnapshot
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
-import { db } from "../firebase";
+import { db,auth } from "../firebase";
 import "./NursingOrders.css";
 import NursingOrderCreate from "./NursingOrderCreate";
 
@@ -83,6 +84,7 @@ const [fromDate, setFromDate] = useState("");
 const [toDate, setToDate] = useState("");
 const [serviceFilter, setServiceFilter] = useState("all");
 const [kpiFilter, setKpiFilter] = useState("all");
+const [userRole, setUserRole] = useState(null);
   /* =========================
      Load Nursing Orders
   ========================= */
@@ -103,7 +105,18 @@ const [kpiFilter, setKpiFilter] = useState("all");
 
     load();
   }, []);
+useEffect(() => {
+  const user = auth.currentUser;
+  if (!user) return;
 
+  const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
+    if (snap.exists()) {
+      setUserRole(snap.data().role);
+    }
+  });
+
+  return () => unsub();
+}, []);
   const deleteOrder = async (order) => {
 
   const ok = window.confirm(
@@ -593,12 +606,14 @@ const endDate =
                       >
                         Open
                       </button>
+                      {userRole === "superadmin" && (
                       <button
   className="link danger"
   onClick={() => deleteOrder(o)}
 >
 Delete
 </button>
+                      )}
                     </td>
                   </tr>
                 );

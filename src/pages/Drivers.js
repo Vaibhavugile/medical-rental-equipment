@@ -8,9 +8,9 @@ import {
   doc,
   serverTimestamp,
   deleteDoc,
-    where,query
+    where,query,onSnapshot
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db ,auth} from "../firebase";
 import "./Drivers.css";
 import { useNavigate } from "react-router-dom";
 /**
@@ -24,6 +24,7 @@ export default function Drivers() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [showForm, setShowForm] = useState(false); // drawer toggle
+  const [userRole, setUserRole] = useState(null);
   const navigate = useNavigate();
 
   const emptyDriver = {
@@ -63,7 +64,18 @@ export default function Drivers() {
     };
     fetchDrivers();
   }, []);
+useEffect(() => {
+  const user = auth.currentUser;
+  if (!user) return;
 
+  const unsub = onSnapshot(doc(db, "users", user.uid), (docSnap) => {
+    if (docSnap.exists()) {
+      setUserRole(docSnap.data().role);
+    }
+  });
+
+  return () => unsub();
+}, []);
   // Open the form automatically when editing
   useEffect(() => {
     if (editingId) setShowForm(true);
@@ -125,6 +137,18 @@ export default function Drivers() {
     !marketingSnap.empty ||
     !usersSnap.empty
   );
+};
+const handleEnter = (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+
+    const form = e.target.form;
+    const index = Array.prototype.indexOf.call(form, e.target);
+
+    if (form.elements[index + 1]) {
+      form.elements[index + 1].focus();
+    }
+  }
 };
 
  const validate = (payload) => {
@@ -359,7 +383,7 @@ export default function Drivers() {
           <h3>{editingId ? "Edit Driver" : "Add Driver"}</h3>
           <button className="cp-btn ghost" type="button" onClick={() => setShowForm(false)}>Close</button>
         </div>
-        <form onSubmit={saveDriver} className="driver-form">
+        <form onSubmit={saveDriver} className="driver-form" onKeyDown={handleEnter}>
           <div className="grid-cols">
             <input type="text" placeholder="Full Name *" value={newDriver.name} onChange={(e) => setNewDriver({ ...newDriver, name: e.target.value })} required />
             <input type="email" placeholder="Login Email *" value={newDriver.loginEmail} onChange={(e) => setNewDriver({ ...newDriver, loginEmail: e.target.value })} required />
@@ -456,13 +480,14 @@ export default function Drivers() {
       >
         Edit
       </button>
-
+{userRole === "superadmin" && (
       <button
         className="dr-btn delete"
         onClick={() => deleteDriverById(d)}
       >
         Delete
       </button>
+      )}
 
       <button
         className="dr-btn attendance"

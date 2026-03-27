@@ -4,9 +4,11 @@ import {
   getDocs,
   updateDoc,
   doc,
-  serverTimestamp
+  serverTimestamp,
+  onSnapshot,
+
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db ,auth} from "../firebase";
 import "./Marketing.css"; // reuse same styling
 
 export default function Employees() {
@@ -18,6 +20,7 @@ export default function Employees() {
   const [showDrawer, setShowDrawer] = useState(false);
   const [editingId, setEditingId] = useState(null);
 
+const [userRole, setUserRole] = useState(null);
   const empty = {
     name: "",
     email: "",
@@ -63,7 +66,18 @@ export default function Employees() {
 
   setLoading(false);
 };
+useEffect(() => {
+  const user = auth.currentUser;
+  if (!user) return;
 
+  const unsub = onSnapshot(doc(db, "users", user.uid), (docSnap) => {
+    if (docSnap.exists()) {
+      setUserRole(docSnap.data().role);
+    }
+  });
+
+  return () => unsub();
+}, []);
   useEffect(() => {
     reload();
   }, []);
@@ -424,13 +438,14 @@ export default function Employees() {
                       >
                         Track
                       </button>
+                      {userRole === "superadmin" && (
                        <button
     className="mk-btn delete"
     onClick={() => deleteEmployee(r)}
   >
     Delete
   </button>
-
+)}
                     </div>
 
                   </td>

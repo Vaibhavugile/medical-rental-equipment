@@ -980,6 +980,23 @@ await updateAccountReport({
   }
 };
 
+const handleEnter = (e) => {
+  if (e.key === "Enter" && e.target.tagName !== "TEXTAREA") {
+    e.preventDefault();
+
+    const formElements = Array.from(
+      document.querySelectorAll(
+        "input, select, textarea, button"
+      )
+    ).filter((el) => !el.disabled && el.offsetParent !== null);
+
+    const index = formElements.indexOf(e.target);
+
+    if (index > -1 && formElements[index + 1]) {
+      formElements[index + 1].focus();
+    }
+  }
+};
 
 
   if (!open) return null;
@@ -989,6 +1006,7 @@ await updateAccountReport({
       <div
         className="cp-form details"
         onClick={(e) => e.stopPropagation()}
+         onKeyDown={handleEnter}
       >
         <div className="cp-form-head">
           <h2>Create Order — {draft?.orderNo || "…"}</h2>

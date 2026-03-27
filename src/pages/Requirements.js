@@ -140,7 +140,7 @@ export default function Requirements() {
   const [requirements, setRequirements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
+const [userRole, setUserRole] = useState(null); 
   // Toolbar state
   const [statusFilter, setStatusFilter] = useState("all");
 const [editRequirement, setEditRequirement] = useState(null);
@@ -314,7 +314,18 @@ const normalizeTaxes = (taxes = []) =>
   setActiveItemIdx(null);
   setOpenQuotation(true);
 };
+useEffect(() => {
+  const user = auth.currentUser;
+  if (!user) return;
 
+  const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
+    if (snap.exists()) {
+      setUserRole(snap.data().role);
+    }
+  });
+
+  return () => unsub();
+}, []);
 
   const closeQuotation = () => {
     setOpenQuotation(false);
@@ -809,6 +820,7 @@ const normalizeTaxes = (taxes = []) =>
     Edit
   </button>
   {/* Delete */}
+  {userRole === "superadmin" && (
   <button
     type="button"
     className="row-btn danger"
@@ -816,7 +828,7 @@ const normalizeTaxes = (taxes = []) =>
   >
     Delete
   </button>
-
+)}
 </div>
                     </td>
                   </tr>

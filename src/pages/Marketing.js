@@ -2,9 +2,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
   collection, addDoc, getDocs, updateDoc, setDoc, doc,
-  serverTimestamp, deleteDoc, query, orderBy,where
+  serverTimestamp, deleteDoc, query, orderBy,where,onSnapshot
 } from "firebase/firestore";
-import { db } from "../firebase";
+import { db ,auth} from "../firebase";
 import "./Marketing.css";
 
 export default function Marketing() {
@@ -16,7 +16,7 @@ export default function Marketing() {
 
   const [showForm, setShowForm] = useState(false); // drawer
   const [editingId, setEditingId] = useState(null);
-
+const [userRole, setUserRole] = useState(null);
   const empty = {
   name: "",
   loginEmail: "",
@@ -42,7 +42,18 @@ export default function Marketing() {
       setLoading(false);
     }
   };
+useEffect(() => {
+  const user = auth.currentUser;
+  if (!user) return;
 
+  const unsub = onSnapshot(doc(db, "users", user.uid), (docSnap) => {
+    if (docSnap.exists()) {
+      setUserRole(docSnap.data().role);
+    }
+  });
+
+  return () => unsub();
+}, []);
   useEffect(() => { reload(); }, []);
 
   // Drawer: auto-open when editing
@@ -238,6 +249,18 @@ const emailExists = async (email) => {
   }
 
 };
+const handleEnter = (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+
+    const form = e.target.form;
+    const index = Array.prototype.indexOf.call(form, e.target);
+
+    if (form.elements[index + 1]) {
+      form.elements[index + 1].focus();
+    }
+  }
+};
 
   // Quick toggle active
   const toggleActive = async (r, next) => {
@@ -313,7 +336,7 @@ const emailExists = async (email) => {
           <button className="cp-btn ghost" type="button" onClick={() => setShowForm(false)}>Close</button>
         </div>
 
-        <form onSubmit={save} className="marketing-form">
+        <form onSubmit={save} className="marketing-form" onKeyDown={handleEnter}>
           <input
             type="text" placeholder="Full Name *"
             value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required
@@ -407,10 +430,11 @@ const emailExists = async (email) => {
     <button className="mk-btn edit" onClick={() => editRow(r)}>
       Edit
     </button>
-
+{userRole === "superadmin" && (
     <button className="mk-btn delete" onClick={() => deleteRow(r)}>
       Delete
     </button>
+)}
 
     <button
       className="mk-btn attendance"

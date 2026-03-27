@@ -433,6 +433,7 @@ const [deliveriesByOrder, setDeliveriesByOrder] = useState({});
   const [drivers, setDrivers] = useState([]);
   const [createOpen, setCreateOpen] = useState(false);
 const [assetCompanyFilter, setAssetCompanyFilter] = useState("");
+const [userRole, setUserRole] = useState(null);
 
 
   // Payments
@@ -476,6 +477,18 @@ const [assetCompanyFilter, setAssetCompanyFilter] = useState("");
       }
     })();
   }, []);
+  useEffect(() => {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
+    if (snap.exists()) {
+      setUserRole(snap.data().role);
+    }
+  });
+
+  return () => unsub();
+}, []);
 useEffect(() => {
   const q = query(collection(db, "deliveries"));
   const unsub = onSnapshot(q, (snap) => {
@@ -2181,12 +2194,14 @@ const badgeText = getDeliveryBadgeText(o, deliveriesByOrder);
         Mark On Rent
       </button>
     )}
+    {userRole === "superadmin" && (
        <button
   className="order-action delete"
   onClick={() => deleteOrder(o)}
 >
   🗑
 </button>
+    )}
 
   </div>
 </td>

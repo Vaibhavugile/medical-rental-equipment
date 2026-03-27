@@ -73,7 +73,7 @@ export default function Leads() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-
+const [userRole, setUserRole] = useState(null); 
   // Drawer/edit form
   const [showForm, setShowForm] = useState(false);
   const [closing, setClosing] = useState(false);
@@ -105,7 +105,18 @@ export default function Leads() {
   // Filters
   const [typeFilter, setTypeFilter] = useState("all");   // PRIMARY FILTER (drives Firestore query)
   const [statusFilter, setStatusFilter] = useState("all"); // Secondary filter (client-side)
+useEffect(() => {
+  const user = auth.currentUser;
+  if (!user) return;
 
+  const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
+    if (snap.exists()) {
+      setUserRole(snap.data().role);
+    }
+  });
+
+  return () => unsub();
+}, []);
   // ---------- Realtime leads (TYPE-DRIVEN QUERY) ----------
   useEffect(() => {
     setLoading(true);
@@ -744,14 +755,15 @@ const openWhatsApp = (phone) => {
 >
   <FontAwesomeIcon icon={faWhatsapp} />
 </button>
- <button
+{userRole === "superadmin" && (
+  <button
     title="Delete Lead"
     className="row-btn delete"
     onClick={() => setConfirmDelete(l)}
   >
     🗑
   </button>
-
+)}
 
 </div>
               </td>

@@ -103,7 +103,7 @@ export default function Quotations() {
   const [viewingVersion, setViewingVersion] = useState(null);
   const [saving, setSaving] = useState(false);
   const [shareReady, setShareReady] = useState(false);
-
+const [userRole, setUserRole] = useState(null);
   // NEW: WhatsApp send state
   const [waPhone, setWaPhone] = useState("");
   const [sendingWa, setSendingWa] = useState(false);
@@ -185,7 +185,18 @@ const [typeFilter, setTypeFilter] = useState("all");
     return fields.some((f) => f.includes(term));
   });
 }, [quotations, statusFilter, typeFilter, search]);
+useEffect(() => {
+  const user = auth.currentUser;
+  if (!user) return;
 
+  const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
+    if (snap.exists()) {
+      setUserRole(snap.data().role);
+    }
+  });
+
+  return () => unsub();
+}, []);
   // ===== Helpers to fetch from requirement -> leadssnapshop / leadSnapshot
   const pickFromRequirement = (req = {}) => {
     const ls = req.leadssnapshop || req.leadSnapshot || {};
@@ -1014,12 +1025,14 @@ const convertToOrder = (quote) => {
       View Orders
     </button>
   )} */}
+  {userRole === "superadmin" && (
   <button
   className="qp-btn danger"
   onClick={() => deleteQuotation(q)}
 >
   Delete
 </button>
+  )}
 
 </div>
                   </td>
