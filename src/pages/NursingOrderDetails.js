@@ -30,7 +30,7 @@ export default function NursingOrderDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-
+const [staffSearch, setStaffSearch] = useState("");
   const params = new URLSearchParams(location.search);
   const isDeleted = params.get("deleted") === "true";
   const [order, setOrder] = useState(null);
@@ -313,23 +313,46 @@ export default function NursingOrderDetails() {
     startDate: "",
     endDate: ""
   });
-  const filteredStaff = staffList.filter((s) => {
+ const filteredStaff = staffList.filter((s) => {
 
-    if (staffFilters.staffType !== "all" && s.staffType !== staffFilters.staffType) {
-      return false;
-    }
+  if (
+    staffFilters.staffType !== "all" &&
+    s.staffType !== staffFilters.staffType
+  ) {
+    return false;
+  }
 
-    if (staffFilters.shiftType !== "all" && s.shiftType !== staffFilters.shiftType) {
-      return false;
-    }
+  if (
+    staffFilters.shiftType !== "all" &&
+    s.shiftType !== staffFilters.shiftType
+  ) {
+    return false;
+  }
 
-    if (staffFilters.rateType !== "all" && s.rateType !== staffFilters.rateType) {
-      return false;
-    }
+  if (
+    staffFilters.rateType !== "all" &&
+    s.rateType !== staffFilters.rateType
+  ) {
+    return false;
+  }
 
-    return true;
+  if (staffSearch) {
+    const q = staffSearch.toLowerCase();
 
-  });
+    const text = [
+      s.name,
+      s.phone,
+      s.staffType,
+      ...(s.servicesOffered || [])
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    if (!text.includes(q)) return false;
+  }
+
+  return true;
+});
 
   const displayUser = (uid, name) =>
     uid === auth.currentUser?.uid ? "You" : name;
@@ -3850,7 +3873,12 @@ export default function NursingOrderDetails() {
             {/* GLOBAL RATE CONFIG */}
 
 
-
+<input
+  className="nod-input"
+  placeholder="Search nurse..."
+  value={staffSearch}
+  onChange={(e) => setStaffSearch(e.target.value)}
+/>
 
             {/* STAFF GRID */}
 
