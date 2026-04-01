@@ -40,8 +40,8 @@ const fmtDate = (ts) => {
 };
 
 // Stages used for status chips
-const STAGES = ["new", "contacted", "req shared", "lost"];
-const STATUS_FLOW = ["new", "contacted", "req shared"];
+const STAGES = ["new", "contacted", "req shared", "followup", "lost"];
+const STATUS_FLOW = ["new", "contacted"];
 const normStatus = (s = "") => s.toLowerCase();
 const statusClass = (s = "") =>
   s
@@ -73,13 +73,14 @@ export default function Leads() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
-const [userRole, setUserRole] = useState(null); 
+  const [userRole, setUserRole] = useState(null);
   // Drawer/edit form
   const [showForm, setShowForm] = useState(false);
   const [closing, setClosing] = useState(false);
   const CLOSE_MS = 180;
   const [form, setForm] = useState(defaultForm);
-
+  const [followupFilter, setFollowupFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("created");
   // Delete confirm
   const [confirmDelete, setConfirmDelete] = useState(null);
 
@@ -105,18 +106,18 @@ const [userRole, setUserRole] = useState(null);
   // Filters
   const [typeFilter, setTypeFilter] = useState("all");   // PRIMARY FILTER (drives Firestore query)
   const [statusFilter, setStatusFilter] = useState("all"); // Secondary filter (client-side)
-useEffect(() => {
-  const user = auth.currentUser;
-  if (!user) return;
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
 
-  const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
-    if (snap.exists()) {
-      setUserRole(snap.data().role);
-    }
-  });
+    const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
+      if (snap.exists()) {
+        setUserRole(snap.data().role);
+      }
+    });
 
-  return () => unsub();
-}, []);
+    return () => unsub();
+  }, []);
   // ---------- Realtime leads (TYPE-DRIVEN QUERY) ----------
   useEffect(() => {
     setLoading(true);
@@ -152,6 +153,7 @@ useEffect(() => {
             updatedBy: data.updatedBy || "",
             updatedByName: data.updatedByName || "",
             history: Array.isArray(data.history) ? data.history : [],
+            followupDate: data.followupDate || null,
           };
         });
         setLeads(docs);
@@ -188,26 +190,95 @@ useEffect(() => {
 
   // ---------- Counts for STATUS chips (within current TYPE selection) ----------
   const statusCounts = useMemo(() => {
-    const map = { all: leads.length };
+    const map = {
+      all: leads.length,
+      new: 0,
+      contacted: 0,
+      "req shared": 0,
+      followup: 0,
+      today: 0,
+      overdue: 0,
+      lost: 0
+    };
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
     for (const l of leads) {
       const s = normStatus(l.status) || "new";
-      map[s] = (map[s] || 0) + 1;
+
+      if (map[s] !== undefined) {
+        map[s] += 1;
+      }
+
+      if (s === "followup" && l.followupDate) {
+        const fDate = new Date(l.followupDate);
+        fDate.setHours(0, 0, 0, 0);
+
+        if (fDate.getTime() === today.getTime()) {
+          map.today += 1;
+        }
+
+        if (fDate < today) {
+          map.overdue += 1;
+        }
+      }
     }
+
     return map;
   }, [leads]);
 
   // ---------- Search + STATUS filter (TYPE already applied by Firestore) ----------
-  const filtered = useMemo(() => {
-    let list = leads;
+ const filtered = useMemo(() => {
 
-    if (statusFilter !== "all") {
-      list = list.filter((l) => normStatus(l.status) === statusFilter);
-    }
+  let list = [...leads];
 
-    const q = search.trim().toLowerCase();
-    if (!q) return list;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-    return list.filter((l) => {
+  // STATUS FILTER
+  if (statusFilter !== "all") {
+
+    list = list.filter((l) => {
+
+      const s = normStatus(l.status);
+
+      // FOLLOWUP STATUS
+      if (statusFilter === "followup") {
+
+        if (s !== "followup") return false;
+        if (!l.followupDate) return false;
+
+        const fDate = new Date(l.followupDate);
+        fDate.setHours(0, 0, 0, 0);
+
+        if (followupFilter === "today") {
+          return fDate.getTime() === today.getTime();
+        }
+
+        if (followupFilter === "overdue") {
+          return fDate < today;
+        }
+
+        if (followupFilter === "upcoming") {
+          return fDate > today;
+        }
+
+        return true;
+      }
+
+      return s === statusFilter;
+
+    });
+
+  }
+
+  // SEARCH FILTER
+  const q = search.trim().toLowerCase();
+
+  if (q) {
+    list = list.filter((l) => {
+
       return (
         (l.customerName || "").toLowerCase().includes(q) ||
         (l.contactPerson || "").toLowerCase().includes(q) ||
@@ -216,8 +287,40 @@ useEffect(() => {
         (l.leadSource || "").toLowerCase().includes(q) ||
         (l.notes || "").toLowerCase().includes(q)
       );
+
     });
-  }, [leads, search, statusFilter]);
+  }
+
+  // SORTING
+  if (sortBy === "followup") {
+
+    list.sort((a, b) => {
+
+      if (!a.followupDate) return 1;
+      if (!b.followupDate) return -1;
+
+      return new Date(a.followupDate) - new Date(b.followupDate);
+
+    });
+
+  }
+
+  if (sortBy === "created") {
+
+    list.sort((a, b) => {
+
+      if (!a.createdAt) return 1;
+      if (!b.createdAt) return -1;
+
+      return b.createdAt.toMillis() - a.createdAt.toMillis();
+
+    });
+
+  }
+
+  return list;
+
+}, [leads, search, statusFilter, followupFilter, sortBy]);
 
   // ---------- Drawer helpers ----------
   const openDrawer = (initial = defaultForm) => {
@@ -361,8 +464,8 @@ useEffect(() => {
           history: [createEntry],
         });
         await updateAccountReport({
-        leadsAdded: increment(1)
-});
+          leadsAdded: increment(1)
+        });
       }
 
       closeDrawer();
@@ -377,12 +480,19 @@ useEffect(() => {
   // ---------- Status modal helpers ----------
   const openStatusModal = (lead) => {
     const cur = lead.status || "new";
-    const idx = STATUS_FLOW.indexOf(cur);
-    const next =
-      idx >= 0 && idx < STATUS_FLOW.length - 1
-        ? STATUS_FLOW[idx + 1]
-        : STATUS_FLOW[Math.max(0, idx)];
-    setStatusModal({ open: true, lead, nextStatus: next, note: "" });
+
+    let next = "contacted";
+
+    if (cur === "new") next = "contacted";
+    else if (cur === "contacted") next = ""; // user must choose
+
+    setStatusModal({
+      open: true,
+      lead,
+      nextStatus: next,
+      note: "",
+      followupDate: ""
+    });
   };
   const closeStatusModal = () =>
     setStatusModal({ open: false, lead: null, nextStatus: null, note: "" });
@@ -407,16 +517,17 @@ useEffect(() => {
 
       await updateDoc(doc(db, "leads", lead.id), {
         status: nextStatus,
+        followupDate: statusModal.followupDate || null,
         updatedAt: serverTimestamp(),
         updatedBy: user.uid || "",
         updatedByName: user.displayName || user.email || user.uid || "",
         history: arrayUnion(entry),
       });
-      if(nextStatus === "contacted"){
-  await updateAccountReport({
-    leadsContacted: increment(1)
-  });
-}
+      if (nextStatus === "contacted") {
+        await updateAccountReport({
+          leadsContacted: increment(1)
+        });
+      }
 
       closeStatusModal();
     } catch (err) {
@@ -428,25 +539,25 @@ useEffect(() => {
   // ---------- Details drawer ----------
   const openDetails = (lead) => setDetailsLead(lead);
   const closeDetails = () => setDetailsLead(null);
-const openWhatsApp = (phone) => {
-  if (!phone) return;
+  const openWhatsApp = (phone) => {
+    if (!phone) return;
 
-  // Remove spaces, dashes, brackets etc
-  let clean = phone.replace(/[^\d]/g, "");
+    // Remove spaces, dashes, brackets etc
+    let clean = phone.replace(/[^\d]/g, "");
 
-  // Force India country code (+91)
-  if (!clean.startsWith("91")) {
-    clean = "91" + clean;
-  }
+    // Force India country code (+91)
+    if (!clean.startsWith("91")) {
+      clean = "91" + clean;
+    }
 
-  // Prefilled message
-  const message = encodeURIComponent("Hi");
+    // Prefilled message
+    const message = encodeURIComponent("Hi");
 
-  // Official WhatsApp API
-  const url = `https://wa.me/${clean}?text=${message}`;
+    // Official WhatsApp API
+    const url = `https://wa.me/${clean}?text=${message}`;
 
-  window.open(url, "_blank");
-};
+    window.open(url, "_blank");
+  };
 
 
   // ---------- Delete ----------
@@ -495,557 +606,650 @@ const openWhatsApp = (phone) => {
       {error && <div className="coupons-error">{error}</div>}
 
       <header className="leads-header">
-  <div className="leads-header-left">
-    <div className="leads-title-row">
-      <span className="leads-icon">📋</span>
-      <h1 className="leads-title">Leads</h1>
-    </div>
+        <div className="leads-header-left">
+          <div className="leads-title-row">
+            <span className="leads-icon">📋</span>
+            <h1 className="leads-title">Leads</h1>
+          </div>
 
-    <p className="leads-subtitle">
-      Filter by <strong>Type</strong> and refine using <strong>Status</strong>.
-    </p>
-  </div>
+          <p className="leads-subtitle">
+            Filter by <strong>Type</strong> and refine using <strong>Status</strong>.
+          </p>
+        </div>
 
-  <div className="leads-header-actions">
-    <button
-      className="cp-btn ghost"
-      onClick={() => openDrawer(defaultForm)}
-    >
-      + New Lead
-    </button>
+        <div className="leads-header-actions">
+          <button
+            className="cp-btn ghost"
+            onClick={() => openDrawer(defaultForm)}
+          >
+            + New Lead
+          </button>
 
-    <button
-      className="cp-btn primary"
-      onClick={() => {
-        setDetailsLead(null);
-        setReqLead(null);
-        setTemplateReq(null);
-        setOpenReq(true);
-      }}
-    >
-      +Add Req
-    </button>
-  </div>
-</header>
+          <button
+            className="cp-btn primary"
+            onClick={() => {
+              setDetailsLead(null);
+              setReqLead(null);
+              setTemplateReq(null);
+              setOpenReq(true);
+            }}
+          >
+            +Add Req
+          </button>
+        </div>
+      </header>
 
       {/* Toolbar: TYPE chips (server filter) + search + STATUS chips (client filter) */}
-    {/* ===== PREMIUM FILTER BAR ===== */}
-<section className="filter-bar">
+      {/* ===== PREMIUM FILTER BAR ===== */}
+      <section className="filter-bar">
 
-  <div className="filter-left">
+        <div className="filter-left">
 
-    {/* TYPE SEGMENT */}
-    <div className="segmented type-segment">
-      <button
-        className={`seg-btn ${typeFilter === "all" ? "active" : ""}`}
-        onClick={() => {
-          setTypeFilter("all");
-          setStatusFilter("all");
-        }}
-      >
-        All
-      </button>
+          {/* TYPE SEGMENT */}
+          <div className="segmented type-segment">
+            <button
+              className={`seg-btn ${typeFilter === "all" ? "active" : ""}`}
+              onClick={() => {
+                setTypeFilter("all");
+                setStatusFilter("all");
+              }}
+            >
+              All
+            </button>
 
-      <button
-        className={`seg-btn equipment ${typeFilter === "equipment" ? "active" : ""}`}
-        onClick={() => {
-          setTypeFilter("equipment");
-          setStatusFilter("all");
-        }}
-      >
-        Equipment
-      </button>
+            <button
+              className={`seg-btn equipment ${typeFilter === "equipment" ? "active" : ""}`}
+              onClick={() => {
+                setTypeFilter("equipment");
+                setStatusFilter("all");
+              }}
+            >
+              Equipment
+            </button>
 
-      <button
-        className={`seg-btn nursing ${typeFilter === "nursing" ? "active" : ""}`}
-        onClick={() => {
-          setTypeFilter("nursing");
-          setStatusFilter("all");
-        }}
-      >
-        Nursing
-      </button>
-      <button
-  className={`seg-btn caretaker ${typeFilter === "caretaker" ? "active" : ""}`}
-  onClick={() => {
-    setTypeFilter("caretaker");
-    setStatusFilter("all");
-  }}
->
-  Caretaker
-</button>
-    </div>
+            <button
+              className={`seg-btn nursing ${typeFilter === "nursing" ? "active" : ""}`}
+              onClick={() => {
+                setTypeFilter("nursing");
+                setStatusFilter("all");
+              }}
+            >
+              Nursing
+            </button>
+            <button
+              className={`seg-btn caretaker ${typeFilter === "caretaker" ? "active" : ""}`}
+              onClick={() => {
+                setTypeFilter("caretaker");
+                setStatusFilter("all");
+              }}
+            >
+              Caretaker
+            </button>
+          </div>
 
-    {/* STATUS SEGMENT */}
-    <div className="segmented status-segment">
-      <button
-        className={`seg-btn ${statusFilter === "all" ? "active" : ""}`}
-        onClick={() => setStatusFilter("all")}
-      >
-        All <span className="badge">{statusCounts.all || 0}</span>
-      </button>
+          {/* STATUS SEGMENT */}
+          <div className="segmented status-segment">
 
-      {STAGES.map((s) => (
-        <button
-          key={s}
-          className={`seg-btn ${statusClass(s)} ${
-            statusFilter === s ? "active" : ""
-          }`}
-          onClick={() => setStatusFilter(s)}
+            <button
+              className={`seg-btn ${statusFilter === "all" ? "active" : ""}`}
+              onClick={() => setStatusFilter("all")}
+            >
+              All <span className="badge">{statusCounts.all}</span>
+            </button>
+
+            <button
+              className={`seg-btn ${statusFilter === "new" ? "active" : ""}`}
+              onClick={() => setStatusFilter("new")}
+            >
+              New <span className="badge">{statusCounts.new}</span>
+            </button>
+
+            <button
+              className={`seg-btn ${statusFilter === "contacted" ? "active" : ""}`}
+              onClick={() => setStatusFilter("contacted")}
+            >
+              Contacted <span className="badge">{statusCounts.contacted}</span>
+            </button>
+
+            <button
+              className={`seg-btn ${statusFilter === "req shared" ? "active" : ""}`}
+              onClick={() => setStatusFilter("req shared")}
+            >
+              Req <span className="badge">{statusCounts["req shared"]}</span>
+            </button>
+
+            <button
+              className={`seg-btn ${statusFilter === "followup" ? "active" : ""}`}
+              onClick={() => {
+                setStatusFilter("followup");
+                setFollowupFilter("all");
+              }}
+            >
+              Followup <span className="badge">{statusCounts.followup}</span>
+            </button>
+
+            <button
+              className={`seg-btn ${statusFilter === "lost" ? "active" : ""}`}
+              onClick={() => setStatusFilter("lost")}
+            >
+              Lost <span className="badge">{statusCounts.lost}</span>
+            </button>
+
+          </div>{statusFilter === "followup" && (
+
+  <div className="followup-subfilters">
+
+    <button
+      className={`seg-btn ${followupFilter === "all" ? "active" : ""}`}
+      onClick={() => {
+        setStatusFilter("followup");
+        setFollowupFilter("all");
+      }}
+    >
+      All
+    </button>
+
+    <button
+      className={`seg-btn ${followupFilter === "today" ? "active" : ""}`}
+      onClick={() => {
+        setStatusFilter("followup");
+        setFollowupFilter("today");
+      }}
+    >
+      Today ({statusCounts.today})
+    </button>
+
+    <button
+      className={`seg-btn ${followupFilter === "upcoming" ? "active" : ""}`}
+      onClick={() => {
+        setStatusFilter("followup");
+        setFollowupFilter("upcoming");
+      }}
+    >
+      Upcoming
+    </button>
+
+    <button
+      className={`seg-btn overdue ${followupFilter === "overdue" ? "active" : ""}`}
+      onClick={() => {
+        setStatusFilter("followup");
+        setFollowupFilter("overdue");
+      }}
+    >
+      Overdue 🔴 ({statusCounts.overdue})
+    </button>
+
+  </div>
+
+)}
+
+
+
+        </div>
+
+        {/* SEARCH */}
+        <div className="filter-search">
+          <input
+            className="search-input"
+            placeholder="Search customer, phone, source..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <select
+          className="sort-select"
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
         >
-          {s}
-          <span className="badge">{statusCounts[s] || 0}</span>
-        </button>
-      ))}
-    </div>
 
-  </div>
+          <option value="created">Sort: Latest</option>
+          <option value="followup">Sort: Followup Date</option>
 
-  {/* SEARCH */}
-  <div className="filter-search">
-    <input
-      className="search-input"
-      placeholder="Search customer, phone, source..."
-      value={search}
-      onChange={(e) => setSearch(e.target.value)}
-    />
-  </div>
+        </select>
 
-  {/* SUMMARY */}
-  <div className="filter-summary">
-    {filtered.length} / {leads.length}
-  </div>
+        {/* SUMMARY */}
+        <div className="filter-summary">
+          {filtered.length} / {leads.length}
+        </div>
 
-</section>
+      </section>
       {/* Table */}
-    <section className="leads-card">
-  <div className="leads-table-wrap">
-    <table className="leads-table">
+      <section className="leads-card">
+        <div className="leads-table-wrap">
+          <table className="leads-table">
 
-      <thead>
-        <tr>
-          <th>Customer</th>
-          {/* <th>Contact</th> */}
-          <th>Phone</th>
-          <th>Source</th>
-          <th>Type</th>
-          <th>Status</th>
-          <th>Created By</th>
-          <th>Updated</th>
-          <th className="actions-col">Actions</th>
-        </tr>
-      </thead>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                {/* <th>Contact</th> */}
+                <th>Phone</th>
+                <th>Source</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Created By</th>
+                <th>Updated</th>
+                <th className="actions-col">Actions</th>
+              </tr>
+            </thead>
 
-      <tbody>
-        {filtered.map((l) => {
-          const latestReq = reqByLead[l.id];
-          const canCreateReq =
-            normStatus(l.status) === "req shared";
+            <tbody>
+              {filtered.map((l) => {
+                const latestReq = reqByLead[l.id];
+                const canCreateReq =
+                  normStatus(l.status) === "req shared";
 
-          return (
-            <tr key={l.id} className="leads-row">
+                return (
+                  <tr key={l.id} className="leads-row">
 
-              <td className="cell-strong">
-                {l.customerName}
-              </td>
+                    <td className="cell-strong">
+                      {l.customerName}
+                    </td>
 
-              {/* <td className="cell-muted">
+                    {/* <td className="cell-muted">
                 {l.contactPerson}
                 {l.email ? ` · ${l.email}` : ""}
               </td> */}
 
-              <td>{l.phone}</td>
+                    <td>{l.phone}</td>
 
-              <td className="cell-muted">
-                {l.leadSource || "—"}
-              </td>
+                    <td className="cell-muted">
+                      {l.leadSource || "—"}
+                    </td>
 
-              <td className="cell-muted">
-  {(l.type || "equipment")
-    .charAt(0)
-    .toUpperCase() + (l.type || "equipment").slice(1)}
-</td>
+                    <td className="cell-muted">
+                      {(l.type || "equipment")
+                        .charAt(0)
+                        .toUpperCase() + (l.type || "equipment").slice(1)}
+                    </td>
 
-              <td>
-                <span className={`chip ${statusClass(l.status)}`}>
-                  {l.status}
-                </span>
-              </td>
+                    <td>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <span className={`chip ${statusClass(l.status)}`}>
+                          {l.status}
+                        </span>
 
-              <td className="cell-muted">
-                {l.createdByName || l.createdBy || "—"}
-              </td>
+                        {l.status === "followup" && l.followupDate && (
+                          <span style={{ fontSize: 12, color: "#64748b" }}>
+                            {fmtDate(l.followupDate)}
+                          </span>
+                        )}
+                      </div>
+                    </td>
 
-              <td className="cell-muted updated-cell">
-  <div className="updated-date">
-    {l.updatedAt
-      ? fmtDate(l.updatedAt)
-      : l.createdAt
-      ? fmtDate(l.createdAt)
-      : "—"}
-  </div>
+                    <td className="cell-muted">
+                      {l.createdByName || l.createdBy || "—"}
+                    </td>
 
-  {l.updatedByName && (
-    <div className="updated-user">
-      {l.updatedByName}
-    </div>
-  )}
-</td>
+                    <td className="cell-muted updated-cell">
+                      <div className="updated-date">
+                        {l.updatedAt
+                          ? fmtDate(l.updatedAt)
+                          : l.createdAt
+                            ? fmtDate(l.createdAt)
+                            : "—"}
+                      </div>
 
-              <td>
-                <div className="row-actions">
+                      {l.updatedByName && (
+                        <div className="updated-user">
+                          {l.updatedByName}
+                        </div>
+                      )}
+                    </td>
 
-  {/* Edit */}
-  <button
-    title="Edit lead"
-    className="row-btn icon"
-    onClick={() => editLead(l)}
-  >
-    ✎
-  </button>
+                    <td>
+                      <div className="row-actions">
 
-  {/* Requirement */}
-  {latestReq ? (
-    <button
-      className="row-btn req"
-      onClick={(e) => {
-        e.stopPropagation();
-        setReqLead(l);
-        setTemplateReq(latestReq);
-        setDetailsLead(null);
-        setOpenReq(true);
-      }}
-    >
-      Add Req
-    </button>
-  ) : canCreateReq ? (
-    <button
-      className="row-btn req"
-      onClick={(e) => {
-        e.stopPropagation();
-        setReqLead(l);
-        setTemplateReq(null);
-        setDetailsLead(null);
-        setOpenReq(true);
-      }}
-    >
-      + Req
-    </button>
-  ) : null}
+                        {/* Edit */}
+                        <button
+                          title="Edit lead"
+                          className="row-btn icon"
+                          onClick={() => editLead(l)}
+                        >
+                          ✎
+                        </button>
 
-  {/* View */}
-  <button
-    className="row-btn view"
-    onClick={() => openDetails(l)}
-  >
-    View
-  </button>
+                        {/* Requirement */}
+                        {latestReq ? (
+                          <button
+                            className="row-btn req"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReqLead(l);
+                              setTemplateReq(latestReq);
+                              setDetailsLead(null);
+                              setOpenReq(true);
+                            }}
+                          >
+                            Add Req
+                          </button>
+                        ) : canCreateReq ? (
+                          <button
+                            className="row-btn req"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setReqLead(l);
+                              setTemplateReq(null);
+                              setDetailsLead(null);
+                              setOpenReq(true);
+                            }}
+                          >
+                            + Req
+                          </button>
+                        ) : null}
 
-  {/* Next */}
-  <button
-    className="row-btn next"
-    onClick={() => openStatusModal(l)}
-  >
-    Next
-  </button>
-  <button
-  title="WhatsApp"
-  className="row-btn whatsapp"
-  onClick={() => openWhatsApp(l.phone)}
->
-  <FontAwesomeIcon icon={faWhatsapp} />
-</button>
-{userRole === "superadmin" && (
-  <button
-    title="Delete Lead"
-    className="row-btn delete"
-    onClick={() => setConfirmDelete(l)}
-  >
-    🗑
-  </button>
-)}
+                        {/* View */}
+                        <button
+                          className="row-btn view"
+                          onClick={() => openDetails(l)}
+                        >
+                          View
+                        </button>
 
-</div>
-              </td>
+                        {/* Next */}
+                        <button
+                          className="row-btn next"
+                          onClick={() => openStatusModal(l)}
+                        >
+                          Next
+                        </button>
+                        <button
+                          title="WhatsApp"
+                          className="row-btn whatsapp"
+                          onClick={() => openWhatsApp(l.phone)}
+                        >
+                          <FontAwesomeIcon icon={faWhatsapp} />
+                        </button>
+                        {userRole === "superadmin" && (
+                          <button
+                            title="Delete Lead"
+                            className="row-btn delete"
+                            onClick={() => setConfirmDelete(l)}
+                          >
+                            🗑
+                          </button>
+                        )}
 
-            </tr>
-          );
-        })}
+                      </div>
+                    </td>
 
-        {!filtered.length && (
-          <tr>
-            <td colSpan="9">
-              <div className="table-empty">
-                No leads found.
-              </div>
-            </td>
-          </tr>
-        )}
-      </tbody>
+                  </tr>
+                );
+              })}
 
-    </table>
-  </div>
-</section>
+              {!filtered.length && (
+                <tr>
+                  <td colSpan="9">
+                    <div className="table-empty">
+                      No leads found.
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+
+          </table>
+        </div>
+      </section>
 
       {/* Edit drawer */}
-    {showForm && (
-  <div
-    onClick={(e) => {
-      if (e.target === e.currentTarget) closeDrawer();
-    }}
-    style={{
-      position: "fixed",
-      inset: 0,
-      background: "rgba(15,23,42,0.45)",
-      backdropFilter: "blur(6px)",
-      display: "flex",
-      justifyContent: "flex-end",
-      zIndex: 1000,
-    }}
-  >
-    <form
-      onSubmit={handleSave}
-      style={{
-        width: "640px",
-        maxWidth: "100%",
-        height: "100%",
-        background: "#ffffff",
-        boxShadow: "-20px 0 60px rgba(0,0,0,0.18)",
-        padding: "28px 32px",
-        display: "flex",
-        flexDirection: "column",
-        overflowY: "auto",
-      }}
-    >
-      {/* HEADER */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 28,
-        }}
-      >
-        <h2 style={{ fontSize: 22, fontWeight: 700 }}>
-          {form.id ? "Edit Lead" : "New Lead"}
-        </h2>
-
-     <button
-  type="button"
-  onClick={closeDrawer}
-  onMouseEnter={(e) => {
-    e.currentTarget.style.background = "#fee2e2";
-    e.currentTarget.style.color = "#dc2626";
-  }}
-  onMouseLeave={(e) => {
-    e.currentTarget.style.background = "#f1f5f9";
-    e.currentTarget.style.color = "#475569";
-  }}
-  style={{
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    border: "1px solid #e2e8f0",
-    background: "#f1f5f9",
-    color: "#475569",
-    cursor: "pointer",
-    fontSize: 18,
-    fontWeight: 600,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "all 0.2s ease",
-  }}
->
-  ✕
-</button>
-      </div>
-
-      {/* GRID */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "22px 24px",
-          marginBottom: 28,
-        }}
-      >
-        {/* Field Template */}
-        {[
-          { label: "Customer / Hospital", key: "customerName", required: true },
-          { label: "Contact Person", key: "contactPerson", required: true },
-          { label: "Phone", key: "phone", required: true },
-          { label: "Email", key: "email" },
-          { label: "Address / City", key: "address" },
-          { label: "Lead Source", key: "leadSource" },
-        ].map((field) => (
-          <div key={field.key} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <label style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>
-              {field.label}
-            </label>
-            <input
-              value={form[field.key]}
-              required={field.required}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, [field.key]: e.target.value }))
-              }
-              style={{
-                height: 44,
-                padding: "0 14px",
-                borderRadius: 10,
-                border: "1px solid #e2e8f0",
-                background: "#f8fafc",
-                fontSize: 14,
-              }}
-            />
-          </div>
-        ))}
-
-        {/* TYPE */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <label style={{ fontSize: 13, fontWeight: 600 }}>Type</label>
-          <select
-  value={form.type}
-  onChange={(e) =>
-    setForm((f) => ({ ...f, type: e.target.value }))
-  }
->
-  <option value="equipment">equipment</option>
-  <option value="nursing">nursing</option>
-  <option value="caretaker">caretaker</option>
-</select>
-        </div>
-
-        {/* NOTES FULL WIDTH */}
+      {showForm && (
         <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeDrawer();
+          }}
           style={{
-            gridColumn: "1 / -1",
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.45)",
+            backdropFilter: "blur(6px)",
             display: "flex",
-            flexDirection: "column",
-            gap: 8,
+            justifyContent: "flex-end",
+            zIndex: 1000,
           }}
         >
-          <label style={{ fontSize: 13, fontWeight: 600 }}>Notes</label>
-          <textarea
-            value={form.notes}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, notes: e.target.value }))
-            }
-            rows={4}
+          <form
+            onSubmit={handleSave}
             style={{
-              padding: "12px 14px",
-              borderRadius: 10,
-              border: "1px solid #e2e8f0",
-              background: "#f8fafc",
-              fontSize: 14,
-              resize: "vertical",
-            }}
-          />
-        </div>
-
-        {/* STATUS */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <label style={{ fontSize: 13, fontWeight: 600 }}>Status</label>
-          <select
-            value={form.status}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, status: e.target.value }))
-            }
-            style={{
-              height: 44,
-              padding: "0 14px",
-              borderRadius: 10,
-              border: "1px solid #e2e8f0",
-              background: "#f8fafc",
-              fontSize: 14,
+              width: "640px",
+              maxWidth: "100%",
+              height: "100%",
+              background: "#ffffff",
+              boxShadow: "-20px 0 60px rgba(0,0,0,0.18)",
+              padding: "28px 32px",
+              display: "flex",
+              flexDirection: "column",
+              overflowY: "auto",
             }}
           >
-            <option value="new">new</option>
-            <option value="contacted">contacted</option>
-            <option value="req shared">req shared</option>
-            <option value="lost">lost</option>
-          </select>
+            {/* HEADER */}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 28,
+              }}
+            >
+              <h2 style={{ fontSize: 22, fontWeight: 700 }}>
+                {form.id ? "Edit Lead" : "New Lead"}
+              </h2>
+
+              <button
+                type="button"
+                onClick={closeDrawer}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#fee2e2";
+                  e.currentTarget.style.color = "#dc2626";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "#f1f5f9";
+                  e.currentTarget.style.color = "#475569";
+                }}
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  border: "1px solid #e2e8f0",
+                  background: "#f1f5f9",
+                  color: "#475569",
+                  cursor: "pointer",
+                  fontSize: 18,
+                  fontWeight: 600,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "all 0.2s ease",
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* GRID */}
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "22px 24px",
+                marginBottom: 28,
+              }}
+            >
+              {/* Field Template */}
+              {[
+                { label: "Customer / Hospital", key: "customerName", required: true },
+                { label: "Contact Person", key: "contactPerson", required: true },
+                { label: "Phone", key: "phone", required: true },
+                { label: "Email", key: "email" },
+                { label: "Address / City", key: "address" },
+                { label: "Lead Source", key: "leadSource" },
+              ].map((field) => (
+                <div key={field.key} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>
+                    {field.label}
+                  </label>
+                  <input
+                    value={form[field.key]}
+                    required={field.required}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, [field.key]: e.target.value }))
+                    }
+                    style={{
+                      height: 44,
+                      padding: "0 14px",
+                      borderRadius: 10,
+                      border: "1px solid #e2e8f0",
+                      background: "#f8fafc",
+                      fontSize: 14,
+                    }}
+                  />
+                </div>
+              ))}
+
+              {/* TYPE */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 600 }}>Type</label>
+                <select
+                  value={form.type}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, type: e.target.value }))
+                  }
+                >
+                  <option value="equipment">equipment</option>
+                  <option value="nursing">nursing</option>
+                  <option value="caretaker">caretaker</option>
+                </select>
+              </div>
+
+              {/* NOTES FULL WIDTH */}
+              <div
+                style={{
+                  gridColumn: "1 / -1",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <label style={{ fontSize: 13, fontWeight: 600 }}>Notes</label>
+                <textarea
+                  value={form.notes}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, notes: e.target.value }))
+                  }
+                  rows={4}
+                  style={{
+                    padding: "12px 14px",
+                    borderRadius: 10,
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                    fontSize: 14,
+                    resize: "vertical",
+                  }}
+                />
+              </div>
+
+              {/* STATUS */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 600 }}>Status</label>
+                <select
+                  value={form.status}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, status: e.target.value }))
+                  }
+                  style={{
+                    height: 44,
+                    padding: "0 14px",
+                    borderRadius: 10,
+                    border: "1px solid #e2e8f0",
+                    background: "#f8fafc",
+                    fontSize: 14,
+                  }}
+                >
+                  <option value="new">new</option>
+                  <option value="contacted">contacted</option>
+                  <option value="req shared">req shared</option>
+                  <option value="lost">lost</option>
+                </select>
+              </div>
+
+              {/* CREATED BY */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <label style={{ fontSize: 13, fontWeight: 600 }}>Created By</label>
+                <input
+                  value={form.createdByName || form.createdBy || ""}
+                  readOnly
+                  style={{
+                    height: 44,
+                    padding: "0 14px",
+                    borderRadius: 10,
+                    border: "1px solid #e2e8f0",
+                    background: "#f1f5f9",
+                    fontSize: 14,
+                  }}
+                />
+                <small style={{ fontSize: 12, color: "#64748b" }}>
+                  Automatically recorded
+                </small>
+              </div>
+            </div>
+
+            {/* ACTIONS */}
+            <div
+              style={{
+                marginTop: "auto",
+                paddingTop: 24,
+                borderTop: "1px solid #f1f5f9",
+                display: "flex",
+                justifyContent: "flex-end",
+                gap: 14,
+              }}
+            >
+              <button
+                type="button"
+                onClick={closeDrawer}
+                disabled={saving}
+                style={{
+                  padding: "9px 20px",
+                  borderRadius: 999,
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                  color: "#334155",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.background = "#e2e8f0";
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.background = "#f8fafc";
+                }}
+              >
+                Cancel
+              </button>
+
+              <button
+                disabled={saving}
+                style={{
+                  padding: "8px 22px",
+                  borderRadius: 999,
+                  border: "none",
+                  background: "linear-gradient(135deg,#4f46e5,#6366f1)",
+                  color: "#fff",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  boxShadow: "0 6px 18px rgba(79,70,229,0.35)",
+                }}
+              >
+                {saving
+                  ? "Saving…"
+                  : form.id
+                    ? "Update Lead"
+                    : "Create Lead"}
+              </button>
+            </div>
+          </form>
         </div>
-
-        {/* CREATED BY */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <label style={{ fontSize: 13, fontWeight: 600 }}>Created By</label>
-          <input
-            value={form.createdByName || form.createdBy || ""}
-            readOnly
-            style={{
-              height: 44,
-              padding: "0 14px",
-              borderRadius: 10,
-              border: "1px solid #e2e8f0",
-              background: "#f1f5f9",
-              fontSize: 14,
-            }}
-          />
-          <small style={{ fontSize: 12, color: "#64748b" }}>
-            Automatically recorded
-          </small>
-        </div>
-      </div>
-
-      {/* ACTIONS */}
-      <div
-        style={{
-          marginTop: "auto",
-          paddingTop: 24,
-          borderTop: "1px solid #f1f5f9",
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: 14,
-        }}
-      >
-        <button
-  type="button"
-  onClick={closeDrawer}
-  disabled={saving}
-  style={{
-    padding: "9px 20px",
-    borderRadius: 999,
-    border: "1px solid #e2e8f0",
-    background: "#f8fafc",
-    color: "#334155",
-    fontWeight: 600,
-    cursor: "pointer",
-    transition: "all 0.2s ease",
-  }}
-  onMouseEnter={(e) => {
-    e.target.style.background = "#e2e8f0";
-  }}
-  onMouseLeave={(e) => {
-    e.target.style.background = "#f8fafc";
-  }}
->
-  Cancel
-</button>
-
-        <button
-          disabled={saving}
-          style={{
-            padding: "8px 22px",
-            borderRadius: 999,
-            border: "none",
-            background: "linear-gradient(135deg,#4f46e5,#6366f1)",
-            color: "#fff",
-            fontWeight: 600,
-            cursor: "pointer",
-            boxShadow: "0 6px 18px rgba(79,70,229,0.35)",
-          }}
-        >
-          {saving
-            ? "Saving…"
-            : form.id
-            ? "Update Lead"
-            : "Create Lead"}
-        </button>
-      </div>
-    </form>
-  </div>
-)}
+      )}
 
       {/* Status modal */}
       {statusModal.open && statusModal.lead && (
@@ -1057,10 +1261,57 @@ const openWhatsApp = (phone) => {
         >
           <div className="cp-modal-card">
             <h3>Change status for “{statusModal.lead.customerName}”</h3>
-            <p className="muted">
-              From <strong>{statusModal.lead.status}</strong> →{" "}
-              <strong>{statusModal.nextStatus}</strong>
-            </p>
+            {statusModal.lead.status === "contacted" ? (
+              <div style={{ marginTop: 12 }}>
+                <label style={{ fontWeight: 600 }}>Select Outcome</label>
+
+           <div className="status-chip-group">
+
+<button
+type="button"
+className={`status-chip ${statusModal.nextStatus === "req shared" ? "active" : ""}`}
+onClick={()=>setStatusModal(s=>({...s,nextStatus:"req shared"}))}
+>
+Req Shared
+</button>
+
+<button
+type="button"
+className={`status-chip followup ${statusModal.nextStatus === "followup" ? "active" : ""}`}
+onClick={()=>setStatusModal(s=>({...s,nextStatus:"followup"}))}
+>
+Follow-up
+</button>
+
+<button
+type="button"
+className={`status-chip lost ${statusModal.nextStatus === "lost" ? "active" : ""}`}
+onClick={()=>setStatusModal(s=>({...s,nextStatus:"lost"}))}
+>
+Lead Lost
+</button>
+
+</div>
+
+                {statusModal.nextStatus === "followup" && (
+                  <div style={{ marginTop: 10 }}>
+                    <label>Follow-up Date</label>
+                    <input
+                      type="date"
+                      className="cp-input"
+                      onChange={(e) =>
+                        setStatusModal(s => ({ ...s, followupDate: e.target.value }))
+                      }
+                    />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <p className="muted">
+                From <strong>{statusModal.lead.status}</strong> →
+                <strong>contacted</strong>
+              </p>
+            )}
 
             <div style={{ marginTop: 12 }}>
               <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>
@@ -1171,9 +1422,8 @@ const openWhatsApp = (phone) => {
                     <div className="label muted">Last Updated</div>
                     <div className="value">
                       {detailsLead.updatedAt
-                        ? `${fmtDate(detailsLead.updatedAt)} · ${
-                            detailsLead.updatedByName || detailsLead.updatedBy
-                          }`
+                        ? `${fmtDate(detailsLead.updatedAt)} · ${detailsLead.updatedByName || detailsLead.updatedBy
+                        }`
                         : "—"}
                     </div>
                   </div>

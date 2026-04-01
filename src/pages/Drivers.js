@@ -279,20 +279,26 @@ const handleEnter = (e) => {
 
   try {
 
-    const uid = driver.authUid || driver.uid || driver.id;
+    const uid = driver.authUid;
+const docId = driver.id;
 
-    await fetch(
-      "https://us-central1-medrent-5d771.cloudfunctions.net/deleteUser",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          uid
-        })
-      }
-    );
+const res = await fetch(
+  "https://us-central1-medrent-5d771.cloudfunctions.net/deleteUser",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      uid,
+      docId
+    })
+  }
+);
+
+if (!res.ok) {
+  throw new Error("Delete failed");
+}
 
     setDrivers(prev =>
       prev.filter(d => d.id !== driver.id)

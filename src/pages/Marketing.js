@@ -222,6 +222,9 @@ const emailExists = async (email) => {
 
   try {
 
+    const uid = user.authUid || user.uid;
+    const docId = user.id;
+
     const res = await fetch(
       "https://us-central1-medrent-5d771.cloudfunctions.net/deleteUser",
       {
@@ -230,14 +233,15 @@ const emailExists = async (email) => {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          uid: user.authUid || user.uid || user.id
+          uid,
+          docId
         })
       }
     );
 
-    const data = await res.json();
-
-    console.log("delete response", data);
+    if (!res.ok) {
+      throw new Error("Delete failed");
+    }
 
     setRows(prev => prev.filter(x => x.id !== user.id));
 

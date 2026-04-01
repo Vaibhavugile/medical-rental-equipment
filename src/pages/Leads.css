@@ -100,6 +100,7 @@ body {
   transition: all 0.25s ease;
 }
 
+
 .cp-btn.primary {
   background: linear-gradient(135deg, var(--primary), var(--primary-light));
   color: white;
@@ -108,6 +109,74 @@ body {
 
 .cp-btn.primary:hover {
   transform: translateY(-2px);
+}
+/* FOLLOWUP SUB FILTERS */
+.followup-subfilters{
+display:flex;
+align-items:center;
+gap:10px;
+margin-top:12px;
+flex-wrap:nowrap;
+}
+
+/* remove big width buttons */
+.followup-subfilters .seg-btn{
+padding:6px 14px;
+border-radius:999px;
+font-size:13px;
+font-weight:500;
+background:#f1f5f9;
+border:1px solid #e2e8f0;
+color:#334155;
+white-space:nowrap;
+width:auto; /* important */
+}
+
+/* active */
+.followup-subfilters .seg-btn.active{
+background:#2563eb;
+border-color:#2563eb;
+color:white;
+}
+
+/* overdue style */
+.followup-subfilters .seg-btn.overdue{
+color:#dc2626;
+}
+
+.followup-subfilters .seg-btn.overdue.active{
+background:#dc2626;
+border-color:#dc2626;
+color:white;
+}
+
+.sort-select{
+width:100%;
+max-width:420px;
+margin-top:12px;
+
+padding:10px 14px;
+
+border-radius:10px;
+border:1px solid #e2e8f0;
+
+background:white;
+
+font-size:14px;
+font-weight:500;
+color:#334155;
+
+transition:all .2s ease;
+}
+
+.sort-select:hover{
+border-color:#cbd5f5;
+}
+
+.sort-select:focus{
+outline:none;
+border-color:#2563eb;
+box-shadow:0 0 0 3px rgba(37,99,235,.15);
 }
 
 .cp-btn.ghost {
@@ -348,3 +417,48 @@ body {
 }
 
 
+.status-chip-group{
+display:flex;
+gap:12px;
+margin-top:12px;
+}
+
+.status-chip{
+padding:8px 18px;
+border-radius:999px;
+border:1px solid #d1d5db;
+
+background:#f8fafc;
+color:#374151;
+
+font-size:14px;
+font-weight:600;
+
+cursor:pointer;
+transition:all .2s ease;
+}
+
+/* hover */
+.status-chip:hover{
+background:#e2e8f0;
+border-color:#cbd5f5;
+}
+
+/* active chip */
+.status-chip.active{
+background:#2563eb;
+border-color:#2563eb;
+color:white;
+}
+
+/* followup chip color */
+.status-chip.followup.active{
+background:#0ea5e9;
+border-color:#0ea5e9;
+}
+
+/* lost chip color */
+.status-chip.lost.active{
+background:#dc2626;
+border-color:#dc2626;
+}
