@@ -218,16 +218,36 @@ async function generateRequirementNumber() {
   }, [requirement, templateRequirement, lead]);
 
   // Compute end date automatically
-  useEffect(() => {
-    if (form.expectedStartDate && form.expectedDurationDays) {
-      const start = new Date(form.expectedStartDate);
-      const end = new Date(start);
-      end.setDate(start.getDate() + Number(form.expectedDurationDays));
-      setForm((prev) => ({ ...prev, expectedEndDate: end.toISOString().slice(0, 10) }));
-    } else {
-      setForm((prev) => ({ ...prev, expectedEndDate: "" }));
+ useEffect(() => {
+  if (form.expectedStartDate && form.expectedEndDate) {
+    const start = new Date(form.expectedStartDate);
+    const end = new Date(form.expectedEndDate);
+
+    const diff =
+      Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+    if (diff > 0) {
+      setForm((prev) => ({
+        ...prev,
+        expectedDurationDays: diff,
+      }));
     }
-  }, [form.expectedStartDate, form.expectedDurationDays]);
+  }
+}, [form.expectedEndDate, form.expectedStartDate]);
+useEffect(() => {
+  if (form.expectedStartDate && form.expectedDurationDays) {
+    const start = new Date(form.expectedStartDate);
+    const end = new Date(start);
+
+    // inclusive day logic
+    end.setDate(start.getDate() + Number(form.expectedDurationDays) - 1);
+
+    setForm((prev) => ({
+      ...prev,
+      expectedEndDate: end.toISOString().slice(0, 10),
+    }));
+  }
+}, [form.expectedStartDate, form.expectedDurationDays]);
 
   // Autosave (only if already created)
   useEffect(() => {
@@ -490,12 +510,16 @@ React.createElement(
               })),
           }),
           React.createElement("label", null, "Expected End Date"),
-          React.createElement("input", {
-            className: "input",
-            type: "date",
-            value: form.expectedEndDate,
-            readOnly: true,
-          }),
+         React.createElement("input", {
+  className: "input",
+  type: "date",
+  value: form.expectedEndDate,
+  onChange: (e) =>
+    setForm((f) => ({
+      ...f,
+      expectedEndDate: e.target.value,
+    })),
+}),
           React.createElement("label", null, "Urgency"),
           React.createElement(
             "select",

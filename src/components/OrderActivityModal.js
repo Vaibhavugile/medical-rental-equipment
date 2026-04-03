@@ -3,7 +3,9 @@ import {
     doc,
     getDoc,
     collection,
-    getDocs
+    getDocs,
+    query,
+    where
 } from "firebase/firestore";
 
 import { db } from "../firebase";
@@ -20,8 +22,9 @@ export default function OrderActivityModal({ order, onClose }) {
     const [data, setData] = useState(null);
     const [payments, setPayments] = useState([]);
     const [extensions, setExtensions] = useState([]);
-const [refunds, setRefunds] = useState([]);
-const [stops, setStops] = useState([]);
+    const [refunds, setRefunds] = useState([]);
+    const [stops, setStops] = useState([]);
+    const [staffAssignments, setStaffAssignments] = useState([]);
     useEffect(() => {
         if (order) {
             console.log("Opening order modal:", order);
@@ -82,7 +85,7 @@ const [stops, setStops] = useState([]);
         setPayments([]);
         setExtensions([]);
         setRefunds([]);
-setStops([]);
+        setStops([]);
 
         try {
 
@@ -140,63 +143,63 @@ setStops([]);
    REFUNDS
 ================================ */
 
-let refundList = d.refunds || [];
+            let refundList = d.refunds || [];
 
-refundList.sort((a, b) => {
-  const da = new Date(a.createdAt || 0);
-  const db = new Date(b.createdAt || 0);
-  return db - da;
-});
+            refundList.sort((a, b) => {
+                const da = new Date(a.createdAt || 0);
+                const db = new Date(b.createdAt || 0);
+                return db - da;
+            });
 
-setRefunds(refundList);
-/* ===============================
-   STOP HISTORY (FROM ITEMS)
-================================ */
+            setRefunds(refundList);
+            /* ===============================
+               STOP HISTORY (FROM ITEMS)
+            ================================ */
 
-let stopList = [];
+            let stopList = [];
 
-/* EQUIPMENT */
-if (order.collection === "orders") {
-  resolvedItems.forEach((it) => {
-    (it.stopHistory || []).forEach(s => {
-      stopList.push({
-        ...s,
-        serviceName: it.name
-      });
-    });
-  });
-}
+            /* EQUIPMENT */
+            if (order.collection === "orders") {
+                resolvedItems.forEach((it) => {
+                    (it.stopHistory || []).forEach(s => {
+                        stopList.push({
+                            ...s,
+                            serviceName: it.name
+                        });
+                    });
+                });
+            }
 
-/* NURSING (handle both safely) */
-if (order.collection === "nursingOrders") {
+            /* NURSING (handle both safely) */
+            if (order.collection === "nursingOrders") {
 
-  // root-level
-  (d.stopHistory || []).forEach(s => {
-    stopList.push({
-      ...s,
-      serviceName: s.serviceName || "Service"
-    });
-  });
+                // root-level
+                (d.stopHistory || []).forEach(s => {
+                    stopList.push({
+                        ...s,
+                        serviceName: s.serviceName || "Service"
+                    });
+                });
 
-  // item-level fallback
-  resolvedItems.forEach((it) => {
-    (it.stopHistory || []).forEach(s => {
-      stopList.push({
-        ...s,
-        serviceName: it.name
-      });
-    });
-  });
+                // item-level fallback
+                resolvedItems.forEach((it) => {
+                    (it.stopHistory || []).forEach(s => {
+                        stopList.push({
+                            ...s,
+                            serviceName: it.name
+                        });
+                    });
+                });
 
-}
+            }
 
-stopList.sort((a, b) => {
-  const da = new Date(a.stoppedAt || 0);
-  const db = new Date(b.stoppedAt || 0);
-  return db - da;
-});
+            stopList.sort((a, b) => {
+                const da = new Date(a.stoppedAt || 0);
+                const db = new Date(b.stoppedAt || 0);
+                return db - da;
+            });
 
-setStops(stopList);
+            setStops(stopList);
 
             /* ===============================
             EXTENSIONS
@@ -263,6 +266,34 @@ setStops(stopList);
 
             setPayments(payList);
 
+/* ===============================
+STAFF ASSIGNMENTS
+================================ */
+
+try {
+
+  const q = query(
+    collection(db, "staffAssignments"),
+    where("orderId", "==", order.id)
+  );
+
+  const snap = await getDocs(q);
+
+  const list = snap.docs.map(d => ({
+    id: d.id,
+    ...d.data()
+  }));
+
+  console.log("Staff assignments loaded:", list);
+
+  setStaffAssignments(list);
+
+} catch (err) {
+
+  console.error("Staff assignment load error:", err);
+
+}
+
         } catch (err) {
 
             console.error("Order load error:", err);
@@ -304,13 +335,31 @@ setStops(stopList);
     const totalAmount = data?.totals?.total || 0;
 
     const refundPaid = refunds.reduce(
-  (s, r) => s + Number(r.paidAmount || 0),
+        (s, r) => s + Number(r.paidAmount || 0),
+        0
+    );
+
+    const netPaid = totalPaid - refundPaid;
+
+    const balance = totalAmount - netPaid;
+    /* ===============================
+STAFF SALARY TOTALS
+================================ */
+
+const totalSalary = staffAssignments.reduce(
+  (s, a) => s + Number(a.amount || 0),
   0
 );
 
-const netPaid = totalPaid - refundPaid;
+const paidSalary = staffAssignments.reduce(
+  (s, a) => s + Number(a.paidAmount || 0),
+  0
+);
 
-const balance = totalAmount - netPaid;
+const pendingSalary = staffAssignments.reduce(
+  (s, a) => s + Number(a.balanceAmount || 0),
+  0
+);
 
     /* ===============================
     UI
@@ -377,6 +426,11 @@ const balance = totalAmount - netPaid;
                                         {it.name || it.productId || "Unknown Product"}
                                     </div>
 
+                                    <div className="muted">
+                                        Qty: {it.qty || 1}
+                                    </div>
+
+
                                     <div>
                                         {it.expectedStartDate} → {it.expectedEndDate}
                                     </div>
@@ -436,47 +490,47 @@ const balance = totalAmount - netPaid;
                         </div>
                         <div className="section">
 
-  <h3>Service Stop History</h3>
+                            <h3>Service Stop History</h3>
 
-  {stops.length === 0 && <div>No stops</div>}
+                            {stops.length === 0 && <div>No stops</div>}
 
-  {stops.map((s, i) => (
+                            {stops.map((s, i) => (
 
-    <div key={i} className="history-item">
+                                <div key={i} className="history-item">
 
-      <div className="history-main">
+                                    <div className="history-main">
 
-        <div>
-          <strong>{s.serviceName}</strong>
-        </div>
+                                        <div>
+                                            <strong>{s.serviceName}</strong>
+                                        </div>
 
-        <div>
-          {s.oldEndDate} → {s.newEndDate}
-        </div>
+                                        <div>
+                                            {s.oldEndDate} → {s.newEndDate}
+                                        </div>
 
-        <div className="muted">
-          ₹{s.oldAmount} → ₹{s.newAmount}
-        </div>
+                                        <div className="muted">
+                                            ₹{s.oldAmount} → ₹{s.newAmount}
+                                        </div>
 
-      </div>
+                                    </div>
 
-      <div className="history-meta">
+                                    <div className="history-meta">
 
-        <div className="muted">
-          {fmt(s.stoppedAt)}
-        </div>
+                                        <div className="muted">
+                                            {fmt(s.stoppedAt)}
+                                        </div>
 
-        <div className="muted small">
-          Loss: ₹{(s.oldAmount || 0) - (s.newAmount || 0)}
-        </div>
+                                        <div className="muted small">
+                                            Loss: ₹{(s.oldAmount || 0) - (s.newAmount || 0)}
+                                        </div>
 
-      </div>
+                                    </div>
 
-    </div>
+                                </div>
 
-  ))}
+                            ))}
 
-</div>
+                        </div>
 
                         {/* PAYMENTS */}
 
@@ -523,77 +577,163 @@ const balance = totalAmount - netPaid;
                         </div>
                         <div className="section">
 
-  <h3>Refund History</h3>
+                            <h3>Refund History</h3>
 
-  {refunds.length === 0 && <div>No refunds</div>}
+                            {refunds.length === 0 && <div>No refunds</div>}
 
-  {refunds.map((r, i) => {
+                            {refunds.map((r, i) => {
 
-    const remaining =
-      (r.amount || 0) - (r.paidAmount || 0);
+                                const remaining =
+                                    (r.amount || 0) - (r.paidAmount || 0);
 
-    return (
+                                return (
 
-      <div key={i} className="history-item">
+                                    <div key={i} className="history-item">
 
-        <div className="history-main">
+                                        <div className="history-main">
 
-          <div className="amount">
-            ₹{r.paidAmount || 0} / ₹{r.amount}
-          </div>
+                                            <div className="amount">
+                                                ₹{r.paidAmount || 0} / ₹{r.amount}
+                                            </div>
 
-          <div className={`badge ${r.status}`}>
-            {r.status}
-          </div>
+                                            <div className={`badge ${r.status}`}>
+                                                {r.status}
+                                            </div>
 
-        </div>
+                                        </div>
 
-        <div className="history-meta">
+                                        <div className="history-meta">
 
-          <div className="muted">
-            Created: {fmt(r.createdAt)}
-          </div>
+                                            <div className="muted">
+                                                Created: {fmt(r.createdAt)}
+                                            </div>
 
-          <div className="muted">
-            Remaining: ₹{remaining}
-          </div>
+                                            <div className="muted">
+                                                Remaining: ₹{remaining}
+                                            </div>
 
-          {/* REFUND PAYMENTS */}
-          {(r.payments || []).length > 0 && (
+                                            {/* REFUND PAYMENTS */}
+                                            {(r.payments || []).length > 0 && (
 
-            <div style={{ marginTop: 6 }}>
+                                                <div style={{ marginTop: 6 }}>
 
-              {(r.payments || []).map((p, idx) => (
+                                                    {(r.payments || []).map((p, idx) => (
 
-                <div key={idx} className="mini-history">
+                                                        <div key={idx} className="mini-history">
 
-                  <div>₹{p.amount}</div>
+                                                            <div>₹{p.amount}</div>
 
-                  <div className="muted">
-                    {p.method} • {fmt(p.date)}
-                  </div>
+                                                            <div className="muted">
+                                                                {p.method} • {fmt(p.date)}
+                                                            </div>
 
-                  {p.note && (
-                    <div className="muted small">
-                      {p.note}
-                    </div>
-                  )}
+                                                            {p.note && (
+                                                                <div className="muted small">
+                                                                    {p.note}
+                                                                </div>
+                                                            )}
 
-                </div>
+                                                        </div>
 
-              ))}
+                                                    ))}
 
+                                                </div>
+
+                                            )}
+
+                                        </div>
+
+                                    </div>
+
+                                );
+
+                            })}
+
+                        </div>
+                        {/* STAFF SALARY */}
+
+<div className="section">
+
+  <h3>Staff Salary</h3>
+
+  {staffAssignments.length === 0 && (
+    <div>No staff assigned</div>
+  )}
+
+  {staffAssignments.map((a,i)=>(
+
+  <div key={i} className="history-item">
+
+    <div className="history-main">
+
+      <div>
+        <strong>{a.staffName}</strong>
+      </div>
+
+      <div className="muted">
+        {a.role} • {a.shift}
+      </div>
+
+    </div>
+
+    <div className="history-meta">
+
+      <div>Total: ₹{a.amount}</div>
+
+      <div className="muted">
+        Paid: ₹{a.paidAmount || 0}
+      </div>
+
+      <div className="muted">
+        Pending: ₹{a.balanceAmount || 0}
+      </div>
+
+    </div>
+
+    {/* STAFF PAYMENT HISTORY */}
+
+    {(a.payments || []).length > 0 && (
+
+      <div style={{marginTop:8}}>
+
+        {(a.payments || []).map((p,idx)=>(
+
+          <div key={idx} className="mini-history">
+
+            <div>₹{p.amount}</div>
+
+            <div className="muted">
+              {fmt(p.date)}
             </div>
 
-          )}
+          </div>
 
-        </div>
+        ))}
 
       </div>
 
-    );
+    )}
 
-  })}
+  </div>
+
+))}
+
+  <hr/>
+
+  <div className="total-row">
+    <span>Total Salary</span>
+    <span>₹{totalSalary}</span>
+  </div>
+
+  <div className="total-row">
+    <span>Paid Salary</span>
+    <span>₹{paidSalary}</span>
+  </div>
+
+  <div className="total-row balance">
+    <span>Pending Salary</span>
+    <span>₹{pendingSalary}</span>
+  </div>
 
 </div>
 
@@ -620,27 +760,27 @@ const balance = totalAmount - netPaid;
 
                             <hr />
 
-                           <div className="total-row">
-    <span>Total Paid</span>
-    <span>₹{totalPaid}</span>
-</div>
+                            <div className="total-row">
+                                <span>Total Paid</span>
+                                <span>₹{totalPaid}</span>
+                            </div>
 
-<div className="total-row" style={{ color: "#b91c1c" }}>
-    <span>Refund Paid</span>
-    <span>- ₹{refundPaid}</span>
-</div>
+                            <div className="total-row" style={{ color: "#b91c1c" }}>
+                                <span>Refund Paid</span>
+                                <span>- ₹{refundPaid}</span>
+                            </div>
 
-<hr />
+                            <hr />
 
-<div className="total-row">
-    <span>Net Paid</span>
-    <span>₹{netPaid}</span>
-</div>
+                            <div className="total-row">
+                                <span>Net Paid</span>
+                                <span>₹{netPaid}</span>
+                            </div>
 
-<div className="total-row balance">
-    <span>Balance</span>
-    <span>₹{balance}</span>
-</div>
+                            <div className="total-row balance">
+                                <span>Balance</span>
+                                <span>₹{balance}</span>
+                            </div>
 
                         </div>
 
