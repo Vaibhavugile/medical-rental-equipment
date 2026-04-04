@@ -788,7 +788,7 @@ const toggleSelectCompany = (companyAssets) => {
             <div className="cp-form-head">
               <h2>Product — {selectedProduct.name}</h2>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <button className="cp-btn" onClick={async () => {
+                {/* <button className="cp-btn" onClick={async () => {
                   const pid = selectedProduct.id;
                   try {
                     await updateDoc(doc(db, "products", pid), {
@@ -798,7 +798,7 @@ const toggleSelectCompany = (companyAssets) => {
                     });
                     showToast("Product counts synced", "success");
                   } catch (e) { setError(e.message || "Failed to sync product"); }
-                }}>Sync product</button>
+                }}>Sync product</button> */}
                 <button type="button" className="cp-icon" onClick={() => setSelectedProduct(null)}>✕</button>
               </div>
             </div>
@@ -1208,112 +1208,206 @@ const toggleSelectCompany = (companyAssets) => {
       )}
 
       {/* Asset details modal */}
-      {assetDetailsOpen && assetDetails && (
-        <div className="cp-modal" onClick={() => setAssetDetailsOpen(false)}>
-          <div className="cp-modal-card" onClick={(e) => e.stopPropagation()}>
-            <h3>Asset details — {assetDetails.assetId}</h3>
-            <div className="muted" style={{ marginTop: 6 }}>
-              Product: {assetDetails.productId} · Branch: {(branches.find(b => b.id === assetDetails.branchId) || {}).name || assetDetails.branchId || "—"}
-            </div>
+     {assetDetailsOpen && assetDetails && (
+  <div className="asset-modal-overlay" onClick={() => setAssetDetailsOpen(false)}>
+    <div className="asset-modal-card" onClick={(e) => e.stopPropagation()}>
 
-            <div style={{ marginTop: 12 }}>
-              <h4 style={{ marginBottom: 8 }}>Metadata</h4>
-              <div className="muted">
-                {assetDetails.metadata && <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(assetDetails.metadata, null, 2)}</pre>}
-              </div>
-              {assetDetails.qrUrl && (
-                <div style={{ marginTop: 12 }}>
-                  <h4 style={{ marginBottom: 8 }}>QR Code</h4>
-                  <img
-                    src={assetDetails.qrUrl}
-                    alt={`QR for ${assetDetails.assetId}`}
-                    style={{ width: 180, height: 180 }}
-                  />
-                  <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>
-                    Scans to: assetId “{assetDetails.assetId}”
-                  </div>
-                </div>
-              )}
+      <h3 className="asset-modal-title">
+        Asset Details — {assetDetails.assetId}
+      </h3>
 
-              {/* History */}
-              <h4 style={{ marginTop: 12, marginBottom: 8 }}>History</h4>
+      <div className="asset-modal-subtitle">
+        Product: {assetDetails.productId} · Branch: {
+          (branches.find(b => b.id === assetDetails.branchId) || {}).name
+          || assetDetails.branchId || "—"
+        }
+      </div>
 
-              {Array.isArray(assetDetails.history) && assetDetails.history.length > 0 ? (
-                <div className="history-wrap">
-                  <table className="history-table">
-                    <thead>
-                      <tr>
-                        <th style={{ width: 180 }}>When</th>
-                        <th style={{ width: 180 }}>By</th>
-                        <th style={{ width: 140 }}>Event</th>
-                        <th>Note</th>
-                        <th style={{ width: 120, textAlign: "right" }}>Data</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {assetDetails.history
-                        .slice()
-                        .sort((a, b) => {
-                          const ta = a?.ts?.seconds ? a.ts.seconds * 1000 : Date.parse(a?.ts || 0);
-                          const tb = b?.ts?.seconds ? b.ts.seconds * 1000 : Date.parse(b?.ts || 0);
-                          return tb - ta; // newest first
-                        })
-                        .map((h, i) => {
-                          const ts = h?.ts?.seconds
-                            ? new Date(h.ts.seconds * 1000)
-                            : (h?.ts ? new Date(h.ts) : null);
-                          const when = ts && !Number.isNaN(ts.getTime())
-                            ? ts.toLocaleString()
-                            : "—";
 
-                          const by =
-                            h.byName || h.changedByName || h.by || h.changedBy || "system";
+      {/* METADATA */}
+      <div className="asset-section">
 
-                          const type =
-                            h.type || h.changeType || h.event || h.status || "update";
+        <h4 className="asset-section-title">Metadata</h4>
 
-                          const hasData = h.data && Object.keys(h.data).length > 0;
+        {assetDetails.metadata ? (
+          <div className="asset-json-table-wrap">
 
-                          return (
-                            <tr key={i}>
-                              <td className="muted">{when}</td>
-                              <td className="muted">{by}</td>
-                              <td>
-                                <span className={`ev ev-${String(type).toLowerCase()}`}>
-                                  {String(type).replace(/_/g, " ")}
-                                </span>
-                              </td>
-                              <td>{h.note || "—"}</td>
-                              <td style={{ textAlign: "right" }}>
-                                {hasData ? (
-                                  <details>
-                                    <summary className="history-view-json">View</summary>
-                                    <pre className="history-json">
-                                      {JSON.stringify(h.data, null, 2)}
-                                    </pre>
-                                  </details>
-                                ) : (
-                                  <span className="muted">—</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="muted">No history recorded for this asset.</div>
-              )}
+            <table className="asset-json-table">
+              <tbody>
 
-            </div>
+                {Object.entries(assetDetails.metadata).map(([key, value]) => (
 
-            <div className="cp-form-actions" style={{ marginTop: 12 }}>
-              <button className="cp-btn ghost" onClick={() => setAssetDetailsOpen(false)}>Close</button>
-            </div>
+                  <tr key={key}>
+                    <td className="asset-json-key">{key}</td>
+
+                    <td className="asset-json-value">
+                      {typeof value === "object"
+                        ? JSON.stringify(value)
+                        : String(value)}
+                    </td>
+                  </tr>
+
+                ))}
+
+              </tbody>
+            </table>
+
           </div>
+        ) : (
+          <div className="asset-muted">No metadata available</div>
+        )}
+
+      </div>
+
+
+      {/* QR */}
+      {assetDetails.qrUrl && (
+        <div className="asset-section">
+
+          <h4 className="asset-section-title">QR Code</h4>
+
+          <img
+            src={assetDetails.qrUrl}
+            alt={`QR for ${assetDetails.assetId}`}
+            className="asset-qr-image"
+          />
+
+          <div className="asset-muted small">
+            Scans to: assetId "{assetDetails.assetId}"
+          </div>
+
         </div>
       )}
+
+
+      {/* HISTORY */}
+      <div className="asset-section">
+
+        <h4 className="asset-section-title">History</h4>
+
+        {Array.isArray(assetDetails.history) && assetDetails.history.length > 0 ? (
+
+          <div className="asset-history-wrap">
+
+            <table className="asset-history-table">
+
+              <thead>
+                <tr>
+                  <th>When</th>
+                  <th>Event</th>
+                  <th>Customer</th>
+                  <th>From</th>
+                  <th>To</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+
+              <tbody>
+
+                {assetDetails.history
+                  .slice()
+                  .sort((a, b) => {
+
+                    const ta = a?.ts?.seconds
+                      ? a.ts.seconds * 1000
+                      : Date.parse(a?.ts || 0);
+
+                    const tb = b?.ts?.seconds
+                      ? b.ts.seconds * 1000
+                      : Date.parse(b?.ts || 0);
+
+                    return tb - ta;
+
+                  })
+                  .map((h, i) => {
+
+                    const ts = h?.ts?.seconds
+                      ? new Date(h.ts.seconds * 1000)
+                      : (h?.ts ? new Date(h.ts) : null);
+
+                    const when = ts && !Number.isNaN(ts.getTime())
+                      ? ts.toLocaleString()
+                      : "—";
+
+                    const type =
+                      h.type || h.changeType ||
+                      h.event || h.status || "update";
+
+                    const data = h.data || {};
+
+                    return (
+
+                      <tr key={i}>
+
+                        <td className="asset-muted">
+                          {when}
+                        </td>
+
+                        <td>
+                          <span className={`asset-ev asset-ev-${type}`}>
+                            {String(type).replace(/_/g, " ")}
+                          </span>
+                        </td>
+
+                        <td>
+                          {data.customer || "—"}
+                        </td>
+
+                        <td>
+                          {data.from
+                            ? new Date(data.from).toLocaleDateString()
+                            : "—"}
+                        </td>
+
+                        <td>
+                          {data.to
+                            ? new Date(data.to).toLocaleDateString()
+                            : "—"}
+                        </td>
+
+                        
+                        <td>
+                          {h.note || "—"}
+                        </td>
+
+                      </tr>
+
+                    );
+
+                  })}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        ) : (
+
+          <div className="asset-muted">
+            No history recorded for this asset.
+          </div>
+
+        )}
+
+      </div>
+
+
+      {/* ACTIONS */}
+      <div className="asset-modal-actions">
+
+        <button
+          className="asset-btn asset-btn-ghost"
+          onClick={() => setAssetDetailsOpen(false)}
+        >
+          Close
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+)}
 
       {/* Add / Edit Product modal */}
       {productModalOpen && (

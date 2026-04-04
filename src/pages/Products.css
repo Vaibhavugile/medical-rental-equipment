@@ -191,3 +191,167 @@
 .cp-drawer .history-table tbody tr:hover {
   background: #f9fafb !important;
 }
+.asset-modal-overlay{
+position:fixed;
+inset:0;
+background:rgba(0,0,0,0.45);
+display:flex;
+align-items:center;
+justify-content:center;
+z-index:1000000 !important;
+padding:20px;
+}
+
+.asset-modal-card{
+width:100%;
+max-width:1000px;
+max-height:90vh;
+overflow:auto;
+background:#fff;
+border-radius:14px;
+padding:24px;
+box-shadow:0 10px 30px rgba(0,0,0,0.15);
+}
+
+.asset-modal-title{
+font-size:20px;
+font-weight:700;
+}
+
+.asset-modal-subtitle{
+color:#6b7280;
+font-size:13px;
+margin-top:6px;
+}
+
+.asset-section{
+margin-top:18px;
+}
+
+.asset-section-title{
+font-size:15px;
+font-weight:600;
+margin-bottom:8px;
+}
+
+.asset-muted{
+color:#6b7280;
+font-size:13px;
+}
+
+.asset-muted.small{
+font-size:12px;
+}
+
+.asset-qr-image{
+width:180px;
+height:180px;
+border-radius:8px;
+border:1px solid #e5e7eb;
+padding:6px;
+background:#fff;
+}
+
+/* JSON TABLE */
+
+.asset-json-table-wrap{
+border:1px solid #e5e7eb;
+border-radius:10px;
+overflow:auto;
+}
+
+.asset-json-table{
+width:100%;
+border-collapse:collapse;
+font-size:13px;
+}
+
+.asset-json-table td{
+padding:8px 10px;
+border-bottom:1px solid #f1f5f9;
+}
+
+.asset-json-key{
+font-weight:600;
+background:#f9fafb;
+width:180px;
+}
+
+.asset-json-value{
+word-break:break-word;
+}
+
+/* HISTORY */
+
+.asset-history-wrap{
+border:1px solid #e5e7eb;
+border-radius:10px;
+overflow:auto;
+max-height:360px;
+}
+
+.asset-history-table{
+width:100%;
+border-collapse:collapse;
+font-size:13px;
+}
+
+.asset-history-table th{
+text-align:left;
+padding:10px;
+background:#f3f4f6;
+color: #111827;
+}
+
+.asset-history-table td{
+padding:9px;
+border-bottom:1px solid #f1f5f9;
+}
+
+.asset-history-table tbody tr:hover{
+background:#f9fafb;
+}
+
+/* EVENT BADGES */
+
+.asset-ev{
+padding:4px 8px;
+border-radius:6px;
+font-size:11px;
+font-weight:600;
+text-transform:capitalize;
+background:#e0e7ff;
+color:#3730a3;
+}
+
+/* BUTTONS */
+
+.asset-modal-actions{
+display:flex;
+justify-content:flex-end;
+margin-top:20px;
+}
+
+.asset-btn{
+padding:7px 14px;
+border-radius:8px;
+font-size:13px;
+font-weight:600;
+cursor:pointer;
+border:none;
+}
+
+.asset-btn-ghost{
+background:#e5e7eb;
+color: #111827;
+}
+
+.asset-btn-ghost:hover{
+background:#d1d5db;
+}
+
+.asset-view-json{
+font-size:12px;
+color:#2563eb;
+cursor:pointer;
+}
