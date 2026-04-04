@@ -112,7 +112,19 @@ const [staffSearch, setStaffSearch] = useState("");
 
     setIsEditingCustomer(true);
   };
+  const mergeDateKeepTime = (oldDateTime, newDate) => {
+  const old = new Date(oldDateTime);
+  const newD = new Date(newDate);
 
+  newD.setHours(
+    old.getHours(),
+    old.getMinutes(),
+    old.getSeconds(),
+    0
+  );
+
+  return formatDateTimeLocal(newD);
+};
   const cancelEditingCustomer = () => {
     setIsEditingCustomer(false);
     setCustomerDraft(null);
@@ -4369,16 +4381,21 @@ const [staffSearch, setStaffSearch] = useState("");
             <label>Stop Date / Time</label>
 
             <input
-              type="datetime-local"
-              className="nod-input"
-              value={stopFullModal.stopDate}
-              onChange={(e) =>
-                setStopFullModal((p) => ({
-                  ...p,
-                  stopDate: e.target.value,
-                }))
-              }
-            />
+  type="date"
+  className="nod-input"
+  value={stopFullModal.stopDate?.split("T")[0] || ""}
+  onChange={(e) => {
+    const merged = mergeDateKeepTime(
+      stopFullModal.stopDate,
+      e.target.value
+    );
+
+    setStopFullModal({
+      ...stopFullModal,
+      stopDate: merged
+    });
+  }}
+/>
 
             {/* 🔥 PREVIEW */}
             {stopPreview && (

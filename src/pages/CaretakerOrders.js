@@ -414,30 +414,7 @@ const refundPendingCount = serviceRanges.filter((o) => {
 >
   + Add Caretaker Order
 </button>  </div>
-<div className="service-filter">
 
-  <button
-    className={`service-filter-btn ${serviceFilter === "all" ? "is-active" : ""}`}
-    onClick={() => setServiceFilter("all")}
-  >
-    All <span className="filter-count">{allCount}</span>
-  </button>
-
-  <button
-    className={`service-filter-btn ${serviceFilter === "nursing" ? "is-active" : ""}`}
-    onClick={() => setServiceFilter("nursing")}
-  >
-    Nursing <span className="filter-count">{nursingCount}</span>
-  </button>
-
-  <button
-    className={`service-filter-btn ${serviceFilter === "caretaker" ? "is-active" : ""}`}
-    onClick={() => setServiceFilter("caretaker")}
-  >
-    Caretaker <span className="filter-count">{caretakerCount}</span>
-  </button>
-
-</div>
 
   <div className="no-filters">
     <div className="no-filter-row-1">
