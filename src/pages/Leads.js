@@ -479,21 +479,16 @@ export default function Leads() {
 
   // ---------- Status modal helpers ----------
   const openStatusModal = (lead) => {
-    const cur = lead.status || "new";
 
-    let next = "contacted";
+  setStatusModal({
+    open: true,
+    lead,
+    nextStatus: "",
+    note: "",
+    followupDate: ""
+  });
 
-    if (cur === "new") next = "contacted";
-    else if (cur === "contacted") next = ""; // user must choose
-
-    setStatusModal({
-      open: true,
-      lead,
-      nextStatus: next,
-      note: "",
-      followupDate: ""
-    });
-  };
+};
   const closeStatusModal = () =>
     setStatusModal({ open: false, lead: null, nextStatus: null, note: "" });
 
@@ -1260,85 +1255,137 @@ export default function Leads() {
           }}
         >
           <div className="cp-modal-card">
-            <h3>Change status for “{statusModal.lead.customerName}”</h3>
-            {statusModal.lead.status === "contacted" ? (
-              <div style={{ marginTop: 12 }}>
-                <label style={{ fontWeight: 600 }}>Select Outcome</label>
 
-           <div className="status-chip-group">
+  <h3>Change status for “{statusModal.lead.customerName}”</h3>
 
-<button
-type="button"
-className={`status-chip ${statusModal.nextStatus === "req shared" ? "active" : ""}`}
-onClick={()=>setStatusModal(s=>({...s,nextStatus:"req shared"}))}
->
-Req Shared
-</button>
+  <div style={{ marginTop: 14 }}>
 
-<button
-type="button"
-className={`status-chip followup ${statusModal.nextStatus === "followup" ? "active" : ""}`}
-onClick={()=>setStatusModal(s=>({...s,nextStatus:"followup"}))}
->
-Follow-up
-</button>
+    <label style={{ fontWeight: 600 }}>Select Outcome</label>
 
-<button
-type="button"
-className={`status-chip lost ${statusModal.nextStatus === "lost" ? "active" : ""}`}
-onClick={()=>setStatusModal(s=>({...s,nextStatus:"lost"}))}
->
-Lead Lost
-</button>
+    <div className="status-chip-group">
+
+      {/* CONTACTED */}
+      <button
+        type="button"
+        className={`status-chip ${
+          statusModal.nextStatus === "contacted" ? "active" : ""
+        }`}
+        onClick={() =>
+          setStatusModal((s) => ({ ...s, nextStatus: "contacted" }))
+        }
+      >
+        Contacted
+      </button>
+
+      {/* REQ SHARED */}
+      <button
+        type="button"
+        className={`status-chip ${
+          statusModal.nextStatus === "req shared" ? "active" : ""
+        }`}
+        onClick={() =>
+          setStatusModal((s) => ({ ...s, nextStatus: "req shared" }))
+        }
+      >
+        Req Shared
+      </button>
+
+      {/* FOLLOWUP */}
+      <button
+        type="button"
+        className={`status-chip followup ${
+          statusModal.nextStatus === "followup" ? "active" : ""
+        }`}
+        onClick={() =>
+          setStatusModal((s) => ({ ...s, nextStatus: "followup" }))
+        }
+      >
+        Follow-up
+      </button>
+
+      {/* LOST */}
+      <button
+        type="button"
+        className={`status-chip lost ${
+          statusModal.nextStatus === "lost" ? "active" : ""
+        }`}
+        onClick={() =>
+          setStatusModal((s) => ({ ...s, nextStatus: "lost" }))
+        }
+      >
+        Lead Lost
+      </button>
+
+    </div>
+
+  </div>
+
+  {/* FOLLOWUP DATE */}
+
+  {statusModal.nextStatus === "followup" && (
+    <div style={{ marginTop: 14 }}>
+      <label style={{ fontWeight: 600 }}>Follow-up Date</label>
+
+      <input
+        type="date"
+        className="cp-input"
+        value={statusModal.followupDate || ""}
+        onChange={(e) =>
+          setStatusModal((s) => ({
+            ...s,
+            followupDate: e.target.value,
+          }))
+        }
+      />
+    </div>
+  )}
+
+  {/* NOTE */}
+
+  <div style={{ marginTop: 16 }}>
+    <label
+      style={{
+        display: "block",
+        fontWeight: 600,
+        marginBottom: 6,
+      }}
+    >
+      Note / Reason
+    </label>
+
+    <textarea
+      value={statusModal.note}
+      onChange={(e) =>
+        setStatusModal((s) => ({ ...s, note: e.target.value }))
+      }
+      rows={4}
+      className="cp-input"
+      placeholder="Enter a note explaining the status change (required)"
+    />
+  </div>
+
+  {/* ACTIONS */}
+
+  <div className="cp-form-actions" style={{ marginTop: 16 }}>
+
+    <button
+      className="cp-btn ghost"
+      onClick={closeStatusModal}
+    >
+      Cancel
+    </button>
+
+    <button
+      className="cp-btn primary"
+      onClick={confirmStatusChange}
+      disabled={!statusModal.nextStatus || !statusModal.note.trim()}
+    >
+      Confirm
+    </button>
+
+  </div>
 
 </div>
-
-                {statusModal.nextStatus === "followup" && (
-                  <div style={{ marginTop: 10 }}>
-                    <label>Follow-up Date</label>
-                    <input
-                      type="date"
-                      className="cp-input"
-                      onChange={(e) =>
-                        setStatusModal(s => ({ ...s, followupDate: e.target.value }))
-                      }
-                    />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="muted">
-                From <strong>{statusModal.lead.status}</strong> →
-                <strong>contacted</strong>
-              </p>
-            )}
-
-            <div style={{ marginTop: 12 }}>
-              <label style={{ display: "block", fontWeight: 600, marginBottom: 6 }}>
-                Note / Reason
-              </label>
-              <textarea
-                value={statusModal.note}
-                onChange={(e) => setStatusModal((s) => ({ ...s, note: e.target.value }))}
-                rows={4}
-                className="cp-input"
-                placeholder="Enter a note explaining the status change (required)"
-              ></textarea>
-            </div>
-
-            <div className="cp-form-actions" style={{ marginTop: 12 }}>
-              <button className="cp-btn ghost" onClick={closeStatusModal}>
-                Cancel
-              </button>
-              <button
-                className="cp-btn primary"
-                onClick={confirmStatusChange}
-                disabled={!statusModal.note.trim()}
-              >
-                Confirm
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
