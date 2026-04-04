@@ -30,7 +30,7 @@ export default function NursingOrderDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-const [staffSearch, setStaffSearch] = useState("");
+  const [staffSearch, setStaffSearch] = useState("");
   const params = new URLSearchParams(location.search);
   const isDeleted = params.get("deleted") === "true";
   const [order, setOrder] = useState(null);
@@ -81,7 +81,9 @@ const [staffSearch, setStaffSearch] = useState("");
     open: false,
     serviceIndex: null,
     endDate: "",
-    amount: ""
+    rate: "",
+    extraDays: 0,
+    amount: 0
   });
   const [salaryRequestModal, setSalaryRequestModal] = useState({
     open: false,
@@ -113,21 +115,38 @@ const [staffSearch, setStaffSearch] = useState("");
     setIsEditingCustomer(true);
   };
   const mergeDateKeepTime = (oldDateTime, newDate) => {
-  const old = new Date(oldDateTime);
-  const newD = new Date(newDate);
+    const old = new Date(oldDateTime);
+    const newD = new Date(newDate);
 
-  newD.setHours(
-    old.getHours(),
-    old.getMinutes(),
-    old.getSeconds(),
-    0
-  );
+    newD.setHours(
+      old.getHours(),
+      old.getMinutes(),
+      old.getSeconds(),
+      0
+    );
 
-  return formatDateTimeLocal(newD);
-};
+    return formatDateTimeLocal(newD);
+  };
   const cancelEditingCustomer = () => {
     setIsEditingCustomer(false);
     setCustomerDraft(null);
+  };
+  const calculateExtension = (serviceIndex, newEndDate, rate) => {
+
+    const service = editableItems[serviceIndex];
+
+    const oldEnd = new Date(service.expectedEndDate);
+    const newEnd = new Date(newEndDate);
+
+    const extraDays = Math.max(
+      0,
+      Math.floor((newEnd - oldEnd) / (1000 * 60 * 60 * 24))
+    );
+
+    const amount = extraDays * rate;
+
+    return { extraDays, amount };
+
   };
 
   const validateCustomer = () => {
@@ -185,18 +204,39 @@ const [staffSearch, setStaffSearch] = useState("");
       alert("Failed to update customer");
     }
   };
-  const openExtendServiceModal = (serviceIndex) => {
+const openExtendServiceModal = (serviceIndex) => {
 
-    const service = editableItems?.[serviceIndex];
+  const service = editableItems?.[serviceIndex];
 
-    setExtendServiceModal({
-      open: true,
-      serviceIndex,
-      endDate: formatDateTimeLocal(service?.expectedEndDate),
-      amount: ""
-    });
+  let rate = 0;
 
-  };
+  /* IF EXTENSION ALREADY DONE */
+  if (service?.lastExtensionRate) {
+
+    rate = service.lastExtensionRate;
+
+  } else {
+
+    const start = new Date(service.expectedStartDate);
+    const end = new Date(service.expectedEndDate);
+
+    const totalDays =
+      Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+
+    rate = service.amount / totalDays;
+
+  }
+
+  setExtendServiceModal({
+    open: true,
+    serviceIndex,
+    endDate: formatDateTimeLocal(service.expectedEndDate),
+    rate: Math.round(rate),
+    extraDays: 0,
+    amount: 0
+  });
+
+};
   const formatDateTimeLocal = (value) => {
     if (!value) return "";
 
@@ -325,46 +365,46 @@ const [staffSearch, setStaffSearch] = useState("");
     startDate: "",
     endDate: ""
   });
- const filteredStaff = staffList.filter((s) => {
+  const filteredStaff = staffList.filter((s) => {
 
-  if (
-    staffFilters.staffType !== "all" &&
-    s.staffType !== staffFilters.staffType
-  ) {
-    return false;
-  }
+    if (
+      staffFilters.staffType !== "all" &&
+      s.staffType !== staffFilters.staffType
+    ) {
+      return false;
+    }
 
-  if (
-    staffFilters.shiftType !== "all" &&
-    s.shiftType !== staffFilters.shiftType
-  ) {
-    return false;
-  }
+    if (
+      staffFilters.shiftType !== "all" &&
+      s.shiftType !== staffFilters.shiftType
+    ) {
+      return false;
+    }
 
-  if (
-    staffFilters.rateType !== "all" &&
-    s.rateType !== staffFilters.rateType
-  ) {
-    return false;
-  }
+    if (
+      staffFilters.rateType !== "all" &&
+      s.rateType !== staffFilters.rateType
+    ) {
+      return false;
+    }
 
-  if (staffSearch) {
-    const q = staffSearch.toLowerCase();
+    if (staffSearch) {
+      const q = staffSearch.toLowerCase();
 
-    const text = [
-      s.name,
-      s.phone,
-      s.staffType,
-      ...(s.servicesOffered || [])
-    ]
-      .join(" ")
-      .toLowerCase();
+      const text = [
+        s.name,
+        s.phone,
+        s.staffType,
+        ...(s.servicesOffered || [])
+      ]
+        .join(" ")
+        .toLowerCase();
 
-    if (!text.includes(q)) return false;
-  }
+      if (!text.includes(q)) return false;
+    }
 
-  return true;
-});
+    return true;
+  });
 
   const displayUser = (uid, name) =>
     uid === auth.currentUser?.uid ? "You" : name;
@@ -1365,10 +1405,13 @@ const [staffSearch, setStaffSearch] = useState("");
       const updatedItems = [...editableItems];
 
       updatedItems[serviceIndex] = {
-        ...service,
-        expectedEndDate: updatedEndDate,
-        amount: Number(service.amount || 0) + extraAmount
-      };
+  ...service,
+  expectedEndDate: updatedEndDate,
+  amount: Number(service.amount || 0) + extraAmount,
+
+  /* SAVE EXTENSION RATE */
+  lastExtensionRate: extendServiceModal.rate
+};
 
       const existingTaxes = order?.totals?.taxBreakdown || [];
 
@@ -1394,25 +1437,31 @@ const [staffSearch, setStaffSearch] = useState("");
         lastExtendedAt: serverTimestamp(),
 
         extensionHistory: [
-          ...(order.extensionHistory || []),
-          {
-            serviceIndex,
-            serviceName: service.name,
+  ...(order.extensionHistory || []),
+  {
+    serviceIndex,
+    serviceName: service.name,
 
-            oldEndDate: service.expectedEndDate,
-            newEndDate: updatedEndDate,
+    oldEndDate: service.expectedEndDate,
+    newEndDate: updatedEndDate,
 
-            extraAmount,
+    /* RATE HISTORY */
+    oldRate: service.lastExtensionRate || extendServiceModal.rate,
+    newRate: extendServiceModal.rate,
 
-            extendedByUid: auth.currentUser?.uid || "",
-            extendedByName:
-              auth.currentUser?.displayName ||
-              auth.currentUser?.email ||
-              "Admin",
+    extraDays: extendServiceModal.extraDays,
 
-            extendedAt: new Date().toISOString()
-          }
-        ],
+    extraAmount,
+
+    extendedByUid: auth.currentUser?.uid || "",
+    extendedByName:
+      auth.currentUser?.displayName ||
+      auth.currentUser?.email ||
+      "Admin",
+
+    extendedAt: new Date().toISOString()
+  }
+],
 
         updatedAt: serverTimestamp()
 
@@ -1536,12 +1585,14 @@ const [staffSearch, setStaffSearch] = useState("");
 
       await loadAssignments();
 
-      setExtendServiceModal({
-        open: false,
-        serviceIndex: null,
-        endDate: "",
-        amount: ""
-      });
+     setExtendServiceModal({
+  open: false,
+  serviceIndex: null,
+  endDate: "",
+  rate: 0,
+  extraDays: 0,
+  amount: 0
+});
 
     } catch (err) {
 
@@ -2716,7 +2767,7 @@ const [staffSearch, setStaffSearch] = useState("");
   if (!order) return null;
 
   return (
-<div className={`nod-wrap ${isDeleted ? "nod-readonly" : ""}`}>      {/* HEADER */}
+    <div className={`nod-wrap ${isDeleted ? "nod-readonly" : ""}`}>      {/* HEADER */}
       <div className="nod-head">
         <h2>{order.serviceType === "caretaker"
           ? "Caretaker Order"
@@ -3663,6 +3714,9 @@ const [staffSearch, setStaffSearch] = useState("");
                 <div className="nod-muted small">
                   {e.oldEndDate} → {e.newEndDate}
                 </div>
+                <div className="nod-muted">
+  Rate: ₹{e.oldRate} → ₹{e.newRate}
+</div>
 
                 <div className="nod-muted small">
                   Extended by {e.extendedByName}
@@ -3885,12 +3939,12 @@ const [staffSearch, setStaffSearch] = useState("");
             {/* GLOBAL RATE CONFIG */}
 
 
-<input
-  className="nod-input"
-  placeholder="Search nurse..."
-  value={staffSearch}
-  onChange={(e) => setStaffSearch(e.target.value)}
-/>
+            <input
+              className="nod-input"
+              placeholder="Search nurse..."
+              value={staffSearch}
+              onChange={(e) => setStaffSearch(e.target.value)}
+            />
 
             {/* STAFF GRID */}
 
@@ -4254,15 +4308,66 @@ const [staffSearch, setStaffSearch] = useState("");
 
             <input
               type="datetime-local"
-              className="nod-input"
               value={extendServiceModal.endDate}
-              onChange={(e) =>
-                setExtendServiceModal(p => ({
-                  ...p,
-                  endDate: e.target.value
-                }))
-              }
+              onChange={(e) => {
+
+                const newDate = e.target.value;
+
+                const result = calculateExtension(
+                  extendServiceModal.serviceIndex,
+                  newDate,
+                  extendServiceModal.rate
+                );
+
+                setExtendServiceModal({
+                  ...extendServiceModal,
+                  endDate: newDate,
+                  extraDays: result.extraDays,
+                  amount: result.amount
+                });
+
+              }}
             />
+            <label>
+{editableItems?.[extendServiceModal.serviceIndex]?.lastExtensionRate
+  ? "Last Extended Rate"
+  : "Daily Rate"}
+</label>
+
+            <input
+              type="number"
+              className="nod-input"
+              value={extendServiceModal.rate}
+              onChange={(e) => {
+
+                const newRate = Number(e.target.value);
+
+                const result = calculateExtension(
+                  extendServiceModal.serviceIndex,
+                  extendServiceModal.endDate,
+                  newRate
+                );
+
+                setExtendServiceModal({
+                  ...extendServiceModal,
+                  rate: newRate,
+                  extraDays: result.extraDays,
+                  amount: result.amount
+                });
+
+              }}
+            />
+            <div className="extend-preview">
+
+              <div className="days">
+                Extra Days: {extendServiceModal.extraDays}
+              </div>
+
+              <div className="amount">
+                Amount: ₹ {extendServiceModal.amount}
+              </div>
+
+            </div>
 
             <label>Extra Amount</label>
 
@@ -4279,16 +4384,21 @@ const [staffSearch, setStaffSearch] = useState("");
               }
             />
 
+
             <div className="nod-row">
 
               <button
                 className="nod-btn nod-btn-secondary"
-                onClick={() => setExtendServiceModal({
-                  open: false,
-                  serviceIndex: null,
-                  endDate: "",
-                  amount: ""
-                })}
+                onClick={() =>
+                  setExtendServiceModal({
+                    open: false,
+                    serviceIndex: null,
+                    endDate: "",
+                    rate: "",
+                    extraDays: 0,
+                    amount: 0
+                  })
+                }
               >
                 Cancel
               </button>
@@ -4381,21 +4491,21 @@ const [staffSearch, setStaffSearch] = useState("");
             <label>Stop Date / Time</label>
 
             <input
-  type="date"
-  className="nod-input"
-  value={stopFullModal.stopDate?.split("T")[0] || ""}
-  onChange={(e) => {
-    const merged = mergeDateKeepTime(
-      stopFullModal.stopDate,
-      e.target.value
-    );
+              type="date"
+              className="nod-input"
+              value={stopFullModal.stopDate?.split("T")[0] || ""}
+              onChange={(e) => {
+                const merged = mergeDateKeepTime(
+                  stopFullModal.stopDate,
+                  e.target.value
+                );
 
-    setStopFullModal({
-      ...stopFullModal,
-      stopDate: merged
-    });
-  }}
-/>
+                setStopFullModal({
+                  ...stopFullModal,
+                  stopDate: merged
+                });
+              }}
+            />
 
             {/* 🔥 PREVIEW */}
             {stopPreview && (

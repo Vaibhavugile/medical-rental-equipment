@@ -952,3 +952,85 @@ text-align:center;
     width: 100%;
   }
 }
+/* =============================
+   EXTEND SERVICE MODAL
+============================= */
+
+.nod-modal-card h4{
+  margin-bottom: 18px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* labels */
+
+.nod-modal-card label{
+  font-size: 13px;
+  font-weight: 600;
+  color:#555;
+  margin-top:12px;
+  display:block;
+}
+
+/* inputs */
+
+.nod-modal-card .nod-input{
+  width:100%;
+  margin-top:6px;
+  padding:10px 12px;
+  border-radius:8px;
+  border:1px solid #ddd;
+  font-size:14px;
+  transition:0.2s;
+}
+
+.nod-modal-card .nod-input:focus{
+  border-color:#2f6fed;
+  outline:none;
+  box-shadow:0 0 0 2px rgba(47,111,237,0.1);
+}
+
+/* datetime input */
+
+.nod-modal-card input[type="datetime-local"]{
+  width:100%;
+  margin-top:6px;
+  padding:10px;
+  border-radius:8px;
+  border:1px solid #ddd;
+}
+
+/* info row */
+
+.extend-preview{
+  margin-top:14px;
+  padding:12px;
+  background:#f7f9fc;
+  border-radius:8px;
+  border:1px solid #eef1f6;
+}
+
+/* extra days */
+
+.extend-preview .days{
+  font-size:13px;
+  color:#666;
+}
+
+/* amount */
+
+.extend-preview .amount{
+  margin-top:4px;
+  font-size:16px;
+  font-weight:600;
+  color:#1a1a1a;
+}
+
+/* modal buttons */
+
+.nod-modal-card .nod-row{
+  margin-top:20px;
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+}
