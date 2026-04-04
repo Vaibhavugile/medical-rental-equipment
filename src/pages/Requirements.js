@@ -559,25 +559,37 @@ useEffect(() => {
   };
 
   // Counts & filter for chips
- const statusCounts = useMemo(() => {
+const statusCounts = useMemo(() => {
+
+  const mainStatuses = [
+    "ready_for_quotation",
+    "quotation shared",
+    "order_created"
+  ];
+
   const counts = {
     all: requirements.length,
     ready_for_quotation: 0,
     "quotation shared": 0,
     order_created: 0,
+    others: 0
   };
 
   requirements.forEach((r) => {
+
     const s = (r.status || "").toLowerCase();
 
-    if (counts[s] !== undefined) {
+    if (mainStatuses.includes(s)) {
       counts[s]++;
+    } else {
+      counts.others++;
     }
+
   });
 
   return counts;
-}, [requirements]);
 
+}, [requirements]);
   const filtered = useMemo(() => {
   return requirements.filter((r) => {
     const service = r.serviceType || "rental";
@@ -585,9 +597,25 @@ useEffect(() => {
     const matchesType =
       typeFilter === "all" || service === typeFilter;
 
-    const matchesStatus =
-      statusFilter === "all" ||
-      (r.status || "").toLowerCase() === statusFilter.toLowerCase();
+    const mainStatuses = [
+  "ready_for_quotation",
+  "quotation shared",
+  "order_created"
+];
+
+let matchesStatus = true;
+
+if (statusFilter !== "all") {
+
+  const s = (r.status || "").toLowerCase();
+
+  if (statusFilter === "others") {
+    matchesStatus = !mainStatuses.includes(s);
+  } else {
+    matchesStatus = s === statusFilter.toLowerCase();
+  }
+
+}
 
     const searchText = search.toLowerCase();
 
@@ -724,6 +752,15 @@ useEffect(() => {
       {statusCounts.order_created}
     </span>
   </button>
+  <button
+  className={`seg-btn ${statusFilter === "others" ? "active" : ""}`}
+  onClick={() => setStatusFilter("others")}
+>
+  Others
+  <span className="badge">
+    {statusCounts.others}
+  </span>
+</button>
 
 </div>
 

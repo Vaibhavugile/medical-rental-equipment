@@ -190,43 +190,54 @@ export default function Leads() {
 
   // ---------- Counts for STATUS chips (within current TYPE selection) ----------
   const statusCounts = useMemo(() => {
-    const map = {
-      all: leads.length,
-      new: 0,
-      contacted: 0,
-      "req shared": 0,
-      followup: 0,
-      today: 0,
-      overdue: 0,
-      lost: 0
-    };
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+  const mainStatuses = ["new","contacted","req shared","followup","lost"];
 
-    for (const l of leads) {
-      const s = normStatus(l.status) || "new";
+  const map = {
+    all: leads.length,
+    new: 0,
+    contacted: 0,
+    "req shared": 0,
+    followup: 0,
+    lost: 0,
+    others: 0,
+    today: 0,
+    overdue: 0
+  };
 
-      if (map[s] !== undefined) {
-        map[s] += 1;
-      }
+  const today = new Date();
+  today.setHours(0,0,0,0);
 
-      if (s === "followup" && l.followupDate) {
-        const fDate = new Date(l.followupDate);
-        fDate.setHours(0, 0, 0, 0);
+  for (const l of leads) {
 
-        if (fDate.getTime() === today.getTime()) {
-          map.today += 1;
-        }
+    const s = normStatus(l.status) || "new";
 
-        if (fDate < today) {
-          map.overdue += 1;
-        }
-      }
+    if (mainStatuses.includes(s)) {
+      map[s] = (map[s] || 0) + 1;
+    } else {
+      map.others++;
     }
 
-    return map;
-  }, [leads]);
+    if (s === "followup" && l.followupDate) {
+
+      const fDate = new Date(l.followupDate);
+      fDate.setHours(0,0,0,0);
+
+      if (fDate.getTime() === today.getTime()) {
+        map.today++;
+      }
+
+      if (fDate < today) {
+        map.overdue++;
+      }
+
+    }
+
+  }
+
+  return map;
+
+}, [leads]);
 
   // ---------- Search + STATUS filter (TYPE already applied by Firestore) ----------
  const filtered = useMemo(() => {
@@ -239,39 +250,44 @@ export default function Leads() {
   // STATUS FILTER
   if (statusFilter !== "all") {
 
-    list = list.filter((l) => {
+const mainStatuses = ["new","contacted","req shared","followup","lost"];
 
-      const s = normStatus(l.status);
+list = list.filter((l)=>{
 
-      // FOLLOWUP STATUS
-      if (statusFilter === "followup") {
+const s = normStatus(l.status);
 
-        if (s !== "followup") return false;
-        if (!l.followupDate) return false;
+if(statusFilter === "others"){
+return !mainStatuses.includes(s);
+}
 
-        const fDate = new Date(l.followupDate);
-        fDate.setHours(0, 0, 0, 0);
+if(statusFilter === "followup"){
 
-        if (followupFilter === "today") {
-          return fDate.getTime() === today.getTime();
-        }
+if(s !== "followup") return false;
+if(!l.followupDate) return false;
 
-        if (followupFilter === "overdue") {
-          return fDate < today;
-        }
+const fDate = new Date(l.followupDate);
+fDate.setHours(0,0,0,0);
 
-        if (followupFilter === "upcoming") {
-          return fDate > today;
-        }
+if(followupFilter === "today"){
+return fDate.getTime() === today.getTime();
+}
 
-        return true;
-      }
+if(followupFilter === "overdue"){
+return fDate < today;
+}
 
-      return s === statusFilter;
+if(followupFilter === "upcoming"){
+return fDate > today;
+}
 
-    });
+return true;
+}
 
-  }
+return s === statusFilter;
+
+});
+
+}
 
   // SEARCH FILTER
   const q = search.trim().toLowerCase();
@@ -685,52 +701,59 @@ export default function Leads() {
           {/* STATUS SEGMENT */}
           <div className="segmented status-segment">
 
-            <button
-              className={`seg-btn ${statusFilter === "all" ? "active" : ""}`}
-              onClick={() => setStatusFilter("all")}
-            >
-              All <span className="badge">{statusCounts.all}</span>
-            </button>
+<button
+className={`seg-btn ${statusFilter === "all" ? "active" : ""}`}
+onClick={() => setStatusFilter("all")}
+>
+All <span className="badge">{statusCounts.all}</span>
+</button>
 
-            <button
-              className={`seg-btn ${statusFilter === "new" ? "active" : ""}`}
-              onClick={() => setStatusFilter("new")}
-            >
-              New <span className="badge">{statusCounts.new}</span>
-            </button>
+<button
+className={`seg-btn ${statusFilter === "new" ? "active" : ""}`}
+onClick={() => setStatusFilter("new")}
+>
+New <span className="badge">{statusCounts.new}</span>
+</button>
 
-            <button
-              className={`seg-btn ${statusFilter === "contacted" ? "active" : ""}`}
-              onClick={() => setStatusFilter("contacted")}
-            >
-              Contacted <span className="badge">{statusCounts.contacted}</span>
-            </button>
+<button
+className={`seg-btn ${statusFilter === "contacted" ? "active" : ""}`}
+onClick={() => setStatusFilter("contacted")}
+>
+Contacted <span className="badge">{statusCounts.contacted}</span>
+</button>
 
-            <button
-              className={`seg-btn ${statusFilter === "req shared" ? "active" : ""}`}
-              onClick={() => setStatusFilter("req shared")}
-            >
-              Req <span className="badge">{statusCounts["req shared"]}</span>
-            </button>
+<button
+className={`seg-btn ${statusFilter === "req shared" ? "active" : ""}`}
+onClick={() => setStatusFilter("req shared")}
+>
+Req <span className="badge">{statusCounts["req shared"]}</span>
+</button>
 
-            <button
-              className={`seg-btn ${statusFilter === "followup" ? "active" : ""}`}
-              onClick={() => {
-                setStatusFilter("followup");
-                setFollowupFilter("all");
-              }}
-            >
-              Followup <span className="badge">{statusCounts.followup}</span>
-            </button>
+<button
+className={`seg-btn ${statusFilter === "followup" ? "active" : ""}`}
+onClick={() => {
+setStatusFilter("followup");
+setFollowupFilter("all");
+}}
+>
+Followup <span className="badge">{statusCounts.followup}</span>
+</button>
 
-            <button
-              className={`seg-btn ${statusFilter === "lost" ? "active" : ""}`}
-              onClick={() => setStatusFilter("lost")}
-            >
-              Lost <span className="badge">{statusCounts.lost}</span>
-            </button>
+<button
+className={`seg-btn ${statusFilter === "lost" ? "active" : ""}`}
+onClick={() => setStatusFilter("lost")}
+>
+Lost <span className="badge">{statusCounts.lost}</span>
+</button>
 
-          </div>{statusFilter === "followup" && (
+<button
+  className={`seg-btn ${statusFilter === "others" ? "active" : ""}`}
+  onClick={() => setStatusFilter("others")}
+>
+  Others <span className="badge">{statusCounts.others}</span>
+</button>
+
+</div>{statusFilter === "followup" && (
 
   <div className="followup-subfilters">
 
