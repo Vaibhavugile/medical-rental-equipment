@@ -68,9 +68,9 @@ const fmtCurrency = (v) => {
 
 const calcAmounts = (items, discount, taxes) => {
   const subtotal = (items || []).reduce(
-    (s, it) => s + Number(it.qty || 0) * Number(it.rate || 0),
-    0
-  );
+  (s, it) => s + Number(it.amount || 0),
+  0
+);
 
   // ✅ Discount
   let discountAmount = 0;
@@ -334,14 +334,26 @@ useEffect(() => {
   };
 
   const updateQuotationItem = (idx, patch) => {
-    setQuotation((q) => {
-      const items = (q.items || []).slice();
-      items[idx] = { ...items[idx], ...patch };
-      items[idx].amount =
-        Number(items[idx].qty || 0) * Number(items[idx].rate || 0);
-      return { ...q, items };
-    });
-  };
+  setQuotation((q) => {
+    const items = (q.items || []).slice();
+    items[idx] = { ...items[idx], ...patch };
+
+    if (q.serviceType === "nursing" || q.serviceType === "caretaker") {
+      const qty = Number(items[idx].qty || 0);
+      const rate = Number(items[idx].rate || 0);
+      const days = Number(items[idx].days || 1);
+
+      items[idx].amount = qty * rate * days;
+    } else {
+      const qty = Number(items[idx].qty || 0);
+      const rate = Number(items[idx].rate || 0);
+
+      items[idx].amount = qty * rate;
+    }
+
+    return { ...q, items };
+  });
+};
 
   // Insert NEW item right BELOW the last focused row; copy its dates/days
   const addQuotationItem = () =>
@@ -1276,10 +1288,10 @@ useEffect(() => {
                           />
                           <input
                             type="number"
-                            min="0"
+                            // min="0"
                             step="0.01"
                             className="req-quote-input small"
-                            placeholder="Price"
+                            placeholder={isNursingReq(detailsReq) ? "Daily Price" : "Price"}
                             value={it.rate ?? ""}
                             onFocus={() => setActiveItemIdx(idx)}
                             onChange={(e) =>
@@ -1292,7 +1304,14 @@ useEffect(() => {
                           {/* Line Total */}
                           <div className="req-quote-total">
                             {fmtCurrency(
-                              (Number(it.qty || 0) * Number(it.rate || 0)) || 0
+                          
+  quotation.serviceType === "nursing" || quotation.serviceType === "caretaker"
+    ? Number(it.qty || 0) *
+      Number(it.rate || 0) *
+      Number(it.days || 1)
+    : Number(it.qty || 0) *
+      Number(it.rate || 0)
+
                             )}
                           </div>
 
