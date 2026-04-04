@@ -85,6 +85,7 @@ const [toDate, setToDate] = useState("");
 const [serviceFilter, setServiceFilter] = useState("all");
 const [kpiFilter, setKpiFilter] = useState("all");
 const [userRole, setUserRole] = useState(null);
+const [paymentFilter, setPaymentFilter] = useState("all");
   /* =========================
      Load Nursing Orders
   ========================= */
@@ -183,6 +184,35 @@ const getRefundPending = (order) => {
     .filter(r => r.status === "pending")
     .reduce((sum, r) => sum + Number(r.amount || 0), 0);
 };
+const paymentCounts = pageOrders.reduce(
+  (acc, o) => {
+
+    const totalPaid = (o.payments || []).reduce(
+      (s, p) => s + Number(p.amount || 0),
+      0
+    );
+
+    const total = Number(o.totals?.total || 0);
+
+    let paymentStatus = "due";
+
+    if (totalPaid >= total && total > 0) {
+      paymentStatus = "paid";
+    } else if (totalPaid > 0) {
+      paymentStatus = "partial";
+    }
+
+    acc.all++;
+
+    if (paymentStatus === "paid") acc.paid++;
+    if (paymentStatus === "partial") acc.partial++;
+    if (paymentStatus === "due") acc.due++;
+
+    return acc;
+
+  },
+  { all: 0, paid: 0, partial: 0, due: 0 }
+);
 
 const filteredOrders = pageOrders.filter((o) => {
 
@@ -196,7 +226,23 @@ const filteredOrders = pageOrders.filter((o) => {
 
   const matchesStatus =
     statusFilter === "all" || o.status === statusFilter;
+const totalPaid = (o.payments || []).reduce(
+  (s, p) => s + Number(p.amount || 0),
+  0
+);
 
+const total = Number(o.totals?.total || 0);
+
+let paymentStatus = "due";
+
+if (totalPaid >= total && total > 0) {
+  paymentStatus = "paid";
+} else if (totalPaid > 0) {
+  paymentStatus = "partial";
+}
+
+const matchesPayment =
+  paymentFilter === "all" || paymentStatus === paymentFilter;
   /* ---------- SERVICE TYPE ---------- */
 
   const serviceType = getServiceType(o);
@@ -268,11 +314,12 @@ const filteredOrders = pageOrders.filter((o) => {
 }
 
   return (
-    matchesSearch &&
-    matchesStatus &&
-    matchesService &&
-    matchesDate &&
-    matchesKpi
+     matchesSearch &&
+  matchesStatus &&
+  matchesService &&
+  matchesDate &&
+  matchesKpi &&
+  matchesPayment
   );
 
 });
@@ -404,6 +451,7 @@ const refundPendingCount = serviceRanges.filter((o) => {
   <div className="no-kpi-value">{refundPendingCount}</div>
 </div>
 
+
 </div>
   <div className="no-head-top">
     <h2>Caretakers Orders</h2>
@@ -439,6 +487,7 @@ const refundPendingCount = serviceRanges.filter((o) => {
   <option value="active">Active</option>
   <option value="completed">Completed</option>
 </select>
+
 <input
   type="date"
   className="no-input no-compact"
@@ -464,6 +513,45 @@ const refundPendingCount = serviceRanges.filter((o) => {
   Clear
 </button>    </div>
   </div>
+</div>
+<div className="pay-filter-wrapper">
+
+  <div className="pay-filter-bar">
+
+    <button
+      className={`pay-filter-btn ${paymentFilter === "all" ? "active" : ""}`}
+      onClick={() => setPaymentFilter("all")}
+    >
+      <span>All</span>
+      <span className="pay-filter-count">{paymentCounts.all}</span>
+    </button>
+
+    <button
+      className={`pay-filter-btn paid ${paymentFilter === "paid" ? "active" : ""}`}
+      onClick={() => setPaymentFilter("paid")}
+    >
+      <span>Full Paid</span>
+      <span className="pay-filter-count">{paymentCounts.paid}</span>
+    </button>
+
+    <button
+      className={`pay-filter-btn partial ${paymentFilter === "partial" ? "active" : ""}`}
+      onClick={() => setPaymentFilter("partial")}
+    >
+      <span>Partial</span>
+      <span className="pay-filter-count">{paymentCounts.partial}</span>
+    </button>
+
+    <button
+      className={`pay-filter-btn due ${paymentFilter === "due" ? "active" : ""}`}
+      onClick={() => setPaymentFilter("due")}
+    >
+      <span>Due</span>
+      <span className="pay-filter-count">{paymentCounts.due}</span>
+    </button>
+
+  </div>
+
 </div>
 
 
@@ -505,6 +593,20 @@ const refundPendingCount = serviceRanges.filter((o) => {
 
             {!loading &&
              filteredOrders.map((o) => {
+              const totalPaid = (o.payments || []).reduce(
+  (s, p) => s + Number(p.amount || 0),
+  0
+);
+
+const total = Number(o.totals?.total || 0);
+
+let paymentStatus = "due";
+
+if (totalPaid >= total && total > 0) {
+  paymentStatus = "paid";
+} else if (totalPaid > 0) {
+  paymentStatus = "partial";
+}
 
                 const staffCount =
                   o.items?.reduce(
@@ -553,6 +655,13 @@ const endDate =
   <span className="pill blue">
     {o.items?.[0]?.name || "—"}
   </span>
+  <td>
+  <span className={`pay-pill ${paymentStatus}`}>
+    {paymentStatus === "paid" && "Full Paid"}
+    {paymentStatus === "partial" && "Partially Paid"}
+    {paymentStatus === "due" && "Payment Due"}
+  </span>
+</td>
 </td>
 
                     <td>{fmtDate(startDate)}</td>
@@ -562,8 +671,10 @@ const endDate =
                     <td>{staffCount}</td>
 
                     <td className="right">
-                      ₹ {fmtCurrency(o.totals?.total || 0)}
-                    </td>
+  ₹ {fmtCurrency(o.totals?.total || 0)}
+</td>
+
+
 
                     <td className="actions">
                       <button
@@ -575,14 +686,14 @@ const endDate =
                         View
                       </button>
 
-                      <button
+                      {/* <button
                         className="link"
                         onClick={() =>
                           navigate(`/crm/nursing-orders/${o.id}?open=true`)
                         }
                       >
                         Open
-                      </button>
+                      </button> */}
                       {userRole === "superadmin" && (
                       <button
   className="link danger"

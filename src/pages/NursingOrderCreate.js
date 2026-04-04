@@ -662,7 +662,11 @@ orders: arrayUnion({
 
     onCreated?.(orderId);
     onClose?.();
-    navigate("/crm/nursing-orders");
+    navigate(
+  draft.serviceType === "caretaker"
+    ? "/crm/caretaker-orders"
+    : "/crm/nursing-orders"
+);
 
   } catch (err) {
     console.error("Nursing createOrder error", err);

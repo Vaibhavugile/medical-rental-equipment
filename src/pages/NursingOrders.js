@@ -5,13 +5,13 @@ import {
   orderBy,
   query,
   deleteDoc,
-setDoc,
-doc,
-serverTimestamp,
- onSnapshot
+  setDoc,
+  doc,
+  serverTimestamp,
+  onSnapshot
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
-import { db,auth} from "../firebase";
+import { db, auth } from "../firebase";
 import "./NursingOrders.css";
 import NursingOrderCreate from "./NursingOrderCreate";
 
@@ -53,12 +53,12 @@ function toYmd(value) {
   // firestore timestamp
   if (value?.toDate) {
     const d = value.toDate();
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   }
 
   // JS Date
   if (value instanceof Date) {
-    return `${value.getFullYear()}-${String(value.getMonth()+1).padStart(2,"0")}-${String(value.getDate()).padStart(2,"0")}`;
+    return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
   }
 
   return null;
@@ -78,13 +78,14 @@ export default function NursingOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
-const [search, setSearch] = useState("");
-const [statusFilter, setStatusFilter] = useState("all");
-const [fromDate, setFromDate] = useState("");
-const [toDate, setToDate] = useState("");
-const [serviceFilter, setServiceFilter] = useState("all");
-const [kpiFilter, setKpiFilter] = useState("all");
-const [userRole, setUserRole] = useState(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [serviceFilter, setServiceFilter] = useState("all");
+  const [kpiFilter, setKpiFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [userRole, setUserRole] = useState(null);
   /* =========================
      Load Nursing Orders
   ========================= */
@@ -106,364 +107,452 @@ const [userRole, setUserRole] = useState(null);
     load();
   }, []);
 
-function getServiceType(order) {
-  const name = order.items?.[0]?.name?.toLowerCase() || "";
+  function getServiceType(order) {
+    const name = order.items?.[0]?.name?.toLowerCase() || "";
 
-  if (name.includes("caretaker")) return "caretaker";
-  if (name.includes("nurs")) return "nursing";
+    if (name.includes("caretaker")) return "caretaker";
+    if (name.includes("nurs")) return "nursing";
 
-  return "other";
-}
+    return "other";
+  }
 
-useEffect(() => {
-  const user = auth.currentUser;
-  if (!user) return;
+  useEffect(() => {
+    const user = auth.currentUser;
+    if (!user) return;
 
-  const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
-    if (snap.exists()) {
-      setUserRole(snap.data().role);
+    const unsub = onSnapshot(doc(db, "users", user.uid), (snap) => {
+      if (snap.exists()) {
+        setUserRole(snap.data().role);
+      }
+    });
+
+    return () => unsub();
+  }, []);
+  const pageOrders = orders.filter(
+    (o) => !o.serviceType || o.serviceType === "nursing"
+  );
+  const nursingCount = orders.filter((o) =>
+    o.items?.[0]?.name?.toLowerCase().includes("nurs")
+  ).length;
+
+  const caretakerCount = orders.filter((o) =>
+    o.items?.[0]?.name?.toLowerCase().includes("caretaker")
+  ).length;
+
+  const allCount = orders.length;
+  const getRefundPending = (order) => {
+    return (order.refunds || [])
+      .filter(r => r.status === "pending")
+      .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  };
+  const paymentCounts = pageOrders.reduce(
+    (acc, o) => {
+
+      const totalPaid = (o.payments || []).reduce(
+        (s, p) => s + Number(p.amount || 0),
+        0
+      );
+
+      const total = Number(o.totals?.total || 0);
+
+      let paymentStatus = "due";
+
+      if (totalPaid >= total && total > 0) {
+        paymentStatus = "paid";
+      } else if (totalPaid > 0) {
+        paymentStatus = "partial";
+      }
+
+      acc.all++;
+
+      if (paymentStatus === "paid") acc.paid++;
+      if (paymentStatus === "partial") acc.partial++;
+      if (paymentStatus === "due") acc.due++;
+
+      return acc;
+
+    },
+    { all: 0, paid: 0, partial: 0, due: 0 }
+  );
+  const filteredOrders = pageOrders.filter((o) => {
+
+
+    const q = search.toLowerCase();
+
+    const matchesSearch =
+      !q ||
+      o.orderNo?.toLowerCase().includes(q) ||
+      o.customerName?.toLowerCase().includes(q) ||
+      o.deliveryAddress?.toLowerCase().includes(q);
+
+    const matchesStatus =
+      statusFilter === "all" || o.status === statusFilter;
+    const totalPaid = (o.payments || []).reduce(
+      (s, p) => s + Number(p.amount || 0),
+      0
+    );
+
+    const total = Number(o.totals?.total || 0);
+
+    let paymentStatus = "due";
+
+    if (totalPaid >= total && total > 0) {
+      paymentStatus = "paid";
+    } else if (totalPaid > 0) {
+      paymentStatus = "partial";
     }
+
+    const matchesPayment =
+      paymentFilter === "all" || paymentStatus === paymentFilter;
+    /* ---------- SERVICE TYPE ---------- */
+
+    const serviceType = getServiceType(o);
+
+    const matchesService =
+      serviceFilter === "all" || serviceType === serviceFilter;
+
+
+
+
+    /* ---------- SERVICE DATES ---------- */
+
+    const startDates =
+      o.items?.map((it) => toYmd(it.expectedStartDate)).filter(Boolean) || [];
+
+    const endDates =
+      o.items?.map((it) => toYmd(it.expectedEndDate)).filter(Boolean) || [];
+
+    const startDate =
+      startDates.length > 0 ? startDates.sort()[0] : null;
+
+    const endDate =
+      endDates.length > 0 ? endDates.sort().slice(-1)[0] : null;
+
+    const today = new Date().toLocaleDateString("en-CA");
+
+    /* ---------- DATE RANGE FILTER ---------- */
+
+    let matchesDate = true;
+
+    if (fromDate && startDate) {
+      matchesDate = startDate >= fromDate;
+    }
+
+    if (toDate && startDate) {
+      matchesDate = matchesDate && startDate <= toDate;
+    }
+
+    /* ---------- KPI FILTER ---------- */
+
+    let matchesKpi = true;
+
+    if (kpiFilter === "active") {
+      matchesKpi = o.status === "active";
+    }
+
+    if (kpiFilter === "completed") {
+      matchesKpi = o.status === "completed";
+    }
+
+    if (kpiFilter === "startingToday") {
+      matchesKpi = startDate && startDate === today;
+    }
+
+    if (kpiFilter === "endingToday") {
+      matchesKpi = endDate && endDate === today;
+    }
+
+    if (kpiFilter === "endingSoon") {
+
+      if (!endDate) return false;
+
+      const diff =
+        (new Date(endDate) - new Date(today)) /
+        (1000 * 60 * 60 * 24);
+
+      matchesKpi = diff > 0 && diff <= 5;
+    }
+    if (kpiFilter === "refundPending") {
+      const refundPending = getRefundPending(o);
+      matchesKpi = refundPending > 0;
+    }
+
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesService &&
+      matchesDate &&
+      matchesKpi &&
+      matchesPayment
+    );
+
   });
-
-  return () => unsub();
-}, []);
-const pageOrders = orders.filter(
-  (o) => !o.serviceType || o.serviceType === "nursing"
-);
-const nursingCount = orders.filter((o) =>
-  o.items?.[0]?.name?.toLowerCase().includes("nurs")
-).length;
-
-const caretakerCount = orders.filter((o) =>
-  o.items?.[0]?.name?.toLowerCase().includes("caretaker")
-).length;
-
-const allCount = orders.length;
-const getRefundPending = (order) => {
-  return (order.refunds || [])
-    .filter(r => r.status === "pending")
-    .reduce((sum, r) => sum + Number(r.amount || 0), 0);
-};
-
-const filteredOrders = pageOrders.filter((o) => {
-
-
-  const q = search.toLowerCase();
-
-  const matchesSearch =
-    !q ||
-    o.orderNo?.toLowerCase().includes(q) ||
-    o.customerName?.toLowerCase().includes(q) ||
-    o.deliveryAddress?.toLowerCase().includes(q);
-
-  const matchesStatus =
-    statusFilter === "all" || o.status === statusFilter;
-
-  /* ---------- SERVICE TYPE ---------- */
-
-  const serviceType = getServiceType(o);
-
-  const matchesService =
-    serviceFilter === "all" || serviceType === serviceFilter;
-
-  /* ---------- SERVICE DATES ---------- */
-
-  const startDates =
-    o.items?.map((it) => toYmd(it.expectedStartDate)).filter(Boolean) || [];
-
-  const endDates =
-    o.items?.map((it) => toYmd(it.expectedEndDate)).filter(Boolean) || [];
-
-  const startDate =
-    startDates.length > 0 ? startDates.sort()[0] : null;
-
-  const endDate =
-    endDates.length > 0 ? endDates.sort().slice(-1)[0] : null;
-
   const today = new Date().toLocaleDateString("en-CA");
+  const serviceRanges = pageOrders.map((o) => {
 
-  /* ---------- DATE RANGE FILTER ---------- */
+    const startDates =
+      o.items?.map((it) => toDateOnly(it.expectedStartDate)).filter(Boolean) || [];
 
-  let matchesDate = true;
+    const endDates =
+      o.items?.map((it) => toDateOnly(it.expectedEndDate)).filter(Boolean) || [];
 
-  if (fromDate && startDate) {
-    matchesDate = startDate >= fromDate;
-  }
+    const start =
+      startDates.length > 0 ? startDates.sort()[0] : null;
 
-  if (toDate && startDate) {
-    matchesDate = matchesDate && startDate <= toDate;
-  }
+    const end =
+      endDates.length > 0 ? endDates.sort().slice(-1)[0] : null;
 
-  /* ---------- KPI FILTER ---------- */
+    return {
+      ...o,
+      serviceStart: start,
+      serviceEnd: end
+    };
 
-  let matchesKpi = true;
+  });
+  const activeCount = serviceRanges.filter(
+    (o) => o.status === "active"
+  ).length;
 
-  if (kpiFilter === "active") {
-    matchesKpi = o.status === "active";
-  }
+  const completedCount = serviceRanges.filter(
+    (o) => o.status === "completed"
+  ).length;
 
-  if (kpiFilter === "completed") {
-    matchesKpi = o.status === "completed";
-  }
+  const startingTodayCount = serviceRanges.filter((o) => {
 
-  if (kpiFilter === "startingToday") {
-    matchesKpi = startDate && startDate === today;
-  }
+    if (!o.serviceStart) return false;
 
-  if (kpiFilter === "endingToday") {
-    matchesKpi = endDate && endDate === today;
-  }
+    return o.serviceStart.slice(0, 10) === today;
 
-  if (kpiFilter === "endingSoon") {
+  }).length;
 
-    if (!endDate) return false;
+  const endingTodayCount = serviceRanges.filter((o) => {
+
+    if (!o.serviceEnd) return false;
+
+    return o.serviceEnd.slice(0, 10) === today;
+
+  }).length;
+
+  const endingSoonCount = serviceRanges.filter((o) => {
+    if (!o.serviceEnd) return false;
 
     const diff =
-      (new Date(endDate) - new Date(today)) /
+      (new Date(o.serviceEnd) - new Date(today)) /
       (1000 * 60 * 60 * 24);
 
-    matchesKpi = diff > 0 && diff <= 5;
-  }
-  if (kpiFilter === "refundPending") {
-  const refundPending = getRefundPending(o);
-  matchesKpi = refundPending > 0;
-}
+    return diff > 0 && diff <= 5; // next 3 days
+  }).length;
+  const refundPendingCount = serviceRanges.filter((o) => {
+    const refundPending = (o.refunds || [])
+      .filter(r => r.status === "pending")
+      .reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
-  return (
-    matchesSearch &&
-    matchesStatus &&
-    matchesService &&
-    matchesDate &&
-    matchesKpi
-  );
+    return refundPending > 0;
+  }).length;
+  const deleteNursingOrder = async (order) => {
 
-});
-const today = new Date().toLocaleDateString("en-CA");
-const serviceRanges = pageOrders.map((o) => {
+    const ok = window.confirm(
+      `Move order ${order.orderNo || order.id} to Recycle Bin?`
+    );
 
-  const startDates =
-    o.items?.map((it) => toDateOnly(it.expectedStartDate)).filter(Boolean) || [];
+    if (!ok) return;
 
-  const endDates =
-    o.items?.map((it) => toDateOnly(it.expectedEndDate)).filter(Boolean) || [];
+    try {
 
-  const start =
-    startDates.length > 0 ? startDates.sort()[0] : null;
+      // 1️⃣ move order to recycle bin
+      await setDoc(
+        doc(db, "nursingOrders_recycle_bin", order.id),
+        {
+          ...order,
+          originalId: order.id,
+          deletedAt: serverTimestamp()
+        }
+      );
 
-  const end =
-    endDates.length > 0 ? endDates.sort().slice(-1)[0] : null;
+      // 2️⃣ delete from main collection
+      await deleteDoc(
+        doc(db, "nursingOrders", order.id)
+      );
 
-  return {
-    ...o,
-    serviceStart: start,
-    serviceEnd: end
+      // 3️⃣ update local UI
+      setOrders(prev =>
+        prev.filter(o => o.id !== order.id)
+      );
+
+    } catch (err) {
+
+      console.error(err);
+      alert("Failed to delete nursing order");
+
+    }
+
   };
-
-});
-const activeCount = serviceRanges.filter(
-  (o) => o.status === "active"
-).length;
-
-const completedCount = serviceRanges.filter(
-  (o) => o.status === "completed"
-).length;
-
-const startingTodayCount = serviceRanges.filter((o) => {
-
-  if (!o.serviceStart) return false;
-
-  return o.serviceStart.slice(0,10) === today;
-
-}).length;
-
-const endingTodayCount = serviceRanges.filter((o) => {
-
-  if (!o.serviceEnd) return false;
-
-  return o.serviceEnd.slice(0,10) === today;
-
-}).length;
-
-const endingSoonCount = serviceRanges.filter((o) => {
-  if (!o.serviceEnd) return false;
-
-  const diff =
-    (new Date(o.serviceEnd) - new Date(today)) /
-    (1000 * 60 * 60 * 24);
-
-  return diff > 0 && diff <= 5; // next 3 days
-}).length;
-const refundPendingCount = serviceRanges.filter((o) => {
-  const refundPending = (o.refunds || [])
-    .filter(r => r.status === "pending")
-    .reduce((sum, r) => sum + Number(r.amount || 0), 0);
-
-  return refundPending > 0;
-}).length;
-const deleteNursingOrder = async (order) => {
-
-  const ok = window.confirm(
-    `Move order ${order.orderNo || order.id} to Recycle Bin?`
-  );
-
-  if (!ok) return;
-
-  try {
-
-    // 1️⃣ move order to recycle bin
-    await setDoc(
-      doc(db, "nursingOrders_recycle_bin", order.id),
-      {
-        ...order,
-        originalId: order.id,
-        deletedAt: serverTimestamp()
-      }
-    );
-
-    // 2️⃣ delete from main collection
-    await deleteDoc(
-      doc(db, "nursingOrders", order.id)
-    );
-
-    // 3️⃣ update local UI
-    setOrders(prev =>
-      prev.filter(o => o.id !== order.id)
-    );
-
-  } catch (err) {
-
-    console.error(err);
-    alert("Failed to delete nursing order");
-
-  }
-
-};
 
   return (
     <div className="no-wrap">
       {/* Header */}
-     <div className="no-head">
-      <div className="no-kpis">
+      <div className="no-head">
+        <div className="no-kpis">
 
-  <div
-    className={`no-kpi ${kpiFilter === "active" ? "active" : ""}`}
-    onClick={() =>
-      setKpiFilter(kpiFilter === "active" ? "all" : "active")
-    }
-  >
-    <div className="no-kpi-label">Active</div>
-    <div className="no-kpi-value">{activeCount}</div>
+          <div
+            className={`no-kpi ${kpiFilter === "active" ? "active" : ""}`}
+            onClick={() =>
+              setKpiFilter(kpiFilter === "active" ? "all" : "active")
+            }
+          >
+            <div className="no-kpi-label">Active</div>
+            <div className="no-kpi-value">{activeCount}</div>
+          </div>
+
+          <div
+            className={`no-kpi ${kpiFilter === "completed" ? "active" : ""}`}
+            onClick={() =>
+              setKpiFilter(kpiFilter === "completed" ? "all" : "completed")
+            }
+          >
+            <div className="no-kpi-label">Completed</div>
+            <div className="no-kpi-value">{completedCount}</div>
+          </div>
+
+          <div
+            className={`no-kpi ${kpiFilter === "startingToday" ? "active" : ""}`}
+            onClick={() =>
+              setKpiFilter(kpiFilter === "startingToday" ? "all" : "startingToday")
+            }
+          >
+            <div className="no-kpi-label">Starting Today</div>
+            <div className="no-kpi-value">{startingTodayCount}</div>
+          </div>
+
+          <div
+            className={`no-kpi ${kpiFilter === "endingToday" ? "active" : ""}`}
+            onClick={() =>
+              setKpiFilter(kpiFilter === "endingToday" ? "all" : "endingToday")
+            }
+          >
+            <div className="no-kpi-label">Ending Today</div>
+            <div className="no-kpi-value">{endingTodayCount}</div>
+          </div>
+
+          <div
+            className={`no-kpi warning ${kpiFilter === "endingSoon" ? "active" : ""}`}
+            onClick={() =>
+              setKpiFilter(kpiFilter === "endingSoon" ? "all" : "endingSoon")
+            }
+          >
+            <div className="no-kpi-label">Ending Soon</div>
+            <div className="no-kpi-value">{endingSoonCount}</div>
+          </div>
+          <div
+            className={`no-kpi danger ${kpiFilter === "refundPending" ? "active" : ""}`}
+            onClick={() =>
+              setKpiFilter(kpiFilter === "refundPending" ? "all" : "refundPending")
+            }
+          >
+            <div className="no-kpi-label">Refund Pending</div>
+            <div className="no-kpi-value">{refundPendingCount}</div>
+          </div>
+
+        </div>
+        <div className="no-head-top">
+          <h2>Nursing Orders</h2>
+
+          <button
+            className="cp-btn"
+            onClick={() => setCreateOpen(true)}
+          >
+            + Add Nursing Order
+          </button>  </div>
+
+        <div className="no-filters">
+          <div className="no-filter-row-1">
+            <input
+              type="text"
+              className="no-input no-search"
+              placeholder="Search order no, customer, address…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+
+          <div className="no-filter-row-2">
+            <select
+              className="no-input no-compact"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              <option value="all">All Status</option>
+              <option value="created">Created</option>
+              <option value="assigned">Assigned</option>
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+            </select>
+            <input
+              type="date"
+              className="no-input no-compact"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+            />
+            <input
+              type="date"
+              className="no-input no-compact"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+            />
+            <button
+              className="cp-btn ghost"
+              onClick={() => {
+                setSearch("");
+                setStatusFilter("all");
+                setFromDate("");
+                setToDate("");
+                setServiceFilter("all");
+              }}
+            >
+              Clear
+            </button>    </div>
+        </div>
+      </div>
+     <div className="pay-filter-wrapper">
+
+  <div className="pay-filter-bar">
+
+    <button
+      className={`pay-filter-btn ${paymentFilter === "all" ? "active" : ""}`}
+      onClick={() => setPaymentFilter("all")}
+    >
+      <span>All</span>
+      <span className="pay-filter-count">{paymentCounts.all}</span>
+    </button>
+
+    <button
+      className={`pay-filter-btn paid ${paymentFilter === "paid" ? "active" : ""}`}
+      onClick={() => setPaymentFilter("paid")}
+    >
+      <span>Full Paid</span>
+      <span className="pay-filter-count">{paymentCounts.paid}</span>
+    </button>
+
+    <button
+      className={`pay-filter-btn partial ${paymentFilter === "partial" ? "active" : ""}`}
+      onClick={() => setPaymentFilter("partial")}
+    >
+      <span>Partial</span>
+      <span className="pay-filter-count">{paymentCounts.partial}</span>
+    </button>
+
+    <button
+      className={`pay-filter-btn due ${paymentFilter === "due" ? "active" : ""}`}
+      onClick={() => setPaymentFilter("due")}
+    >
+      <span>Due</span>
+      <span className="pay-filter-count">{paymentCounts.due}</span>
+    </button>
+
   </div>
 
-  <div
-    className={`no-kpi ${kpiFilter === "completed" ? "active" : ""}`}
-    onClick={() =>
-      setKpiFilter(kpiFilter === "completed" ? "all" : "completed")
-    }
-  >
-    <div className="no-kpi-label">Completed</div>
-    <div className="no-kpi-value">{completedCount}</div>
-  </div>
-
-  <div
-    className={`no-kpi ${kpiFilter === "startingToday" ? "active" : ""}`}
-    onClick={() =>
-      setKpiFilter(kpiFilter === "startingToday" ? "all" : "startingToday")
-    }
-  >
-    <div className="no-kpi-label">Starting Today</div>
-    <div className="no-kpi-value">{startingTodayCount}</div>
-  </div>
-
-  <div
-    className={`no-kpi ${kpiFilter === "endingToday" ? "active" : ""}`}
-    onClick={() =>
-      setKpiFilter(kpiFilter === "endingToday" ? "all" : "endingToday")
-    }
-  >
-    <div className="no-kpi-label">Ending Today</div>
-    <div className="no-kpi-value">{endingTodayCount}</div>
-  </div>
-
-  <div
-    className={`no-kpi warning ${kpiFilter === "endingSoon" ? "active" : ""}`}
-    onClick={() =>
-      setKpiFilter(kpiFilter === "endingSoon" ? "all" : "endingSoon")
-    }
-  >
-    <div className="no-kpi-label">Ending Soon</div>
-    <div className="no-kpi-value">{endingSoonCount}</div>
-  </div>
-  <div
-  className={`no-kpi danger ${kpiFilter === "refundPending" ? "active" : ""}`}
-  onClick={() =>
-    setKpiFilter(kpiFilter === "refundPending" ? "all" : "refundPending")
-  }
->
-  <div className="no-kpi-label">Refund Pending</div>
-  <div className="no-kpi-value">{refundPendingCount}</div>
 </div>
 
-</div>
-  <div className="no-head-top">
-    <h2>Nursing Orders</h2>
-    
-<button
-  className="cp-btn"
-  onClick={() => setCreateOpen(true)}
->
-  + Add Nursing Order
-</button>  </div>
-
-  <div className="no-filters">
-    <div className="no-filter-row-1">
-      <input
-  type="text"
-  className="no-input no-search"
-  placeholder="Search order no, customer, address…"
-  value={search}
-  onChange={(e) => setSearch(e.target.value)}
-/>
-    </div>
-
-    <div className="no-filter-row-2">
-<select
-  className="no-input no-compact"
-  value={statusFilter}
-  onChange={(e) => setStatusFilter(e.target.value)}
->
-  <option value="all">All Status</option>
-  <option value="created">Created</option>
-  <option value="assigned">Assigned</option>
-  <option value="active">Active</option>
-  <option value="completed">Completed</option>
-</select>
-<input
-  type="date"
-  className="no-input no-compact"
-  value={fromDate}
-  onChange={(e) => setFromDate(e.target.value)}
-/>     
-<input
-  type="date"
-  className="no-input no-compact"
-  value={toDate}
-  onChange={(e) => setToDate(e.target.value)}
-/>    
-<button
-  className="cp-btn ghost"
-  onClick={() => {
-    setSearch("");
-    setStatusFilter("all");
-    setFromDate("");
-    setToDate("");
-    setServiceFilter("all");
-  }}
->
-  Clear
-</button>    </div>
-  </div>
-</div>
 
 
 
@@ -493,7 +582,7 @@ const deleteNursingOrder = async (order) => {
               </tr>
             )}
 
-           {!loading && filteredOrders.length === 0 && (
+            {!loading && filteredOrders.length === 0 && (
 
               <tr>
                 <td colSpan="10" className="no-muted">
@@ -503,7 +592,21 @@ const deleteNursingOrder = async (order) => {
             )}
 
             {!loading &&
-             filteredOrders.map((o) => {
+              filteredOrders.map((o) => {
+                const totalPaid = (o.payments || []).reduce(
+                  (s, p) => s + Number(p.amount || 0),
+                  0
+                );
+
+                const total = Number(o.totals?.total || 0);
+
+                let paymentStatus = "due";
+
+                if (totalPaid >= total && total > 0) {
+                  paymentStatus = "paid";
+                } else if (totalPaid > 0) {
+                  paymentStatus = "partial";
+                }
 
                 const staffCount =
                   o.items?.reduce(
@@ -511,21 +614,21 @@ const deleteNursingOrder = async (order) => {
                     0
                   ) || 0;
 
-            const startDates =
-  o.items?.map((it) => toYmd(it.expectedStartDate)).filter(Boolean) || [];
+                const startDates =
+                  o.items?.map((it) => toYmd(it.expectedStartDate)).filter(Boolean) || [];
 
-const endDates =
-  o.items?.map((it) => toYmd(it.expectedEndDate)).filter(Boolean) || [];
+                const endDates =
+                  o.items?.map((it) => toYmd(it.expectedEndDate)).filter(Boolean) || [];
 
-const startDate =
-  startDates.length > 0
-    ? startDates.sort()[0]
-    : null;
+                const startDate =
+                  startDates.length > 0
+                    ? startDates.sort()[0]
+                    : null;
 
-const endDate =
-  endDates.length > 0
-    ? endDates.sort().slice(-1)[0]
-    : null;
+                const endDate =
+                  endDates.length > 0
+                    ? endDates.sort().slice(-1)[0]
+                    : null;
 
                 return (
                   <tr key={o.id}>
@@ -546,17 +649,25 @@ const endDate =
                       <span className={`pill ${o.status || "created"}`}>
                         {o.status || "created"}
                       </span>
+                      
                     </td>
 
                     <td>
-  <span className="pill blue">
-    {o.items?.[0]?.name || "—"}
-  </span>
-</td>
+                      <span className="pill blue">
+                        {o.items?.[0]?.name || "—"}
+                      </span>
+                          <td>
+                      <span className={`pay-pill ${paymentStatus}`}>
+                        {paymentStatus === "paid" && "Full Paid"}
+                        {paymentStatus === "partial" && "Partially Paid"}
+                        {paymentStatus === "due" && "Payment Due"}
+                      </span>
+                    </td>
+                    </td>
 
                     <td>{fmtDate(startDate)}</td>
-<td>{fmtDate(endDate)}</td>
-<td>{fmtDateTime(o.createdAt)}</td>
+                    <td>{fmtDate(endDate)}</td>
+                    <td>{fmtDateTime(o.createdAt)}</td>
 
                     <td>{staffCount}</td>
 
@@ -564,6 +675,7 @@ const endDate =
                       ₹ {fmtCurrency(o.totals?.total || 0)}
                     </td>
 
+                  
                     <td className="actions">
                       <button
                         className="link"
@@ -574,21 +686,14 @@ const endDate =
                         View
                       </button>
 
-                      <button
-                        className="link"
-                        onClick={() =>
-                          navigate(`/crm/nursing-orders/${o.id}?open=true`)
-                        }
-                      >
-                        Open
-                      </button>
+                    
                       {userRole === "superadmin" && (
-                      <button
-  className="link danger"
-  onClick={() => deleteNursingOrder(o)}
->
-  Delete
-</button>
+                        <button
+                          className="link danger"
+                          onClick={() => deleteNursingOrder(o)}
+                        >
+                          Delete
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -598,17 +703,17 @@ const endDate =
         </table>
       </div>
       {createOpen && (
-  <NursingOrderCreate
-    open
-    serviceType="nursing"
-    onClose={() => setCreateOpen(false)}
-    onCreated={() => {
-      setCreateOpen(false);
-      // reload orders
-      setOrders((prev) => [...prev]);
-    }}
-  />
-)}
+        <NursingOrderCreate
+          open
+          serviceType="nursing"
+          onClose={() => setCreateOpen(false)}
+          onCreated={() => {
+            setCreateOpen(false);
+            // reload orders
+            setOrders((prev) => [...prev]);
+          }}
+        />
+      )}
 
     </div>
   );
