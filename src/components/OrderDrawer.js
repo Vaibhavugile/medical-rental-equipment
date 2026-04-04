@@ -1044,12 +1044,12 @@ await syncDeliveryAssets({
   };
 
   return (
-    <div
-      className="cp-drawer"
-      onClick={(e) => {
-        if (e.target.classList.contains("cp-drawer")) closeOrder();
-      }}
-    >
+   <div
+  className="cp-drawer"
+  onClick={(e) => {
+    e.stopPropagation(); // prevents overlay close
+  }}
+>
       <div className="cp-form details" onClick={(e) => e.stopPropagation()}>
         <div className="cp-form-head">
           <h2>Order — {selectedOrder.orderNo || selectedOrder.id}</h2>

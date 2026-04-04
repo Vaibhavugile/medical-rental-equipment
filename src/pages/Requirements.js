@@ -1329,7 +1329,7 @@ if (statusFilter !== "all") {
                             step="0.01"
                             className="req-quote-input small"
                             placeholder={isNursingReq(detailsReq) ? "Daily Price" : "Price"}
-                            value={it.rate ?? ""}
+                            value={it.rate === 0 ? "" : it.rate}
                             onFocus={() => setActiveItemIdx(idx)}
                             onChange={(e) =>
                               updateQuotationItem(idx, {

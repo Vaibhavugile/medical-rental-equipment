@@ -120,7 +120,13 @@ background:#d1fae5;
   background: #fff;
   border: 1px solid #3b82f6;
 }
+.cp-drawer{
+  pointer-events: none;
+}
 
+.cp-drawer .cp-form{
+  pointer-events: auto;
+}
 /* Buttons */
 .btn-edit {
   background: #eef2ff !important;
