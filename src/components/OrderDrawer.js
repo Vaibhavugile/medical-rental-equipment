@@ -66,7 +66,6 @@ export default function OrderDrawer({
     open: false,
     itemIndex: null,
     stopDate: "",
-    amountOverride: "",
   });
 
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
@@ -233,64 +232,9 @@ const syncDeliveryAssets = async (order) => {
     console.warn("syncDeliveryAssets failed", err);
   }
 };
-  const getItemStopPreview = () => {
-    if (
-      stopItemModal.itemIndex === null ||
-      !stopItemModal.stopDate
-    )
-      return null;
-
-    const item = selectedOrder.items[stopItemModal.itemIndex];
-    if (!item) return null;
-
-    const start = new Date(item.expectedStartDate);
-    const oldEnd = new Date(item.expectedEndDate);
-    const newEnd = new Date(stopItemModal.stopDate);
-
-    if (newEnd >= oldEnd) return null;
-
-    const totalDays =
-      Math.round((oldEnd - start) / (1000 * 60 * 60 * 24)) + 1;
-
-    const newDays =
-      Math.round((newEnd - start) / (1000 * 60 * 60 * 24)) + 1;
-
-    const qty = Number(item.qty || 1);
-    const oldAmount = Number(item.amount || 0);
-
-    // 🔥 per day
-    const perDayRate = oldAmount / (totalDays * qty);
-
-    // 🔥 auto amount
-    const calculatedAmount = Math.round(
-      perDayRate * newDays * qty
-    );
 
 
-    // 🔥 override
-    const hasOverride =
-      stopItemModal.amountOverride !== "" &&
-      stopItemModal.amountOverride !== null &&
-      stopItemModal.amountOverride !== undefined;
 
-    const finalAmount = hasOverride
-      ? Number(stopItemModal.amountOverride)
-      : calculatedAmount;
-
-    // 🔥 derive new rate
-    const finalRate =
-      qty > 0 ? finalAmount / qty : 0;
-
-    return {
-      newDays,
-      calculatedAmount,
-      finalAmount,
-      finalRate,
-    };
-  };
-
-
-  const stopItemPreview = getItemStopPreview();
   // --- local helpers (UI-only) ---
   const fmtCurrency = (v) => {
     try {
@@ -650,164 +594,82 @@ await syncDeliveryAssets({
       return d;
     }
   };
-  const handleStopItem = async (preview) => {
-    try {
-      const idx = stopItemModal.itemIndex;
+  const handleStopItem = async () => {
+  try {
+    const idx = stopItemModal.itemIndex;
 
-      const oldItem = selectedOrder.items[idx];
-      const updatedItems = [...selectedOrder.items];
+    const oldItem = selectedOrder.items[idx];
+    const updatedItems = [...selectedOrder.items];
 
-      /* =========================
-         1️⃣ UPDATE ITEM + STOP HISTORY
-      ========================= */
+    /* =========================
+       1️⃣ UPDATE ITEM (ONLY END DATE)
+    ========================= */
 
-      updatedItems[idx] = {
-        ...oldItem,
+    updatedItems[idx] = {
+      ...oldItem,
 
-        expectedEndDate: stopItemModal.stopDate,
-        days: preview.newDays,
-        amount: Math.round(preview.finalAmount),
-        rate: Math.round(preview.finalRate),
+      // ✅ ONLY update end date
+      expectedEndDate: stopItemModal.stopDate,
 
-        // ✅ STOP HISTORY
-        stopHistory: [
-          ...(oldItem.stopHistory || []),
-          {
-            oldEndDate: oldItem.expectedEndDate,
-            newEndDate: stopItemModal.stopDate,
+      // ❌ DO NOT change billing fields
+      days: oldItem.days,
+      amount: oldItem.amount,
+      rate: oldItem.rate,
 
-            oldAmount: oldItem.amount,
-            newAmount: preview.finalAmount,
+      // ✅ STOP HISTORY
+      stopHistory: [
+        ...(oldItem.stopHistory || []),
+        {
+          oldEndDate: oldItem.expectedEndDate,
+          newEndDate: stopItemModal.stopDate,
 
-            stoppedAt: new Date().toISOString(),
-          },
-        ],
-      };
+          oldAmount: oldItem.amount,
+          newAmount: oldItem.amount,
 
-      /* =========================
-         2️⃣ RECALCULATE TOTALS
-      ========================= */
-
-      const newSubtotal = updatedItems.reduce(
-        (sum, it) => sum + Number(it.amount || 0),
-        0
-      );
-
-      const discount = Number(selectedOrder.totals?.discountAmount || 0);
-      const tax = Number(selectedOrder.totals?.totalTax || 0);
-
-      const newTotal = newSubtotal - discount + tax;
-
-      /* =========================
-         3️⃣ CALCULATE REFUND
-      ========================= */
-
-      const totalPaid = (selectedOrder.payments || []).reduce(
-        (s, p) => s + Number(p.amount || 0),
-        0
-      );
-
-      const refundAmount = Math.max(0, totalPaid - newTotal);
-
-      /* =========================
-         4️⃣ BUILD UPDATE PAYLOAD
-      ========================= */
-
-      let updatePayload = {
-        items: updatedItems,
-
-        totals: {
-          ...selectedOrder.totals,
-          subtotal: newSubtotal,
-          total: newTotal,
+          stoppedAt: new Date().toISOString(),
         },
+      ],
+    };
 
+    /* =========================
+       2️⃣ SAVE TO FIRESTORE
+    ========================= */
+
+    await updateDoc(
+      doc(db, "orders", selectedOrder.id),
+      {
+        items: updatedItems,
         lastStoppedAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
-      };
-
-      /* =========================
-         5️⃣ ADD REFUND IF EXISTS
-      ========================= */
-
-      if (refundAmount > 0) {
-        updatePayload = {
-          ...updatePayload,
-
-          refunds: arrayUnion({
-            id: `refund-${Date.now()}`,
-
-            amount: refundAmount,
-            paidAmount: 0,
-            status: "pending",
-
-            payments: [],
-
-            createdAt: new Date().toISOString(),
-            reason: "Service stopped early",
-          }),
-
-          // ✅ IMPORTANT
-          lastRefundedAt: serverTimestamp(),
-        };
       }
+    );
 
-      /* =========================
-         6️⃣ SAVE TO FIRESTORE
-      ========================= */
+    /* =========================
+       3️⃣ UPDATE LOCAL STATE
+    ========================= */
 
-      await updateDoc(
-        doc(db, "orders", selectedOrder.id),
-        updatePayload
-      );
+    setSelectedOrder((o) => ({
+      ...o,
+      items: updatedItems,
+    }));
 
-      /* =========================
-         7️⃣ UPDATE LOCAL STATE
-      ========================= */
+    /* =========================
+       4️⃣ RESET MODAL
+    ========================= */
 
-      setSelectedOrder((o) => ({
-        ...o,
-        items: updatedItems,
-        totals: {
-          ...o.totals,
-          subtotal: newSubtotal,
-          total: newTotal,
-        },
+    setStopItemModal({
+      open: false,
+      itemIndex: null,
+      stopDate: "",
+    });
 
-        ...(refundAmount > 0 && {
-          refunds: [
-            ...(o.refunds || []),
-            {
-              amount: refundAmount,
-              status: "pending",
-              createdAt: new Date().toISOString(),
-            },
-          ],
-        }),
-      }));
+    alert("Service stopped successfully");
 
-      /* =========================
-         8️⃣ RESET MODAL
-      ========================= */
-
-      setStopItemModal({
-        open: false,
-        itemIndex: null,
-        stopDate: "",
-        amountOverride: "",
-      });
-
-      alert(
-        refundAmount > 0
-          ? `Item stopped. Refund ₹${refundAmount} pending`
-          : "Item stopped"
-      );
-
-    } catch (err) {
-      console.error(err);
-      alert("Failed");
-    }
-  };
+  } catch (err) {
+    console.error(err);
+    alert("Failed to stop item");
+  }
+};
 
   // Auto-assign N: pick in-stock assets for product+branch, set & reserve (no checkout)
   const autoAssignAndReserve = async (idx) => {
@@ -1455,7 +1317,6 @@ await syncDeliveryAssets({
                                     open: true,
                                     itemIndex: idx,
                                     stopDate: it.expectedEndDate || "",
-                                    amountOverride: "",
                                   })
                                 }
                               >
@@ -2476,97 +2337,87 @@ Remove
           </div>
         )}
         {stopItemModal.open && (
-          <div
-            className="cp-modal"
-            onClick={() =>
-              setStopItemModal({
-                open: false,
-                itemIndex: null,
-                stopDate: "",
-                amountOverride: "",
-              })
-            }
-          >
-            <div
-              className="cp-modal-card"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h3>Stop Item</h3>
+  <div
+    className="cp-modal"
+    onClick={() =>
+      setStopItemModal({
+        open: false,
+        itemIndex: null,
+        stopDate: "",
+      })
+    }
+  >
+    <div
+      className="cp-modal-card"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h3>Stop Service</h3>
 
-              {/* DATE INPUT */}
-              <input
-                type="date"
-                className="cp-input"
-                value={stopItemModal.stopDate}
-                onChange={(e) =>
-                  setStopItemModal((s) => ({
-                    ...s,
-                    stopDate: e.target.value,
-                  }))
-                }
-              />
+      {/* STOP DATE */}
+      <div style={{ marginTop: 12 }}>
+        <div className="label muted">Stop Date</div>
 
-              {/* 👇 IF NO DATE SELECTED */}
-              {!stopItemPreview && (
-                <div style={{ marginTop: 12 }} className="muted">
-                  Select stop date to see calculation
-                </div>
-              )}
+        <input
+          type="date"
+          className="cp-input"
+          value={stopItemModal.stopDate}
+          onChange={(e) =>
+            setStopItemModal((s) => ({
+              ...s,
+              stopDate: e.target.value,
+            }))
+          }
+        />
+      </div>
 
-              {/* 👇 PREVIEW ONLY WHEN AVAILABLE */}
-              {stopItemPreview && (
-                <>
-                  <div style={{ marginTop: 12 }}>
-                    Calculated: ₹{fmtCurrency(stopItemPreview.calculatedAmount)}
-                  </div>
+      {/* INFO MESSAGE */}
+      <div
+        style={{
+          marginTop: 12,
+          padding: "10px",
+          background: "#f9fafb",
+          borderRadius: 6,
+          fontSize: 13,
+          color: "#6b7280",
+        }}
+      >
+        Service will stop on the selected date.  
+        Billing amount and rate will remain unchanged.
+      </div>
 
-                  <div style={{ marginTop: 6 }}>
-                    New Amount:
-                    <input
-                      className="cp-input"
-                      type="number"
-                      value={stopItemModal.amountOverride ?? stopItemPreview.calculatedAmount}
-                      onChange={(e) =>
-                        setStopItemModal((s) => ({
-                          ...s,
-                          amountOverride: e.target.value,
-                        }))
-                      }
-                    />
-                  </div>
+      {/* ACTION BUTTONS */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 8,
+          marginTop: 16,
+        }}
+      >
+        <button
+          className="cp-btn ghost"
+          onClick={() =>
+            setStopItemModal({
+              open: false,
+              itemIndex: null,
+              stopDate: "",
+            })
+          }
+        >
+          Cancel
+        </button>
 
-                  <div style={{ marginTop: 6 }}>
-                    New Rate: ₹{stopItemPreview.finalRate.toFixed(2)}
-                  </div>
-
-                  <button
-                    className="cp-btn"
-                    style={{ marginTop: 12 }}
-                    onClick={() => handleStopItem(stopItemPreview)}
-                  >
-                    Confirm Stop
-                  </button>
-                </>
-              )}
-
-              {/* CANCEL BUTTON */}
-              <button
-                className="cp-btn ghost"
-                style={{ marginTop: 8 }}
-                onClick={() =>
-                  setStopItemModal({
-                    open: false,
-                    itemIndex: null,
-                    stopDate: "",
-                    amountOverride: null,
-                  })
-                }
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
+        <button
+          className="cp-btn"
+          disabled={!stopItemModal.stopDate}
+          onClick={() => handleStopItem()}
+        >
+          Confirm Stop
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
 
         {/* Payment modal */}
