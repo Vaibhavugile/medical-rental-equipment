@@ -71,6 +71,7 @@ export default function NursingOrderDetails() {
   });
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [customerDraft, setCustomerDraft] = useState(null);
+  const [allAssignments, setAllAssignments] = useState([]);
   const [customerErrors, setCustomerErrors] = useState({});
   const [staffFilters, setStaffFilters] = useState({
     staffType: "all",
@@ -405,7 +406,63 @@ const openExtendServiceModal = (serviceIndex) => {
 
     return true;
   });
+  const isDateOverlap = (start1, end1, start2, end2) => {
 
+  const s1 = new Date(start1).getTime();
+  const e1 = new Date(end1).getTime();
+
+  const s2 = new Date(start2).getTime();
+  const e2 = new Date(end2).getTime();
+
+  return s1 < e2 && s2 < e1;
+
+};
+  const getStaffAvailability = (staffId) => {
+
+  if (!assignDates.startDate || !assignDates.endDate) {
+    return { status: "available" };
+  }
+
+  const conflicting = allAssignments.find((a) => {
+
+    if (a.staffId !== staffId) return false;
+
+    if (!["assigned", "active"].includes(a.status)) return false;
+
+    return isDateOverlap(
+      assignDates.startDate,
+      assignDates.endDate,
+      a.startDate,
+      a.endDate
+    );
+
+  });
+
+  if (!conflicting) {
+    return { status: "available" };
+  }
+
+  if (conflicting.orderId === id) {
+    return {
+      status: "reserved",
+      orderNo: conflicting.orderNo,
+      startDate: conflicting.startDate,
+      endDate: conflicting.endDate
+    };
+  }
+
+  return {
+    status: "busy",
+    orderNo: conflicting.orderNo,
+    startDate: conflicting.startDate,
+    endDate: conflicting.endDate
+  };
+
+};
+ const staffWithStatus = filteredStaff.map((s) => ({
+  ...s,
+  availability: getStaffAvailability(s.id)
+}));
   const displayUser = (uid, name) =>
     uid === auth.currentUser?.uid ? "You" : name;
   const calculateTotals = (items, discountAmount = 0, taxBreakdown = []) => {
@@ -594,6 +651,34 @@ const openExtendServiceModal = (serviceIndex) => {
     loadRates();
 
   }, []);
+const loadAllAssignments = async () => {
+
+  try {
+
+    const q = query(
+      collection(db, "staffAssignments"),
+      where("status", "in", ["assigned", "active"])
+    );
+
+    const snap = await getDocs(q);
+
+    const data = snap.docs.map(d => ({
+      id: d.id,
+      ...(d.data() || {})
+    }));
+
+    setAllAssignments(data);
+
+  } catch (err) {
+
+    console.error("Failed loading assignments", err);
+
+  }
+
+};
+useEffect(() => {
+  loadAllAssignments();
+}, []);
   useEffect(() => {
 
     const loadUserRole = async () => {
@@ -1047,6 +1132,7 @@ const openExtendServiceModal = (serviceIndex) => {
   };
 
 
+
   const getMaxEndDate = () => {
     const dates = (order.items || [])
       .map(i => i.expectedEndDate)
@@ -1111,6 +1197,9 @@ const openExtendServiceModal = (serviceIndex) => {
     };
 
   };
+  
+
+  
   const assignStaff = async (staff) => {
 
     if (!order) return;
@@ -1289,6 +1378,7 @@ const openExtendServiceModal = (serviceIndex) => {
       =============================== */
 
       await loadAssignments();
+      await loadAllAssignments();
 
       setAssignOpen(false);
 
@@ -2649,6 +2739,7 @@ const openExtendServiceModal = (serviceIndex) => {
     }
 
   };
+
   const getStopPreview = () => {
     if (!stopFullModal.stopDate || !order) return null;
 
@@ -3341,24 +3432,65 @@ const openExtendServiceModal = (serviceIndex) => {
                       {/* SALARY DISPLAY / EDIT */}
                       <div className="nod-bold">
                         {isSuperAdmin && editingStaffId === a.id ? (
+  <div className="nod-salary-edit">
+
+    <span>₹</span>
+
+    <input
+      type="number"
+      className="nod-input small"
+      value={tempSalary[a.id]}
+      onChange={(e) =>
+        setTempSalary((p) => ({
+          ...p,
+          [a.id]: Number(e.target.value || 0),
+        }))
+      }
+    />
+
+    <button
+      className="nod-btn nod-btn-primary small"
+      onClick={() =>
+        saveStaffSalary({
+          ...a,
+          amount: tempSalary[a.id],
+        })
+      }
+    >
+      Save
+    </button>
+
+    <button
+      className="nod-btn nod-btn-secondary small"
+      onClick={() => {
+        setEditingStaffId(null);
+        setTempSalary({});
+      }}
+    >
+      Cancel
+    </button>
+
+  </div>
+) : (
                           <>
-                            ₹
-                            <input
-                              type="number"
-                              className="nod-input small"
-                              value={tempSalary[a.id]}
-                              onChange={(e) =>
-                                setTempSalary((p) => ({
-                                  ...p,
-                                  [a.id]: Number(e.target.value || 0),
-                                }))
-                              }
-                            />
-                          </>
-                        ) : (
-                          <>₹ {fmtCurrency(a.amount)}</>
+                        <div>
+
+  <strong>
+    ₹{fmtCurrency(a.amount)}
+  </strong>
+
+  <div className="nod-muted">
+    ₹{fmtCurrency(a.rate)} / {a.rateType}
+  </div>
+
+  <div className="nod-muted">
+    {a.days} days × ₹{fmtCurrency(a.rate)}
+  </div>
+
+</div></>
                         )}
                       </div>
+                      
 
                       {/* Payment badge */}
                       <span
@@ -3457,31 +3589,7 @@ const openExtendServiceModal = (serviceIndex) => {
                       {/* EDIT / SAVE */}
                       {/* EDIT / SAVE (SUPERADMIN ONLY) */}
                       {isSuperAdmin && (
-                        editingStaffId === a.id ? (
-                          <>
-                            <button
-                              className="nod-btn nod-btn-primary small"
-                              onClick={() =>
-                                saveStaffSalary({
-                                  ...a,
-                                  amount: tempSalary[a.id],
-                                })
-                              }
-                            >
-                              Save
-                            </button>
-
-                            <button
-                              className="nod-btn nod-btn-secondary small"
-                              onClick={() => {
-                                setEditingStaffId(null);
-                                setTempSalary({});
-                              }}
-                            >
-                              Cancel
-                            </button>
-                          </>
-                        ) : (
+                       
                           <button
                             className="nod-btn nod-btn-secondary small"
                             onClick={() => {
@@ -3491,7 +3599,7 @@ const openExtendServiceModal = (serviceIndex) => {
                           >
                             Edit
                           </button>
-                        )
+                        
                       )}
 
                       {/* PAY */}
@@ -3573,14 +3681,25 @@ const openExtendServiceModal = (serviceIndex) => {
 
 
       {/* ACTIONS */}
-      <div className="nod-actions">
-        <button className="nod-btn nod-btn-secondary" onClick={() => markStatus("active")}>
-          Mark Active
-        </button>
-        <button className="nod-btn nod-btn-primary" onClick={() => markStatus("completed")}>
-          Mark Completed
-        </button>
-      </div>
+     <div className="nod-actions">
+
+  <button
+    className="nod-btn nod-btn-secondary"
+    disabled={order.status === "active"}
+    onClick={() => markStatus("active")}
+  >
+    Mark Active
+  </button>
+
+  <button
+    className="nod-btn nod-btn-primary"
+    disabled={order.status === "completed"}
+    onClick={() => markStatus("completed")}
+  >
+    Mark Completed
+  </button>
+
+</div>
       <div className="nod-card">
         <h3>Activity Log</h3>
 
@@ -3950,7 +4069,7 @@ const openExtendServiceModal = (serviceIndex) => {
 
             <div className="nod-staff-grid">
 
-              {filteredStaff.map((s) => {
+              {staffWithStatus.map((s) => {
 
                 const preview = getSalaryPreview(s);
 
@@ -4019,6 +4138,20 @@ const openExtendServiceModal = (serviceIndex) => {
                       )}
 
                     </div>
+       <div>
+
+  <span className={`staff-status ${s.availability.status}`}>
+    {s.availability.status.toUpperCase()}
+  </span>
+
+  {s.availability.status !== "available" && (
+    <div className="nod-muted">
+      Order: {s.availability.orderNo} <br />
+      {fmtDateTime(s.availability.startDate)} → {fmtDateTime(s.availability.endDate)}
+    </div>
+  )}
+
+</div>
 
                     <button
                       className="nod-btn nod-btn-primary"

@@ -70,11 +70,11 @@ useEffect(() => {
          ACTIVE ASSIGNMENTS
       =============================== */
 
-      const activeQ = query(
-        collection(db, "staffAssignments"),
-        where("staffId", "==", id),
-        where("status", "==", "active")
-      );
+     const activeQ = query(
+  collection(db, "staffAssignments"),
+  where("staffId", "==", id),
+  where("status", "in", ["assigned", "active"])
+);
 
       /* ===============================
          ASSIGNMENT HISTORY
@@ -165,10 +165,12 @@ useEffect(() => {
 const totalAssignments =
   activeAssignments.length + assignmentHistory.length;
 
-const totalEarnings = assignmentHistory.reduce(
-  (sum, a) => sum + Number(a.amount || 0),
-  0
-);
+const totalEarnings = assignmentHistory
+  .filter(a => a.status === "completed")
+  .reduce(
+    (sum, a) => sum + Number(a.amount || 0),
+    0
+  );
 
 const currentMonth = new Date().getMonth();
 const currentYear = new Date().getFullYear();
@@ -325,6 +327,9 @@ const monthlyIncome = payrollHistory
               <div className="sd-muted">
                 {a.startDate} → {a.endDate}
               </div>
+              <span className={`sd-badge ${a.status}`}>
+  {a.status}
+</span>
             </div>
             <div className="sd-amount">
               ₹ {fmtCurrency(a.amount)}
@@ -346,8 +351,12 @@ const monthlyIncome = payrollHistory
             <div>
               <strong>{a.orderNo}</strong>
               <div className="sd-muted">
-                {a.startDate} → {a.endDate}
-              </div>
+  {a.startDate} → {a.endDate}
+</div>
+
+<span className={`sd-badge ${a.status}`}>
+  {a.status}
+</span>
             </div>
             <div>
               ₹ {fmtCurrency(a.amount)}{" "}

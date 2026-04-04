@@ -1034,3 +1034,28 @@ text-align:center;
   justify-content:flex-end;
   gap:10px;
 }
+.staff-status{
+  font-size:12px;
+  padding:3px 8px;
+  border-radius:6px;
+  margin-right:8px;
+}
+
+.staff-status.available{
+  background:#e8f8f0;
+  color:#0a7a3f;
+}
+
+.staff-status.busy{
+  background:#fdeaea;
+  color:#c0392b;
+}
+
+.staff-status.reserved{
+  background:#fff6e5;
+  color:#b26a00;
+}
+.nod-btn:disabled{
+opacity:0.5;
+cursor:not-allowed;
+}
