@@ -221,11 +221,11 @@ if (role === "users") {
 
     const person = peopleById[userId]
 
-    const monthlySalary =
-      person?.salaryMonthly ||
-      person?.salary ||
-      person?.baseRate ||
-      0
+   const monthlySalary =
+  person?.salary ||
+  person?.salaryMonthly ||
+  person?.baseRate ||
+  0
     const perDaySalary = monthlySalary / 26
 
     const salary =
@@ -371,7 +371,10 @@ if (role === "users") {
 
           const person = peopleById[id]
 
-          const monthlySalary = person?.salaryMonthly || 0
+          const monthlySalary =
+  person?.salary ||
+  person?.salaryMonthly ||
+  0
           const perDaySalary = monthlySalary / 26
 
           const salary =

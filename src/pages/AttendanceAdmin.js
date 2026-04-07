@@ -601,7 +601,7 @@ if (type === "absent") prev.absent++;
   const pu = perUserById[id] || { leads: 0, visits: 0 };
 
   // salary calculation
-  const monthlySalary = peopleById[id]?.salaryMonthly || 0;
+  const monthlySalary = peopleById[id]?.salaryMonthly ||peopleById[id]?.salary || 0;
   const perDaySalary = monthlySalary / 26;
 
 const salary =
