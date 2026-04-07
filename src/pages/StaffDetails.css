@@ -9,7 +9,14 @@
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   color: #0f172a;
 }
+.clickable {
+  cursor: pointer;
+  transition: background 0.2s;
+}
 
+.clickable:hover {
+  background: #f5f7fb;
+}
 /* ===============================
    Header
 ================================ */

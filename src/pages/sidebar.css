@@ -8,7 +8,22 @@
   overflow: hidden;
 }
 
+.sidebar-badge{
+  background:#ef4444;
+  color:white;
+  font-size:11px;
+  font-weight:600;
+  min-width:18px;
+  height:18px;
+  padding:0 6px;
+  border-radius:999px;
 
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  line-height:1;
+}
 /* allow tooltips to escape */
 .sidebar.collapsed {
   overflow: visible;
@@ -212,8 +227,12 @@
 }
 
 /* LABEL */
-.sidebar-link-label {
-  white-space: nowrap;
+.sidebar-link-label{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  width:100%;
 }
 
 /* ===============================

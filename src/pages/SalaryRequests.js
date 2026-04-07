@@ -45,6 +45,18 @@ export default function SalaryRequests() {
     try{
 
       const snap = await getDocs(collection(db,"salaryOverrideRequests"));
+      for (const d of snap.docs) {
+
+  const data = d.data();
+
+  if (!data.seenBy) {
+    await updateDoc(doc(db,"salaryOverrideRequests", d.id), {
+      seenBy: auth.currentUser?.uid || "",
+      seenAt: serverTimestamp()
+    });
+  }
+
+}
 
       const data = snap.docs.map(d=>({
         id:d.id,
@@ -102,23 +114,25 @@ export default function SalaryRequests() {
     return true;
 
   })
-  .sort((a,b)=>{
+  .sort((a, b) => {
 
-    if(sortBy==="newest"){
-      return new Date(b.requestedAt || 0) - new Date(a.requestedAt || 0);
-    }
+  const getTime = (t) =>
+    t?.toDate ? t.toDate().getTime() : new Date(t || 0).getTime();
 
-    if(sortBy==="oldest"){
-      return new Date(a.requestedAt || 0) - new Date(b.requestedAt || 0);
-    }
+  if (sortBy === "newest") {
+    return getTime(b.requestedAt) - getTime(a.requestedAt);
+  }
 
-    if(sortBy==="highest"){
-      return (b.requestedAmount || 0) - (a.requestedAmount || 0);
-    }
+  if (sortBy === "oldest") {
+    return getTime(a.requestedAt) - getTime(b.requestedAt);
+  }
 
-    return 0;
+  if (sortBy === "highest") {
+    return (b.requestedAmount || 0) - (a.requestedAmount || 0);
+  }
 
-  });
+  return 0;
+});
 
   /* ==========================
      OPEN DETAILS

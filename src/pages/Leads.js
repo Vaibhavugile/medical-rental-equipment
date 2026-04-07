@@ -19,7 +19,7 @@ import { db, auth } from "../firebase";
 import "./Leads.css";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faWhatsapp } from "@fortawesome/free-brands-svg-icons";
-
+import { writeBatch } from "firebase/firestore";
 // Requirement form integration
 import RequirementForm from "../data/RequirementForm";
 
@@ -157,6 +157,22 @@ export default function Leads() {
           };
         });
         setLeads(docs);
+
+/* mark leads as seen */
+const batch = writeBatch(db);
+
+snap.docs.forEach((d) => {
+  const data = d.data();
+
+  if (!data.seen) {
+    batch.update(doc(db, "leads", d.id), {
+      seen: true
+    });
+  }
+});
+
+batch.commit();
+
         setLoading(false);
       },
       (err) => {

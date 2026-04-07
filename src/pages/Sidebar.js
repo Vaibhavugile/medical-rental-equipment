@@ -17,7 +17,14 @@ import {
 } from "lucide-react";
 import "./sidebar.css";
 import useSidebarAccess from "../hooks/useSidebarAccess";
-
+import {
+  collection,
+  query,
+  where,
+  onSnapshot
+} from "firebase/firestore";
+import { db } from "../firebase";
+import { useEffect, useState } from "react";
 /* =========================
    SIDEBAR CONFIG
 ========================= */
@@ -57,11 +64,11 @@ const SECTIONS = [
         icon: FileText,
       },
       {
-  key: "appointments",          // permission key
-  label: "Appointments",
-  path: "/crm/adminappointment",
-  icon: ClipboardList,
-},
+        key: "appointments",          // permission key
+        label: "Appointments",
+        path: "/crm/adminappointment",
+        icon: ClipboardList,
+      },
 
     ],
   },
@@ -80,14 +87,14 @@ const SECTIONS = [
         path: "/crm/nursing-orders",
         icon: Stethoscope,
       },
-         {
+      {
         key: "caretaker-orders",     // ✅
         label: "Caretakers Orders",
         path: "/crm/caretaker-orders",
         icon: Stethoscope,
       },
 
-      
+
     ],
   },
   {
@@ -99,13 +106,13 @@ const SECTIONS = [
       //   path: "/crm/staff",
       //   icon: Users,
       // },
-         {
+      {
         key: "nurses",              // ✅
         label: "Nurses",
         path: "/crm/nurses",
         icon: Users,
       },
-          {
+      {
         key: "caretakers",              // ✅
         label: "Caretakers",
         path: "/crm/caretakers",
@@ -123,8 +130,8 @@ const SECTIONS = [
         path: "/crm/drivers",
         icon: Truck,
       },
-      
-       {
+
+      {
         key: "employee",            // ✅
         label: "Employees",
         path: "/crm/employees",
@@ -153,38 +160,38 @@ const SECTIONS = [
         path: "/crm/reports/caretaker",
         icon: Wallet,
       },
-      
+
       {
         key: "reports",            // ✅
         label: "Equipment Reports",
         path: "/crm/reports",
         icon: BarChart3,
       },
-      
-      
-        {
+
+
+      {
         key: "Nurse_caretakerpay",            // ✅
         label: "Basepay",
         path: "/crm/staffsalary",
         icon: BarChart3,
       },
-       {
+      {
         key: "Payment_Increase_Request",            // ✅
         label: "Salary Increase Request",
         path: "/crm/salaryrequest",
         icon: BarChart3,
       },
-       {
+      {
         key: "salarypayroll",            // ✅
         label: "Salary",
         path: "/crm/salarypayroll",
         icon: BarChart3,
       },
-      
-      
+
+
     ],
   },
-   {
+  {
     title: "Recycle Bin",
     items: [
       {
@@ -199,8 +206,8 @@ const SECTIONS = [
         path: "/crm/nursing-orders/recycle-bin",
         icon: Wallet,
       },
-      
-      
+
+
     ],
   },
   {
@@ -246,8 +253,73 @@ const SECTIONS = [
 ========================= */
 
 export default function Sidebar({ collapsed, onToggle }) {
-   const { allowedKeys, loading } = useSidebarAccess();
-     if (loading) return null; // or loader
+  const { allowedKeys, loading } = useSidebarAccess();
+  const [notifications, setNotifications] = useState({
+    leads: 0,
+    salary: 0
+  });
+  useEffect(() => {
+
+  const q = query(collection(db,"leads"));
+
+  const unsubscribe = onSnapshot(q,(snap)=>{
+
+    let unseenCount = 0;
+
+    snap.docs.forEach((d)=>{
+
+      const data = d.data();
+
+      // treat missing seen as false
+      const isSeen = data.seen === true;
+
+      if(!isSeen){
+        unseenCount++;
+      }
+
+    });
+
+    setNotifications(prev=>({
+      ...prev,
+      leads:unseenCount
+    }));
+
+  });
+
+  return ()=>unsubscribe();
+
+},[]);
+  useEffect(() => {
+
+  const q = query(collection(db,"salaryOverrideRequests"));
+
+  const unsubscribe = onSnapshot(q,(snap)=>{
+
+    let unseenCount = 0;
+
+    snap.docs.forEach((d)=>{
+
+      const data = d.data();
+
+      const isSeen = !!data.seenBy;
+
+      if(!isSeen){
+        unseenCount++;
+      }
+
+    });
+
+    setNotifications(prev=>({
+      ...prev,
+      salary: unseenCount
+    }));
+
+  });
+
+  return ()=>unsubscribe();
+
+},[]);
+  if (loading) return null; // or loader
 
   return (
     <aside className={`sidebar ${collapsed ? "collapsed" : ""}`}>
@@ -273,36 +345,52 @@ export default function Sidebar({ collapsed, onToggle }) {
             )}
 
             {section.items
-  .filter(item =>
-    !allowedKeys || allowedKeys.includes(item.key)
-  )
-  .map(({ key, label, path, icon: Icon, exact }) => (
+              .filter(item =>
+                !allowedKeys || allowedKeys.includes(item.key)
+              )
+              .map(({ key, label, path, icon: Icon, exact }) => (
 
-      <NavLink
-  key={key}
-  to={path}
-  end={exact}
-  className={({ isActive }) =>
-    `sidebar-link ${isActive ? "active" : ""}`
-  }
->
-  <Icon size={18} />
+                <NavLink
+                  key={key}
+                  to={path}
+                  end={exact}
+                  className={({ isActive }) =>
+                    `sidebar-link ${isActive ? "active" : ""}`
+                  }
+                >
+                  <Icon size={18} />
 
-  {/* Normal label when expanded */}
-  {!collapsed && (
-    <span className="sidebar-link-label">{label}</span>
+                  {/* Normal label when expanded */}
+                  {!collapsed && (
+                    <span className="sidebar-link-label">
+
+  {label}
+
+  {key === "leads" && notifications.leads > 0 && (
+    <span className="sidebar-badge">
+      {notifications.leads}
+    </span>
   )}
 
-  {/* Tooltip when collapsed */}
-  {collapsed && (
-    <span className="sidebar-tooltip">{label}</span>
+  {key === "Payment_Increase_Request" && notifications.salary > 0 && (
+    <span className="sidebar-badge">
+      {notifications.salary}
+    </span>
   )}
 
-  <span className="active-indicator" />
-</NavLink>
+</span>
+                  )}
+
+                  {/* Tooltip when collapsed */}
+                  {collapsed && (
+                    <span className="sidebar-tooltip">{label}</span>
+                  )}
+
+                  <span className="active-indicator" />
+                </NavLink>
 
 
-            ))}
+              ))}
           </div>
         ))}
       </div>

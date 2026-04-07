@@ -132,23 +132,28 @@ export default function NursingOrderDetails() {
     setIsEditingCustomer(false);
     setCustomerDraft(null);
   };
-  const calculateExtension = (serviceIndex, newEndDate, rate) => {
+ const calculateExtension = (serviceIndex, newEndDate, rate) => {
 
-    const service = editableItems[serviceIndex];
+  const service = editableItems[serviceIndex];
 
-    const oldEnd = new Date(service.expectedEndDate);
-    const newEnd = new Date(newEndDate);
+  const oldEnd = new Date(service.expectedEndDate);
 
-    const extraDays = Math.max(
-      0,
-      Math.floor((newEnd - oldEnd) / (1000 * 60 * 60 * 24))
-    );
+  const mergedEndDate = mergeDateKeepTime(
+    service.expectedEndDate,
+    newEndDate
+  );
 
-    const amount = extraDays * rate;
+  const newEnd = new Date(mergedEndDate);
 
-    return { extraDays, amount };
+  const extraDays = Math.max(
+    0,
+    Math.floor((newEnd - oldEnd) / (1000 * 60 * 60 * 24))
+  );
 
-  };
+  const amount = extraDays * rate;
+
+  return { extraDays, amount };
+};
 
   const validateCustomer = () => {
     const errors = {};
@@ -231,8 +236,10 @@ const openExtendServiceModal = (serviceIndex) => {
   setExtendServiceModal({
     open: true,
     serviceIndex,
-    endDate: formatDateTimeLocal(service.expectedEndDate),
-    rate: Math.round(rate),
+endDate: new Date(service.expectedEndDate)
+  .toISOString()
+  .slice(0,10),
+      rate: Math.round(rate),
     extraDays: 0,
     amount: 0
   });
@@ -1164,7 +1171,6 @@ useEffect(() => {
     (sum, a) => sum + Number(a.balanceAmount || 0),
     0
   );
-
   const getSalaryPreview = (staff) => {
 
     if (!assignDates.startDate || !assignDates.endDate) return null;
@@ -1486,7 +1492,11 @@ useEffect(() => {
     try {
 
       const service = editableItems[serviceIndex];
-      const updatedEndDate = endDate;
+
+const updatedEndDate = mergeDateKeepTime(
+  service.expectedEndDate,
+  endDate
+);
 
       /* =====================
          UPDATE SERVICE
@@ -1717,6 +1727,19 @@ useEffect(() => {
     setPaymentModal((p) => ({ ...p, saving: true }));
 
     try {
+      const payAmount = Number(paymentModal.form.amount || 0);
+
+if (!payAmount || payAmount <= 0) {
+  alert("Enter valid payment amount");
+  setPaymentModal(p => ({ ...p, saving:false }));
+  return;
+}
+
+if (payAmount > balance) {
+  alert(`Payment cannot exceed remaining balance (₹${balance})`);
+  setPaymentModal(p => ({ ...p, saving:false }));
+  return;
+}
       const user = auth.currentUser;
 
       const newPayment = {
@@ -2050,6 +2073,8 @@ useEffect(() => {
      FINAL BALANCE
   ========================= */
   const orderTotal = Number(order?.totals?.total || 0);
+  const profit = orderTotal - totalSalary;
+
 
   const balance = Math.max(0, orderTotal - netPaid);
   /* ======================
@@ -3670,6 +3695,26 @@ useEffect(() => {
           </strong>
         </div>
       </div>
+      <div className="nod-card">
+  <h3>Finance Summary</h3>
+
+  <div className="nod-row">
+    <span>Total Order Amount</span>
+    <strong>₹{fmtCurrency(orderTotal)}</strong>
+  </div>
+
+  <div className="nod-row">
+    <span>Total Staff Salary</span>
+    <strong>₹{fmtCurrency(totalSalary)}</strong>
+  </div>
+
+  <div className="nod-row">
+    <span>Profit</span>
+    <strong style={{ color: profit >= 0 ? "green" : "red" }}>
+      ₹{fmtCurrency(profit)}
+    </strong>
+  </div>
+</div>
 
 
 
@@ -4440,7 +4485,7 @@ useEffect(() => {
             <label>New End Date</label>
 
             <input
-              type="datetime-local"
+              type="date"
               value={extendServiceModal.endDate}
               onChange={(e) => {
 

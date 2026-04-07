@@ -360,7 +360,7 @@ const pendingSalary = staffAssignments.reduce(
   (s, a) => s + Number(a.balanceAmount || 0),
   0
 );
-
+const profit = totalAmount - totalSalary;
     /* ===============================
     UI
     ================================ */
@@ -781,6 +781,16 @@ const pendingSalary = staffAssignments.reduce(
                                 <span>Balance</span>
                                 <span>₹{balance}</span>
                             </div>
+                            <hr/>
+
+
+<div
+  className="total-row profit"
+  style={{ color: profit >= 0 ? "#059669" : "#dc2626" }}
+>
+  <span>Profit</span>
+  <span>₹{profit}</span>
+</div>
 
                         </div>
 
