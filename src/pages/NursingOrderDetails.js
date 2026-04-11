@@ -86,6 +86,46 @@ export default function NursingOrderDetails() {
     extraDays: 0,
     amount: 0
   });
+  const getDaysInclusive = (start, end) => {
+  if (!start || !end) return 0;
+
+  const s = new Date(start);
+  const e = new Date(end);
+
+  s.setHours(0,0,0,0);
+  e.setHours(0,0,0,0);
+
+  const diff = (e - s) / (1000 * 60 * 60 * 24);
+
+  return Math.max(0, diff + 1);
+};
+const updateServiceItem = (index, patch) => {
+
+  setEditableItems(prev => {
+
+    const items = [...prev];
+
+    const item = {
+      ...items[index],
+      ...patch
+    };
+
+    const rate = Number(item.rate || 0);
+
+    const days = getDaysInclusive(
+      item.expectedStartDate,
+      item.expectedEndDate
+    );
+
+    item.amount = rate * days;
+
+    items[index] = item;
+
+    return items;
+
+  });
+
+};
   const [salaryRequestModal, setSalaryRequestModal] = useState({
     open: false,
     assignment: null,
@@ -1626,11 +1666,11 @@ const updatedEndDate = mergeDateKeepTime(
       ===================== */
 
       const q = query(
-        collection(db, "staffAssignments"),
-        where("orderId", "==", id),
-        where("serviceIndex", "==", serviceIndex),
-        where("status", "==", "assigned")
-      );
+  collection(db, "staffAssignments"),
+  where("orderId", "==", id),
+  where("serviceIndex", "==", serviceIndex),
+  where("status", "in", ["assigned", "active"])
+);
 
       const snap = await getDocs(q);
 
@@ -3003,195 +3043,294 @@ if (payAmount > balance) {
       </div>
 
       {/* SERVICES */}
-      <div className="nod-card">
-        <div className="nod-row">
-          <h3>Services</h3>
+     <div className="nod-card">
+  <div className="nod-row">
+    <h3>Services</h3>
 
-          {!servicesEditing ? (
-            <button
-              className="nod-btn nod-btn-secondary"
-              onClick={() => setServicesEditing(true)}
-            >
-              Edit Services
-            </button>
+    {!servicesEditing ? (
+      <button
+        className="nod-btn nod-btn-secondary"
+        onClick={() => setServicesEditing(true)}
+      >
+        Edit Services
+      </button>
+    ) : (
+      <>
+        <button
+          className="nod-btn nod-btn-primary"
+          onClick={saveServices}
+        >
+          Save
+        </button>
+        <button
+          className="nod-btn nod-btn-secondary"
+          onClick={() => {
+            setEditableItems(order.items);
+            setServicesEditing(false);
+          }}
+        >
+          Cancel
+        </button>
+      </>
+    )}
+  </div>
+
+  {editableItems.map((it, i) => {
+
+    const days = getDaysInclusive(
+      it.expectedStartDate,
+      it.expectedEndDate
+    );
+
+    const rate = Number(it.rate || 0);
+
+    const calculatedAmount = days * rate;
+
+    return (
+
+      <div key={i} className="nod-item-row">
+
+        <div>
+
+          {/* SERVICE NAME */}
+          {servicesEditing ? (
+            <input
+              className="nod-input"
+              value={it.name}
+              onChange={(e) => {
+
+                const updated = [...editableItems];
+
+                updated[i] = {
+                  ...updated[i],
+                  name: e.target.value
+                };
+
+                setEditableItems(updated);
+
+              }}
+            />
           ) : (
-            <>
-              <button
-                className="nod-btn nod-btn-primary"
-                onClick={saveServices}
-              >
-                Save
-              </button>
-              <button
-                className="nod-btn nod-btn-secondary"
-                onClick={() => {
-                  setEditableItems(order.items);
-                  setServicesEditing(false);
-                }}
-              >
-                Cancel
-              </button>
-            </>
+            <strong>{it.name}</strong>
           )}
-        </div>
 
-        {editableItems.map((it, i) => (
+          {/* DATES */}
+          <div className="nod-muted">
 
-          <div key={i} className="nod-item-row">
-            <div>
-              {/* SERVICE NAME */}
-              {servicesEditing ? (
+            {servicesEditing ? (
+              <>
                 <input
-                  className="nod-input"
-                  value={it.name}
+                  type="datetime-local"
+                  className="nod-input small"
+                  value={it.expectedStartDate || ""}
                   onChange={(e) => {
+
                     const updated = [...editableItems];
+
                     updated[i] = {
                       ...updated[i],
-                      name: e.target.value,
+                      expectedStartDate: e.target.value
                     };
+
+                    const days = getDaysInclusive(
+                      e.target.value,
+                      updated[i].expectedEndDate
+                    );
+
+                    updated[i].amount =
+                      days * Number(updated[i].rate || 0);
+
                     setEditableItems(updated);
+
                   }}
                 />
-              ) : (
-                <strong>{it.name}</strong>
-              )}
 
-              {/* DATES */}
-              <div className="nod-muted">
-                {servicesEditing ? (
-                  <>
-                    <input
-                      type="datetime-local"
-                      className="nod-input small"
-                      value={it.expectedStartDate}
-                      onChange={(e) => {
-                        const updated = [...editableItems];
-                        updated[i] = {
-                          ...updated[i],
-                          expectedStartDate: e.target.value,
-                        };
-                        setEditableItems(updated);
-                      }}
-                    />
-                    {" → "}
-                    <input
-                      type="datetime-local"
+                {" → "}
 
-                      className="nod-input small"
-                      value={it.expectedEndDate}
-                      onChange={(e) => {
-                        const updated = [...editableItems];
-                        updated[i] = {
-                          ...updated[i],
-                          expectedEndDate: e.target.value,
-                        };
-                        setEditableItems(updated);
-                      }}
-                    />
-                  </>
-                ) : (
-                  <>
-                    {it.expectedStartDate} → {it.expectedEndDate}
-                  </>
-                )}
-              </div>
+                <input
+                  type="datetime-local"
+                  className="nod-input small"
+                  value={it.expectedEndDate || ""}
+                  onChange={(e) => {
 
-              {/* MANUAL SERVICE AMOUNT */}
-              <div className="nod-muted">
-                {servicesEditing ? (
-                  <>
-                    ₹{" "}
-                    <input
-                      type="number"
-                      className="nod-input small"
-                      value={it.amount}
-                      onChange={(e) => {
-                        const updated = [...editableItems];
-                        updated[i] = {
-                          ...updated[i],
-                          amount: Number(e.target.value || 0),
-                        };
-                        setEditableItems(updated);
-                      }}
-                    />
-                  </>
-                ) : (
-                  <>₹ {fmtCurrency(it.amount)}</>
-                )}
-              </div>
-            </div>
+                    const updated = [...editableItems];
 
-            <div className="nod-right">
-              <div className="nod-bold">
-                ₹ {fmtCurrency(it.amount)}
-              </div>
+                    updated[i] = {
+                      ...updated[i],
+                      expectedEndDate: e.target.value
+                    };
 
+                    const days = getDaysInclusive(
+                      updated[i].expectedStartDate,
+                      e.target.value
+                    );
 
-              <button
-                className="nod-btn nod-btn-primary small"
-                onClick={() => openAssignModal(i)}
-              >
-                {order.serviceType === "caretaker" ? "Assign Caretaker" : "Assign Nurse"}
-              </button>
-              <button
-                className="nod-btn nod-btn-secondary small"
-                onClick={() => openExtendServiceModal(i)}
-              >
-                Extend Service
-              </button>
-              {order?.lastStoppedAt ? (
-                <div className="nod-badge nod-badge-blue">
-                  Service Stopped
-                </div>
-              ) : (
-                <button
-                  className="nod-btn nod-btn-danger"
-                  onClick={() =>
-                    setStopFullModal({
-                      open: true,
-                      stopDate: getMaxEndDate() // default NOW
-                    })
-                  }
-                >
-                  Stop Full Service
-                </button>
-              )}
+                    updated[i].amount =
+                      days * Number(updated[i].rate || 0);
 
-              {servicesEditing && (
-                <button
-                  className="nod-btn nod-btn-danger small"
-                  onClick={() => {
-                    const updated = editableItems.filter((_, idx) => idx !== i);
                     setEditableItems(updated);
-                  }}
-                >
-                  Remove
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
 
-        {servicesEditing && (
+                  }}
+                />
+
+              </>
+            ) : (
+              <>
+                {it.expectedStartDate} → {it.expectedEndDate}
+              </>
+            )}
+
+          </div>
+
+          {/* RATE */}
+          <div className="nod-muted">
+
+            {servicesEditing ? (
+              <>
+                Rate ₹
+                <input
+                  type="number"
+                  className="nod-input small"
+                  value={it.rate || ""}
+                  onChange={(e) => {
+
+                    const updated = [...editableItems];
+
+                    updated[i] = {
+                      ...updated[i],
+                      rate: Number(e.target.value || 0)
+                    };
+
+                    const days = getDaysInclusive(
+                      updated[i].expectedStartDate,
+                      updated[i].expectedEndDate
+                    );
+
+                    updated[i].amount =
+                      days * Number(e.target.value || 0);
+
+                    setEditableItems(updated);
+
+                  }}
+                />
+              </>
+            ) : (
+              <>Rate ₹ {fmtCurrency(it.rate)}</>
+            )}
+
+          </div>
+
+          {/* AMOUNT */}
+          <div className="nod-muted">
+
+            {servicesEditing ? (
+              <>
+                Amount ₹
+                <input
+                  type="number"
+                  className="nod-input small"
+                  value={it.amount || calculatedAmount}
+                  readOnly
+                />
+                <span style={{marginLeft:6}}>
+                  ({days} days × ₹{rate})
+                </span>
+              </>
+            ) : (
+              <>₹ {fmtCurrency(it.amount)}</>
+            )}
+
+          </div>
+
+        </div>
+
+
+        {/* RIGHT SIDE ACTIONS */}
+        <div className="nod-right">
+
+          <div className="nod-bold">
+            ₹ {fmtCurrency(it.amount)}
+          </div>
+
           <button
-            className="nod-btn nod-btn-primary"
-            onClick={() =>
-              setEditableItems((prev) => [
-                ...prev,
-                {
-                  name: "New Service",
-                  expectedStartDate: "",
-                  expectedEndDate: "",
-                  amount: 0,
-                },
-              ])
-            }
+            className="nod-btn nod-btn-primary small"
+            onClick={() => openAssignModal(i)}
           >
-            + Add Service
+            {order.serviceType === "caretaker"
+              ? "Assign Caretaker"
+              : "Assign Nurse"}
           </button>
-        )}
+
+          <button
+            className="nod-btn nod-btn-secondary small"
+            onClick={() => openExtendServiceModal(i)}
+          >
+            Extend Service
+          </button>
+
+          {order?.lastStoppedAt ? (
+            <div className="nod-badge nod-badge-blue">
+              Service Stopped
+            </div>
+          ) : (
+            <button
+              className="nod-btn nod-btn-danger small"
+              onClick={() =>
+                setStopFullModal({
+                  open: true,
+                  stopDate: getMaxEndDate()
+                })
+              }
+            >
+              Stop Full Service
+            </button>
+          )}
+
+          {servicesEditing && (
+            <button
+              className="nod-btn nod-btn-danger small"
+              onClick={() => {
+
+                const updated =
+                  editableItems.filter((_, idx) => idx !== i);
+
+                setEditableItems(updated);
+
+              }}
+            >
+              Remove
+            </button>
+          )}
+
+        </div>
+
       </div>
+
+    );
+
+  })}
+
+  {servicesEditing && (
+    <button
+      className="nod-btn nod-btn-primary"
+      onClick={() =>
+        setEditableItems(prev => [
+          ...prev,
+          {
+            name: "New Service",
+            expectedStartDate: "",
+            expectedEndDate: "",
+            rate: 0,
+            amount: 0
+          }
+        ])
+      }
+    >
+      + Add Service
+    </button>
+  )}
+
+</div>
 
 
       <div className="nod-card">
