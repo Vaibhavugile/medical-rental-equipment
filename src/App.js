@@ -89,6 +89,7 @@ import AccountDashboard from "./pages/AccountDashboard";
 import Employees from "./pages/Employees";
 import OrdersRecycleBin from "./pages/OrdersRecycleBin";
 import NursingOrdersRecycleBin from "./pages/NursingOrdersRecycleBin";
+import BrochurePage from "./pages/BrochurePage";
 /* ============================================================
    PRIVATE ROUTE (AUTH ONLY, SILENT)
 ============================================================ */
@@ -293,6 +294,7 @@ export default function App() {
         <Route path="/doctors" element={<Doctors />} />
         <Route path="/appsupport" element={<Support />} />
                 <Route path="/appprivacy" element={<PrivacyPolicys />} />
+                <Route path="/resmed-lumis-ventilator-brochure" element={<BrochurePage/>} />
 
         <Route path="/equipment" element={<EquipmentList />} />
         <Route path="/equipment/:slug" element={<EquipmentDetail />} />
