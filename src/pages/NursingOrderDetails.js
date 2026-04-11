@@ -65,10 +65,11 @@ export default function NursingOrderDetails() {
     newSubtotal: "",
   });
 
-  const [stopFullModal, setStopFullModal] = useState({
-    open: false,
-    stopDate: "",
-  });
+const [stopFullModal, setStopFullModal] = useState({
+  open: false,
+  stopDate: "",
+  serviceIndex: null
+});
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [customerDraft, setCustomerDraft] = useState(null);
   const [allAssignments, setAllAssignments] = useState([]);
@@ -592,6 +593,15 @@ endDate: new Date(service.expectedEndDate)
     });
 
   };
+ const isServiceStopped = (index) => {
+
+  if (!order?.stopHistory) return false;
+
+  return order.stopHistory.some(
+    s => s.serviceIndex === index
+  );
+
+};
   const emptyPaymentForm = {
     amount: "",
     date: new Date().toISOString().slice(0, 10),
@@ -1871,46 +1881,67 @@ if (payAmount > balance) {
       alert(e.message || "Failed to save payment");
     }
   };
-  const stopAllActiveStaff = async (stopDate) => {
-    try {
-      const q = query(
-        collection(db, "staffAssignments"),
-        where("orderId", "==", id),
-        where("status", "in", ["assigned", "active"])
+ const stopAllActiveStaff = async (stopDate) => {
+
+  try {
+
+    const serviceIndex = stopFullModal.serviceIndex;
+
+    const q = query(
+      collection(db, "staffAssignments"),
+      where("orderId", "==", id),
+      where("serviceIndex", "==", serviceIndex), // ✅ only that service
+      where("status", "in", ["assigned", "active"])
+    );
+
+    const snap = await getDocs(q);
+
+    const service = order.items?.[serviceIndex];
+
+    if (!service) return;
+
+    for (const d of snap.docs) {
+
+      const a = d.data();
+
+      /* =========================
+         DETERMINE FINAL END DATE
+      ========================= */
+
+      const serviceEnd = new Date(service.expectedEndDate);
+      const stop = new Date(stopDate);
+
+      const finalEndDate =
+        stop < serviceEnd ? stopDate : service.expectedEndDate;
+
+      /* =========================
+         RECALCULATE SALARY
+      ========================= */
+
+      const salary = calculateStaffSalary(
+        a.startDate,
+        finalEndDate,
+        Number(a.rate || 0),
+        a.rateType
       );
 
-      const snap = await getDocs(q);
+      const newAmount = salary.amount;
 
-      for (const d of snap.docs) {
-        const a = d.data();
+      const paidAmount = Number(a.paidAmount || 0);
 
-        // 🛑 Skip if already ended before stopDate
-        if (a.endDate && new Date(a.endDate) <= new Date(stopDate)) {
-          continue;
-        }
+      const newBalance = Math.max(
+        0,
+        newAmount - paidAmount
+      );
 
-        /* =========================
-           RECALCULATE SALARY
-        ========================= */
+      /* =========================
+         UPDATE FIRESTORE
+      ========================= */
 
-        const salary = calculateStaffSalary(
-          a.startDate,
-          stopDate,
-          Number(a.rate || 0),
-          a.rateType
-        );
-
-        const newAmount = salary.amount;
-        const paidAmount = Number(a.paidAmount || 0);
-
-        const newBalance = Math.max(0, newAmount - paidAmount);
-
-        /* =========================
-           UPDATE FIRESTORE
-        ========================= */
-
-        await updateDoc(doc(db, "staffAssignments", d.id), {
-          endDate: stopDate,
+      await updateDoc(
+        doc(db, "staffAssignments", d.id),
+        {
+          endDate: finalEndDate,
 
           hours: salary.hours,
           days: salary.days,
@@ -1922,19 +1953,22 @@ if (payAmount > balance) {
           status: "completed",
 
           stoppedAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-      }
+          updatedAt: serverTimestamp()
+        }
+      );
 
-      alert("All staff updated correctly");
-
-      await loadAssignments();
-
-    } catch (err) {
-      console.error(err);
-      alert("Failed to update staff");
     }
-  };
+
+    await loadAssignments();
+
+  } catch (err) {
+
+    console.error(err);
+    alert("Failed to update staff");
+
+  }
+
+};
   const stopStaffService = async () => {
 
     const assignment = stopServiceModal.assignment;
@@ -2193,205 +2227,226 @@ if (payAmount > balance) {
     }
 
   };
+const stopOrderServicesOnly = async (stopDate, overrideSubtotal = null) => {
+  if (!stopDate) {
+    alert("Select stop date");
+    return;
+  }
 
-  const stopOrderServicesOnly = async (stopDate, overrideSubtotal = null) => {
-    if (!stopDate) {
-      alert("Select stop date");
-      return;
-    }
+  try {
 
-    try {
-      let updatedItems = [...(order.items || [])];
+    let updatedItems = [...(order.items || [])];
 
-      /* =========================
-         1️⃣ UPDATE EACH SERVICE (PRORATE)
-      ========================= */
+    /* =========================
+       1️⃣ UPDATE ONLY SELECTED SERVICE
+    ========================= */
 
-      updatedItems = updatedItems.map((it) => {
-        if (!it.expectedStartDate || !it.expectedEndDate) return it;
+    updatedItems = updatedItems.map((it, index) => {
 
-        const start = new Date(it.expectedStartDate);
-        const oldEnd = new Date(it.expectedEndDate);
-        const newEnd = new Date(stopDate);
-
-        if (isNaN(start) || isNaN(oldEnd) || isNaN(newEnd)) return it;
-
-        if (newEnd >= oldEnd) return it;
-
-        const totalDays =
-          (oldEnd - start) / (1000 * 60 * 60 * 24) + 1;
-
-        const usedDays =
-          (newEnd - start) / (1000 * 60 * 60 * 24) + 1;
-
-        if (totalDays <= 0 || usedDays <= 0) return it;
-
-        const newAmount =
-          (Number(it.amount || 0) / totalDays) * usedDays;
-
-        return {
-          ...it,
-          expectedEndDate: stopDate,
-          amount: Math.round(newAmount),
-        };
-      });
-
-      /* =========================
-         2️⃣ CALCULATE SUBTOTAL
-      ========================= */
-
-      const oldTotals = order?.totals || {};
-
-      const calculatedSubtotal = updatedItems.reduce(
-        (sum, it) => sum + Number(it.amount || 0),
-        0
-      );
-
-      /* =========================
-         3️⃣ APPLY OVERRIDE 🔥
-      ========================= */
-
-      let newSubtotal =
-        overrideSubtotal !== null && overrideSubtotal !== ""
-          ? Number(overrideSubtotal)
-          : calculatedSubtotal;
-
-      /* =========================
-         🔥 3.1 DISTRIBUTE OVERRIDE INTO ITEMS
-      ========================= */
-
-      if (
-        overrideSubtotal !== null &&
-        overrideSubtotal !== "" &&
-        calculatedSubtotal > 0
-      ) {
-        const ratio = newSubtotal / calculatedSubtotal;
-
-        updatedItems = updatedItems.map((it) => ({
-          ...it,
-          amount: Math.round(Number(it.amount || 0) * ratio),
-        }));
+      if (index !== stopFullModal.serviceIndex) {
+        return it;
       }
 
-      /* =========================
-         🔥 3.2 RECALCULATE FINAL SUBTOTAL FROM ITEMS
-      ========================= */
+      if (!it.expectedStartDate || !it.expectedEndDate) return it;
 
-      const finalSubtotalFromItems = updatedItems.reduce(
-        (sum, it) => sum + Number(it.amount || 0),
-        0
+      const start = new Date(it.expectedStartDate);
+      const oldEnd = new Date(it.expectedEndDate);
+
+      const mergedEndDate = mergeDateKeepTime(
+        it.expectedEndDate,
+        stopDate
       );
 
-      /* =========================
-         4️⃣ KEEP TAX + DISCOUNT LOCKED
-      ========================= */
+      const newEnd = new Date(mergedEndDate);
 
-      const taxTotal = (oldTotals.taxBreakdown || []).reduce(
-        (sum, t) => sum + Number(t.amount || 0),
-        0
-      );
+      if (isNaN(start) || isNaN(oldEnd) || isNaN(newEnd)) return it;
 
-      const discount = Number(oldTotals.discountAmount || 0);
+      if (newEnd >= oldEnd) return it;
 
-      const finalTotal = Math.max(
-        0,
-        finalSubtotalFromItems - discount + taxTotal
-      );
+      const totalDays =
+        (oldEnd - start) / (1000 * 60 * 60 * 24) + 1;
 
-      const newTotals = {
-        ...oldTotals,
-        subtotal: finalSubtotalFromItems,
-        total: finalTotal,
-        taxBreakdown: oldTotals.taxBreakdown,
+      const usedDays =
+        (newEnd - start) / (1000 * 60 * 60 * 24) + 1;
+
+      if (totalDays <= 0 || usedDays <= 0) return it;
+
+      const newAmount =
+        (Number(it.amount || 0) / totalDays) * usedDays;
+
+      return {
+        ...it,
+        expectedEndDate: mergedEndDate,
+        amount: Math.round(newAmount),
       };
 
-      /* =========================
-         5️⃣ BUILD LOGS
-      ========================= */
+    });
 
-      const logs = [];
-      const stopHistory = [];
+    /* =========================
+       2️⃣ CALCULATE SUBTOTAL
+    ========================= */
 
-      (order.items || []).forEach((oldItem, i) => {
-        const newItem = updatedItems[i];
+    const oldTotals = order?.totals || {};
 
-        if (!oldItem || !newItem) return;
+    const calculatedSubtotal = updatedItems.reduce(
+      (sum, it) => sum + Number(it.amount || 0),
+      0
+    );
 
-        if (
-          oldItem.expectedEndDate !== newItem.expectedEndDate ||
-          Number(oldItem.amount) !== Number(newItem.amount)
-        ) {
-          logs.push({
-            action: "STOP_SERVICE",
-            oldValue: {
-              endDate: oldItem.expectedEndDate,
-              amount: oldItem.amount,
-            },
-            newValue: {
-              endDate: newItem.expectedEndDate,
-              amount: newItem.amount,
-            },
-            editedByUid: auth.currentUser?.uid || "",
-            editedByName:
-              auth.currentUser?.displayName ||
-              auth.currentUser?.email ||
-              "Admin",
-            editedAt: new Date().toISOString(),
-          });
+    /* =========================
+       3️⃣ APPLY ADMIN OVERRIDE
+    ========================= */
 
-          stopHistory.push({
-            serviceIndex: i,
-            serviceName: oldItem.name,
-            oldEndDate: oldItem.expectedEndDate,
-            newEndDate: newItem.expectedEndDate,
-            oldAmount: oldItem.amount,
-            newAmount: newItem.amount,
-            stoppedByUid: auth.currentUser?.uid || "",
-            stoppedByName:
-              auth.currentUser?.displayName ||
-              auth.currentUser?.email ||
-              "Admin",
-            stoppedAt: new Date().toISOString(),
-          });
-        }
-      });
+    let newSubtotal =
+      overrideSubtotal !== null && overrideSubtotal !== ""
+        ? Number(overrideSubtotal)
+        : calculatedSubtotal;
 
-      /* =========================
-         6️⃣ SAVE TO FIRESTORE
-      ========================= */
+    /* =========================
+       4️⃣ DISTRIBUTE OVERRIDE
+    ========================= */
 
-      await updateDoc(doc(db, "nursingOrders", id), {
-        items: updatedItems,
-        totals: newTotals,
-        stopHistory: [
-          ...(order.stopHistory || []),
-          ...stopHistory,
-        ],
-        activityLog:
-          logs.length > 0
-            ? arrayUnion(...logs)
-            : order.activityLog || [],
-        stoppedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
+    if (
+      overrideSubtotal !== null &&
+      overrideSubtotal !== "" &&
+      calculatedSubtotal > 0
+    ) {
+      const ratio = newSubtotal / calculatedSubtotal;
 
-      /* =========================
-         7️⃣ UPDATE UI
-      ========================= */
-
-      setOrder((o) => ({
-        ...o,
-        items: updatedItems,
-        totals: newTotals,
+      updatedItems = updatedItems.map((it) => ({
+        ...it,
+        amount: Math.round(Number(it.amount || 0) * ratio),
       }));
-
-      alert("Services updated successfully");
-
-    } catch (err) {
-      console.error(err);
-      alert("Failed to stop services");
     }
-  };
+
+    const finalSubtotalFromItems = updatedItems.reduce(
+      (sum, it) => sum + Number(it.amount || 0),
+      0
+    );
+
+    /* =========================
+       5️⃣ KEEP TAX + DISCOUNT LOCKED
+    ========================= */
+
+    const taxTotal = (oldTotals.taxBreakdown || []).reduce(
+      (sum, t) => sum + Number(t.amount || 0),
+      0
+    );
+
+    const discount = Number(oldTotals.discountAmount || 0);
+
+    const finalTotal = Math.max(
+      0,
+      finalSubtotalFromItems - discount + taxTotal
+    );
+
+    const newTotals = {
+      ...oldTotals,
+      subtotal: finalSubtotalFromItems,
+      total: finalTotal,
+      taxBreakdown: oldTotals.taxBreakdown,
+    };
+
+    /* =========================
+       6️⃣ BUILD LOGS
+    ========================= */
+
+    const logs = [];
+    const stopHistory = [];
+
+    (order.items || []).forEach((oldItem, i) => {
+
+      const newItem = updatedItems[i];
+
+      if (!oldItem || !newItem) return;
+
+      if (
+        oldItem.expectedEndDate !== newItem.expectedEndDate ||
+        Number(oldItem.amount) !== Number(newItem.amount)
+      ) {
+
+        logs.push({
+          action: "STOP_SERVICE",
+          oldValue: {
+            endDate: oldItem.expectedEndDate,
+            amount: oldItem.amount,
+          },
+          newValue: {
+            endDate: newItem.expectedEndDate,
+            amount: newItem.amount,
+          },
+          editedByUid: auth.currentUser?.uid || "",
+          editedByName:
+            auth.currentUser?.displayName ||
+            auth.currentUser?.email ||
+            "Admin",
+          editedAt: new Date().toISOString(),
+        });
+
+        stopHistory.push({
+          serviceIndex: i,
+          serviceName: oldItem.name,
+          oldEndDate: oldItem.expectedEndDate,
+          newEndDate: newItem.expectedEndDate,
+          oldAmount: oldItem.amount,
+          newAmount: newItem.amount,
+          stoppedByUid: auth.currentUser?.uid || "",
+          stoppedByName:
+            auth.currentUser?.displayName ||
+            auth.currentUser?.email ||
+            "Admin",
+          stoppedAt: new Date().toISOString(),
+        });
+
+      }
+
+    });
+
+    /* =========================
+       7️⃣ SAVE TO FIRESTORE
+    ========================= */
+
+    await updateDoc(doc(db, "nursingOrders", id), {
+
+      items: updatedItems,
+
+      totals: newTotals,
+
+      stopHistory: [
+        ...(order.stopHistory || []),
+        ...stopHistory,
+      ],
+
+      activityLog:
+        logs.length > 0
+          ? arrayUnion(...logs)
+          : order.activityLog || [],
+
+      stoppedAt: serverTimestamp(),
+
+      updatedAt: serverTimestamp(),
+
+    });
+
+    /* =========================
+       8️⃣ UPDATE UI
+    ========================= */
+
+    setOrder((o) => ({
+      ...o,
+      items: updatedItems,
+      totals: newTotals,
+    }));
+
+    alert("Service updated successfully");
+
+  } catch (err) {
+
+    console.error(err);
+    alert("Failed to stop service");
+
+  }
+};
 
   const handleCustomerRefund = async (
     newTotals,
@@ -2805,114 +2860,129 @@ if (payAmount > balance) {
 
   };
 
-  const getStopPreview = () => {
-    if (!stopFullModal.stopDate || !order) return null;
+const getStopPreview = () => {
 
-    /* =========================
-       1️⃣ UPDATE ITEMS (PRORATE)
-    ========================= */
+  if (!stopFullModal.stopDate || !order) return null;
 
-    let updatedItems = [...order.items];
+  /* =========================
+     1️⃣ UPDATE ITEMS (ONLY SELECTED SERVICE)
+  ========================= */
 
-    updatedItems = updatedItems.map((it) => {
-      if (!it.expectedStartDate || !it.expectedEndDate) return it;
+  let updatedItems = [...order.items].map((it, index) => {
 
-      const start = new Date(it.expectedStartDate);
-      const oldEnd = new Date(it.expectedEndDate);
-      const newEnd = new Date(stopFullModal.stopDate);
-
-      // if stop after end → no change
-      if (newEnd >= oldEnd) return it;
-
-      const totalDays =
-        (oldEnd - start) / (1000 * 60 * 60 * 24) + 1;
-
-      const usedDays =
-        (newEnd - start) / (1000 * 60 * 60 * 24) + 1;
-
-      const newAmount = (it.amount / totalDays) * usedDays;
-
-      return {
-        ...it,
-        expectedEndDate: stopFullModal.stopDate,
-        amount: Math.round(newAmount),
-      };
-    });
-
-    /* =========================
-       2️⃣ CALCULATE SUBTOTAL ONLY
-    ========================= */
-
-    const oldTotals = order?.totals || {};
-
-    const newSubtotal = updatedItems.reduce(
-      (sum, it) => sum + Number(it.amount || 0),
-      0
-    );
-
-    /* =========================
-       3️⃣ KEEP TAX LOCKED
-    ========================= */
-
-    const taxTotal = (oldTotals.taxBreakdown || []).reduce(
-      (sum, t) => sum + Number(t.amount || 0),
-      0
-    );
-
-    const discount = Number(oldTotals.discountAmount || 0);
-
-    /* =========================
-       4️⃣ APPLY ADMIN OVERRIDE
-    ========================= */
-
-    let finalSubtotal = newSubtotal;
-
-    if (stopPreviewOverride.newSubtotal) {
-      finalSubtotal = Number(stopPreviewOverride.newSubtotal);
+    // only modify clicked service
+    if (index !== stopFullModal.serviceIndex) {
+      return it;
     }
 
-    /* =========================
-       5️⃣ FINAL TOTAL
-    ========================= */
+    if (!it.expectedStartDate || !it.expectedEndDate) return it;
 
-    const finalTotal = finalSubtotal - discount + taxTotal;
+    const start = new Date(it.expectedStartDate);
+    const oldEnd = new Date(it.expectedEndDate);
 
-    /* =========================
-       6️⃣ TOTAL PAID
-    ========================= */
-
-    const totalPaid = (order.payments || []).reduce(
-      (sum, p) => sum + Number(p.amount || 0),
-      0
+    /* 🔥 keep original service time */
+    const mergedEndDate = mergeDateKeepTime(
+      it.expectedEndDate,
+      stopFullModal.stopDate
     );
 
-    /* =========================
-       7️⃣ REFUND CALCULATION
-    ========================= */
+    const newEnd = new Date(mergedEndDate);
 
-    const refund = Math.max(0, totalPaid - finalTotal);
+    if (newEnd >= oldEnd) return it;
 
-    /* =========================
-       RETURN
-    ========================= */
+    const totalDays =
+      (oldEnd - start) / (1000 * 60 * 60 * 24) + 1;
+
+    const usedDays =
+      (newEnd - start) / (1000 * 60 * 60 * 24) + 1;
+
+    const newAmount =
+      (Number(it.amount || 0) / totalDays) * usedDays;
 
     return {
-      updatedItems,
-
-      // 🔥 KEY VALUES
-      oldSubtotal: oldTotals.subtotal || 0,
-      newSubtotal,
-
-      finalSubtotal,
-
-      taxTotal,
-      discount,
-
-      finalTotal,
-
-      refund,
+      ...it,
+      expectedEndDate: mergedEndDate,   // ✅ FIX
+      amount: Math.round(newAmount),
     };
+
+  });
+
+  /* =========================
+     2️⃣ CALCULATE SUBTOTAL
+  ========================= */
+
+  const oldTotals = order?.totals || {};
+
+  const newSubtotal = updatedItems.reduce(
+    (sum, it) => sum + Number(it.amount || 0),
+    0
+  );
+
+  /* =========================
+     3️⃣ KEEP TAX LOCKED
+  ========================= */
+
+  const taxTotal = (oldTotals.taxBreakdown || []).reduce(
+    (sum, t) => sum + Number(t.amount || 0),
+    0
+  );
+
+  const discount = Number(oldTotals.discountAmount || 0);
+
+  /* =========================
+     4️⃣ ADMIN OVERRIDE
+  ========================= */
+
+  let finalSubtotal = newSubtotal;
+
+  if (stopPreviewOverride.newSubtotal) {
+    finalSubtotal = Number(stopPreviewOverride.newSubtotal);
+  }
+
+  /* =========================
+     5️⃣ FINAL TOTAL
+  ========================= */
+
+  const finalTotal = finalSubtotal - discount + taxTotal;
+
+  /* =========================
+     6️⃣ TOTAL PAID
+  ========================= */
+
+  const totalPaid = (order.payments || []).reduce(
+    (sum, p) => sum + Number(p.amount || 0),
+    0
+  );
+
+  /* =========================
+     7️⃣ REFUND CALCULATION
+  ========================= */
+
+  const refund = Math.max(0, totalPaid - finalTotal);
+
+  /* =========================
+     RETURN
+  ========================= */
+
+  return {
+
+    updatedItems,
+
+    oldSubtotal: oldTotals.subtotal || 0,
+    newSubtotal,
+
+    finalSubtotal,
+
+    taxTotal,
+    discount,
+
+    finalTotal,
+
+    refund,
+
   };
+
+};
   const stopPreview = getStopPreview();
 
   /* ======================
@@ -3112,6 +3182,8 @@ if (payAmount > balance) {
             />
           ) : (
             <strong>{it.name}</strong>
+        
+
           )}
 
           {/* DATES */}
@@ -3268,23 +3340,24 @@ if (payAmount > balance) {
             Extend Service
           </button>
 
-          {order?.lastStoppedAt ? (
-            <div className="nod-badge nod-badge-blue">
-              Service Stopped
-            </div>
-          ) : (
-            <button
-              className="nod-btn nod-btn-danger small"
-              onClick={() =>
-                setStopFullModal({
-                  open: true,
-                  stopDate: getMaxEndDate()
-                })
-              }
-            >
-              Stop Full Service
-            </button>
-          )}
+       {isServiceStopped(i) ? (
+  <div className="nod-badge nod-badge-red">
+    Service Stopped
+  </div>
+) : (
+  <button
+    className="nod-btn nod-btn-danger small"
+    onClick={() =>
+      setStopFullModal({
+        open: true,
+        serviceIndex: i,
+        stopDate: editableItems[i]?.expectedEndDate
+      })
+    }
+  >
+    Stop Full Service
+  </button>
+)}
 
           {servicesEditing && (
             <button
@@ -4827,6 +4900,15 @@ if (payAmount > balance) {
             {/* 🔥 PREVIEW */}
             {stopPreview && (
               <div className="nod-preview-box">
+                <div style={{marginTop:10,fontSize:14}}>
+
+  {stopPreview?.updatedItems?.map((it,i)=>(
+    <div key={i}>
+      {it.name} : ₹{fmtCurrency(it.amount)}
+    </div>
+  ))}
+
+</div>
 
                 {/* OLD SUBTOTAL */}
                 <div className="nod-row">
