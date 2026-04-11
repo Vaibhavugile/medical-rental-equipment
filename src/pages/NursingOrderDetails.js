@@ -118,7 +118,9 @@ const updateServiceItem = (index, patch) => {
       item.expectedEndDate
     );
 
-    item.amount = rate * days;
+    const staffCount = Number(item.staffCount || 1);
+
+    item.amount = rate * days * staffCount;
 
     items[index] = item;
 
@@ -3162,159 +3164,205 @@ const getStopPreview = () => {
 
         <div>
 
-          {/* SERVICE NAME */}
-          {servicesEditing ? (
-            <input
-              className="nod-input"
-              value={it.name}
-              onChange={(e) => {
+  {/* SERVICE NAME */}
+  {servicesEditing ? (
+    <input
+      className="nod-input"
+      value={it.name}
+      onChange={(e) => {
 
-                const updated = [...editableItems];
+        const updated = [...editableItems];
 
-                updated[i] = {
-                  ...updated[i],
-                  name: e.target.value
-                };
+        updated[i] = {
+          ...updated[i],
+          name: e.target.value
+        };
 
-                setEditableItems(updated);
+        setEditableItems(updated);
 
-              }}
-            />
-          ) : (
-            <strong>{it.name}</strong>
-        
+      }}
+    />
+  ) : (
+    <strong>{it.name}</strong>
+  )}
 
-          )}
+  {/* DATES */}
+  <div className="nod-muted">
 
-          {/* DATES */}
-          <div className="nod-muted">
+    {servicesEditing ? (
+      <>
+        <input
+          type="datetime-local"
+          className="nod-input small"
+          value={it.expectedStartDate || ""}
+          onChange={(e) => {
 
-            {servicesEditing ? (
-              <>
-                <input
-                  type="datetime-local"
-                  className="nod-input small"
-                  value={it.expectedStartDate || ""}
-                  onChange={(e) => {
+            const updated = [...editableItems];
 
-                    const updated = [...editableItems];
+            updated[i] = {
+              ...updated[i],
+              expectedStartDate: e.target.value
+            };
 
-                    updated[i] = {
-                      ...updated[i],
-                      expectedStartDate: e.target.value
-                    };
+            const days = getDaysInclusive(
+              e.target.value,
+              updated[i].expectedEndDate
+            );
 
-                    const days = getDaysInclusive(
-                      e.target.value,
-                      updated[i].expectedEndDate
-                    );
+            const rate = Number(updated[i].rate || 0);
+            const staff = Number(updated[i].staffCount || 1);
 
-                    updated[i].amount =
-                      days * Number(updated[i].rate || 0);
+            updated[i].amount = days * rate * staff;
 
-                    setEditableItems(updated);
+            setEditableItems(updated);
 
-                  }}
-                />
+          }}
+        />
 
-                {" → "}
+        {" → "}
 
-                <input
-                  type="datetime-local"
-                  className="nod-input small"
-                  value={it.expectedEndDate || ""}
-                  onChange={(e) => {
+        <input
+          type="datetime-local"
+          className="nod-input small"
+          value={it.expectedEndDate || ""}
+          onChange={(e) => {
 
-                    const updated = [...editableItems];
+            const updated = [...editableItems];
 
-                    updated[i] = {
-                      ...updated[i],
-                      expectedEndDate: e.target.value
-                    };
+            updated[i] = {
+              ...updated[i],
+              expectedEndDate: e.target.value
+            };
 
-                    const days = getDaysInclusive(
-                      updated[i].expectedStartDate,
-                      e.target.value
-                    );
+            const days = getDaysInclusive(
+              updated[i].expectedStartDate,
+              e.target.value
+            );
 
-                    updated[i].amount =
-                      days * Number(updated[i].rate || 0);
+            const rate = Number(updated[i].rate || 0);
+            const staff = Number(updated[i].staffCount || 1);
 
-                    setEditableItems(updated);
+            updated[i].amount = days * rate * staff;
 
-                  }}
-                />
+            setEditableItems(updated);
 
-              </>
-            ) : (
-              <>
-                {it.expectedStartDate} → {it.expectedEndDate}
-              </>
-            )}
+          }}
+        />
 
-          </div>
+      </>
+    ) : (
+      <>
+        {it.expectedStartDate} → {it.expectedEndDate}
+      </>
+    )}
 
-          {/* RATE */}
-          <div className="nod-muted">
+  </div>
 
-            {servicesEditing ? (
-              <>
-                Rate ₹
-                <input
-                  type="number"
-                  className="nod-input small"
-                  value={it.rate || ""}
-                  onChange={(e) => {
+  {/* RATE */}
+  <div className="nod-muted">
 
-                    const updated = [...editableItems];
+    {servicesEditing ? (
+      <>
+        Rate ₹
+        <input
+          type="number"
+          className="nod-input small"
+          value={it.rate || ""}
+          onChange={(e) => {
 
-                    updated[i] = {
-                      ...updated[i],
-                      rate: Number(e.target.value || 0)
-                    };
+            const updated = [...editableItems];
 
-                    const days = getDaysInclusive(
-                      updated[i].expectedStartDate,
-                      updated[i].expectedEndDate
-                    );
+            updated[i] = {
+              ...updated[i],
+              rate: Number(e.target.value || 0)
+            };
 
-                    updated[i].amount =
-                      days * Number(e.target.value || 0);
+            const days = getDaysInclusive(
+              updated[i].expectedStartDate,
+              updated[i].expectedEndDate
+            );
 
-                    setEditableItems(updated);
+            const staff = Number(updated[i].staffCount || 1);
 
-                  }}
-                />
-              </>
-            ) : (
-              <>Rate ₹ {fmtCurrency(it.rate)}</>
-            )}
+            updated[i].amount =
+              days * Number(e.target.value || 0) * staff;
 
-          </div>
+            setEditableItems(updated);
 
-          {/* AMOUNT */}
-          <div className="nod-muted">
+          }}
+        />
+      </>
+    ) : (
+      <>Rate ₹ {fmtCurrency(it.rate)}</>
+    )}
 
-            {servicesEditing ? (
-              <>
-                Amount ₹
-                <input
-                  type="number"
-                  className="nod-input small"
-                  value={it.amount || calculatedAmount}
-                  readOnly
-                />
-                <span style={{marginLeft:6}}>
-                  ({days} days × ₹{rate})
-                </span>
-              </>
-            ) : (
-              <>₹ {fmtCurrency(it.amount)}</>
-            )}
+  </div>
 
-          </div>
+  {/* STAFF COUNT */}
+  <div className="nod-muted">
 
-        </div>
+    {servicesEditing ? (
+      <>
+        Staff
+       <input
+  type="number"
+  min="1"
+  className="nod-input small"
+  value={it.staffCount ?? ""}
+  onChange={(e) => {
+
+    const updated = [...editableItems];
+
+    const staff = Number(e.target.value || 0);
+
+    updated[i] = {
+      ...updated[i],
+      staffCount: staff
+    };
+
+    const days = getDaysInclusive(
+      updated[i].expectedStartDate,
+      updated[i].expectedEndDate
+    );
+
+    const rate = Number(updated[i].rate || 0);
+
+    updated[i].amount = days * rate * (staff || 1);
+
+    setEditableItems(updated);
+
+  }}
+/>
+      </>
+    ) : (
+      <>Staff: {it.staffCount || 1}</>
+    )}
+
+  </div>
+
+  {/* AMOUNT */}
+  <div className="nod-muted">
+
+    {servicesEditing ? (
+      <>
+        Amount ₹
+        <input
+          type="number"
+          className="nod-input small"
+          value={it.amount || calculatedAmount}
+          readOnly
+        />
+        <span style={{ marginLeft: 6 }}>
+          ({days} days × ₹{rate} × {it.staffCount || 1} staff)
+        </span>
+      </>
+    ) : (
+      <>₹ {fmtCurrency(it.amount)}</>
+    )}
+
+  </div>
+
+</div>
 
 
         {/* RIGHT SIDE ACTIONS */}
@@ -3385,22 +3433,29 @@ const getStopPreview = () => {
 
   {servicesEditing && (
     <button
-      className="nod-btn nod-btn-primary"
-      onClick={() =>
-        setEditableItems(prev => [
-          ...prev,
-          {
-            name: "New Service",
-            expectedStartDate: "",
-            expectedEndDate: "",
-            rate: 0,
-            amount: 0
-          }
-        ])
-      }
-    >
-      + Add Service
-    </button>
+  className="nod-btn nod-btn-primary"
+  onClick={() =>
+    setEditableItems(prev => {
+
+      const lastService = prev[prev.length - 1];
+
+      return [
+        ...prev,
+        {
+          name: lastService?.name || "Service",
+          expectedStartDate: "",
+          expectedEndDate: "",
+          rate: 0,
+          amount: 0,
+          staffCount: 1
+        }
+      ];
+
+    })
+  }
+>
+  + Add Service
+</button>
   )}
 
 </div>
