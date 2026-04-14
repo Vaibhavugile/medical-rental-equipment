@@ -104,6 +104,7 @@ export default function Leads() {
   const [sortBy, setSortBy] = useState("created");
   // Delete confirm
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const [notInterestedFilter, setNotInterestedFilter] = useState("all");
   const [statusBranch, setStatusBranch] = useState(null);
   const [statusLevel1, setStatusLevel1] = useState(null)
   const [statusLevel2, setStatusLevel2] = useState(null)
@@ -390,15 +391,22 @@ export default function Leads() {
           return ["interested", "req shared", "followup"].includes(s);
         }
 
-        if (statusFilter === "not interested") {
-          return [
-            "not interested",
-            "out of service",
-            "high price",
-            "out of area",
-            "urgent visit"
-          ].includes(s);
-        }
+      if (statusFilter === "not interested") {
+
+  const reasons = [
+    "out of service",
+    "high price",
+    "out of area",
+    "urgent visit"
+  ];
+
+  if (notInterestedFilter === "all") {
+    return ["not interested", ...reasons].includes(s);
+  }
+
+  return s === notInterestedFilter;
+
+}
 
         return s === statusFilter;
 
@@ -453,7 +461,7 @@ export default function Leads() {
 
     return list;
 
-  }, [leads, search, statusFilter, followupFilter, sortBy]);
+}, [leads, search, statusFilter, followupFilter, notInterestedFilter, sortBy]);
 
   // ---------- Drawer helpers ----------
   const openDrawer = (initial = defaultForm) => {
@@ -906,12 +914,15 @@ export default function Leads() {
   </button>
 
   {/* NOT INTERESTED */}
-  <button
-    className={`seg-btn ${statusFilter === "not interested" ? "active" : ""}`}
-    onClick={() => setStatusFilter("not interested")}
-  >
-    Not Interested ({statusCounts["not interested"]})
-  </button>
+<button
+  className={`seg-btn ${statusFilter === "not interested" ? "active" : ""}`}
+  onClick={() => {
+    setStatusFilter("not interested");
+    setNotInterestedFilter("all");
+  }}
+>
+  Not Interested ({statusCounts["not interested"]})
+</button>
 
   {/* INVALID */}
   <button
@@ -976,6 +987,27 @@ export default function Leads() {
     >
       Overdue 🔴 ({statusCounts.overdue})
     </button>
+
+  </div>
+
+)}
+{statusFilter === "not interested" && (
+
+  <div className="notInterestedFilters">
+
+    <select
+      className="notInterestedDropdown"
+      value={notInterestedFilter}
+      onChange={(e) => setNotInterestedFilter(e.target.value)}
+    >
+
+      <option value="all">All</option>
+      <option value="high price">High Price</option>
+      <option value="out of service">Out Of Service</option>
+      <option value="out of area">Out Of Area</option>
+      <option value="urgent visit">Urgent Visit</option>
+
+    </select>
 
   </div>
 
@@ -1452,224 +1484,249 @@ export default function Leads() {
       )}
 
       {/* Status modal */}
-      {statusModal.open && statusModal.lead && (
-        <div
-          className="cp-modal"
-          onClick={(e) => {
-            if (e.target.classList.contains("cp-modal")) closeStatusModal();
-          }}
-        >
-          <div className="cp-modal-card">
+     {statusModal.open && statusModal.lead && (
+  <div
+    className="leadStatusOverlay"
+    onClick={(e) => {
+      if (e.target.classList.contains("leadStatusOverlay")) closeStatusModal();
+    }}
+  >
+    <div className="leadStatusModal">
 
-            <h3>Change status for “{statusModal.lead.customerName}”</h3>
+      <h3 className="leadStatusTitle">
+        Change status for “{statusModal.lead.customerName}”
+      </h3>
 
-            <div style={{ marginTop: 14 }}>
+      <div className="leadStatusSection">
 
-              <label style={{ fontWeight: 600 }}>Select Outcome</label>
+        <label className="leadStatusLabel">Select Outcome</label>
 
-              {/* VALIDATION */}
-              <h4>Validation</h4>
-              <div className="status-chip-group">
+        {/* VALIDATION */}
+        <h4 className="leadStatusHeading">Validation</h4>
 
-                <button
-                  className={`status-chip ${statusModal.validation === "valid" ? "active" : ""}`}
-                  onClick={() => setStatusModal(s => ({
-                    ...s,
-                    validation: "valid",
-                    interest: "",
-                    reason: "",
-                    action: ""
-                  }))}>
-                  Valid
-                </button>
+        <div className="leadStatusRow">
 
-                <button
-                  className={`status-chip ${statusModal.validation === "invalid" ? "active" : ""}`}
-                  onClick={() => setStatusModal(s => ({
-                    ...s,
-                    validation: "invalid",
-                    interest: "",
-                    reason: "",
-                    action: ""
-                  }))}>
-                  Invalid
-                </button>
+          <button
+            className={`leadStatusChip ${statusModal.validation === "valid" ? "active" : ""}`}
+            onClick={() =>
+              setStatusModal((s) => ({
+                ...s,
+                validation: "valid",
+                interest: "",
+                reason: "",
+                action: "",
+              }))
+            }
+          >
+            Valid
+          </button>
 
-              </div>
+          <button
+            className={`leadStatusChip ${statusModal.validation === "invalid" ? "active" : ""}`}
+            onClick={() =>
+              setStatusModal((s) => ({
+                ...s,
+                validation: "invalid",
+                interest: "",
+                reason: "",
+                action: "",
+              }))
+            }
+          >
+            Invalid
+          </button>
 
-
-              {/* INTEREST */}
-              {statusModal.validation === "valid" && (
-                <>
-                  <h4>Interest</h4>
-
-                  <div className="status-chip-group">
-
-                    <button
-                      className={`status-chip ${statusModal.interest === "interested" ? "active" : ""}`}
-                      onClick={() =>
-                        setStatusModal(s => ({
-                          ...s,
-                          interest: "interested",
-                          reason: "",
-                          action: ""
-                        }))
-                      }                    >
-                      Interested
-                    </button>
-
-                    <button
-                      className={`status-chip ${statusModal.interest === "not interested" ? "active" : ""}`}
-                      onClick={() =>
-                        setStatusModal(s => ({
-                          ...s,
-                          interest: "not interested",
-                          action: ""
-                        }))
-                      }                    >
-                      Not Interested
-                    </button>
-
-                  </div>
-                </>
-              )}
-
-              {/* REASONS */}
-              {statusModal.interest === "not interested" && (
-                <>
-                  <h4>Reason</h4>
-                  <div className="status-chip-group">
-
-                    <button
-                      className={`status-chip ${statusModal.reason === "out of service" ? "active" : ""}`}
-                      onClick={() => setStatusModal(s => ({ ...s, reason: "out of service" }))}
-                    >
-                      Out Of Service
-                    </button>
-
-                    <button
-                      className={`status-chip ${statusModal.reason === "high price" ? "active" : ""}`}
-                      onClick={() => setStatusModal(s => ({ ...s, reason: "high price" }))}
-                    >
-                      High Price
-                    </button>
-
-                    <button
-                      className={`status-chip ${statusModal.reason === "out of area" ? "active" : ""}`}
-                      onClick={() => setStatusModal(s => ({ ...s, reason: "out of area" }))}
-                    >
-                      Out Of Area
-                    </button>
-
-                    <button
-                      className={`status-chip ${statusModal.reason === "urgent visit" ? "active" : ""}`}
-                      onClick={() => setStatusModal(s => ({ ...s, reason: "urgent visit" }))}
-                    >
-                      Urgent Visit
-                    </button>
-
-                  </div>
-                </>
-              )}
+        </div>
 
 
-              {/* NEXT ACTION */}
-              {statusModal.interest === "interested" && (
-                <>
-                  <h4>Next Action</h4>
-                  <div className="status-chip-group">
+        {/* INTEREST */}
+        {statusModal.validation === "valid" && (
+          <>
+            <h4 className="leadStatusHeading">Interest</h4>
 
-                    <button
-                      className={`status-chip ${statusModal.action === "req shared" ? "active" : ""}`}
-                      onClick={() => setStatusModal(s => ({ ...s, action: "req shared" }))}
-                    >
-                      Req Shared
-                    </button>
-
-                    <button
-                      className={`status-chip ${statusModal.action === "followup" ? "active" : ""}`}
-                      onClick={() => setStatusModal(s => ({ ...s, action: "followup" }))}
-                    >
-                      Followup
-                    </button>
-
-                  </div>
-                </>
-              )}
-
-            </div>
-
-            {/* FOLLOWUP DATE */}
-
-            {statusModal.action === "followup" && (
-              <div style={{ marginTop: 14 }}>
-                <label style={{ fontWeight: 600 }}>Follow-up Date</label>
-
-                <input
-                  type="date"
-                  className="cp-input"
-                  value={statusModal.followupDate || ""}
-                  onChange={(e) =>
-                    setStatusModal((s) => ({
-                      ...s,
-                      followupDate: e.target.value,
-                    }))
-                  }
-                />
-              </div>
-            )}
-
-            {/* NOTE */}
-
-            <div style={{ marginTop: 16 }}>
-              <label
-                style={{
-                  display: "block",
-                  fontWeight: 600,
-                  marginBottom: 6,
-                }}
-              >
-                Note / Reason
-              </label>
-
-              <textarea
-                value={statusModal.note}
-                onChange={(e) =>
-                  setStatusModal((s) => ({ ...s, note: e.target.value }))
-                }
-                rows={4}
-                className="cp-input"
-                placeholder="Enter a note explaining the status change (required)"
-              />
-            </div>
-
-            {/* ACTIONS */}
-
-            <div className="cp-form-actions" style={{ marginTop: 16 }}>
+            <div className="leadStatusRow">
 
               <button
-                className="cp-btn ghost"
-                onClick={closeStatusModal}
+                className={`leadStatusChip ${statusModal.interest === "interested" ? "active" : ""}`}
+                onClick={() =>
+                  setStatusModal((s) => ({
+                    ...s,
+                    interest: "interested",
+                    reason: "",
+                    action: "",
+                  }))
+                }
               >
-                Cancel
+                Interested
               </button>
 
               <button
-                className="cp-btn primary"
-                onClick={confirmStatusChange}
-                disabled={
-                  !(statusModal.validation || statusModal.interest || statusModal.reason || statusModal.action)
-                  || !statusModal.note.trim()
+                className={`leadStatusChip ${statusModal.interest === "not interested" ? "active" : ""}`}
+                onClick={() =>
+                  setStatusModal((s) => ({
+                    ...s,
+                    interest: "not interested",
+                    action: "",
+                  }))
                 }
               >
-                Confirm
+                Not Interested
               </button>
 
             </div>
+          </>
+        )}
 
-          </div>
+
+        {/* REASONS */}
+        {statusModal.interest === "not interested" && (
+          <>
+            <h4 className="leadStatusHeading">Reason</h4>
+
+            <div className="leadStatusRow">
+
+              <button
+                className={`leadStatusChip ${statusModal.reason === "out of service" ? "active" : ""}`}
+                onClick={() =>
+                  setStatusModal((s) => ({ ...s, reason: "out of service" }))
+                }
+              >
+                Out Of Service
+              </button>
+
+              <button
+                className={`leadStatusChip ${statusModal.reason === "high price" ? "active" : ""}`}
+                onClick={() =>
+                  setStatusModal((s) => ({ ...s, reason: "high price" }))
+                }
+              >
+                High Price
+              </button>
+
+              <button
+                className={`leadStatusChip ${statusModal.reason === "out of area" ? "active" : ""}`}
+                onClick={() =>
+                  setStatusModal((s) => ({ ...s, reason: "out of area" }))
+                }
+              >
+                Out Of Area
+              </button>
+
+              <button
+                className={`leadStatusChip ${statusModal.reason === "urgent visit" ? "active" : ""}`}
+                onClick={() =>
+                  setStatusModal((s) => ({ ...s, reason: "urgent visit" }))
+                }
+              >
+                Urgent Visit
+              </button>
+
+            </div>
+          </>
+        )}
+
+
+        {/* NEXT ACTION */}
+        {statusModal.interest === "interested" && (
+          <>
+            <h4 className="leadStatusHeading">Next Action</h4>
+
+            <div className="leadStatusRow">
+
+              <button
+                className={`leadStatusChip ${statusModal.action === "req shared" ? "active" : ""}`}
+                onClick={() =>
+                  setStatusModal((s) => ({ ...s, action: "req shared" }))
+                }
+              >
+                Req Shared
+              </button>
+
+              <button
+                className={`leadStatusChip ${statusModal.action === "followup" ? "active" : ""}`}
+                onClick={() =>
+                  setStatusModal((s) => ({ ...s, action: "followup" }))
+                }
+              >
+                Followup
+              </button>
+
+            </div>
+          </>
+        )}
+
+      </div>
+
+
+      {/* FOLLOWUP DATE */}
+      {statusModal.action === "followup" && (
+        <div className="leadStatusInputGroup">
+
+          <label className="leadStatusLabel">Follow-up Date</label>
+
+          <input
+            type="date"
+            className="leadStatusInput"
+            value={statusModal.followupDate || ""}
+            onChange={(e) =>
+              setStatusModal((s) => ({
+                ...s,
+                followupDate: e.target.value,
+              }))
+            }
+          />
+
         </div>
       )}
+
+
+      {/* NOTE */}
+      <div className="leadStatusInputGroup">
+
+        <label className="leadStatusLabel">Note / Reason</label>
+
+        <textarea
+          className="leadStatusTextarea"
+          rows={4}
+          value={statusModal.note}
+          onChange={(e) =>
+            setStatusModal((s) => ({ ...s, note: e.target.value }))
+          }
+          placeholder="Enter a note explaining the status change (required)"
+        />
+
+      </div>
+
+
+      {/* ACTIONS */}
+      <div className="leadStatusActions">
+
+        <button
+          className="leadStatusBtn ghost"
+          onClick={closeStatusModal}
+        >
+          Cancel
+        </button>
+
+        <button
+          className="leadStatusBtn primary"
+          onClick={confirmStatusChange}
+          disabled={
+            !(statusModal.validation ||
+              statusModal.interest ||
+              statusModal.reason ||
+              statusModal.action) ||
+            !statusModal.note.trim()
+          }
+        >
+          Confirm
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+)}
 
       {/* Details drawer */}
       {detailsLead && (

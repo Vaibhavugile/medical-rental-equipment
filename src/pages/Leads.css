@@ -462,3 +462,157 @@ border-color:#0ea5e9;
 background:#dc2626;
 border-color:#dc2626;
 }
+/* overlay */
+
+.leadStatusOverlay{
+position:fixed;
+inset:0;
+background:rgba(15,23,42,.45);
+backdrop-filter:blur(6px);
+display:flex;
+align-items:center;
+justify-content:center;
+z-index:1200;
+}
+
+/* modal */
+
+.leadStatusModal{
+width:520px;
+max-width:92%;
+background:#fff;
+border-radius:16px;
+padding:28px;
+box-shadow:0 20px 60px rgba(0,0,0,.18);
+}
+
+/* title */
+
+.leadStatusTitle{
+font-size:20px;
+font-weight:700;
+margin-bottom:14px;
+}
+
+/* section */
+
+.leadStatusSection{
+margin-top:10px;
+}
+
+/* headings */
+
+.leadStatusHeading{
+font-size:14px;
+font-weight:600;
+margin:16px 0 6px;
+color:#334155;
+}
+
+/* labels */
+
+.leadStatusLabel{
+font-weight:600;
+font-size:13px;
+color:#475569;
+}
+
+/* row */
+
+.leadStatusRow{
+display:flex;
+gap:10px;
+flex-wrap:wrap;
+}
+
+/* chips */
+
+.leadStatusChip{
+padding:8px 16px;
+border-radius:999px;
+border:1px solid #e2e8f0;
+background:#f8fafc;
+font-size:13px;
+cursor:pointer;
+transition:.18s;
+color:#1e293b;
+font-weight:500;
+}
+
+.leadStatusChip:hover{
+background:#e2e8f0;
+}
+
+.leadStatusChip.active{
+background:#2563eb;
+color:#ffffff;
+border-color:#2563eb;
+font-weight:600;
+}
+
+/* inputs */
+
+.leadStatusInputGroup{
+margin-top:16px;
+}
+
+.leadStatusInput,
+.leadStatusTextarea{
+width:100%;
+border-radius:10px;
+border:1px solid #e2e8f0;
+padding:10px 12px;
+background:#f8fafc;
+font-size:14px;
+margin-top:6px;
+}
+
+.leadStatusTextarea{
+resize:vertical;
+}
+
+/* actions */
+
+.leadStatusActions{
+margin-top:18px;
+display:flex;
+justify-content:flex-end;
+gap:10px;
+}
+
+
+.leadStatusBtn{
+padding:8px 18px;
+border-radius:999px;
+font-weight:600;
+cursor:pointer;
+border:none;
+}
+
+.leadStatusBtn.primary{
+background:linear-gradient(135deg,#2563eb,#3b82f6);
+color:white;
+}
+
+.leadStatusBtn.ghost{
+background:#f1f5f9;
+border:1px solid #e2e8f0;
+color:#334155;
+font-weight:600;
+}
+.leadStatusBtn.ghost:hover{
+background:#e2e8f0;
+color:#0f172a;
+}
+.notInterestedFilters{
+margin-top:8px;
+}
+
+.notInterestedDropdown{
+padding:6px 10px;
+border-radius:8px;
+border:1px solid #e2e8f0;
+background:white;
+font-size:13px;
+cursor:pointer;
+}
