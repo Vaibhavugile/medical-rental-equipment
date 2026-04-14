@@ -65,11 +65,11 @@ export default function NursingOrderDetails() {
     newSubtotal: "",
   });
 
-const [stopFullModal, setStopFullModal] = useState({
-  open: false,
-  stopDate: "",
-  serviceIndex: null
-});
+  const [stopFullModal, setStopFullModal] = useState({
+    open: false,
+    stopDate: "",
+    serviceIndex: null
+  });
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [customerDraft, setCustomerDraft] = useState(null);
   const [allAssignments, setAllAssignments] = useState([]);
@@ -88,47 +88,47 @@ const [stopFullModal, setStopFullModal] = useState({
     amount: 0
   });
   const getDaysInclusive = (start, end) => {
-  if (!start || !end) return 0;
+    if (!start || !end) return 0;
 
-  const s = new Date(start);
-  const e = new Date(end);
+    const s = new Date(start);
+    const e = new Date(end);
 
-  s.setHours(0,0,0,0);
-  e.setHours(0,0,0,0);
+    s.setHours(0, 0, 0, 0);
+    e.setHours(0, 0, 0, 0);
 
-  const diff = (e - s) / (1000 * 60 * 60 * 24);
+    const diff = (e - s) / (1000 * 60 * 60 * 24);
 
-  return Math.max(0, diff + 1);
-};
-const updateServiceItem = (index, patch) => {
+    return Math.max(0, diff + 1);
+  };
+  const updateServiceItem = (index, patch) => {
 
-  setEditableItems(prev => {
+    setEditableItems(prev => {
 
-    const items = [...prev];
+      const items = [...prev];
 
-    const item = {
-      ...items[index],
-      ...patch
-    };
+      const item = {
+        ...items[index],
+        ...patch
+      };
 
-    const rate = Number(item.rate || 0);
+      const rate = Number(item.rate || 0);
 
-    const days = getDaysInclusive(
-      item.expectedStartDate,
-      item.expectedEndDate
-    );
+      const days = getDaysInclusive(
+        item.expectedStartDate,
+        item.expectedEndDate
+      );
 
-    const staffCount = Number(item.staffCount || 1);
+      const staffCount = Number(item.staffCount || 1);
 
-    item.amount = rate * days * staffCount;
+      item.amount = rate * days * staffCount;
 
-    items[index] = item;
+      items[index] = item;
 
-    return items;
+      return items;
 
-  });
+    });
 
-};
+  };
   const [salaryRequestModal, setSalaryRequestModal] = useState({
     open: false,
     assignment: null,
@@ -175,28 +175,28 @@ const updateServiceItem = (index, patch) => {
     setIsEditingCustomer(false);
     setCustomerDraft(null);
   };
- const calculateExtension = (serviceIndex, newEndDate, rate) => {
+  const calculateExtension = (serviceIndex, newEndDate, rate) => {
 
-  const service = editableItems[serviceIndex];
+    const service = editableItems[serviceIndex];
 
-  const oldEnd = new Date(service.expectedEndDate);
+    const oldEnd = new Date(service.expectedEndDate);
 
-  const mergedEndDate = mergeDateKeepTime(
-    service.expectedEndDate,
-    newEndDate
-  );
+    const mergedEndDate = mergeDateKeepTime(
+      service.expectedEndDate,
+      newEndDate
+    );
 
-  const newEnd = new Date(mergedEndDate);
+    const newEnd = new Date(mergedEndDate);
 
-  const extraDays = Math.max(
-    0,
-    Math.floor((newEnd - oldEnd) / (1000 * 60 * 60 * 24))
-  );
+    const extraDays = Math.max(
+      0,
+      Math.floor((newEnd - oldEnd) / (1000 * 60 * 60 * 24))
+    );
 
-  const amount = extraDays * rate;
+    const amount = extraDays * rate;
 
-  return { extraDays, amount };
-};
+    return { extraDays, amount };
+  };
 
   const validateCustomer = () => {
     const errors = {};
@@ -253,41 +253,41 @@ const updateServiceItem = (index, patch) => {
       alert("Failed to update customer");
     }
   };
-const openExtendServiceModal = (serviceIndex) => {
+  const openExtendServiceModal = (serviceIndex) => {
 
-  const service = editableItems?.[serviceIndex];
+    const service = editableItems?.[serviceIndex];
 
-  let rate = 0;
+    let rate = 0;
 
-  /* IF EXTENSION ALREADY DONE */
-  if (service?.lastExtensionRate) {
+    /* IF EXTENSION ALREADY DONE */
+    if (service?.lastExtensionRate) {
 
-    rate = service.lastExtensionRate;
+      rate = service.lastExtensionRate;
 
-  } else {
+    } else {
 
-    const start = new Date(service.expectedStartDate);
-    const end = new Date(service.expectedEndDate);
+      const start = new Date(service.expectedStartDate);
+      const end = new Date(service.expectedEndDate);
 
-    const totalDays =
-      Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+      const totalDays =
+        Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
-    rate = service.amount / totalDays;
+      rate = service.amount / totalDays;
 
-  }
+    }
 
-  setExtendServiceModal({
-    open: true,
-    serviceIndex,
-endDate: new Date(service.expectedEndDate)
-  .toISOString()
-  .slice(0,10),
+    setExtendServiceModal({
+      open: true,
+      serviceIndex,
+      endDate: new Date(service.expectedEndDate)
+        .toISOString()
+        .slice(0, 10),
       rate: Math.round(rate),
-    extraDays: 0,
-    amount: 0
-  });
+      extraDays: 0,
+      amount: 0
+    });
 
-};
+  };
   const formatDateTimeLocal = (value) => {
     if (!value) return "";
 
@@ -458,61 +458,61 @@ endDate: new Date(service.expectedEndDate)
   });
   const isDateOverlap = (start1, end1, start2, end2) => {
 
-  const s1 = new Date(start1).getTime();
-  const e1 = new Date(end1).getTime();
+    const s1 = new Date(start1).getTime();
+    const e1 = new Date(end1).getTime();
 
-  const s2 = new Date(start2).getTime();
-  const e2 = new Date(end2).getTime();
+    const s2 = new Date(start2).getTime();
+    const e2 = new Date(end2).getTime();
 
-  return s1 < e2 && s2 < e1;
+    return s1 < e2 && s2 < e1;
 
-};
+  };
   const getStaffAvailability = (staffId) => {
 
-  if (!assignDates.startDate || !assignDates.endDate) {
-    return { status: "available" };
-  }
+    if (!assignDates.startDate || !assignDates.endDate) {
+      return { status: "available" };
+    }
 
-  const conflicting = allAssignments.find((a) => {
+    const conflicting = allAssignments.find((a) => {
 
-    if (a.staffId !== staffId) return false;
+      if (a.staffId !== staffId) return false;
 
-    if (!["assigned", "active"].includes(a.status)) return false;
+      if (!["assigned", "active"].includes(a.status)) return false;
 
-    return isDateOverlap(
-      assignDates.startDate,
-      assignDates.endDate,
-      a.startDate,
-      a.endDate
-    );
+      return isDateOverlap(
+        assignDates.startDate,
+        assignDates.endDate,
+        a.startDate,
+        a.endDate
+      );
 
-  });
+    });
 
-  if (!conflicting) {
-    return { status: "available" };
-  }
+    if (!conflicting) {
+      return { status: "available" };
+    }
 
-  if (conflicting.orderId === id) {
+    if (conflicting.orderId === id) {
+      return {
+        status: "reserved",
+        orderNo: conflicting.orderNo,
+        startDate: conflicting.startDate,
+        endDate: conflicting.endDate
+      };
+    }
+
     return {
-      status: "reserved",
+      status: "busy",
       orderNo: conflicting.orderNo,
       startDate: conflicting.startDate,
       endDate: conflicting.endDate
     };
-  }
 
-  return {
-    status: "busy",
-    orderNo: conflicting.orderNo,
-    startDate: conflicting.startDate,
-    endDate: conflicting.endDate
   };
-
-};
- const staffWithStatus = filteredStaff.map((s) => ({
-  ...s,
-  availability: getStaffAvailability(s.id)
-}));
+  const staffWithStatus = filteredStaff.map((s) => ({
+    ...s,
+    availability: getStaffAvailability(s.id)
+  }));
   const displayUser = (uid, name) =>
     uid === auth.currentUser?.uid ? "You" : name;
   const calculateTotals = (items, discountAmount = 0, taxBreakdown = []) => {
@@ -595,15 +595,15 @@ endDate: new Date(service.expectedEndDate)
     });
 
   };
- const isServiceStopped = (index) => {
+  const isServiceStopped = (index) => {
 
-  if (!order?.stopHistory) return false;
+    if (!order?.stopHistory) return false;
 
-  return order.stopHistory.some(
-    s => s.serviceIndex === index
-  );
+    return order.stopHistory.some(
+      s => s.serviceIndex === index
+    );
 
-};
+  };
   const emptyPaymentForm = {
     amount: "",
     date: new Date().toISOString().slice(0, 10),
@@ -710,34 +710,34 @@ endDate: new Date(service.expectedEndDate)
     loadRates();
 
   }, []);
-const loadAllAssignments = async () => {
+  const loadAllAssignments = async () => {
 
-  try {
+    try {
 
-    const q = query(
-      collection(db, "staffAssignments"),
-      where("status", "in", ["assigned", "active"])
-    );
+      const q = query(
+        collection(db, "staffAssignments"),
+        where("status", "in", ["assigned", "active"])
+      );
 
-    const snap = await getDocs(q);
+      const snap = await getDocs(q);
 
-    const data = snap.docs.map(d => ({
-      id: d.id,
-      ...(d.data() || {})
-    }));
+      const data = snap.docs.map(d => ({
+        id: d.id,
+        ...(d.data() || {})
+      }));
 
-    setAllAssignments(data);
+      setAllAssignments(data);
 
-  } catch (err) {
+    } catch (err) {
 
-    console.error("Failed loading assignments", err);
+      console.error("Failed loading assignments", err);
 
-  }
+    }
 
-};
-useEffect(() => {
-  loadAllAssignments();
-}, []);
+  };
+  useEffect(() => {
+    loadAllAssignments();
+  }, []);
   useEffect(() => {
 
     const loadUserRole = async () => {
@@ -1255,9 +1255,9 @@ useEffect(() => {
     };
 
   };
-  
 
-  
+
+
   const assignStaff = async (staff) => {
 
     if (!order) return;
@@ -1545,10 +1545,10 @@ useEffect(() => {
 
       const service = editableItems[serviceIndex];
 
-const updatedEndDate = mergeDateKeepTime(
-  service.expectedEndDate,
-  endDate
-);
+      const updatedEndDate = mergeDateKeepTime(
+        service.expectedEndDate,
+        endDate
+      );
 
       /* =====================
          UPDATE SERVICE
@@ -1557,13 +1557,13 @@ const updatedEndDate = mergeDateKeepTime(
       const updatedItems = [...editableItems];
 
       updatedItems[serviceIndex] = {
-  ...service,
-  expectedEndDate: updatedEndDate,
-  amount: Number(service.amount || 0) + extraAmount,
+        ...service,
+        expectedEndDate: updatedEndDate,
+        amount: Number(service.amount || 0) + extraAmount,
 
-  /* SAVE EXTENSION RATE */
-  lastExtensionRate: extendServiceModal.rate
-};
+        /* SAVE EXTENSION RATE */
+        lastExtensionRate: extendServiceModal.rate
+      };
 
       const existingTaxes = order?.totals?.taxBreakdown || [];
 
@@ -1589,31 +1589,31 @@ const updatedEndDate = mergeDateKeepTime(
         lastExtendedAt: serverTimestamp(),
 
         extensionHistory: [
-  ...(order.extensionHistory || []),
-  {
-    serviceIndex,
-    serviceName: service.name,
+          ...(order.extensionHistory || []),
+          {
+            serviceIndex,
+            serviceName: service.name,
 
-    oldEndDate: service.expectedEndDate,
-    newEndDate: updatedEndDate,
+            oldEndDate: service.expectedEndDate,
+            newEndDate: updatedEndDate,
 
-    /* RATE HISTORY */
-    oldRate: service.lastExtensionRate || extendServiceModal.rate,
-    newRate: extendServiceModal.rate,
+            /* RATE HISTORY */
+            oldRate: service.lastExtensionRate || extendServiceModal.rate,
+            newRate: extendServiceModal.rate,
 
-    extraDays: extendServiceModal.extraDays,
+            extraDays: extendServiceModal.extraDays,
 
-    extraAmount,
+            extraAmount,
 
-    extendedByUid: auth.currentUser?.uid || "",
-    extendedByName:
-      auth.currentUser?.displayName ||
-      auth.currentUser?.email ||
-      "Admin",
+            extendedByUid: auth.currentUser?.uid || "",
+            extendedByName:
+              auth.currentUser?.displayName ||
+              auth.currentUser?.email ||
+              "Admin",
 
-    extendedAt: new Date().toISOString()
-  }
-],
+            extendedAt: new Date().toISOString()
+          }
+        ],
 
         updatedAt: serverTimestamp()
 
@@ -1678,11 +1678,11 @@ const updatedEndDate = mergeDateKeepTime(
       ===================== */
 
       const q = query(
-  collection(db, "staffAssignments"),
-  where("orderId", "==", id),
-  where("serviceIndex", "==", serviceIndex),
-  where("status", "in", ["assigned", "active"])
-);
+        collection(db, "staffAssignments"),
+        where("orderId", "==", id),
+        where("serviceIndex", "==", serviceIndex),
+        where("status", "in", ["assigned", "active"])
+      );
 
       const snap = await getDocs(q);
 
@@ -1737,14 +1737,14 @@ const updatedEndDate = mergeDateKeepTime(
 
       await loadAssignments();
 
-     setExtendServiceModal({
-  open: false,
-  serviceIndex: null,
-  endDate: "",
-  rate: 0,
-  extraDays: 0,
-  amount: 0
-});
+      setExtendServiceModal({
+        open: false,
+        serviceIndex: null,
+        endDate: "",
+        rate: 0,
+        extraDays: 0,
+        amount: 0
+      });
 
     } catch (err) {
 
@@ -1781,18 +1781,31 @@ const updatedEndDate = mergeDateKeepTime(
     try {
       const payAmount = Number(paymentModal.form.amount || 0);
 
-if (!payAmount || payAmount <= 0) {
-  alert("Enter valid payment amount");
-  setPaymentModal(p => ({ ...p, saving:false }));
-  return;
+      if (!payAmount || payAmount <= 0) {
+        alert("Enter valid payment amount");
+        setPaymentModal(p => ({ ...p, saving: false }));
+        return;
+      }
+
+    let allowedBalance = balance;
+
+if (paymentModal.editingId) {
+  const existingPayment = order.payments.find(
+    p => p.id === paymentModal.editingId
+  );
+
+  if (existingPayment) {
+    allowedBalance = balance + Number(existingPayment.amount || 0);
+  }
 }
 
-if (payAmount > balance) {
-  alert(`Payment cannot exceed remaining balance (₹${balance})`);
-  setPaymentModal(p => ({ ...p, saving:false }));
+if (payAmount > allowedBalance) {
+  alert(`Payment cannot exceed remaining balance (₹${allowedBalance})`);
+  setPaymentModal(p => ({ ...p, saving: false }));
   return;
 }
       const user = auth.currentUser;
+      const selectedDate = new Date(paymentModal.form.date).toISOString();
 
       const newPayment = {
         amount: Number(paymentModal.form.amount),
@@ -1810,7 +1823,7 @@ if (payAmount > balance) {
           "Admin",
 
         // ❌ no serverTimestamp inside array
-        createdAt: new Date().toISOString(),
+        createdAt: selectedDate,
       };
 
 
@@ -1883,94 +1896,95 @@ if (payAmount > balance) {
       alert(e.message || "Failed to save payment");
     }
   };
- const stopAllActiveStaff = async (stopDate) => {
 
-  try {
+  const stopAllActiveStaff = async (stopDate) => {
 
-    const serviceIndex = stopFullModal.serviceIndex;
+    try {
 
-    const q = query(
-      collection(db, "staffAssignments"),
-      where("orderId", "==", id),
-      where("serviceIndex", "==", serviceIndex), // ✅ only that service
-      where("status", "in", ["assigned", "active"])
-    );
+      const serviceIndex = stopFullModal.serviceIndex;
 
-    const snap = await getDocs(q);
-
-    const service = order.items?.[serviceIndex];
-
-    if (!service) return;
-
-    for (const d of snap.docs) {
-
-      const a = d.data();
-
-      /* =========================
-         DETERMINE FINAL END DATE
-      ========================= */
-
-      const serviceEnd = new Date(service.expectedEndDate);
-      const stop = new Date(stopDate);
-
-      const finalEndDate =
-        stop < serviceEnd ? stopDate : service.expectedEndDate;
-
-      /* =========================
-         RECALCULATE SALARY
-      ========================= */
-
-      const salary = calculateStaffSalary(
-        a.startDate,
-        finalEndDate,
-        Number(a.rate || 0),
-        a.rateType
+      const q = query(
+        collection(db, "staffAssignments"),
+        where("orderId", "==", id),
+        where("serviceIndex", "==", serviceIndex), // ✅ only that service
+        where("status", "in", ["assigned", "active"])
       );
 
-      const newAmount = salary.amount;
+      const snap = await getDocs(q);
 
-      const paidAmount = Number(a.paidAmount || 0);
+      const service = order.items?.[serviceIndex];
 
-      const newBalance = Math.max(
-        0,
-        newAmount - paidAmount
-      );
+      if (!service) return;
 
-      /* =========================
-         UPDATE FIRESTORE
-      ========================= */
+      for (const d of snap.docs) {
 
-      await updateDoc(
-        doc(db, "staffAssignments", d.id),
-        {
-          endDate: finalEndDate,
+        const a = d.data();
 
-          hours: salary.hours,
-          days: salary.days,
-          months: salary.months,
+        /* =========================
+           DETERMINE FINAL END DATE
+        ========================= */
 
-          amount: newAmount,
-          balanceAmount: newBalance,
+        const serviceEnd = new Date(service.expectedEndDate);
+        const stop = new Date(stopDate);
 
-          status: "completed",
+        const finalEndDate =
+          stop < serviceEnd ? stopDate : service.expectedEndDate;
 
-          stoppedAt: serverTimestamp(),
-          updatedAt: serverTimestamp()
-        }
-      );
+        /* =========================
+           RECALCULATE SALARY
+        ========================= */
+
+        const salary = calculateStaffSalary(
+          a.startDate,
+          finalEndDate,
+          Number(a.rate || 0),
+          a.rateType
+        );
+
+        const newAmount = salary.amount;
+
+        const paidAmount = Number(a.paidAmount || 0);
+
+        const newBalance = Math.max(
+          0,
+          newAmount - paidAmount
+        );
+
+        /* =========================
+           UPDATE FIRESTORE
+        ========================= */
+
+        await updateDoc(
+          doc(db, "staffAssignments", d.id),
+          {
+            endDate: finalEndDate,
+
+            hours: salary.hours,
+            days: salary.days,
+            months: salary.months,
+
+            amount: newAmount,
+            balanceAmount: newBalance,
+
+            status: "completed",
+
+            stoppedAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          }
+        );
+
+      }
+
+      await loadAssignments();
+
+    } catch (err) {
+
+      console.error(err);
+      alert("Failed to update staff");
 
     }
 
-    await loadAssignments();
-
-  } catch (err) {
-
-    console.error(err);
-    alert("Failed to update staff");
-
-  }
-
-};
+  };
   const stopStaffService = async () => {
 
     const assignment = stopServiceModal.assignment;
@@ -2229,226 +2243,226 @@ if (payAmount > balance) {
     }
 
   };
-const stopOrderServicesOnly = async (stopDate, overrideSubtotal = null) => {
-  if (!stopDate) {
-    alert("Select stop date");
-    return;
-  }
-
-  try {
-
-    let updatedItems = [...(order.items || [])];
-
-    /* =========================
-       1️⃣ UPDATE ONLY SELECTED SERVICE
-    ========================= */
-
-    updatedItems = updatedItems.map((it, index) => {
-
-      if (index !== stopFullModal.serviceIndex) {
-        return it;
-      }
-
-      if (!it.expectedStartDate || !it.expectedEndDate) return it;
-
-      const start = new Date(it.expectedStartDate);
-      const oldEnd = new Date(it.expectedEndDate);
-
-      const mergedEndDate = mergeDateKeepTime(
-        it.expectedEndDate,
-        stopDate
-      );
-
-      const newEnd = new Date(mergedEndDate);
-
-      if (isNaN(start) || isNaN(oldEnd) || isNaN(newEnd)) return it;
-
-      if (newEnd >= oldEnd) return it;
-
-      const totalDays =
-        (oldEnd - start) / (1000 * 60 * 60 * 24) + 1;
-
-      const usedDays =
-        (newEnd - start) / (1000 * 60 * 60 * 24) + 1;
-
-      if (totalDays <= 0 || usedDays <= 0) return it;
-
-      const newAmount =
-        (Number(it.amount || 0) / totalDays) * usedDays;
-
-      return {
-        ...it,
-        expectedEndDate: mergedEndDate,
-        amount: Math.round(newAmount),
-      };
-
-    });
-
-    /* =========================
-       2️⃣ CALCULATE SUBTOTAL
-    ========================= */
-
-    const oldTotals = order?.totals || {};
-
-    const calculatedSubtotal = updatedItems.reduce(
-      (sum, it) => sum + Number(it.amount || 0),
-      0
-    );
-
-    /* =========================
-       3️⃣ APPLY ADMIN OVERRIDE
-    ========================= */
-
-    let newSubtotal =
-      overrideSubtotal !== null && overrideSubtotal !== ""
-        ? Number(overrideSubtotal)
-        : calculatedSubtotal;
-
-    /* =========================
-       4️⃣ DISTRIBUTE OVERRIDE
-    ========================= */
-
-    if (
-      overrideSubtotal !== null &&
-      overrideSubtotal !== "" &&
-      calculatedSubtotal > 0
-    ) {
-      const ratio = newSubtotal / calculatedSubtotal;
-
-      updatedItems = updatedItems.map((it) => ({
-        ...it,
-        amount: Math.round(Number(it.amount || 0) * ratio),
-      }));
+  const stopOrderServicesOnly = async (stopDate, overrideSubtotal = null) => {
+    if (!stopDate) {
+      alert("Select stop date");
+      return;
     }
 
-    const finalSubtotalFromItems = updatedItems.reduce(
-      (sum, it) => sum + Number(it.amount || 0),
-      0
-    );
+    try {
 
-    /* =========================
-       5️⃣ KEEP TAX + DISCOUNT LOCKED
-    ========================= */
+      let updatedItems = [...(order.items || [])];
 
-    const taxTotal = (oldTotals.taxBreakdown || []).reduce(
-      (sum, t) => sum + Number(t.amount || 0),
-      0
-    );
+      /* =========================
+         1️⃣ UPDATE ONLY SELECTED SERVICE
+      ========================= */
 
-    const discount = Number(oldTotals.discountAmount || 0);
+      updatedItems = updatedItems.map((it, index) => {
 
-    const finalTotal = Math.max(
-      0,
-      finalSubtotalFromItems - discount + taxTotal
-    );
+        if (index !== stopFullModal.serviceIndex) {
+          return it;
+        }
 
-    const newTotals = {
-      ...oldTotals,
-      subtotal: finalSubtotalFromItems,
-      total: finalTotal,
-      taxBreakdown: oldTotals.taxBreakdown,
-    };
+        if (!it.expectedStartDate || !it.expectedEndDate) return it;
 
-    /* =========================
-       6️⃣ BUILD LOGS
-    ========================= */
+        const start = new Date(it.expectedStartDate);
+        const oldEnd = new Date(it.expectedEndDate);
 
-    const logs = [];
-    const stopHistory = [];
+        const mergedEndDate = mergeDateKeepTime(
+          it.expectedEndDate,
+          stopDate
+        );
 
-    (order.items || []).forEach((oldItem, i) => {
+        const newEnd = new Date(mergedEndDate);
 
-      const newItem = updatedItems[i];
+        if (isNaN(start) || isNaN(oldEnd) || isNaN(newEnd)) return it;
 
-      if (!oldItem || !newItem) return;
+        if (newEnd >= oldEnd) return it;
+
+        const totalDays =
+          (oldEnd - start) / (1000 * 60 * 60 * 24) + 1;
+
+        const usedDays =
+          (newEnd - start) / (1000 * 60 * 60 * 24) + 1;
+
+        if (totalDays <= 0 || usedDays <= 0) return it;
+
+        const newAmount =
+          (Number(it.amount || 0) / totalDays) * usedDays;
+
+        return {
+          ...it,
+          expectedEndDate: mergedEndDate,
+          amount: Math.round(newAmount),
+        };
+
+      });
+
+      /* =========================
+         2️⃣ CALCULATE SUBTOTAL
+      ========================= */
+
+      const oldTotals = order?.totals || {};
+
+      const calculatedSubtotal = updatedItems.reduce(
+        (sum, it) => sum + Number(it.amount || 0),
+        0
+      );
+
+      /* =========================
+         3️⃣ APPLY ADMIN OVERRIDE
+      ========================= */
+
+      let newSubtotal =
+        overrideSubtotal !== null && overrideSubtotal !== ""
+          ? Number(overrideSubtotal)
+          : calculatedSubtotal;
+
+      /* =========================
+         4️⃣ DISTRIBUTE OVERRIDE
+      ========================= */
 
       if (
-        oldItem.expectedEndDate !== newItem.expectedEndDate ||
-        Number(oldItem.amount) !== Number(newItem.amount)
+        overrideSubtotal !== null &&
+        overrideSubtotal !== "" &&
+        calculatedSubtotal > 0
       ) {
+        const ratio = newSubtotal / calculatedSubtotal;
 
-        logs.push({
-          action: "STOP_SERVICE",
-          oldValue: {
-            endDate: oldItem.expectedEndDate,
-            amount: oldItem.amount,
-          },
-          newValue: {
-            endDate: newItem.expectedEndDate,
-            amount: newItem.amount,
-          },
-          editedByUid: auth.currentUser?.uid || "",
-          editedByName:
-            auth.currentUser?.displayName ||
-            auth.currentUser?.email ||
-            "Admin",
-          editedAt: new Date().toISOString(),
-        });
-
-        stopHistory.push({
-          serviceIndex: i,
-          serviceName: oldItem.name,
-          oldEndDate: oldItem.expectedEndDate,
-          newEndDate: newItem.expectedEndDate,
-          oldAmount: oldItem.amount,
-          newAmount: newItem.amount,
-          stoppedByUid: auth.currentUser?.uid || "",
-          stoppedByName:
-            auth.currentUser?.displayName ||
-            auth.currentUser?.email ||
-            "Admin",
-          stoppedAt: new Date().toISOString(),
-        });
-
+        updatedItems = updatedItems.map((it) => ({
+          ...it,
+          amount: Math.round(Number(it.amount || 0) * ratio),
+        }));
       }
 
-    });
+      const finalSubtotalFromItems = updatedItems.reduce(
+        (sum, it) => sum + Number(it.amount || 0),
+        0
+      );
 
-    /* =========================
-       7️⃣ SAVE TO FIRESTORE
-    ========================= */
+      /* =========================
+         5️⃣ KEEP TAX + DISCOUNT LOCKED
+      ========================= */
 
-    await updateDoc(doc(db, "nursingOrders", id), {
+      const taxTotal = (oldTotals.taxBreakdown || []).reduce(
+        (sum, t) => sum + Number(t.amount || 0),
+        0
+      );
 
-      items: updatedItems,
+      const discount = Number(oldTotals.discountAmount || 0);
 
-      totals: newTotals,
+      const finalTotal = Math.max(
+        0,
+        finalSubtotalFromItems - discount + taxTotal
+      );
 
-      stopHistory: [
-        ...(order.stopHistory || []),
-        ...stopHistory,
-      ],
+      const newTotals = {
+        ...oldTotals,
+        subtotal: finalSubtotalFromItems,
+        total: finalTotal,
+        taxBreakdown: oldTotals.taxBreakdown,
+      };
 
-      activityLog:
-        logs.length > 0
-          ? arrayUnion(...logs)
-          : order.activityLog || [],
+      /* =========================
+         6️⃣ BUILD LOGS
+      ========================= */
 
-      stoppedAt: serverTimestamp(),
+      const logs = [];
+      const stopHistory = [];
 
-      updatedAt: serverTimestamp(),
+      (order.items || []).forEach((oldItem, i) => {
 
-    });
+        const newItem = updatedItems[i];
 
-    /* =========================
-       8️⃣ UPDATE UI
-    ========================= */
+        if (!oldItem || !newItem) return;
 
-    setOrder((o) => ({
-      ...o,
-      items: updatedItems,
-      totals: newTotals,
-    }));
+        if (
+          oldItem.expectedEndDate !== newItem.expectedEndDate ||
+          Number(oldItem.amount) !== Number(newItem.amount)
+        ) {
 
-    alert("Service updated successfully");
+          logs.push({
+            action: "STOP_SERVICE",
+            oldValue: {
+              endDate: oldItem.expectedEndDate,
+              amount: oldItem.amount,
+            },
+            newValue: {
+              endDate: newItem.expectedEndDate,
+              amount: newItem.amount,
+            },
+            editedByUid: auth.currentUser?.uid || "",
+            editedByName:
+              auth.currentUser?.displayName ||
+              auth.currentUser?.email ||
+              "Admin",
+            editedAt: new Date().toISOString(),
+          });
 
-  } catch (err) {
+          stopHistory.push({
+            serviceIndex: i,
+            serviceName: oldItem.name,
+            oldEndDate: oldItem.expectedEndDate,
+            newEndDate: newItem.expectedEndDate,
+            oldAmount: oldItem.amount,
+            newAmount: newItem.amount,
+            stoppedByUid: auth.currentUser?.uid || "",
+            stoppedByName:
+              auth.currentUser?.displayName ||
+              auth.currentUser?.email ||
+              "Admin",
+            stoppedAt: new Date().toISOString(),
+          });
 
-    console.error(err);
-    alert("Failed to stop service");
+        }
 
-  }
-};
+      });
+
+      /* =========================
+         7️⃣ SAVE TO FIRESTORE
+      ========================= */
+
+      await updateDoc(doc(db, "nursingOrders", id), {
+
+        items: updatedItems,
+
+        totals: newTotals,
+
+        stopHistory: [
+          ...(order.stopHistory || []),
+          ...stopHistory,
+        ],
+
+        activityLog:
+          logs.length > 0
+            ? arrayUnion(...logs)
+            : order.activityLog || [],
+
+        stoppedAt: serverTimestamp(),
+
+        updatedAt: serverTimestamp(),
+
+      });
+
+      /* =========================
+         8️⃣ UPDATE UI
+      ========================= */
+
+      setOrder((o) => ({
+        ...o,
+        items: updatedItems,
+        totals: newTotals,
+      }));
+
+      alert("Service updated successfully");
+
+    } catch (err) {
+
+      console.error(err);
+      alert("Failed to stop service");
+
+    }
+  };
 
   const handleCustomerRefund = async (
     newTotals,
@@ -2862,129 +2876,129 @@ const stopOrderServicesOnly = async (stopDate, overrideSubtotal = null) => {
 
   };
 
-const getStopPreview = () => {
+  const getStopPreview = () => {
 
-  if (!stopFullModal.stopDate || !order) return null;
+    if (!stopFullModal.stopDate || !order) return null;
 
-  /* =========================
-     1️⃣ UPDATE ITEMS (ONLY SELECTED SERVICE)
-  ========================= */
+    /* =========================
+       1️⃣ UPDATE ITEMS (ONLY SELECTED SERVICE)
+    ========================= */
 
-  let updatedItems = [...order.items].map((it, index) => {
+    let updatedItems = [...order.items].map((it, index) => {
 
-    // only modify clicked service
-    if (index !== stopFullModal.serviceIndex) {
-      return it;
-    }
+      // only modify clicked service
+      if (index !== stopFullModal.serviceIndex) {
+        return it;
+      }
 
-    if (!it.expectedStartDate || !it.expectedEndDate) return it;
+      if (!it.expectedStartDate || !it.expectedEndDate) return it;
 
-    const start = new Date(it.expectedStartDate);
-    const oldEnd = new Date(it.expectedEndDate);
+      const start = new Date(it.expectedStartDate);
+      const oldEnd = new Date(it.expectedEndDate);
 
-    /* 🔥 keep original service time */
-    const mergedEndDate = mergeDateKeepTime(
-      it.expectedEndDate,
-      stopFullModal.stopDate
+      /* 🔥 keep original service time */
+      const mergedEndDate = mergeDateKeepTime(
+        it.expectedEndDate,
+        stopFullModal.stopDate
+      );
+
+      const newEnd = new Date(mergedEndDate);
+
+      if (newEnd >= oldEnd) return it;
+
+      const totalDays =
+        (oldEnd - start) / (1000 * 60 * 60 * 24) + 1;
+
+      const usedDays =
+        (newEnd - start) / (1000 * 60 * 60 * 24) + 1;
+
+      const newAmount =
+        (Number(it.amount || 0) / totalDays) * usedDays;
+
+      return {
+        ...it,
+        expectedEndDate: mergedEndDate,   // ✅ FIX
+        amount: Math.round(newAmount),
+      };
+
+    });
+
+    /* =========================
+       2️⃣ CALCULATE SUBTOTAL
+    ========================= */
+
+    const oldTotals = order?.totals || {};
+
+    const newSubtotal = updatedItems.reduce(
+      (sum, it) => sum + Number(it.amount || 0),
+      0
     );
 
-    const newEnd = new Date(mergedEndDate);
+    /* =========================
+       3️⃣ KEEP TAX LOCKED
+    ========================= */
 
-    if (newEnd >= oldEnd) return it;
+    const taxTotal = (oldTotals.taxBreakdown || []).reduce(
+      (sum, t) => sum + Number(t.amount || 0),
+      0
+    );
 
-    const totalDays =
-      (oldEnd - start) / (1000 * 60 * 60 * 24) + 1;
+    const discount = Number(oldTotals.discountAmount || 0);
 
-    const usedDays =
-      (newEnd - start) / (1000 * 60 * 60 * 24) + 1;
+    /* =========================
+       4️⃣ ADMIN OVERRIDE
+    ========================= */
 
-    const newAmount =
-      (Number(it.amount || 0) / totalDays) * usedDays;
+    let finalSubtotal = newSubtotal;
+
+    if (stopPreviewOverride.newSubtotal) {
+      finalSubtotal = Number(stopPreviewOverride.newSubtotal);
+    }
+
+    /* =========================
+       5️⃣ FINAL TOTAL
+    ========================= */
+
+    const finalTotal = finalSubtotal - discount + taxTotal;
+
+    /* =========================
+       6️⃣ TOTAL PAID
+    ========================= */
+
+    const totalPaid = (order.payments || []).reduce(
+      (sum, p) => sum + Number(p.amount || 0),
+      0
+    );
+
+    /* =========================
+       7️⃣ REFUND CALCULATION
+    ========================= */
+
+    const refund = Math.max(0, totalPaid - finalTotal);
+
+    /* =========================
+       RETURN
+    ========================= */
 
     return {
-      ...it,
-      expectedEndDate: mergedEndDate,   // ✅ FIX
-      amount: Math.round(newAmount),
+
+      updatedItems,
+
+      oldSubtotal: oldTotals.subtotal || 0,
+      newSubtotal,
+
+      finalSubtotal,
+
+      taxTotal,
+      discount,
+
+      finalTotal,
+
+      refund,
+
     };
 
-  });
-
-  /* =========================
-     2️⃣ CALCULATE SUBTOTAL
-  ========================= */
-
-  const oldTotals = order?.totals || {};
-
-  const newSubtotal = updatedItems.reduce(
-    (sum, it) => sum + Number(it.amount || 0),
-    0
-  );
-
-  /* =========================
-     3️⃣ KEEP TAX LOCKED
-  ========================= */
-
-  const taxTotal = (oldTotals.taxBreakdown || []).reduce(
-    (sum, t) => sum + Number(t.amount || 0),
-    0
-  );
-
-  const discount = Number(oldTotals.discountAmount || 0);
-
-  /* =========================
-     4️⃣ ADMIN OVERRIDE
-  ========================= */
-
-  let finalSubtotal = newSubtotal;
-
-  if (stopPreviewOverride.newSubtotal) {
-    finalSubtotal = Number(stopPreviewOverride.newSubtotal);
-  }
-
-  /* =========================
-     5️⃣ FINAL TOTAL
-  ========================= */
-
-  const finalTotal = finalSubtotal - discount + taxTotal;
-
-  /* =========================
-     6️⃣ TOTAL PAID
-  ========================= */
-
-  const totalPaid = (order.payments || []).reduce(
-    (sum, p) => sum + Number(p.amount || 0),
-    0
-  );
-
-  /* =========================
-     7️⃣ REFUND CALCULATION
-  ========================= */
-
-  const refund = Math.max(0, totalPaid - finalTotal);
-
-  /* =========================
-     RETURN
-  ========================= */
-
-  return {
-
-    updatedItems,
-
-    oldSubtotal: oldTotals.subtotal || 0,
-    newSubtotal,
-
-    finalSubtotal,
-
-    taxTotal,
-    discount,
-
-    finalTotal,
-
-    refund,
-
   };
-
-};
   const stopPreview = getStopPreview();
 
   /* ======================
@@ -3007,6 +3021,7 @@ const getStopPreview = () => {
           Back
         </button>
       </div>
+      
 
       {/* CUSTOMER */}
       <div className={`nod-card ${isEditingCustomer ? "editing" : ""}`}>
@@ -3115,350 +3130,350 @@ const getStopPreview = () => {
       </div>
 
       {/* SERVICES */}
-     <div className="nod-card">
-  <div className="nod-row">
-    <h3>Services</h3>
-
-    {!servicesEditing ? (
-      <button
-        className="nod-btn nod-btn-secondary"
-        onClick={() => setServicesEditing(true)}
-      >
-        Edit Services
-      </button>
-    ) : (
-      <>
-        <button
-          className="nod-btn nod-btn-primary"
-          onClick={saveServices}
-        >
-          Save
-        </button>
-        <button
-          className="nod-btn nod-btn-secondary"
-          onClick={() => {
-            setEditableItems(order.items);
-            setServicesEditing(false);
-          }}
-        >
-          Cancel
-        </button>
-      </>
-    )}
-  </div>
-
-  {editableItems.map((it, i) => {
-
-    const days = getDaysInclusive(
-      it.expectedStartDate,
-      it.expectedEndDate
-    );
-
-    const rate = Number(it.rate || 0);
-
-    const calculatedAmount = days * rate;
-
-    return (
-
-      <div key={i} className="nod-item-row">
-
-        <div>
-
-  {/* SERVICE NAME */}
-  {servicesEditing ? (
-    <input
-      className="nod-input"
-      value={it.name}
-      onChange={(e) => {
-
-        const updated = [...editableItems];
-
-        updated[i] = {
-          ...updated[i],
-          name: e.target.value
-        };
-
-        setEditableItems(updated);
-
-      }}
-    />
-  ) : (
-    <strong>{it.name}</strong>
-  )}
-
-  {/* DATES */}
-  <div className="nod-muted">
-
-    {servicesEditing ? (
-      <>
-        <input
-          type="datetime-local"
-          className="nod-input small"
-          value={it.expectedStartDate || ""}
-          onChange={(e) => {
-
-            const updated = [...editableItems];
-
-            updated[i] = {
-              ...updated[i],
-              expectedStartDate: e.target.value
-            };
-
-            const days = getDaysInclusive(
-              e.target.value,
-              updated[i].expectedEndDate
-            );
-
-            const rate = Number(updated[i].rate || 0);
-            const staff = Number(updated[i].staffCount || 1);
-
-            updated[i].amount = days * rate * staff;
-
-            setEditableItems(updated);
-
-          }}
-        />
-
-        {" → "}
-
-        <input
-          type="datetime-local"
-          className="nod-input small"
-          value={it.expectedEndDate || ""}
-          onChange={(e) => {
-
-            const updated = [...editableItems];
-
-            updated[i] = {
-              ...updated[i],
-              expectedEndDate: e.target.value
-            };
-
-            const days = getDaysInclusive(
-              updated[i].expectedStartDate,
-              e.target.value
-            );
-
-            const rate = Number(updated[i].rate || 0);
-            const staff = Number(updated[i].staffCount || 1);
-
-            updated[i].amount = days * rate * staff;
-
-            setEditableItems(updated);
-
-          }}
-        />
-
-      </>
-    ) : (
-      <>
-        {it.expectedStartDate} → {it.expectedEndDate}
-      </>
-    )}
-
-  </div>
-
-  {/* RATE */}
-  <div className="nod-muted">
-
-    {servicesEditing ? (
-      <>
-        Rate ₹
-        <input
-          type="number"
-          className="nod-input small"
-          value={it.rate || ""}
-          onChange={(e) => {
-
-            const updated = [...editableItems];
-
-            updated[i] = {
-              ...updated[i],
-              rate: Number(e.target.value || 0)
-            };
-
-            const days = getDaysInclusive(
-              updated[i].expectedStartDate,
-              updated[i].expectedEndDate
-            );
-
-            const staff = Number(updated[i].staffCount || 1);
-
-            updated[i].amount =
-              days * Number(e.target.value || 0) * staff;
-
-            setEditableItems(updated);
-
-          }}
-        />
-      </>
-    ) : (
-      <>Rate ₹ {fmtCurrency(it.rate)}</>
-    )}
-
-  </div>
-
-  {/* STAFF COUNT */}
-  <div className="nod-muted">
-
-    {servicesEditing ? (
-      <>
-        Staff
-       <input
-  type="number"
-  min="1"
-  className="nod-input small"
-  value={it.staffCount ?? ""}
-  onChange={(e) => {
-
-    const updated = [...editableItems];
-
-    const staff = Number(e.target.value || 0);
-
-    updated[i] = {
-      ...updated[i],
-      staffCount: staff
-    };
-
-    const days = getDaysInclusive(
-      updated[i].expectedStartDate,
-      updated[i].expectedEndDate
-    );
-
-    const rate = Number(updated[i].rate || 0);
-
-    updated[i].amount = days * rate * (staff || 1);
-
-    setEditableItems(updated);
-
-  }}
-/>
-      </>
-    ) : (
-      <>Staff: {it.staffCount || 1}</>
-    )}
-
-  </div>
-
-  {/* AMOUNT */}
-  <div className="nod-muted">
-
-    {servicesEditing ? (
-      <>
-        Amount ₹
-        <input
-          type="number"
-          className="nod-input small"
-          value={it.amount || calculatedAmount}
-          readOnly
-        />
-        <span style={{ marginLeft: 6 }}>
-          ({days} days × ₹{rate} × {it.staffCount || 1} staff)
-        </span>
-      </>
-    ) : (
-      <>₹ {fmtCurrency(it.amount)}</>
-    )}
-
-  </div>
-
-</div>
-
-
-        {/* RIGHT SIDE ACTIONS */}
-        <div className="nod-right">
-
-          <div className="nod-bold">
-            ₹ {fmtCurrency(it.amount)}
-          </div>
-
-          <button
-            className="nod-btn nod-btn-primary small"
-            onClick={() => openAssignModal(i)}
-          >
-            {order.serviceType === "caretaker"
-              ? "Assign Caretaker"
-              : "Assign Nurse"}
-          </button>
-
-          <button
-            className="nod-btn nod-btn-secondary small"
-            onClick={() => openExtendServiceModal(i)}
-          >
-            Extend Service
-          </button>
-
-       {isServiceStopped(i) ? (
-  <div className="nod-badge nod-badge-red">
-    Service Stopped
-  </div>
-) : (
-  <button
-    className="nod-btn nod-btn-danger small"
-    onClick={() =>
-      setStopFullModal({
-        open: true,
-        serviceIndex: i,
-        stopDate: editableItems[i]?.expectedEndDate
-      })
-    }
-  >
-    Stop Full Service
-  </button>
-)}
-
-          {servicesEditing && (
+      <div className="nod-card">
+        <div className="nod-row">
+          <h3>Services</h3>
+
+          {!servicesEditing ? (
             <button
-              className="nod-btn nod-btn-danger small"
-              onClick={() => {
-
-                const updated =
-                  editableItems.filter((_, idx) => idx !== i);
-
-                setEditableItems(updated);
-
-              }}
+              className="nod-btn nod-btn-secondary"
+              onClick={() => setServicesEditing(true)}
             >
-              Remove
+              Edit Services
             </button>
+          ) : (
+            <>
+              <button
+                className="nod-btn nod-btn-primary"
+                onClick={saveServices}
+              >
+                Save
+              </button>
+              <button
+                className="nod-btn nod-btn-secondary"
+                onClick={() => {
+                  setEditableItems(order.items);
+                  setServicesEditing(false);
+                }}
+              >
+                Cancel
+              </button>
+            </>
           )}
-
         </div>
 
+        {editableItems.map((it, i) => {
+
+          const days = getDaysInclusive(
+            it.expectedStartDate,
+            it.expectedEndDate
+          );
+
+          const rate = Number(it.rate || 0);
+
+          const calculatedAmount = days * rate;
+
+          return (
+
+            <div key={i} className="nod-item-row">
+
+              <div>
+
+                {/* SERVICE NAME */}
+                {servicesEditing ? (
+                  <input
+                    className="nod-input"
+                    value={it.name}
+                    onChange={(e) => {
+
+                      const updated = [...editableItems];
+
+                      updated[i] = {
+                        ...updated[i],
+                        name: e.target.value
+                      };
+
+                      setEditableItems(updated);
+
+                    }}
+                  />
+                ) : (
+                  <strong>{it.name}</strong>
+                )}
+
+                {/* DATES */}
+                <div className="nod-muted">
+
+                  {servicesEditing ? (
+                    <>
+                      <input
+                        type="datetime-local"
+                        className="nod-input small"
+                        value={it.expectedStartDate || ""}
+                        onChange={(e) => {
+
+                          const updated = [...editableItems];
+
+                          updated[i] = {
+                            ...updated[i],
+                            expectedStartDate: e.target.value
+                          };
+
+                          const days = getDaysInclusive(
+                            e.target.value,
+                            updated[i].expectedEndDate
+                          );
+
+                          const rate = Number(updated[i].rate || 0);
+                          const staff = Number(updated[i].staffCount || 1);
+
+                          updated[i].amount = days * rate * staff;
+
+                          setEditableItems(updated);
+
+                        }}
+                      />
+
+                      {" → "}
+
+                      <input
+                        type="datetime-local"
+                        className="nod-input small"
+                        value={it.expectedEndDate || ""}
+                        onChange={(e) => {
+
+                          const updated = [...editableItems];
+
+                          updated[i] = {
+                            ...updated[i],
+                            expectedEndDate: e.target.value
+                          };
+
+                          const days = getDaysInclusive(
+                            updated[i].expectedStartDate,
+                            e.target.value
+                          );
+
+                          const rate = Number(updated[i].rate || 0);
+                          const staff = Number(updated[i].staffCount || 1);
+
+                          updated[i].amount = days * rate * staff;
+
+                          setEditableItems(updated);
+
+                        }}
+                      />
+
+                    </>
+                  ) : (
+                    <>
+                      {it.expectedStartDate} → {it.expectedEndDate}
+                    </>
+                  )}
+
+                </div>
+
+                {/* RATE */}
+                <div className="nod-muted">
+
+                  {servicesEditing ? (
+                    <>
+                      Rate ₹
+                      <input
+                        type="number"
+                        className="nod-input small"
+                        value={it.rate || ""}
+                        onChange={(e) => {
+
+                          const updated = [...editableItems];
+
+                          updated[i] = {
+                            ...updated[i],
+                            rate: Number(e.target.value || 0)
+                          };
+
+                          const days = getDaysInclusive(
+                            updated[i].expectedStartDate,
+                            updated[i].expectedEndDate
+                          );
+
+                          const staff = Number(updated[i].staffCount || 1);
+
+                          updated[i].amount =
+                            days * Number(e.target.value || 0) * staff;
+
+                          setEditableItems(updated);
+
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <>Rate ₹ {fmtCurrency(it.rate)}</>
+                  )}
+
+                </div>
+
+                {/* STAFF COUNT */}
+                <div className="nod-muted">
+
+                  {servicesEditing ? (
+                    <>
+                      Staff
+                      <input
+                        type="number"
+                        min="1"
+                        className="nod-input small"
+                        value={it.staffCount ?? ""}
+                        onChange={(e) => {
+
+                          const updated = [...editableItems];
+
+                          const staff = Number(e.target.value || 0);
+
+                          updated[i] = {
+                            ...updated[i],
+                            staffCount: staff
+                          };
+
+                          const days = getDaysInclusive(
+                            updated[i].expectedStartDate,
+                            updated[i].expectedEndDate
+                          );
+
+                          const rate = Number(updated[i].rate || 0);
+
+                          updated[i].amount = days * rate * (staff || 1);
+
+                          setEditableItems(updated);
+
+                        }}
+                      />
+                    </>
+                  ) : (
+                    <>Staff: {it.staffCount || 1}</>
+                  )}
+
+                </div>
+
+                {/* AMOUNT */}
+                <div className="nod-muted">
+
+                  {servicesEditing ? (
+                    <>
+                      Amount ₹
+                      <input
+                        type="number"
+                        className="nod-input small"
+                        value={it.amount || calculatedAmount}
+                        readOnly
+                      />
+                      <span style={{ marginLeft: 6 }}>
+                        ({days} days × ₹{rate} × {it.staffCount || 1} staff)
+                      </span>
+                    </>
+                  ) : (
+                    <>₹ {fmtCurrency(it.amount)}</>
+                  )}
+
+                </div>
+
+              </div>
+
+
+              {/* RIGHT SIDE ACTIONS */}
+              <div className="nod-right">
+
+                <div className="nod-bold">
+                  ₹ {fmtCurrency(it.amount)}
+                </div>
+
+                <button
+                  className="nod-btn nod-btn-primary small"
+                  onClick={() => openAssignModal(i)}
+                >
+                  {order.serviceType === "caretaker"
+                    ? "Assign Caretaker"
+                    : "Assign Nurse"}
+                </button>
+
+                <button
+                  className="nod-btn nod-btn-secondary small"
+                  onClick={() => openExtendServiceModal(i)}
+                >
+                  Extend Service
+                </button>
+
+                {isServiceStopped(i) ? (
+                  <div className="nod-badge nod-badge-red">
+                    Service Stopped
+                  </div>
+                ) : (
+                  <button
+                    className="nod-btn nod-btn-danger small"
+                    onClick={() =>
+                      setStopFullModal({
+                        open: true,
+                        serviceIndex: i,
+                        stopDate: editableItems[i]?.expectedEndDate
+                      })
+                    }
+                  >
+                    Stop Full Service
+                  </button>
+                )}
+
+                {servicesEditing && (
+                  <button
+                    className="nod-btn nod-btn-danger small"
+                    onClick={() => {
+
+                      const updated =
+                        editableItems.filter((_, idx) => idx !== i);
+
+                      setEditableItems(updated);
+
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
+
+              </div>
+
+            </div>
+
+          );
+
+        })}
+
+        {servicesEditing && (
+          <button
+            className="nod-btn nod-btn-primary"
+            onClick={() =>
+              setEditableItems(prev => {
+
+                const lastService = prev[prev.length - 1];
+
+                return [
+                  ...prev,
+                  {
+                    name: lastService?.name || "Service",
+                    expectedStartDate: "",
+                    expectedEndDate: "",
+                    rate: 0,
+                    amount: 0,
+                    staffCount: 1
+                  }
+                ];
+
+              })
+            }
+          >
+            + Add Service
+          </button>
+        )}
+
       </div>
-
-    );
-
-  })}
-
-  {servicesEditing && (
-    <button
-  className="nod-btn nod-btn-primary"
-  onClick={() =>
-    setEditableItems(prev => {
-
-      const lastService = prev[prev.length - 1];
-
-      return [
-        ...prev,
-        {
-          name: lastService?.name || "Service",
-          expectedStartDate: "",
-          expectedEndDate: "",
-          rate: 0,
-          amount: 0,
-          staffCount: 1
-        }
-      ];
-
-    })
-  }
->
-  + Add Service
-</button>
-  )}
-
-</div>
 
 
       <div className="nod-card">
@@ -3724,65 +3739,65 @@ const getStopPreview = () => {
                       {/* SALARY DISPLAY / EDIT */}
                       <div className="nod-bold">
                         {isSuperAdmin && editingStaffId === a.id ? (
-  <div className="nod-salary-edit">
+                          <div className="nod-salary-edit">
 
-    <span>₹</span>
+                            <span>₹</span>
 
-    <input
-      type="number"
-      className="nod-input small"
-      value={tempSalary[a.id]}
-      onChange={(e) =>
-        setTempSalary((p) => ({
-          ...p,
-          [a.id]: Number(e.target.value || 0),
-        }))
-      }
-    />
+                            <input
+                              type="number"
+                              className="nod-input small"
+                              value={tempSalary[a.id]}
+                              onChange={(e) =>
+                                setTempSalary((p) => ({
+                                  ...p,
+                                  [a.id]: Number(e.target.value || 0),
+                                }))
+                              }
+                            />
 
-    <button
-      className="nod-btn nod-btn-primary small"
-      onClick={() =>
-        saveStaffSalary({
-          ...a,
-          amount: tempSalary[a.id],
-        })
-      }
-    >
-      Save
-    </button>
+                            <button
+                              className="nod-btn nod-btn-primary small"
+                              onClick={() =>
+                                saveStaffSalary({
+                                  ...a,
+                                  amount: tempSalary[a.id],
+                                })
+                              }
+                            >
+                              Save
+                            </button>
 
-    <button
-      className="nod-btn nod-btn-secondary small"
-      onClick={() => {
-        setEditingStaffId(null);
-        setTempSalary({});
-      }}
-    >
-      Cancel
-    </button>
+                            <button
+                              className="nod-btn nod-btn-secondary small"
+                              onClick={() => {
+                                setEditingStaffId(null);
+                                setTempSalary({});
+                              }}
+                            >
+                              Cancel
+                            </button>
 
-  </div>
-) : (
+                          </div>
+                        ) : (
                           <>
-                        <div>
+                            <div>
 
-  <strong>
-    ₹{fmtCurrency(a.amount)}
-  </strong>
+                              <strong>
+                                ₹{fmtCurrency(a.amount)}
+                              </strong>
 
-  <div className="nod-muted">
-    ₹{fmtCurrency(a.rate)} / {a.rateType}
-  </div>
+                              <div className="nod-muted">
+                                ₹{fmtCurrency(a.rate)} / {a.rateType}
+                              </div>
 
-  <div className="nod-muted">
-    {a.days} days × ₹{fmtCurrency(a.rate)}
-  </div>
+                              <div className="nod-muted">
+                                {a.days} days × ₹{fmtCurrency(a.rate)}
+                              </div>
 
-</div></>
+                            </div></>
                         )}
                       </div>
-                      
+
 
                       {/* Payment badge */}
                       <span
@@ -3881,17 +3896,17 @@ const getStopPreview = () => {
                       {/* EDIT / SAVE */}
                       {/* EDIT / SAVE (SUPERADMIN ONLY) */}
                       {isSuperAdmin && (
-                       
-                          <button
-                            className="nod-btn nod-btn-secondary small"
-                            onClick={() => {
-                              setEditingStaffId(a.id);
-                              setTempSalary({ [a.id]: a.amount });
-                            }}
-                          >
-                            Edit
-                          </button>
-                        
+
+                        <button
+                          className="nod-btn nod-btn-secondary small"
+                          onClick={() => {
+                            setEditingStaffId(a.id);
+                            setTempSalary({ [a.id]: a.amount });
+                          }}
+                        >
+                          Edit
+                        </button>
+
                       )}
 
                       {/* PAY */}
@@ -3963,25 +3978,25 @@ const getStopPreview = () => {
         </div>
       </div>
       <div className="nod-card">
-  <h3>Finance Summary</h3>
+        <h3>Finance Summary</h3>
 
-  <div className="nod-row">
-    <span>Total Order Amount</span>
-    <strong>₹{fmtCurrency(orderTotal)}</strong>
-  </div>
+        <div className="nod-row">
+          <span>Total Order Amount</span>
+          <strong>₹{fmtCurrency(orderTotal)}</strong>
+        </div>
 
-  <div className="nod-row">
-    <span>Total Staff Salary</span>
-    <strong>₹{fmtCurrency(totalSalary)}</strong>
-  </div>
+        <div className="nod-row">
+          <span>Total Staff Salary</span>
+          <strong>₹{fmtCurrency(totalSalary)}</strong>
+        </div>
 
-  <div className="nod-row">
-    <span>Profit</span>
-    <strong style={{ color: profit >= 0 ? "green" : "red" }}>
-      ₹{fmtCurrency(profit)}
-    </strong>
-  </div>
-</div>
+        <div className="nod-row">
+          <span>Profit</span>
+          <strong style={{ color: profit >= 0 ? "green" : "red" }}>
+            ₹{fmtCurrency(profit)}
+          </strong>
+        </div>
+      </div>
 
 
 
@@ -3993,25 +4008,25 @@ const getStopPreview = () => {
 
 
       {/* ACTIONS */}
-     <div className="nod-actions">
+      <div className="nod-actions">
 
-  <button
-    className="nod-btn nod-btn-secondary"
-    disabled={order.status === "active"}
-    onClick={() => markStatus("active")}
-  >
-    Mark Active
-  </button>
+        <button
+          className="nod-btn nod-btn-secondary"
+          disabled={order.status === "active"}
+          onClick={() => markStatus("active")}
+        >
+          Mark Active
+        </button>
 
-  <button
-    className="nod-btn nod-btn-primary"
-    disabled={order.status === "completed"}
-    onClick={() => markStatus("completed")}
-  >
-    Mark Completed
-  </button>
+        <button
+          className="nod-btn nod-btn-primary"
+          disabled={order.status === "completed"}
+          onClick={() => markStatus("completed")}
+        >
+          Mark Completed
+        </button>
 
-</div>
+      </div>
       <div className="nod-card">
         <h3>Activity Log</h3>
 
@@ -4146,8 +4161,8 @@ const getStopPreview = () => {
                   {e.oldEndDate} → {e.newEndDate}
                 </div>
                 <div className="nod-muted">
-  Rate: ₹{e.oldRate} → ₹{e.newRate}
-</div>
+                  Rate: ₹{e.oldRate} → ₹{e.newRate}
+                </div>
 
                 <div className="nod-muted small">
                   Extended by {e.extendedByName}
@@ -4450,20 +4465,20 @@ const getStopPreview = () => {
                       )}
 
                     </div>
-       <div>
+                    <div>
 
-  <span className={`staff-status ${s.availability.status}`}>
-    {s.availability.status.toUpperCase()}
-  </span>
+                      <span className={`staff-status ${s.availability.status}`}>
+                        {s.availability.status.toUpperCase()}
+                      </span>
 
-  {s.availability.status !== "available" && (
-    <div className="nod-muted">
-      Order: {s.availability.orderNo} <br />
-      {fmtDateTime(s.availability.startDate)} → {fmtDateTime(s.availability.endDate)}
-    </div>
-  )}
+                      {s.availability.status !== "available" && (
+                        <div className="nod-muted">
+                          Order: {s.availability.orderNo} <br />
+                          {fmtDateTime(s.availability.startDate)} → {fmtDateTime(s.availability.endDate)}
+                        </div>
+                      )}
 
-</div>
+                    </div>
 
                     <button
                       className="nod-btn nod-btn-primary"
@@ -4774,10 +4789,10 @@ const getStopPreview = () => {
               }}
             />
             <label>
-{editableItems?.[extendServiceModal.serviceIndex]?.lastExtensionRate
-  ? "Last Extended Rate"
-  : "Daily Rate"}
-</label>
+              {editableItems?.[extendServiceModal.serviceIndex]?.lastExtensionRate
+                ? "Last Extended Rate"
+                : "Daily Rate"}
+            </label>
 
             <input
               type="number"
@@ -4955,15 +4970,15 @@ const getStopPreview = () => {
             {/* 🔥 PREVIEW */}
             {stopPreview && (
               <div className="nod-preview-box">
-                <div style={{marginTop:10,fontSize:14}}>
+                <div style={{ marginTop: 10, fontSize: 14 }}>
 
-  {stopPreview?.updatedItems?.map((it,i)=>(
-    <div key={i}>
-      {it.name} : ₹{fmtCurrency(it.amount)}
-    </div>
-  ))}
+                  {stopPreview?.updatedItems?.map((it, i) => (
+                    <div key={i}>
+                      {it.name} : ₹{fmtCurrency(it.amount)}
+                    </div>
+                  ))}
 
-</div>
+                </div>
 
                 {/* OLD SUBTOTAL */}
                 <div className="nod-row">
