@@ -41,7 +41,28 @@ const fmtDate = (ts) => {
 
 // Stages used for status chips
 const STAGES = ["new", "contacted", "req shared", "followup", "lost"];
-const STATUS_FLOW = ["new", "contacted"];
+const STATUS_TREE = {
+  new: ["valid", "invalid"],
+
+  valid: ["interested", "not interested"],
+
+  interested: ["req shared", "followup"],
+
+  "not interested": [
+    "out of service",
+    "high price",
+    "out of area",
+    "urgent visit"
+  ]
+};
+
+const getNextStatus = (status) => {
+  const options = STATUS_TREE[status] || [];
+  return options.length === 1 ? options[0] : null;
+};
+const getNextStatuses = (status) => {
+  return STATUS_TREE[status] || [];
+};
 const normStatus = (s = "") => s.toLowerCase();
 const statusClass = (s = "") =>
   s
@@ -83,13 +104,21 @@ export default function Leads() {
   const [sortBy, setSortBy] = useState("created");
   // Delete confirm
   const [confirmDelete, setConfirmDelete] = useState(null);
-
+  const [statusBranch, setStatusBranch] = useState(null);
+  const [statusLevel1, setStatusLevel1] = useState(null)
+  const [statusLevel2, setStatusLevel2] = useState(null)
   // Status modal (next stage + note)
   const [statusModal, setStatusModal] = useState({
     open: false,
     lead: null,
-    nextStatus: null,
+
+    validation: "",
+    interest: "",
+    reason: "",
+    action: "",
+
     note: "",
+    followupDate: ""
   });
 
   // Right-side details
@@ -158,20 +187,20 @@ export default function Leads() {
         });
         setLeads(docs);
 
-/* mark leads as seen */
-const batch = writeBatch(db);
+        /* mark leads as seen */
+        const batch = writeBatch(db);
 
-snap.docs.forEach((d) => {
-  const data = d.data();
+        snap.docs.forEach((d) => {
+          const data = d.data();
 
-  if (!data.seen) {
-    batch.update(doc(db, "leads", d.id), {
-      seen: true
-    });
-  }
-});
+          if (!data.seen) {
+            batch.update(doc(db, "leads", d.id), {
+              seen: true
+            });
+          }
+        });
 
-batch.commit();
+        batch.commit();
 
         setLoading(false);
       },
@@ -207,152 +236,224 @@ batch.commit();
   // ---------- Counts for STATUS chips (within current TYPE selection) ----------
   const statusCounts = useMemo(() => {
 
-  const mainStatuses = ["new","contacted","req shared","followup","lost"];
+    const map = {
+  all: leads.length,
 
-  const map = {
-    all: leads.length,
-    new: 0,
-    contacted: 0,
-    "req shared": 0,
-    followup: 0,
-    lost: 0,
-    others: 0,
-    today: 0,
-    overdue: 0
-  };
+  new: 0,
+  valid: 0,
+  invalid: 0,
 
-  const today = new Date();
-  today.setHours(0,0,0,0);
+  interested: 0,
+  "not interested": 0,
 
-  for (const l of leads) {
+  "req shared": 0,
+  followup: 0,
 
-    const s = normStatus(l.status) || "new";
+  "out of service": 0,
+  "high price": 0,
+  "out of area": 0,
+  "urgent visit": 0,
 
-    if (mainStatuses.includes(s)) {
-      map[s] = (map[s] || 0) + 1;
-    } else {
+  others: 0
+};
+
+    for (const l of leads) {
+
+      const s = normStatus(l.status);
+      if (s === "new") {
+  map.new++;
+  continue;
+}
+
+      if (s === "invalid") {
+        map.invalid++;
+        continue;
+      }
+
+      if (s === "valid") {
+        map.valid++;
+        continue;
+      }
+
+      if (s === "interested") {
+        map.interested++;
+        map.valid++;
+        continue;
+      }
+
+      if (s === "req shared") {
+        map["req shared"]++;
+        map.interested++;
+        map.valid++;
+        continue;
+      }
+
+      if (s === "followup") {
+        map.followup++;
+        map.interested++;
+        map.valid++;
+        continue;
+      }
+
+      if (s === "not interested") {
+        map["not interested"]++;
+        map.valid++;
+        continue;
+      }
+
+      if (["out of service", "high price", "out of area", "urgent visit"].includes(s)) {
+
+        map[s]++;
+        map["not interested"]++;
+        map.valid++;
+        continue;
+
+      }
+
       map.others++;
-    }
-
-    if (s === "followup" && l.followupDate) {
-
-      const fDate = new Date(l.followupDate);
-      fDate.setHours(0,0,0,0);
-
-      if (fDate.getTime() === today.getTime()) {
-        map.today++;
-      }
-
-      if (fDate < today) {
-        map.overdue++;
-      }
 
     }
 
-  }
+    return map;
 
-  return map;
-
-}, [leads]);
-
+  }, [leads]);
   // ---------- Search + STATUS filter (TYPE already applied by Firestore) ----------
- const filtered = useMemo(() => {
+  const filtered = useMemo(() => {
 
-  let list = [...leads];
+    let list = [...leads];
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-  // STATUS FILTER
-  if (statusFilter !== "all") {
+    // STATUS FILTER
+    if (statusFilter !== "all") {
 
-const mainStatuses = ["new","contacted","req shared","followup","lost"];
+      const mainStatuses = [
+        "new",
+        "valid",
+        "invalid",
+        "interested",
+        "not interested",
+        "req shared",
+        "followup",
+        "out of service",
+        "high price",
+        "out of area",
+        "urgent visit"
+      ];
+      list = list.filter((l) => {
 
-list = list.filter((l)=>{
+        const s = normStatus(l.status);
 
-const s = normStatus(l.status);
+        if (statusFilter === "others") {
+          return !mainStatuses.includes(s);
+        }
 
-if(statusFilter === "others"){
-return !mainStatuses.includes(s);
-}
+        if (statusFilter === "followup") {
 
-if(statusFilter === "followup"){
+          if (s !== "followup") return false;
+          if (!l.followupDate) return false;
 
-if(s !== "followup") return false;
-if(!l.followupDate) return false;
+          const fDate = new Date(l.followupDate);
+          fDate.setHours(0, 0, 0, 0);
 
-const fDate = new Date(l.followupDate);
-fDate.setHours(0,0,0,0);
+          if (followupFilter === "today") {
+            return fDate.getTime() === today.getTime();
+          }
 
-if(followupFilter === "today"){
-return fDate.getTime() === today.getTime();
-}
+          if (followupFilter === "overdue") {
+            return fDate < today;
+          }
 
-if(followupFilter === "overdue"){
-return fDate < today;
-}
+          if (followupFilter === "upcoming") {
+            return fDate > today;
+          }
 
-if(followupFilter === "upcoming"){
-return fDate > today;
-}
+          return true;
+        }
 
-return true;
-}
+        if (statusFilter === "valid") {
+          return [
+            "valid",
+            "interested",
+            "not interested",
+            "req shared",
+            "followup",
+            "out of service",
+            "high price",
+            "out of area",
+            "urgent visit"
+          ].includes(s);
+        }
 
-return s === statusFilter;
+        if (statusFilter === "interested") {
+          return ["interested", "req shared", "followup"].includes(s);
+        }
 
-});
+        if (statusFilter === "not interested") {
+          return [
+            "not interested",
+            "out of service",
+            "high price",
+            "out of area",
+            "urgent visit"
+          ].includes(s);
+        }
 
-}
+        return s === statusFilter;
 
-  // SEARCH FILTER
-  const q = search.trim().toLowerCase();
+      });
 
-  if (q) {
-    list = list.filter((l) => {
+    }
 
-      return (
-        (l.customerName || "").toLowerCase().includes(q) ||
-        (l.contactPerson || "").toLowerCase().includes(q) ||
-        (l.phone || "").toLowerCase().includes(q) ||
-        (l.email || "").toLowerCase().includes(q) ||
-        (l.leadSource || "").toLowerCase().includes(q) ||
-        (l.notes || "").toLowerCase().includes(q)
-      );
+    // SEARCH FILTER
+    const q = search.trim().toLowerCase();
 
-    });
-  }
+    if (q) {
+      list = list.filter((l) => {
 
-  // SORTING
-  if (sortBy === "followup") {
+        return (
+          (l.customerName || "").toLowerCase().includes(q) ||
+          (l.contactPerson || "").toLowerCase().includes(q) ||
+          (l.phone || "").toLowerCase().includes(q) ||
+          (l.email || "").toLowerCase().includes(q) ||
+          (l.leadSource || "").toLowerCase().includes(q) ||
+          (l.notes || "").toLowerCase().includes(q)
+        );
 
-    list.sort((a, b) => {
+      });
+    }
 
-      if (!a.followupDate) return 1;
-      if (!b.followupDate) return -1;
+    // SORTING
+    if (sortBy === "followup") {
 
-      return new Date(a.followupDate) - new Date(b.followupDate);
+      list.sort((a, b) => {
 
-    });
+        if (!a.followupDate) return 1;
+        if (!b.followupDate) return -1;
 
-  }
+        return new Date(a.followupDate) - new Date(b.followupDate);
 
-  if (sortBy === "created") {
+      });
 
-    list.sort((a, b) => {
+    }
 
-      if (!a.createdAt) return 1;
-      if (!b.createdAt) return -1;
+    if (sortBy === "created") {
 
-      return b.createdAt.toMillis() - a.createdAt.toMillis();
+      list.sort((a, b) => {
 
-    });
+        if (!a.createdAt) return 1;
+        if (!b.createdAt) return -1;
 
-  }
+        return b.createdAt.toMillis() - a.createdAt.toMillis();
 
-  return list;
+      });
 
-}, [leads, search, statusFilter, followupFilter, sortBy]);
+    }
+
+    return list;
+
+  }, [leads, search, statusFilter, followupFilter, sortBy]);
 
   // ---------- Drawer helpers ----------
   const openDrawer = (initial = defaultForm) => {
@@ -508,24 +609,70 @@ return s === statusFilter;
       setSaving(false);
     }
   };
-
+  const handleNext = (lead) => {
+    openStatusModal(lead);
+  };
   // ---------- Status modal helpers ----------
   const openStatusModal = (lead) => {
 
-  setStatusModal({
-    open: true,
-    lead,
-    nextStatus: "",
-    note: "",
-    followupDate: ""
-  });
+    const s = lead.status || "";
 
-};
+    setStatusModal({
+      open: true,
+      lead,
+
+      validation:
+        [
+          "valid",
+          "interested",
+          "req shared",
+          "followup",
+          "not interested",
+          "out of service",
+          "high price",
+          "out of area",
+          "urgent visit"
+        ].includes(s)
+          ? "valid"
+          : s === "invalid"
+            ? "invalid"
+            : "",
+
+      interest:
+        ["interested", "req shared", "followup"].includes(s)
+          ? "interested"
+          : ["not interested", "out of service", "high price", "out of area", "urgent visit"].includes(s)
+            ? "not interested"
+            : "",
+
+      reason:
+        ["out of service", "high price", "out of area", "urgent visit"].includes(s)
+          ? s
+          : "",
+
+      action:
+        s === "req shared" || s === "followup"
+          ? s
+          : "",
+
+      note: "",
+      followupDate: lead.followupDate || ""
+    });
+
+  };
   const closeStatusModal = () =>
-    setStatusModal({ open: false, lead: null, nextStatus: null, note: "" });
-
+    setStatusModal({
+      open: false,
+      lead: null,
+      validation: "",
+      interest: "",
+      reason: "",
+      action: "",
+      note: "",
+      followupDate: ""
+    });
   const confirmStatusChange = async () => {
-    const { lead, nextStatus, note } = statusModal;
+    const { lead, validation, interest, reason, action, note } = statusModal;
     if (!lead) return closeStatusModal();
     if (!note || !note.trim()) {
       setError("Please provide a note for the status change.");
@@ -534,6 +681,12 @@ return s === statusFilter;
     setError("");
     try {
       const user = auth.currentUser || {};
+      let nextStatus = validation;
+
+      if (interest) nextStatus = interest;
+      if (reason) nextStatus = reason;
+      if (action) nextStatus = action;
+
       const entry = makeHistoryEntry(user, {
         type: "status",
         field: "status",
@@ -549,6 +702,7 @@ return s === statusFilter;
         updatedBy: user.uid || "",
         updatedByName: user.displayName || user.email || user.uid || "",
         history: arrayUnion(entry),
+
       });
       if (nextStatus === "contacted") {
         await updateAccountReport({
@@ -717,59 +871,69 @@ return s === statusFilter;
           {/* STATUS SEGMENT */}
           <div className="segmented status-segment">
 
-<button
-className={`seg-btn ${statusFilter === "all" ? "active" : ""}`}
-onClick={() => setStatusFilter("all")}
->
-All <span className="badge">{statusCounts.all}</span>
-</button>
+  {/* ALL */}
+  <button
+    className={`seg-btn ${statusFilter === "all" ? "active" : ""}`}
+    onClick={() => setStatusFilter("all")}
+  >
+    All ({statusCounts.all})
+  </button>
+    <button
+    className={`seg-btn ${statusFilter === "new" ? "active" : ""}`}
+    onClick={() => setStatusFilter("new")}
+  >
+    New ({statusCounts.new})
+  </button>
 
-<button
-className={`seg-btn ${statusFilter === "new" ? "active" : ""}`}
-onClick={() => setStatusFilter("new")}
->
-New <span className="badge">{statusCounts.new}</span>
-</button>
 
-<button
-className={`seg-btn ${statusFilter === "contacted" ? "active" : ""}`}
-onClick={() => setStatusFilter("contacted")}
->
-Contacted <span className="badge">{statusCounts.contacted}</span>
-</button>
+  {/* REQ SHARED */}
+  <button
+    className={`seg-btn ${statusFilter === "req shared" ? "active" : ""}`}
+    onClick={() => setStatusFilter("req shared")}
+  >
+    Req Shared ({statusCounts["req shared"]})
+  </button>
 
-<button
-className={`seg-btn ${statusFilter === "req shared" ? "active" : ""}`}
-onClick={() => setStatusFilter("req shared")}
->
-Req <span className="badge">{statusCounts["req shared"]}</span>
-</button>
+  {/* FOLLOWUP */}
+  <button
+    className={`seg-btn ${statusFilter === "followup" ? "active" : ""}`}
+    onClick={() => {
+      setStatusFilter("followup");
+      setFollowupFilter("all");
+    }}
+  >
+    Followup ({statusCounts.followup})
+  </button>
 
-<button
-className={`seg-btn ${statusFilter === "followup" ? "active" : ""}`}
-onClick={() => {
-setStatusFilter("followup");
-setFollowupFilter("all");
-}}
->
-Followup <span className="badge">{statusCounts.followup}</span>
-</button>
+  {/* NOT INTERESTED */}
+  <button
+    className={`seg-btn ${statusFilter === "not interested" ? "active" : ""}`}
+    onClick={() => setStatusFilter("not interested")}
+  >
+    Not Interested ({statusCounts["not interested"]})
+  </button>
 
-<button
-className={`seg-btn ${statusFilter === "lost" ? "active" : ""}`}
-onClick={() => setStatusFilter("lost")}
->
-Lost <span className="badge">{statusCounts.lost}</span>
-</button>
+  {/* INVALID */}
+  <button
+    className={`seg-btn ${statusFilter === "invalid" ? "active" : ""}`}
+    onClick={() => setStatusFilter("invalid")}
+  >
+    Invalid ({statusCounts.invalid})
+  </button>
 
-<button
-  className={`seg-btn ${statusFilter === "others" ? "active" : ""}`}
-  onClick={() => setStatusFilter("others")}
->
-  Others <span className="badge">{statusCounts.others}</span>
-</button>
+  {/* OTHERS */}
+  <button
+    className={`seg-btn ${statusFilter === "others" ? "active" : ""}`}
+    onClick={() => setStatusFilter("others")}
+  >
+    Others ({statusCounts.others})
+  </button>
 
-</div>{statusFilter === "followup" && (
+</div>
+
+
+{/* FOLLOWUP SUBFILTERS */}
+{statusFilter === "followup" && (
 
   <div className="followup-subfilters">
 
@@ -980,12 +1144,14 @@ Lost <span className="badge">{statusCounts.lost}</span>
                         </button>
 
                         {/* Next */}
-                        <button
-                          className="row-btn next"
-                          onClick={() => openStatusModal(l)}
-                        >
-                          Next
-                        </button>
+                      
+  <button
+    className="row-btn next"
+    onClick={() => handleNext(l)}
+  >
+    Next
+  </button>
+
                         <button
                           title="WhatsApp"
                           className="row-btn whatsapp"
@@ -1295,136 +1461,213 @@ Lost <span className="badge">{statusCounts.lost}</span>
         >
           <div className="cp-modal-card">
 
-  <h3>Change status for “{statusModal.lead.customerName}”</h3>
+            <h3>Change status for “{statusModal.lead.customerName}”</h3>
 
-  <div style={{ marginTop: 14 }}>
+            <div style={{ marginTop: 14 }}>
 
-    <label style={{ fontWeight: 600 }}>Select Outcome</label>
+              <label style={{ fontWeight: 600 }}>Select Outcome</label>
 
-    <div className="status-chip-group">
+              {/* VALIDATION */}
+              <h4>Validation</h4>
+              <div className="status-chip-group">
 
-      {/* CONTACTED */}
-      <button
-        type="button"
-        className={`status-chip ${
-          statusModal.nextStatus === "contacted" ? "active" : ""
-        }`}
-        onClick={() =>
-          setStatusModal((s) => ({ ...s, nextStatus: "contacted" }))
-        }
-      >
-        Contacted
-      </button>
+                <button
+                  className={`status-chip ${statusModal.validation === "valid" ? "active" : ""}`}
+                  onClick={() => setStatusModal(s => ({
+                    ...s,
+                    validation: "valid",
+                    interest: "",
+                    reason: "",
+                    action: ""
+                  }))}>
+                  Valid
+                </button>
 
-      {/* REQ SHARED */}
-      <button
-        type="button"
-        className={`status-chip ${
-          statusModal.nextStatus === "req shared" ? "active" : ""
-        }`}
-        onClick={() =>
-          setStatusModal((s) => ({ ...s, nextStatus: "req shared" }))
-        }
-      >
-        Req Shared
-      </button>
+                <button
+                  className={`status-chip ${statusModal.validation === "invalid" ? "active" : ""}`}
+                  onClick={() => setStatusModal(s => ({
+                    ...s,
+                    validation: "invalid",
+                    interest: "",
+                    reason: "",
+                    action: ""
+                  }))}>
+                  Invalid
+                </button>
 
-      {/* FOLLOWUP */}
-      <button
-        type="button"
-        className={`status-chip followup ${
-          statusModal.nextStatus === "followup" ? "active" : ""
-        }`}
-        onClick={() =>
-          setStatusModal((s) => ({ ...s, nextStatus: "followup" }))
-        }
-      >
-        Follow-up
-      </button>
+              </div>
 
-      {/* LOST */}
-      <button
-        type="button"
-        className={`status-chip lost ${
-          statusModal.nextStatus === "lost" ? "active" : ""
-        }`}
-        onClick={() =>
-          setStatusModal((s) => ({ ...s, nextStatus: "lost" }))
-        }
-      >
-        Lead Lost
-      </button>
 
-    </div>
+              {/* INTEREST */}
+              {statusModal.validation === "valid" && (
+                <>
+                  <h4>Interest</h4>
 
-  </div>
+                  <div className="status-chip-group">
 
-  {/* FOLLOWUP DATE */}
+                    <button
+                      className={`status-chip ${statusModal.interest === "interested" ? "active" : ""}`}
+                      onClick={() =>
+                        setStatusModal(s => ({
+                          ...s,
+                          interest: "interested",
+                          reason: "",
+                          action: ""
+                        }))
+                      }                    >
+                      Interested
+                    </button>
 
-  {statusModal.nextStatus === "followup" && (
-    <div style={{ marginTop: 14 }}>
-      <label style={{ fontWeight: 600 }}>Follow-up Date</label>
+                    <button
+                      className={`status-chip ${statusModal.interest === "not interested" ? "active" : ""}`}
+                      onClick={() =>
+                        setStatusModal(s => ({
+                          ...s,
+                          interest: "not interested",
+                          action: ""
+                        }))
+                      }                    >
+                      Not Interested
+                    </button>
 
-      <input
-        type="date"
-        className="cp-input"
-        value={statusModal.followupDate || ""}
-        onChange={(e) =>
-          setStatusModal((s) => ({
-            ...s,
-            followupDate: e.target.value,
-          }))
-        }
-      />
-    </div>
-  )}
+                  </div>
+                </>
+              )}
 
-  {/* NOTE */}
+              {/* REASONS */}
+              {statusModal.interest === "not interested" && (
+                <>
+                  <h4>Reason</h4>
+                  <div className="status-chip-group">
 
-  <div style={{ marginTop: 16 }}>
-    <label
-      style={{
-        display: "block",
-        fontWeight: 600,
-        marginBottom: 6,
-      }}
-    >
-      Note / Reason
-    </label>
+                    <button
+                      className={`status-chip ${statusModal.reason === "out of service" ? "active" : ""}`}
+                      onClick={() => setStatusModal(s => ({ ...s, reason: "out of service" }))}
+                    >
+                      Out Of Service
+                    </button>
 
-    <textarea
-      value={statusModal.note}
-      onChange={(e) =>
-        setStatusModal((s) => ({ ...s, note: e.target.value }))
-      }
-      rows={4}
-      className="cp-input"
-      placeholder="Enter a note explaining the status change (required)"
-    />
-  </div>
+                    <button
+                      className={`status-chip ${statusModal.reason === "high price" ? "active" : ""}`}
+                      onClick={() => setStatusModal(s => ({ ...s, reason: "high price" }))}
+                    >
+                      High Price
+                    </button>
 
-  {/* ACTIONS */}
+                    <button
+                      className={`status-chip ${statusModal.reason === "out of area" ? "active" : ""}`}
+                      onClick={() => setStatusModal(s => ({ ...s, reason: "out of area" }))}
+                    >
+                      Out Of Area
+                    </button>
 
-  <div className="cp-form-actions" style={{ marginTop: 16 }}>
+                    <button
+                      className={`status-chip ${statusModal.reason === "urgent visit" ? "active" : ""}`}
+                      onClick={() => setStatusModal(s => ({ ...s, reason: "urgent visit" }))}
+                    >
+                      Urgent Visit
+                    </button>
 
-    <button
-      className="cp-btn ghost"
-      onClick={closeStatusModal}
-    >
-      Cancel
-    </button>
+                  </div>
+                </>
+              )}
 
-    <button
-      className="cp-btn primary"
-      onClick={confirmStatusChange}
-      disabled={!statusModal.nextStatus || !statusModal.note.trim()}
-    >
-      Confirm
-    </button>
 
-  </div>
+              {/* NEXT ACTION */}
+              {statusModal.interest === "interested" && (
+                <>
+                  <h4>Next Action</h4>
+                  <div className="status-chip-group">
 
-</div>
+                    <button
+                      className={`status-chip ${statusModal.action === "req shared" ? "active" : ""}`}
+                      onClick={() => setStatusModal(s => ({ ...s, action: "req shared" }))}
+                    >
+                      Req Shared
+                    </button>
+
+                    <button
+                      className={`status-chip ${statusModal.action === "followup" ? "active" : ""}`}
+                      onClick={() => setStatusModal(s => ({ ...s, action: "followup" }))}
+                    >
+                      Followup
+                    </button>
+
+                  </div>
+                </>
+              )}
+
+            </div>
+
+            {/* FOLLOWUP DATE */}
+
+            {statusModal.action === "followup" && (
+              <div style={{ marginTop: 14 }}>
+                <label style={{ fontWeight: 600 }}>Follow-up Date</label>
+
+                <input
+                  type="date"
+                  className="cp-input"
+                  value={statusModal.followupDate || ""}
+                  onChange={(e) =>
+                    setStatusModal((s) => ({
+                      ...s,
+                      followupDate: e.target.value,
+                    }))
+                  }
+                />
+              </div>
+            )}
+
+            {/* NOTE */}
+
+            <div style={{ marginTop: 16 }}>
+              <label
+                style={{
+                  display: "block",
+                  fontWeight: 600,
+                  marginBottom: 6,
+                }}
+              >
+                Note / Reason
+              </label>
+
+              <textarea
+                value={statusModal.note}
+                onChange={(e) =>
+                  setStatusModal((s) => ({ ...s, note: e.target.value }))
+                }
+                rows={4}
+                className="cp-input"
+                placeholder="Enter a note explaining the status change (required)"
+              />
+            </div>
+
+            {/* ACTIONS */}
+
+            <div className="cp-form-actions" style={{ marginTop: 16 }}>
+
+              <button
+                className="cp-btn ghost"
+                onClick={closeStatusModal}
+              >
+                Cancel
+              </button>
+
+              <button
+                className="cp-btn primary"
+                onClick={confirmStatusChange}
+                disabled={
+                  !(statusModal.validation || statusModal.interest || statusModal.reason || statusModal.action)
+                  || !statusModal.note.trim()
+                }
+              >
+                Confirm
+              </button>
+
+            </div>
+
+          </div>
         </div>
       )}
 
