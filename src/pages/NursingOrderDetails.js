@@ -1755,26 +1755,53 @@ export default function NursingOrderDetails() {
 
   };
   const unassignStaff = async (assignmentId) => {
-    if (!window.confirm("Unassign this staff from order?")) return;
 
-    try {
-      await updateDoc(doc(db, "staffAssignments", assignmentId), {
-        status: "cancelled",
-        updatedAt: serverTimestamp(),
-        updatedBy: auth.currentUser?.uid || "",
-      });
+  if (!window.confirm("Unassign this staff from order?")) return;
 
-      // update UI instantly
-      setAssignments((prev) =>
-        prev.map((a) =>
-          a.id === assignmentId ? { ...a, status: "cancelled" } : a
-        )
-      );
-    } catch (err) {
-      console.error("unassignStaff error", err);
-      alert("Failed to unassign staff");
-    }
-  };
+  try {
+
+    await updateDoc(doc(db, "staffAssignments", assignmentId), {
+
+      /* RESET SALARY */
+      hours: 0,
+      days: 0,
+      months: 0,
+
+      amount: 0,
+      paidAmount: 0,
+      balanceAmount: 0,
+
+      /* STATUS */
+      status: "cancelled",
+
+      updatedAt: serverTimestamp(),
+      updatedBy: auth.currentUser?.uid || "",
+
+    });
+
+    /* UPDATE UI */
+    setAssignments((prev) =>
+      prev.map((a) =>
+        a.id === assignmentId
+          ? {
+              ...a,
+              hours: 0,
+              days: 0,
+              months: 0,
+              amount: 0,
+              paidAmount: 0,
+              balanceAmount: 0,
+              status: "cancelled",
+            }
+          : a
+      )
+    );
+
+  } catch (err) {
+    console.error("unassignStaff error", err);
+    alert("Failed to unassign staff");
+  }
+};
   const savePayment = async () => {
     setPaymentModal((p) => ({ ...p, saving: true }));
 
@@ -3920,15 +3947,14 @@ if (payAmount > allowedBalance) {
                       )}
 
                       {/* UNASSIGN */}
-                      {a.status !== "cancelled" && (
-                        <button
-                          className="nod-btn nod-btn-danger small"
-                          onClick={() => unassignStaff(a.id)}
-                        >
-                          Unassign
-                        </button>
-                      )}
-
+                    {isSuperAdmin && a.status !== "cancelled" && (
+  <button
+    className="nod-btn nod-btn-danger small"
+    onClick={() => unassignStaff(a.id)}
+  >
+    Unassign
+  </button>
+)}
                       {/* STOP */}
                       {a.status !== "completed" && (
                         <button
@@ -4480,14 +4506,17 @@ if (payAmount > allowedBalance) {
 
                     </div>
 
-                    <button
-                      className="nod-btn nod-btn-primary"
-                      disabled={assigning || !preview}
-                      onClick={() => assignStaff(s)}
-                    >
-                      Assign
-                    </button>
-
+                   <button
+  className="nod-btn nod-btn-primary"
+  disabled={
+    assigning ||
+    !preview ||
+    s.availability?.status !== "available"
+  }
+  onClick={() => assignStaff(s)}
+>
+  Assign
+</button>
                   </div>
                 );
 
