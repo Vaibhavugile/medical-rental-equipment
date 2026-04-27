@@ -36,7 +36,7 @@ const SECTIONS = [
       {
         key: "dashboard",          // ✅
         label: "Dashboard",
-        path: "/crm",
+        path: "/crm/dashboard",
         icon: LayoutDashboard,
         exact: true,
       },

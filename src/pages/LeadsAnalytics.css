@@ -1,0 +1,217 @@
+.analytics-page{
+  padding:40px;
+  background:#f8fafc;
+  min-height:100vh;
+}
+
+/* HEADER */
+
+.analytics-header{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:30px;
+}
+
+.analytics-header h2{
+  font-size:26px;
+  font-weight:700;
+  color:#0f172a;
+}
+
+/* CARD */
+
+.analytics-card{
+
+  background:white;
+
+  border-radius:16px;
+
+  padding:24px;
+
+  margin-bottom:25px;
+
+  border:1px solid #e2e8f0;
+
+  box-shadow:0 10px 25px rgba(0,0,0,0.05);
+
+  animation:cardFade .4s ease;
+
+}
+
+.analytics-card h3{
+
+  font-size:18px;
+
+  font-weight:600;
+
+  margin-bottom:18px;
+
+}
+
+/* ROW */
+
+.analytics-row{
+
+  display:flex;
+
+  align-items:center;
+
+  padding:10px 0;
+
+  border-bottom:1px solid #f1f5f9;
+
+  animation:rowFade .4s ease;
+
+}
+
+.analytics-row:last-child{
+  border-bottom:none;
+}
+
+/* RANK */
+
+.rank{
+
+  width:34px;
+
+  height:34px;
+
+  display:flex;
+
+  align-items:center;
+
+  justify-content:center;
+
+  border-radius:8px;
+
+  background:#6366f1;
+
+  color:white;
+
+  font-size:13px;
+
+  font-weight:600;
+
+  margin-right:10px;
+
+}
+
+/* NAME */
+
+.name{
+
+  flex:1;
+
+  color:#334155;
+
+  font-weight:500;
+
+}
+
+/* COUNT */
+
+.count{
+
+  font-weight:700;
+
+  color:#0f172a;
+
+}
+
+/* ANIMATIONS */
+
+@keyframes cardFade{
+
+  from{
+    opacity:0;
+    transform:translateY(20px);
+  }
+
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+
+}
+
+@keyframes rowFade{
+
+  from{
+    opacity:0;
+    transform:translateY(8px);
+  }
+
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+
+}
+.creator-block{
+  border-bottom:1px solid #f1f5f9;
+  padding:12px 0;
+}
+
+.creator-header{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.status-breakdown{
+  margin-left:44px;
+  margin-top:6px;
+}
+
+.status-row{
+  display:flex;
+  justify-content:space-between;
+  font-size:13px;
+  color:#64748b;
+  padding:2px 0;
+}
+.clickable{
+  cursor:pointer;
+}
+
+.creator-header{
+
+  display:flex;
+  align-items:center;
+  gap:12px;
+
+  padding:10px 0;
+
+}
+
+.arrow{
+
+  margin-left:auto;
+  font-size:12px;
+  color:#64748b;
+
+}
+
+.status-breakdown{
+
+  margin-left:44px;
+  margin-top:6px;
+
+  animation:dropdownFade .25s ease;
+
+}
+
+@keyframes dropdownFade{
+
+  from{
+    opacity:0;
+    transform:translateY(-6px);
+  }
+
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+
+}

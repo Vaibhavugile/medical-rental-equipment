@@ -90,6 +90,7 @@ import Employees from "./pages/Employees";
 import OrdersRecycleBin from "./pages/OrdersRecycleBin";
 import NursingOrdersRecycleBin from "./pages/NursingOrdersRecycleBin";
 import BrochurePage from "./pages/BrochurePage";
+import LeadsAnalytics from "./pages/LeadsAnalytics";
 /* ============================================================
    PRIVATE ROUTE (AUTH ONLY, SILENT)
 ============================================================ */
@@ -184,7 +185,10 @@ function CRMApp() {
             <Route path="staff/:id" element={<StaffDetails />} />
             <Route path="staffsalary" element={<StaffSalary />} />
             <Route path="salaryrequest" element={<SalaryRequests />} />
-
+<Route
+  path="/Dashboard"
+  element={<LeadsAnalytics />}
+/>
             <Route path="visits" element={<Visits />} />
             <Route path="reports" element={<ReportsHome />} />
             <Route path="attendance" element={<AttendanceAdmin />} />
