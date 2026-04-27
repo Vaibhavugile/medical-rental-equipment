@@ -809,6 +809,88 @@ const convertToOrder = (quote) => {
       setSendingWa(false);
     }
   };
+const exportQuotations = async () => {
+
+  const rows = [];
+
+  for (const q of filtered) {
+
+    let customerName = "";
+    let customerPhone = "";
+
+    try {
+
+      if (q.requirementId) {
+
+        const reqRef = doc(db, "requirements", q.requirementId);
+        const reqSnap = await getDoc(reqRef);
+
+        if (reqSnap.exists()) {
+
+          const req = reqSnap.data();
+
+          const ls = req.leadssnapshop || req.leadSnapshot || {};
+
+          customerName =
+            req.customerName ||
+            ls.customerName ||
+            req.contactPerson ||
+            ls.contactPerson ||
+            req.contactName ||
+            "";
+
+          customerPhone =
+            ls.phone ||
+            ls.mobile ||
+            req.phone ||
+            req.customerPhone ||
+            req.contactPhone ||
+            "";
+
+        }
+
+      }
+
+    } catch (e) {
+      console.warn("Requirement fetch failed", e);
+    }
+
+    rows.push({
+      QuotationNo: q.quoNo || q.quotationId || q.id,
+      Requirement: q.requirementNumber || q.requirementId || "",
+      ServiceType: q.serviceType || "rental",
+      Customer: customerName,
+      Phone: customerPhone,
+      Status: q.status || "draft",
+      Total: q.totals?.total || 0,
+      CreatedBy: q.createdByName || q.createdBy || "",
+      CreatedAt: parseDate(q.createdAt),
+    });
+
+  }
+
+  if (!rows.length) return;
+
+  const headers = Object.keys(rows[0]);
+
+  const csv = [
+    headers.join(","),
+    ...rows.map((row) =>
+      headers.map((h) => `"${String(row[h] ?? "").replace(/"/g, '""')}"`).join(",")
+    ),
+  ].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "quotations_export.csv";
+  a.click();
+
+  URL.revokeObjectURL(url);
+};
 
   if (loading) return <div className="qp-wrap"><div className="qp-loading">Loading quotations…</div></div>;
 
@@ -816,6 +898,7 @@ const convertToOrder = (quote) => {
     <div className="qp-wrap">
       <header className="qp-header">
         <h1>Quotations</h1>
+      
 
          </header>
 
@@ -929,8 +1012,15 @@ const convertToOrder = (quote) => {
   <div className="filter-summary">
     {filtered.length} / {quotations.length}
   </div>
+      <button
+    className="cp-btn ghost"
+    onClick={exportQuotations}
+  >
+    Export
+  </button>
 
         </div>
+        
      
 
       {error && <div className="qp-error">{error}</div>}

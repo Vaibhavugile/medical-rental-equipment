@@ -632,6 +632,67 @@ if (statusFilter !== "all") {
     return matchesType && matchesStatus && matchesSearch;
   });
 }, [requirements, typeFilter, statusFilter, search]);
+const exportRequirements = () => {
+
+  const rows = filtered.map((r) => {
+
+    const customer =
+      r.leadSnapshot?.customerName ||
+      r.customerName ||
+      r.deliveryContact?.name ||
+      "";
+
+    const contact =
+      r.leadSnapshot?.contactPerson ||
+      r.contactPerson ||
+      r.deliveryContact?.name ||
+      "";
+
+    const phone =
+      r.leadSnapshot?.phone ||
+      r.phone ||
+      r.deliveryContact?.phone ||
+      "";
+
+    return {
+      RequirementNo: r.requirementNumber || r.id,
+      Service: r.serviceType || "rental",
+      Customer: customer,
+      Contact: contact,
+      Phone: phone,
+      Status: r.status || "",
+      CreatedAt: parseDateForDisplay(r.createdAt)
+    };
+
+  });
+
+  if (!rows.length) return;
+
+  const headers = Object.keys(rows[0]);
+
+  const escapeCSV = (value) => {
+    const str = String(value ?? "");
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+
+  const csv = [
+    headers.join(","),
+    ...rows.map(row =>
+      headers.map(h => escapeCSV(row[h])).join(",")
+    )
+  ].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "requirements_export.csv";
+  a.click();
+
+  URL.revokeObjectURL(url);
+};
 
   if (loading)
     return (
@@ -760,9 +821,12 @@ if (statusFilter !== "all") {
   <span className="badge">
     {statusCounts.others}
   </span>
+  
 </button>
 
+
 </div>
+
 
   </div>
 
@@ -780,8 +844,12 @@ if (statusFilter !== "all") {
   <div className="filter-summary">
     {filtered.length} / {requirements.length}
   </div>
+  <button className="cp-btn ghost" onClick={exportRequirements}>
+    Export
+  </button>
 
 </section>
+
 
       <section className="coupons-card">
         <div className="tbl-wrap">

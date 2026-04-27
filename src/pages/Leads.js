@@ -136,6 +136,16 @@ export default function Leads() {
   // Filters
   const [typeFilter, setTypeFilter] = useState("all");   // PRIMARY FILTER (drives Firestore query)
   const [statusFilter, setStatusFilter] = useState("all"); // Secondary filter (client-side)
+  const normalizePhone = (phone = "") => {
+  let cleaned = phone.replace(/\D/g, "");
+
+  // remove India country code if present
+  if (cleaned.startsWith("91") && cleaned.length > 10) {
+    cleaned = cleaned.slice(2);
+  }
+
+  return cleaned;
+};
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
@@ -318,6 +328,26 @@ export default function Leads() {
     return map;
 
   }, [leads]);
+  const duplicateInfo = useMemo(() => {
+  const map = {};
+  const duplicates = new Set();
+
+  leads.forEach((l) => {
+    const key = `${l.phone}-${l.type}`;
+
+    if (map[key]) {
+      duplicates.add(l.id);
+      duplicates.add(map[key]);
+    } else {
+      map[key] = l.id;
+    }
+  });
+
+  return {
+    ids: duplicates,
+    count: duplicates.size,
+  };
+}, [leads]);
   // ---------- Search + STATUS filter (TYPE already applied by Firestore) ----------
   const filtered = useMemo(() => {
 
@@ -370,6 +400,7 @@ export default function Leads() {
             return fDate > today;
           }
 
+
           return true;
         }
 
@@ -406,6 +437,9 @@ export default function Leads() {
 
   return s === notInterestedFilter;
 
+}
+if (statusFilter === "duplicate") {
+  return duplicateInfo.ids.has(l.id);
 }
 
         return s === statusFilter;
@@ -462,6 +496,48 @@ export default function Leads() {
     return list;
 
 }, [leads, search, statusFilter, followupFilter, notInterestedFilter, sortBy]);
+const duplicateMap = useMemo(() => {
+
+  const map = {};
+  const result = {};
+
+  leads.forEach((l) => {
+
+    const key = `${normalizePhone(l.phone)}-${l.type}`;
+
+    if (!map[key]) {
+      map[key] = [];
+    }
+
+    map[key].push(l);
+
+  });
+
+  Object.keys(map).forEach((key) => {
+
+    const list = map[key];
+
+    if (list.length > 1) {
+
+      list
+        .sort((a, b) => {
+          if (!a.createdAt || !b.createdAt) return 0;
+          return a.createdAt.toMillis() - b.createdAt.toMillis();
+        })
+        .forEach((lead, index) => {
+
+          result[lead.id] =
+            index === 0 ? "original" : "duplicate";
+
+        });
+
+    }
+
+  });
+
+  return result;
+
+}, [leads]);
 
   // ---------- Drawer helpers ----------
   const openDrawer = (initial = defaultForm) => {
@@ -504,6 +580,24 @@ export default function Leads() {
       setError("Customer, Contact and Phone are required.");
       return;
     }
+ const currentPhone = normalizePhone(form.phone);
+
+const duplicate = leads.find(
+  (l) =>
+    normalizePhone(l.phone) === currentPhone &&
+    l.type === form.type &&
+    l.id !== form.id
+);
+
+if (duplicate) {
+  const confirmDuplicate = window.confirm(
+    "⚠ Duplicate lead detected.\n\nA lead with this phone and type already exists.\n\nDo you want to create this lead anyway?"
+  );
+
+  if (!confirmDuplicate) {
+    return;
+  }
+}
     setSaving(true);
     try {
       const payloadFields = {
@@ -759,6 +853,47 @@ export default function Leads() {
       setError(err.message || "Failed to delete lead.");
     }
   };
+ const exportLeads = () => {
+
+  const rows = filtered.map((l) => ({
+    Customer: l.customerName || "",
+    Contact: l.contactPerson || "",
+    Phone: l.phone || "",
+    Email: l.email || "",
+    Address: l.address || "",
+    Source: l.leadSource || "",
+    Type: l.type || "",
+    Status: l.status || "",
+    CreatedBy: l.createdByName || "",
+    CreatedAt: l.createdAt?.toDate?.()?.toLocaleString() || "",
+    UpdatedAt: l.updatedAt?.toDate?.()?.toLocaleString() || ""
+  }));
+
+  const headers = Object.keys(rows[0]);
+
+  const escapeCSV = (value) => {
+    const str = String(value ?? "");
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+
+  const csv = [
+    headers.join(","),
+    ...rows.map((row) =>
+      headers.map((h) => escapeCSV(row[h])).join(",")
+    )
+  ].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "leads_export.csv";
+  link.click();
+
+  URL.revokeObjectURL(url);
+};
 
   // lock body scroll when drawer/modal open
   useEffect(() => {
@@ -815,7 +950,7 @@ export default function Leads() {
           </button>
 
           <button
-            className="cp-btn primary"
+            className="cp-btn ghost"
             onClick={() => {
               setDetailsLead(null);
               setReqLead(null);
@@ -825,6 +960,13 @@ export default function Leads() {
           >
             +Add Req
           </button>
+           <button
+    className="cp-btn ghost"
+    onClick={exportLeads}
+  >
+    Export
+  </button>
+
         </div>
       </header>
 
@@ -931,6 +1073,12 @@ export default function Leads() {
   >
     Invalid ({statusCounts.invalid})
   </button>
+  <button
+  className={`seg-btn ${statusFilter === "duplicate" ? "active" : ""}`}
+  onClick={() => setStatusFilter("duplicate")}
+>
+  🔴 Duplicate ({duplicateInfo.count})
+</button>
 
   {/* OTHERS */}
   <button
@@ -1050,6 +1198,7 @@ export default function Leads() {
 
             <thead>
               <tr>
+                 <th>#</th>
                 <th>Customer</th>
                 {/* <th>Contact</th> */}
                 <th>Phone</th>
@@ -1063,14 +1212,14 @@ export default function Leads() {
             </thead>
 
             <tbody>
-              {filtered.map((l) => {
+              {filtered.map((l, index) => {
                 const latestReq = reqByLead[l.id];
                 const canCreateReq =
                   normStatus(l.status) === "req shared";
 
                 return (
                   <tr key={l.id} className="leads-row">
-
+<td>{index + 1}</td>
                     <td className="cell-strong">
                       {l.customerName}
                     </td>
@@ -1080,7 +1229,21 @@ export default function Leads() {
                 {l.email ? ` · ${l.email}` : ""}
               </td> */}
 
-                    <td>{l.phone}</td>
+                   <td>
+  {l.phone}
+
+  {duplicateMap[l.id] === "original" && (
+    <span style={{ color: "#16a34a", marginLeft: 6, fontSize: 12 }}>
+      🟢 Original
+    </span>
+  )}
+
+  {duplicateMap[l.id] === "duplicate" && (
+    <span style={{ color: "red", marginLeft: 6, fontSize: 12 }}>
+      🔴 Duplicate
+    </span>
+  )}
+</td>
 
                     <td className="cell-muted">
                       {l.leadSource || "—"}
@@ -1226,9 +1389,7 @@ export default function Leads() {
       {/* Edit drawer */}
       {showForm && (
         <div
-          onClick={(e) => {
-            if (e.target === e.currentTarget) closeDrawer();
-          }}
+         
           style={{
             position: "fixed",
             inset: 0,
