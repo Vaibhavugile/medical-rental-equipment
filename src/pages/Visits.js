@@ -424,6 +424,63 @@ export default function Visits() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [statusModal, cancelModal, detailsVisit, showForm, closing]);
+  const exportVisits = () => {
+
+  const rows = visible.map((v, i) => ({
+
+    No: i + 1,
+
+    Customer: v.customerName || "",
+
+    Phone: v.phone || "",
+
+    Address: v.address || "",
+
+    Purpose: v.purpose || "",
+
+    Status: v.status || "",
+
+    AssignedTo: v.assignedToName || v.assignedToId || "",
+
+    CreatedBy: v.createdByName || v.createdBy || "",
+
+    CreatedAt: fmtDate(v.createdAt),
+
+    UpdatedAt: fmtDate(v.updatedAt)
+
+  }));
+
+  if (!rows.length) return;
+
+  const headers = Object.keys(rows[0]);
+
+  const escapeCSV = (v) =>
+    `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+  const csv = [
+    headers.join(","),
+    ...rows.map(r =>
+      headers.map(h => escapeCSV(r[h])).join(",")
+    )
+  ].join("\n");
+
+  const blob = new Blob([csv], {
+    type: "text/csv;charset=utf-8;"
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+
+  a.href = url;
+
+  a.download = "visits_export.csv";
+
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+};
 
   if (loading) {
     return (
@@ -442,8 +499,15 @@ export default function Visits() {
           <h1>📍 Visits</h1>
           <p>Plan and track marketing visits. Update stages and review history.</p>
         </div>
-        <div className="coupons-actions">
-          <button className="cp-btn" onClick={() => openDrawer(defaultForm)}>+ New Visit</button>
+         <div className="leads-header-actions">
+          <button className="cp-btn ghost" onClick={() => openDrawer(defaultForm)}>+ New Visit</button>
+            <button
+    className="cp-btn ghost"
+    onClick={exportVisits}
+  >
+    Export
+  </button>
+
         </div>
       </header>
 
@@ -493,6 +557,7 @@ export default function Visits() {
           <table className="cp-table">
             <thead>
               <tr>
+                  <th>No</th>
                 <th>Customer</th>
                 <th>Phone</th>
                 <th>Purpose</th>
@@ -504,8 +569,9 @@ export default function Visits() {
               </tr>
             </thead>
             <tbody>
-              {visible.map((v) => (
+              {visible.map((v,i) => (
                 <tr key={v.id}>
+                    <td>{i + 1}</td>
                   <td className="strong">{v.customerName}</td>
                   <td>{v.phone || "—"}</td>
                   <td className="muted">{v.purpose || "—"}</td>

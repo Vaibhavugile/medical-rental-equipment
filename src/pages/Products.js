@@ -688,6 +688,71 @@ const toggleSelectCompany = (companyAssets) => {
     });
     return groups;
   }, [visibleAssets]);
+  const exportProducts = () => {
+
+  const rows = filteredProducts.map((p, i) => {
+
+    const st = productAssetStatusCounts[p.id] || {};
+
+    return {
+
+      No: i + 1,
+
+      Product: p.name || "",
+
+      SKU: p.sku || "",
+
+      Rate: p.defaultRate || 0,
+
+      Category: p.category || "",
+
+      TotalAssets: productAssetCounts[p.id] || 0,
+
+      InStock: st.in_stock || 0,
+
+      OutForRental: st.out_for_rental || 0,
+
+      Maintenance: st.maintenance || 0,
+
+      Reserved: st.reserved || 0,
+
+      Created: fmt.date(p.createdAt)
+
+    };
+
+  });
+
+  if (!rows.length) return;
+
+  const headers = Object.keys(rows[0]);
+
+  const escapeCSV = (v) =>
+    `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+  const csv = [
+    headers.join(","),
+    ...rows.map(r =>
+      headers.map(h => escapeCSV(r[h])).join(",")
+    )
+  ].join("\n");
+
+  const blob = new Blob([csv], {
+    type: "text/csv;charset=utf-8;"
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+
+  a.href = url;
+
+  a.download = "products_inventory_export.csv";
+
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+};
 
 
   /* ── render ── */
@@ -702,9 +767,17 @@ const toggleSelectCompany = (companyAssets) => {
           <h1>🧰 Products & Inventory</h1>
           <p className="muted">Realtime asset counts, reservations, maintenance, and safe creation flows.</p>
         </div>
-        <div className="coupons-actions">
-          <button className="cp-btn primary" onClick={openAddProduct}>+ Add Product</button>
+        <div className="leads-header-actions">
+          <button className="cp-btn ghost" onClick={openAddProduct}>+ Add Product</button>
+           <button
+    className="cp-btn ghost"
+    onClick={exportProducts}
+  >
+    Export
+  </button>
         </div>
+         
+
       </header>
 
       {/* Toolbar */}

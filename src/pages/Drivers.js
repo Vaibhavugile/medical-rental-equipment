@@ -337,7 +337,71 @@ if (!res.ok) {
       return statusOk && queryOk;
     });
   }, [drivers, search, statusFilter]);
+const exportDrivers = () => {
 
+  const rows = filtered.map((d, i) => ({
+
+    No: i + 1,
+
+    Name: d.name || "",
+
+    Phone: d.phone || "",
+
+    Vehicle: d.vehicle || "",
+
+    Status: d.status || "",
+
+    Salary:
+      d.salary === "" || d.salary === undefined
+        ? ""
+        : `${d.salary}/${d.salaryPeriod || ""}`,
+
+    Shift: d.shift || "",
+
+    Email: d.loginEmail || "",
+
+    JoinDate: d.joinDate || "",
+
+    LicenseNumber: d.licenseNumber || "",
+
+    LicenseExpiry: d.licenseExpiry || "",
+
+    Address: d.address || "",
+
+    EmergencyContactName: d.emergencyContactName || "",
+
+    EmergencyContactPhone: d.emergencyContactPhone || ""
+
+  }));
+
+  if (!rows.length) return;
+
+  const headers = Object.keys(rows[0]);
+
+  const escapeCSV = (v) =>
+    `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+  const csv = [
+    headers.join(","),
+    ...rows.map(r =>
+      headers.map(h => escapeCSV(r[h])).join(",")
+    )
+  ].join("\n");
+
+  const blob = new Blob([csv], {
+    type: "text/csv;charset=utf-8;"
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "drivers_export.csv";
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+};
   return (
     <div className="drivers-page">
       <h2>Runners Management</h2>
@@ -360,8 +424,9 @@ if (!res.ok) {
           <option value="busy">Busy</option>
           <option value="offline">Offline</option>
         </select>
+        <div className="leads-header-actions">
         <button
-          className="cp-btn add-btn"
+          className="cp-btn ghost"
           type="button"
           onClick={() => {
             setShowForm(true);
@@ -371,6 +436,13 @@ if (!res.ok) {
         >
           Add Driver
         </button>
+        <button
+  className="cp-btn ghost"
+  onClick={exportDrivers}
+>
+  Export
+</button>
+</div>
       </div>
 
       {/* Floating add button for mobile */}
@@ -441,6 +513,7 @@ if (!res.ok) {
           <table>
           <thead>
   <tr>
+    <th>#</th>
     <th>Name</th>
     <th>Phone</th>
     <th>Vehicle</th>
@@ -451,8 +524,9 @@ if (!res.ok) {
   </tr>
 </thead>
             <tbody>
-              {filtered.map((d) => (
+              {filtered.map((d,i) => (
                 <tr key={d.id}>
+                    <td>{i + 1}</td>
   <td className="driver-name">
     {d.name || "-"}
   </td>

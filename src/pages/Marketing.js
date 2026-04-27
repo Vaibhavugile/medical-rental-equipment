@@ -265,7 +265,56 @@ const handleEnter = (e) => {
     }
   }
 };
+const exportMarketing = () => {
 
+  const rowsExport = filtered.map((r, i) => ({
+
+    No: i + 1,
+
+    Name: r.name || "",
+
+    Email: r.loginEmail || r.email || "",
+
+    Phone: r.phone || "",
+
+    Branch: r.branchId || "",
+
+    Salary: r.salaryMonthly || 0,
+
+    Active: r.active !== false ? "Active" : "Inactive",
+
+    UID: r.uid || r.authUid || r.id
+
+  }));
+
+  if (!rowsExport.length) return;
+
+  const headers = Object.keys(rowsExport[0]);
+
+  const escapeCSV = (v) =>
+    `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+  const csv = [
+    headers.join(","),
+    ...rowsExport.map(r =>
+      headers.map(h => escapeCSV(r[h])).join(",")
+    )
+  ].join("\n");
+
+  const blob = new Blob([csv], {
+    type: "text/csv;charset=utf-8;"
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "marketing_export.csv";
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+};
   // Quick toggle active
   const toggleActive = async (r, next) => {
     try {
@@ -316,8 +365,9 @@ const handleEnter = (e) => {
           <option value="active">Active</option>
           <option value="inactive">Inactive</option>
         </select>
+        <div className="leads-header-actions">
         <button
-          className="cp-btn add-btn"
+          className="cp-btn ghost"
           type="button"
           onClick={() => {
             setShowForm(true);
@@ -327,6 +377,13 @@ const handleEnter = (e) => {
         >
           Add Marketing
         </button>
+        <button
+  className="cp-btn ghost"
+  onClick={exportMarketing}
+>
+  Export
+</button>
+</div>
       </div>
 
       {/* Mobile FAB */}
@@ -402,6 +459,7 @@ const handleEnter = (e) => {
           <table>
             <thead>
               <tr>
+                <th>#</th>
                 <th>Name</th>
                 <th>Login Email</th>
                 <th>Phone</th>
@@ -413,8 +471,9 @@ const handleEnter = (e) => {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
+              {filtered.map((r,i) => (
                 <tr key={r.id}>
+                    <td>{i + 1}</td>
                   <td>{r.name || "-"}</td>
                   <td>{r.loginEmail || r.email || "-"}</td>
                   <td>{r.phone || "-"}</td>

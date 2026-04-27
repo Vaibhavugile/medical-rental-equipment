@@ -320,6 +320,72 @@ if (role === "users") {
 
     doc.save(`${person?.name}-salary.pdf`)
   }
+
+  const exportPayroll = () => {
+
+  const rows = [];
+
+  for (const [id, t] of totals.entries()) {
+
+    const person = peopleById[id];
+
+    const monthlySalary =
+      person?.salary ||
+      person?.salaryMonthly ||
+      0;
+
+    const perDaySalary = monthlySalary / 26;
+
+    const salary =
+      ((t.present + t.grace) * perDaySalary) +
+      (t.half * (perDaySalary / 2));
+
+    const key = `${id}_${dateFrom.slice(0, 7)}`;
+    const paid = payStatus[key]?.paid ? "Paid" : "Unpaid";
+
+    rows.push({
+      Name: person?.name || "",
+      Role: role,
+      Present: t.present,
+      Grace: t.grace,
+      HalfDays: t.half,
+      Absent: t.absent,
+      Hours: minsToHhmm(t.minutes),
+      MonthlySalary: monthlySalary,
+      SalaryEarned: Math.round(salary),
+      Status: paid
+    });
+
+  }
+
+  if (!rows.length) return;
+
+  const headers = Object.keys(rows[0]);
+
+  const escapeCSV = (v) =>
+    `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+  const csv = [
+    headers.join(","),
+    ...rows.map(r =>
+      headers.map(h => escapeCSV(r[h])).join(",")
+    )
+  ].join("\n");
+
+  const blob = new Blob([csv], {
+    type: "text/csv;charset=utf-8;"
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `payroll_${role}_${dateFrom}_${dateTo}.csv`;
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+};
   return (
 
     <div className="payroll-page">
@@ -329,6 +395,12 @@ if (role === "users") {
         <h2>💰 Salary Payroll</h2>
 
         <div className="payroll-toolbar">
+          <button
+  className="cp-btn ghost"
+  onClick={exportPayroll}
+>
+  Export
+</button>
 
           <select
             value={role}

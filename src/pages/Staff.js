@@ -414,6 +414,55 @@ const [servicesOpen, setServicesOpen] = useState(false);
       return qOk && tOk;
     });
   }, [rows, search, typeFilter]);
+  const exportStaff = () => {
+
+  const rows = filtered.map((r, i) => ({
+
+    No: i + 1,
+
+    Name: r.name || "",
+    Type: r.staffType || "",
+    Shift: r.shiftType || "",
+    Phone: r.phone || "",
+
+    Aadhaar: r.aadharNumber
+      ? `XXXX-XXXX-${r.aadharNumber.slice(-4)}`
+      : "",
+
+    Services: (r.servicesOffered || []).join(", "),
+
+    Email: r.loginEmail || "",
+
+  }));
+
+  if (!rows.length) return;
+
+  const headers = Object.keys(rows[0]);
+
+  const escapeCSV = (v) =>
+    `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+  const csv = [
+    headers.join(","),
+    ...rows.map(r =>
+      headers.map(h => escapeCSV(r[h])).join(",")
+    )
+  ].join("\n");
+
+  const blob = new Blob([csv], {
+    type: "text/csv;charset=utf-8;"
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "staff_export.csv";
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+};
 
   /* ================= UI ================= */
   return (
@@ -440,8 +489,9 @@ const [servicesOpen, setServicesOpen] = useState(false);
           <option value="nurse">Nurse</option>
           <option value="caretaker">Caretaker</option>
         </select>
+        <div className="leads-header-actions">
         <button
-          className="cp-btn"
+          className="cp-btn ghost"
           onClick={() => {
             setForm(empty);
             setEditingId(null);
@@ -450,6 +500,13 @@ const [servicesOpen, setServicesOpen] = useState(false);
         >
           {defaultType === "caretaker" ? "Add Caretaker" : "Add Nurse"}
         </button>
+        <button
+  className="cp-btn ghost"
+  onClick={exportStaff}
+>
+  Export
+</button>
+</div>
 
 
       </div>
@@ -692,6 +749,7 @@ const [servicesOpen, setServicesOpen] = useState(false);
           <table>
             <thead>
               <tr>
+                <th>#</th>
                 <th>Name</th>
                 <th>Type</th>
                 <th>Shift</th>
@@ -702,8 +760,10 @@ const [servicesOpen, setServicesOpen] = useState(false);
               </tr>
             </thead>
             <tbody>
-              {filtered.map((r) => (
+              {filtered.map((r,index) => (
                 <tr key={r.id}>
+                  <td>{index + 1}</td>
+
                   <td
                     className="staff-name-link"
                     onClick={() => navigate(`/crm/staff/${r.id}`)}

@@ -214,11 +214,61 @@ useEffect(() => {
       )
     );
   };
+const exportEmployees = () => {
 
+  const rowsExport = filtered.map((r, i) => ({
+
+    No: i + 1,
+
+    Name: r.name || "",
+
+    Email: r.email || "",
+
+    Phone: r.phone || "",
+
+    Branch: r.branchId || "",
+
+    Salary: r.salaryMonthly || 0,
+
+    Role: r.role || "",
+
+    Active: r.active !== false ? "Active" : "Inactive"
+
+  }));
+
+  if (!rowsExport.length) return;
+
+  const headers = Object.keys(rowsExport[0]);
+
+  const escapeCSV = (v) =>
+    `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+  const csv = [
+    headers.join(","),
+    ...rowsExport.map(r =>
+      headers.map(h => escapeCSV(r[h])).join(",")
+    )
+  ].join("\n");
+
+  const blob = new Blob([csv], {
+    type: "text/csv;charset=utf-8;"
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "employees_export.csv";
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+};
   return (
     <div className="marketing-page">
 
       <h2>Employees</h2>
+     
 
       {/* Toolbar */}
 
@@ -230,6 +280,13 @@ useEffect(() => {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
+         <button
+  className="cp-btn ghost"
+  onClick={exportEmployees}
+>
+  Export
+</button>
+        
 
       </div>
 
@@ -372,6 +429,7 @@ useEffect(() => {
             <thead>
 
               <tr>
+                  <th>#</th>
                 <th>Name</th>
                 <th>Email</th>
                 <th>Phone</th>
@@ -386,9 +444,12 @@ useEffect(() => {
 
             <tbody>
 
-              {filtered.map(r => (
+              {filtered.map((r, i) => (
 
-                <tr key={r.id}>
+<tr key={r.id}>
+
+  <td>{i + 1}</td>
+                  
 
                   <td>{r.name || "-"}</td>
                   <td>{r.email || "-"}</td>

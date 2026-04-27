@@ -8,7 +8,7 @@ import {
   setDoc,
   deleteDoc,
   serverTimestamp,
-   onSnapshot
+   onSnapshot,where
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { db,auth } from "../firebase";
@@ -40,6 +40,7 @@ const fmtDateTime = (ts) => {
   const d = ts.toDate ? ts.toDate() : new Date(ts);
   return `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
 };
+
 
 // ✅ normalize ANY date to YYYY-MM-DD
 function toYmd(value) {
@@ -89,7 +90,7 @@ const [paymentFilter, setPaymentFilter] = useState("all");
   /* =========================
      Load Nursing Orders
   ========================= */
-
+const [exporting, setExporting] = useState(false);
   useEffect(() => {
     const load = async () => {
       setLoading(true);
@@ -385,6 +386,89 @@ const refundPendingCount = serviceRanges.filter((o) => {
 
   return refundPending > 0;
 }).length;
+const exportNursingOrders = async () => {
+
+  setExporting(true);
+
+  try {
+
+    const rows = [];
+
+    for (const o of filteredOrders) {
+
+      const totalPaid = (o.payments || []).reduce(
+        (s, p) => s + Number(p.amount || 0),
+        0
+      );
+
+      const total = Number(o.totals?.total || 0);
+
+      const q = query(
+        collection(db, "staffAssignments"),
+        where("orderId", "==", o.id)
+      );
+
+      const snap = await getDocs(q);
+
+      const orderAssignments = snap.docs.map(d => d.data());
+
+      const totalSalary = orderAssignments
+        .filter(a => a.status !== "cancelled")
+        .reduce((s, a) => s + Number(a.amount || 0), 0);
+
+      const profit = total - totalSalary;
+
+      rows.push({
+        OrderNo: o.orderNo || o.id,
+        Customer: o.customerName || "",
+        Revenue: total,
+        Salary: totalSalary,
+        Profit: profit,
+        Paid: totalPaid,
+        Balance: total - totalPaid
+      });
+
+    }
+
+    if (!rows.length) return;
+
+    const headers = Object.keys(rows[0]);
+
+    const escapeCSV = (v) =>
+      `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+    const csv = [
+      headers.join(","),
+      ...rows.map(r =>
+        headers.map(h => escapeCSV(r[h])).join(",")
+      )
+    ].join("\n");
+
+    const blob = new Blob([csv], {
+      type: "text/csv;charset=utf-8;"
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "caretaker_orders_export.csv";
+    a.click();
+
+    URL.revokeObjectURL(url);
+
+  } catch (err) {
+
+    console.error(err);
+    alert("Export failed");
+
+  } finally {
+
+    setExporting(false);
+
+  }
+
+};
 
   return (
     <div className="no-wrap">
@@ -456,12 +540,22 @@ const refundPendingCount = serviceRanges.filter((o) => {
   <div className="no-head-top">
     <h2>Caretakers Orders</h2>
     
-<button
-  className="cp-btn"
-  onClick={() => setCreateOpen(true)}
+<div className="leads-header-actions">
+          <button
+            className="cp-btn ghost"
+            onClick={() => setCreateOpen(true)}
+          >
+            + Add Caaretaker Order
+          </button>  
+    <button
+  className="cp-btn ghost"
+  onClick={exportNursingOrders}
+  disabled={exporting}
+  
 >
-  + Add Caretaker Order
-</button>  </div>
+  {exporting ? "Exporting..." : "Export"}
+</button>
+</div> </div>
 
 
   <div className="no-filters">

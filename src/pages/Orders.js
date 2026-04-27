@@ -477,6 +477,7 @@ const [userRole, setUserRole] = useState(null);
       }
     })();
   }, []);
+
   useEffect(() => {
   const user = auth.currentUser;
   if (!user) return;
@@ -841,6 +842,82 @@ const openAssetPickerForItem = async (itemIndex) => {
   }
 };
 
+const exportOrders = () => {
+
+  const rows = [];
+
+  filtered.forEach((o) => {
+
+    const start = getStartDate(o);
+    const end = getEndDate(o);
+
+    const total = Number(o.totals?.total || 0);
+    const paid = Number(o.paymentSummary?.totalPaid || 0);
+    const balance = Math.max(0, total - paid);
+
+    (o.items || []).forEach((it) => {
+
+      const product =
+        productsMap[it.productId]?.name ||
+        productsMap[it.productId]?.title ||
+        it.productName ||
+        "";
+
+      const qty = Number(it.qty || 0);
+      const rate = Number(it.rate || 0);
+      const amount = qty * rate;
+
+      rows.push({
+        OrderNo: o.orderNo || o.id,
+        Customer: o.customerName || "",
+        Address: o.deliveryAddress || "",
+        Product: product,
+        Qty: qty,
+        Rate: rate,
+        Amount: amount,
+        StartDate: start || "",
+        EndDate: end || "",
+        Status: getDeliveryBadgeText(o, deliveriesByOrder),
+        TotalOrderValue: total,
+        Paid: paid,
+        Balance: balance,
+        CreatedAt: o.createdAt?.seconds
+          ? new Date(o.createdAt.seconds * 1000).toLocaleString()
+          : ""
+      });
+
+    });
+
+  });
+
+  if (!rows.length) return;
+
+  const headers = Object.keys(rows[0]);
+
+  const escapeCSV = (v) =>
+    `"${String(v ?? "").replace(/"/g, '""')}"`;
+
+  const csv = [
+    headers.join(","),
+    ...rows.map(r =>
+      headers.map(h => escapeCSV(r[h])).join(",")
+    )
+  ].join("\n");
+
+  const blob = new Blob([csv], {
+    type: "text/csv;charset=utf-8;"
+  });
+
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "orders_export.csv";
+  a.click();
+
+  URL.revokeObjectURL(url);
+
+};
 
 
   const togglePickerSelect = (assetId) => {
@@ -2017,6 +2094,13 @@ if (payment) {
     >
       + Add Order
     </button>
+    <button
+  className="cp-btn ghost"
+  onClick={exportOrders}
+  
+>
+  Export
+</button>
   </div>
 </header>
 
