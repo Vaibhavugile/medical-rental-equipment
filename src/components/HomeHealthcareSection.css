@@ -1,0 +1,553 @@
+/* ========================================= */
+/* ULTRA PREMIUM BOOK MY MEDICARE UI */
+/* MODERN HEALTHCARE GLASSMORPHISM */
+/* ========================================= */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: linear-gradient(
+    180deg,
+    #f8fbff 0%,
+    #f4f7fc 100%
+  );
+
+  font-family: "Inter", sans-serif;
+
+  overflow-x: hidden;
+
+  color: #0f172a;
+}
+
+/* ========================================= */
+/* MAIN SECTION */
+/* ========================================= */
+
+.bmm-main-section {
+  width: 100%;
+
+  padding: 24px 0 50px;
+
+  position: relative;
+
+  overflow: hidden;
+}
+
+/* PREMIUM BLUR BACKGROUNDS */
+
+.bmm-main-section::before {
+  content: "";
+
+  position: absolute;
+
+  top: -140px;
+  left: -120px;
+
+  width: 320px;
+  height: 320px;
+
+  background: rgba(255,138,0,0.08);
+
+  border-radius: 50%;
+
+  filter: blur(110px);
+}
+
+.bmm-main-section::after {
+  content: "";
+
+  position: absolute;
+
+  right: -120px;
+  bottom: -160px;
+
+  width: 340px;
+  height: 340px;
+
+  background: rgba(59,130,246,0.08);
+
+  border-radius: 50%;
+
+  filter: blur(110px);
+}
+
+/* ========================================= */
+/* CONTAINER */
+/* ========================================= */
+
+.bmm-main-container {
+  max-width: 1120px;
+
+  margin: auto;
+
+  padding: 0 18px;
+
+  position: relative;
+
+  z-index: 2;
+}
+
+/* ========================================= */
+/* MAIN PREMIUM CARD */
+/* ========================================= */
+
+.bmm-content-wrapper {
+  position: relative;
+
+  background: rgba(255,255,255,0.72);
+
+  backdrop-filter: blur(18px);
+
+  border: 1px solid rgba(255,255,255,0.7);
+
+  border-radius: 28px;
+
+  padding: 46px 46px;
+
+  overflow: hidden;
+
+  box-shadow:
+    0 10px 35px rgba(15,23,42,0.05),
+    inset 0 1px 0 rgba(255,255,255,0.8);
+}
+
+/* PREMIUM TOP ACCENT */
+
+.bmm-content-wrapper::before {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  left: 0;
+
+  width: 180px;
+  height: 4px;
+
+  background: linear-gradient(
+    90deg,
+    #ff8a00,
+    #ffb347
+  );
+
+  border-radius: 0 0 20px 0;
+}
+
+/* ========================================= */
+/* BADGE */
+/* ========================================= */
+
+.bmm-premium-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+
+  background: rgba(255,138,0,0.08);
+
+  border: 1px solid rgba(255,138,0,0.14);
+
+  color: #ea580c;
+
+  padding: 8px 16px;
+
+  border-radius: 999px;
+
+  font-size: 12px;
+  font-weight: 700;
+
+  margin-bottom: 22px;
+
+  backdrop-filter: blur(10px);
+}
+
+/* ========================================= */
+/* TITLE */
+/* ========================================= */
+
+.bmm-main-title {
+  font-size: 50px;
+
+  line-height: 1.08;
+
+  letter-spacing: -1.8px;
+
+  font-weight: 900;
+
+  color: #0b1324;
+
+  max-width: 780px;
+
+  margin-bottom: 20px;
+}
+
+/* PREMIUM ORANGE */
+
+.bmm-main-title span {
+  background: linear-gradient(
+    135deg,
+    #ff8a00,
+    #ffb347
+  );
+
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ========================================= */
+/* DESCRIPTION */
+/* ========================================= */
+
+.bmm-main-description {
+  font-size: 16px;
+
+  line-height: 1.9;
+
+  color: #475569;
+
+  max-width: 860px;
+
+  margin-bottom: 16px;
+
+  font-weight: 400;
+}
+
+/* ========================================= */
+/* CTA BUTTONS */
+/* ========================================= */
+
+.bmm-cta-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+
+  margin-top: 28px;
+
+  flex-wrap: wrap;
+}
+
+/* ========================================= */
+/* PRIMARY BUTTON */
+/* ========================================= */
+
+.bmm-readmore-button {
+  position: relative;
+
+  border: none;
+  outline: none;
+
+  cursor: pointer;
+
+  overflow: hidden;
+
+  background: linear-gradient(
+    135deg,
+    #ff8a00,
+    #ff6b00
+  );
+
+  color: #ffffff;
+
+  padding: 14px 24px;
+
+  border-radius: 14px;
+
+  font-size: 14px;
+  font-weight: 700;
+
+  transition: all 0.3s ease;
+
+  box-shadow:
+    0 10px 25px rgba(255,136,0,0.25);
+}
+
+.bmm-readmore-button:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 16px 30px rgba(255,136,0,0.32);
+}
+
+/* SHINE EFFECT */
+
+.bmm-readmore-button::before {
+  content: "";
+
+  position: absolute;
+
+  top: 0;
+  left: -120%;
+
+  width: 70%;
+  height: 100%;
+
+  background: rgba(255,255,255,0.22);
+
+  transform: skewX(-20deg);
+
+  transition: 0.7s;
+}
+
+.bmm-readmore-button:hover::before {
+  left: 130%;
+}
+
+/* ========================================= */
+/* SECONDARY BUTTON */
+/* ========================================= */
+
+.bmm-secondary-btn {
+  background: rgba(255,255,255,0.7);
+
+  backdrop-filter: blur(10px);
+
+  border: 1px solid #e2e8f0;
+
+  color: #0f172a;
+
+  padding: 14px 22px;
+
+  border-radius: 14px;
+
+  font-size: 14px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition: 0.3s ease;
+}
+
+.bmm-secondary-btn:hover {
+  background: #0f172a;
+  color: #ffffff;
+}
+
+/* ========================================= */
+/* EXPANDABLE SECTION */
+/* ========================================= */
+
+.bmm-expandable-content {
+  max-height: 0;
+
+  overflow: hidden;
+
+  transition: all 0.7s ease;
+}
+
+.bmm-show-content {
+  max-height: 12000px;
+
+  margin-top: 34px;
+}
+
+/* ========================================= */
+/* GRID */
+/* ========================================= */
+
+.bmm-grid-layout {
+  display: grid;
+
+  grid-template-columns: repeat(2, 1fr);
+
+  gap: 18px;
+}
+
+/* ========================================= */
+/* CONTENT CARD */
+/* ========================================= */
+
+.bmm-content-block {
+  position: relative;
+
+  background: rgba(255,255,255,0.84);
+
+  backdrop-filter: blur(12px);
+
+  border: 1px solid rgba(255,255,255,0.7);
+
+  border-radius: 20px;
+
+  padding: 24px;
+
+  overflow: hidden;
+
+  transition: all 0.3s ease;
+
+  box-shadow:
+    0 4px 20px rgba(15,23,42,0.04);
+}
+
+/* PREMIUM HOVER */
+
+.bmm-content-block:hover {
+  transform: translateY(-5px);
+
+  box-shadow:
+    0 14px 35px rgba(15,23,42,0.08);
+}
+
+/* LIGHT GLOW */
+
+.bmm-content-block::before {
+  content: "";
+
+  position: absolute;
+
+  top: -40px;
+  right: -40px;
+
+  width: 120px;
+  height: 120px;
+
+  background: rgba(255,138,0,0.06);
+
+  border-radius: 50%;
+}
+
+/* ========================================= */
+/* ICON */
+/* ========================================= */
+
+.bmm-card-icon {
+  width: 48px;
+  height: 48px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 16px;
+
+  background: linear-gradient(
+    135deg,
+    rgba(255,138,0,0.12),
+    rgba(255,179,71,0.12)
+  );
+
+  font-size: 20px;
+
+  margin-bottom: 16px;
+}
+
+/* ========================================= */
+/* CARD TITLE */
+/* ========================================= */
+
+.bmm-content-block h2 {
+  font-size: 22px;
+
+  line-height: 1.35;
+
+  color: #0f172a;
+
+  margin-bottom: 14px;
+
+  font-weight: 800;
+}
+
+/* ========================================= */
+/* CARD TEXT */
+/* ========================================= */
+
+.bmm-content-block p {
+  font-size: 14px;
+
+  line-height: 1.85;
+
+  color: #475569;
+
+  margin-bottom: 14px;
+}
+
+/* ========================================= */
+/* LIST */
+/* ========================================= */
+
+.bmm-content-block ul {
+  padding-left: 18px;
+}
+
+.bmm-content-block li {
+  font-size: 14px;
+
+  line-height: 1.8;
+
+  color: #475569;
+
+  margin-bottom: 6px;
+}
+
+/* ========================================= */
+/* TABLET */
+/* ========================================= */
+
+@media (max-width: 992px) {
+
+  .bmm-main-title {
+    font-size: 42px;
+  }
+
+  .bmm-grid-layout {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+/* ========================================= */
+/* MOBILE */
+/* ========================================= */
+
+@media (max-width: 768px) {
+
+  .bmm-main-section {
+    padding: 14px 0 35px;
+  }
+
+  .bmm-main-container {
+    padding: 0 14px;
+  }
+
+  .bmm-content-wrapper {
+    padding: 28px 20px;
+
+    border-radius: 22px;
+  }
+
+  .bmm-main-title {
+    font-size: 32px;
+
+    line-height: 1.14;
+
+    letter-spacing: -1px;
+  }
+
+  .bmm-main-description {
+    font-size: 15px;
+  }
+
+  .bmm-grid-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .bmm-cta-wrapper {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .bmm-readmore-button,
+  .bmm-secondary-btn {
+    width: 100%;
+  }
+
+  .bmm-content-block {
+    padding: 20px;
+  }
+
+  .bmm-content-block h2 {
+    font-size: 20px;
+  }
+
+}

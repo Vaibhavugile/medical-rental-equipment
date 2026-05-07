@@ -8,7 +8,7 @@ import {
   onSnapshot,
   query,
   orderBy,
-    increment,
+  increment,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import "./Requirements.css";
@@ -16,74 +16,84 @@ import { updateAccountReport } from "../utils/accountReport";
 import { runTransaction } from "firebase/firestore";
 
 const emptyLine = () => ({ productId: "", name: "", qty: 1, unitNotes: "" });
+const emptyService = (type = "nursing", start = "", end = "") => ({
+  staffType: type === "caretaker" ? "caretaker" : "nurse",
+  count: 1,
+  shift: "day",
+  startDate: start,
+  endDate: end,
+  notes: "",
+});
 
 export default function RequirementForm({ lead, requirement = null, templateRequirement = null, onSaved, onCancel }) {
   const [form, setForm] = useState({
-  // 🔹 Identity
-  requirementId: null,
-  requirementNumber: "", // ✅ NEW (professional number)
+    // 🔹 Identity
+    requirementId: null,
+    requirementNumber: "", // ✅ NEW (professional number)
 
-  // 🔹 Type
-serviceType:
-  lead?.type === "equipment"
-    ? "rental"
-    : lead?.type === "caretaker"
-    ? "caretaker"
-    : "nursing",
-  // 🔹 Lead linkage
-  leadId: lead?.id || "",
+    // 🔹 Type
+    serviceType:
+      lead?.type === "equipment"
+        ? "rental"
+        : lead?.type === "caretaker"
+          ? "caretaker"
+          : "nursing",
+    // 🔹 Lead linkage
+    leadId: lead?.id || "",
 
-  // 🔹 Nursing (only used if serviceType === nursing)
-  nursing: {
-  staffType: lead?.type === "caretaker" ? "caretaker" : "nurse",
-  count: 1,
-  shift: "day",
-  notes: "",
-},
+    // 🔹 Nursing (only used if serviceType === nursing)
+// 🔹 Nursing (only used if serviceType === nursing)
+nursing: [
+  emptyService(
+    lead?.type === "caretaker" ? "caretaker" : "nursing",
+    "",
+    ""
+  )
+],
 
-  // 🔹 Lead snapshot (freezes data at time of requirement creation)
-  leadSnapshot: {
-    customerName: lead?.customerName || "",
-    contactPerson: lead?.contactPerson || "",
-    phone: lead?.phone || "",
-  },
+    // 🔹 Lead snapshot (freezes data at time of requirement creation)
+    leadSnapshot: {
+      customerName: lead?.customerName || "",
+      contactPerson: lead?.contactPerson || "",
+      phone: lead?.phone || "",
+    },
 
-  // 🔹 Equipment (only used if rental)
-  equipment: [emptyLine()],
+    // 🔹 Equipment (only used if rental)
+    equipment: [emptyLine()],
 
-  // 🔹 Timing
-  expectedStartDate: "",
-  expectedDurationDays: 7,
-  expectedEndDate: "",
+    // 🔹 Timing
+    expectedStartDate: "",
+    expectedDurationDays: 7,
+    expectedEndDate: "",
 
-  // 🔹 Delivery
-  deliveryAddress: lead?.address || "",
-  deliveryCity: lead?.address
-    ? (lead.address.split(",").pop() || "").trim()
-    : "",
+    // 🔹 Delivery
+    deliveryAddress: lead?.address || "",
+    deliveryCity: lead?.address
+      ? (lead.address.split(",").pop() || "").trim()
+      : "",
 
-  deliveryContact: {
-    name: lead?.contactPerson || "",
-    phone: lead?.phone || "",
-    email: lead?.email || "",
-  },
+    deliveryContact: {
+      name: lead?.contactPerson || "",
+      phone: lead?.phone || "",
+      email: lead?.email || "",
+    },
 
-  // 🔹 Meta
-  urgency: "normal",
-  specialInstructions: "",
-  status: "draft",
-  assignedTo: "",
-});
+    // 🔹 Meta
+    urgency: "normal",
+    specialInstructions: "",
+    status: "draft",
+    assignedTo: "",
+  });
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [lastSaved, setLastSaved] = useState(null);
-const serviceLabel =
-  lead?.type === "caretaker"
-    ? "Caretaker"
-    : lead?.type === "nursing"
-    ? "Nursing"
-    : "Equipment";
+  const serviceLabel =
+    lead?.type === "caretaker"
+      ? "Caretaker"
+      : lead?.type === "nursing"
+        ? "Nursing"
+        : "Equipment";
   // Products for suggestions
   const [products, setProducts] = useState([]); // [{id, name, sku, defaultRate, ...}]
   useEffect(() => {
@@ -98,27 +108,27 @@ const serviceLabel =
   const [suggestFor, setSuggestFor] = useState(null); // row index or null
   const wrapsRef = useRef([]); // ref to each name input wrapper
 
-async function generateRequirementNumber() {
-  const counterRef = doc(db, "counters", "requirements");
+  async function generateRequirementNumber() {
+    const counterRef = doc(db, "counters", "requirements");
 
-  return await runTransaction(db, async (transaction) => {
-    const counterDoc = await transaction.get(counterRef);
+    return await runTransaction(db, async (transaction) => {
+      const counterDoc = await transaction.get(counterRef);
 
-    let lastNumber = 0;
-    if (counterDoc.exists()) {
-      lastNumber = counterDoc.data().lastNumber || 0;
-    }
+      let lastNumber = 0;
+      if (counterDoc.exists()) {
+        lastNumber = counterDoc.data().lastNumber || 0;
+      }
 
-    const newNumber = lastNumber + 1;
+      const newNumber = lastNumber + 1;
 
-    transaction.set(counterRef, { lastNumber: newNumber }, { merge: true });
+      transaction.set(counterRef, { lastNumber: newNumber }, { merge: true });
 
-    const year = new Date().getFullYear();
-    const padded = String(newNumber).padStart(4, "0");
+      const year = new Date().getFullYear();
+      const padded = String(newNumber).padStart(4, "0");
 
-    return `REQ-${year}-${padded}`;
-  });
-}
+      return `REQ-${year}-${padded}`;
+    });
+  }
   // Close suggestions on outside click
   useEffect(() => {
     function handleDocMouseDown(e) {
@@ -151,15 +161,15 @@ async function generateRequirementNumber() {
   // 2) templateRequirement provided → CLONE MODE (prefill only, no requirementId)
   // 3) neither → seed from lead for create
   useEffect(() => {
-   if (requirement) {
-  setForm((prev) => ({
-    ...prev,
-    ...requirement,
-    requirementId: requirement.id || requirement.requirementId,
-    requirementNumber: requirement.requirementNumber || "",
-  }));
-  return;
-}
+    if (requirement) {
+      setForm((prev) => ({
+        ...prev,
+        ...requirement,
+        requirementId: requirement.id || requirement.requirementId,
+        requirementNumber: requirement.requirementNumber || "",
+      }));
+      return;
+    }
 
     if (templateRequirement) {
       // CLONE/PREFILL (no requirementId!)
@@ -218,34 +228,48 @@ async function generateRequirementNumber() {
   }, [requirement, templateRequirement, lead]);
 
   // Compute end date automatically
- useEffect(() => {
-  if (form.expectedStartDate && form.expectedEndDate) {
-    const start = new Date(form.expectedStartDate);
-    const end = new Date(form.expectedEndDate);
+  useEffect(() => {
+    if (form.expectedStartDate && form.expectedEndDate) {
+      const start = new Date(form.expectedStartDate);
+      const end = new Date(form.expectedEndDate);
 
-    const diff =
-      Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
+      const diff =
+        Math.floor((end - start) / (1000 * 60 * 60 * 24)) + 1;
 
-    if (diff > 0) {
-      setForm((prev) => ({
-        ...prev,
-        expectedDurationDays: diff,
-      }));
+      if (diff > 0) {
+        setForm((prev) => ({
+          ...prev,
+          expectedDurationDays: diff,
+        }));
+      }
     }
-  }
-}, [form.expectedEndDate, form.expectedStartDate]);
-useEffect(() => {
+  }, [form.expectedEndDate, form.expectedStartDate]);
+  useEffect(() => {
   if (form.expectedStartDate && form.expectedDurationDays) {
     const start = new Date(form.expectedStartDate);
     const end = new Date(start);
 
-    // inclusive day logic
     end.setDate(start.getDate() + Number(form.expectedDurationDays) - 1);
 
-    setForm((prev) => ({
-      ...prev,
-      expectedEndDate: end.toISOString().slice(0, 10),
-    }));
+    const endDate = end.toISOString().slice(0, 10);
+
+    setForm((prev) => {
+      const nursing = [...(prev.nursing || [])];
+
+      if (nursing.length) {
+        nursing[0] = {
+          ...nursing[0],
+          startDate: nursing[0].startDate || prev.expectedStartDate,
+          endDate: nursing[0].endDate || endDate,
+        };
+      }
+
+      return {
+        ...prev,
+        expectedEndDate: endDate,
+        nursing,
+      };
+    });
   }
 }, [form.expectedStartDate, form.expectedDurationDays]);
 
@@ -253,7 +277,7 @@ useEffect(() => {
   useEffect(() => {
     const handler = setTimeout(() => {
       if (form.requirementId) {
-        save(form.status || "draft", true).catch(() => {});
+        save(form.status || "draft", true).catch(() => { });
       }
     }, 15000);
     return () => clearTimeout(handler);
@@ -268,139 +292,159 @@ useEffect(() => {
       arr[i] = { ...arr[i], ...patch };
       return { ...f, equipment: arr };
     });
+  // Service handlers
+ const addService = () =>
+  setForm((f) => ({
+    ...f,
+    nursing: [
+      ...(f.nursing || []),
+      emptyService(
+        f.serviceType,
+        f.expectedStartDate,
+        f.expectedEndDate
+      ),
+    ],
+  }));
 
+  const removeService = (i) =>
+    setForm((f) => ({
+      ...f,
+      nursing: f.nursing.filter((_, idx) => idx !== i),
+    }));
+
+  const setService = (i, patch) =>
+    setForm((f) => {
+      const arr = [...(f.nursing || [])];
+      arr[i] = { ...arr[i], ...patch };
+      return { ...f, nursing: arr };
+    });
   // Validation
- const validate = () => {
-  // Rental validation
-  if (form.serviceType === "rental") {
-    if (!form.equipment || !form.equipment.length)
-      return "Add at least one equipment line.";
-    for (const l of form.equipment) {
-      if (!l.name || !l.qty || Number(l.qty) < 1)
-        return "Each equipment line needs a name and qty >= 1.";
+  const validate = () => {
+    // Rental validation
+    if (form.serviceType === "rental") {
+      if (!form.equipment || !form.equipment.length)
+        return "Add at least one equipment line.";
+      for (const l of form.equipment) {
+        if (!l.name || !l.qty || Number(l.qty) < 1)
+          return "Each equipment line needs a name and qty >= 1.";
+      }
     }
-  }
 
-  // Nursing validation (no equipment required)
-  if (form.serviceType === "nursing") {
-    // future nursing-specific checks will go here
-  }
+    // Nursing validation (no equipment required)
+    if (form.serviceType === "nursing") {
+      // future nursing-specific checks will go here
+    }
 
-  if (!form.expectedStartDate)
-    return "Expected start date is required.";
+    if (!form.expectedStartDate)
+      return "Expected start date is required.";
 
-  if (!form.deliveryAddress)
-    return "Delivery address is required.";
+    if (!form.deliveryAddress)
+      return "Delivery address is required.";
 
-  return null;
-};
+    return null;
+  };
 
 
   // Save (create/update)
- async function save(nextStatus = "draft", silent = false) {
-  const v = validate();
-  if (v) {
-    if (!silent) setError(v);
-    throw new Error(v);
-  }
+  async function save(nextStatus = "draft", silent = false) {
+    const v = validate();
+    if (v) {
+      if (!silent) setError(v);
+      throw new Error(v);
+    }
 
-  setSaving(true);
-  setError("");
+    setSaving(true);
+    setError("");
 
-  try {
-    const user = auth.currentUser || {};
-    let requirementNumberFinal = form.requirementNumber;
+    try {
+      const user = auth.currentUser || {};
+      let requirementNumberFinal = form.requirementNumber;
 
-    const payload = {
-      leadId: form.leadId || "",
-      leadSnapshot: form.leadSnapshot || {},
-      serviceType: form.serviceType || "rental",
+      const payload = {
+        leadId: form.leadId || "",
+        leadSnapshot: form.leadSnapshot || {},
+        serviceType: form.serviceType || "rental",
 
-     nursing:
+        nursing:
   form.serviceType === "nursing" || form.serviceType === "caretaker"
-          ? {
-              staffType: form.nursing?.staffType || "nurse",
-              count: Number(form.nursing?.count || 1),
-              shift: form.nursing?.shift || "day",
-              notes: form.nursing?.notes || "",
-            }
-          : null,
+    ? form.nursing || []
+    : [],
 
-      equipment:
-        form.serviceType === "rental"
-          ? form.equipment || []
-          : [],
+        equipment:
+          form.serviceType === "rental"
+            ? form.equipment || []
+            : [],
 
-      expectedStartDate: form.expectedStartDate || "",
-      expectedDurationDays: Number(form.expectedDurationDays) || 0,
-      expectedEndDate: form.expectedEndDate || "",
+        expectedStartDate: form.expectedStartDate || "",
+        expectedDurationDays: Number(form.expectedDurationDays) || 0,
+        expectedEndDate: form.expectedEndDate || "",
 
-      deliveryAddress: form.deliveryAddress || "",
-      deliveryCity: form.deliveryCity || "",
-      deliveryContact: form.deliveryContact || {},
+        deliveryAddress: form.deliveryAddress || "",
+        deliveryCity: form.deliveryCity || "",
+        deliveryContact: form.deliveryContact || {},
 
-      urgency: form.urgency || "normal",
-      specialInstructions: form.specialInstructions || "",
-      status: nextStatus || "draft",
-      assignedTo: form.assignedTo || "",
+        urgency: form.urgency || "normal",
+        specialInstructions: form.specialInstructions || "",
+        status: nextStatus || "draft",
+        assignedTo: form.assignedTo || "",
 
-      updatedAt: serverTimestamp(),
-      updatedBy: user.uid || "",
-      updatedByName: user.displayName || user.email || "",
-    };
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid || "",
+        updatedByName: user.displayName || user.email || "",
+      };
 
-    if (form.requirementId) {
-      const ref = doc(db, "requirements", form.requirementId);
-      await updateDoc(ref, payload);
-    } else {
-      requirementNumberFinal = await generateRequirementNumber();
+      if (form.requirementId) {
+        const ref = doc(db, "requirements", form.requirementId);
+        await updateDoc(ref, payload);
+      } else {
+        requirementNumberFinal = await generateRequirementNumber();
 
-      const ref = await addDoc(collection(db, "requirements"), {
-        ...payload,
-        requirementNumber: requirementNumberFinal,
-        requirementId: null,
-        createdAt: serverTimestamp(),
-        createdBy: user.uid || "",
-        createdByName: user.displayName || user.email || "",
-      });
-      await updateAccountReport({
-  requirementsCreated: increment(1)
-});
+        const ref = await addDoc(collection(db, "requirements"), {
+          ...payload,
+          requirementNumber: requirementNumberFinal,
+          requirementId: null,
+          createdAt: serverTimestamp(),
+          createdBy: user.uid || "",
+          createdByName: user.displayName || user.email || "",
+        });
+        await updateAccountReport({
+          requirementsCreated: increment(1)
+        });
 
-      await updateDoc(ref, {
-        requirementId: ref.id,
-      });
+        await updateDoc(ref, {
+          requirementId: ref.id,
+        });
 
 
-      setForm((f) => ({
-        ...f,
-        requirementId: ref.id,
-        requirementNumber: requirementNumberFinal,
-      }));
+        setForm((f) => ({
+          ...f,
+          requirementId: ref.id,
+          requirementNumber: requirementNumberFinal,
+        }));
+      }
+
+      setLastSaved(new Date());
+
+      if (!silent && onSaved) {
+        onSaved({
+          ...payload,
+          requirementNumber: requirementNumberFinal,
+        });
+      }
+
+      return true;
+
+    } catch (err) {
+      console.error("Requirement save error:", err);
+      if (!silent) setError(err.message || "Failed to save requirement");
+      throw err;
+
+    } finally {
+      setSaving(false);
     }
-
-    setLastSaved(new Date());
-
-    if (!silent && onSaved) {
-      onSaved({
-        ...payload,
-        requirementNumber: requirementNumberFinal,
-      });
-    }
-
-    return true;
-
-  } catch (err) {
-    console.error("Requirement save error:", err);
-    if (!silent) setError(err.message || "Failed to save requirement");
-    throw err;
-
-  } finally {
-    setSaving(false);
   }
-}
 
-  const saveReady = () => save("ready_for_quotation").catch(() => {});
+  const saveReady = () => save("ready_for_quotation").catch(() => { });
 
   // Render (React.createElement)
   return React.createElement(
@@ -413,13 +457,13 @@ useEffect(() => {
       React.createElement(
         "div",
         { className: "req-title" },
-React.createElement(
-  "h2",
-  null,
-  form.requirementNumber
-    ? `Requirement ${form.requirementNumber}`
-    : "Create Requirement"
-),        React.createElement(
+        React.createElement(
+          "h2",
+          null,
+          form.requirementNumber
+            ? `Requirement ${form.requirementNumber}`
+            : "Create Requirement"
+        ), React.createElement(
           "div",
           { className: "req-sub" },
           "Lead: ",
@@ -496,8 +540,26 @@ React.createElement(
             className: "input",
             type: "date",
             value: form.expectedStartDate,
-            onChange: (e) => setForm((f) => ({ ...f, expectedStartDate: e.target.value })),
-          }),
+onChange: (e) => {
+  const val = e.target.value;
+
+  setForm((f) => {
+    const nursing = [...(f.nursing || [])];
+
+    if (nursing.length && !nursing[0].startDate) {
+      nursing[0] = {
+        ...nursing[0],
+        startDate: val,
+      };
+    }
+
+    return {
+      ...f,
+      expectedStartDate: val,
+      nursing,
+    };
+  });
+},          }),
           React.createElement("label", null, "Duration (days)"),
           React.createElement("input", {
             className: "input",
@@ -510,16 +572,31 @@ React.createElement(
               })),
           }),
           React.createElement("label", null, "Expected End Date"),
-         React.createElement("input", {
-  className: "input",
-  type: "date",
-  value: form.expectedEndDate,
-  onChange: (e) =>
-    setForm((f) => ({
+          React.createElement("input", {
+            className: "input",
+            type: "date",
+            value: form.expectedEndDate,
+            onChange: (e) => {
+  const val = e.target.value;
+
+  setForm((f) => {
+    const nursing = [...(f.nursing || [])];
+
+    if (nursing.length && !nursing[0].endDate) {
+      nursing[0] = {
+        ...nursing[0],
+        endDate: val,
+      };
+    }
+
+    return {
       ...f,
-      expectedEndDate: e.target.value,
-    })),
-}),
+      expectedEndDate: val,
+      nursing,
+    };
+  });
+},
+          }),
           React.createElement("label", null, "Urgency"),
           React.createElement(
             "select",
@@ -534,123 +611,129 @@ React.createElement(
           )
         ),
         // Service Type (Rental / Nursing)
-React.createElement(
-  "div",
-  { className: "card" },
-React.createElement(
-  "h3",
-  null,
-  serviceLabel === "Equipment"
-    ? "Service Type"
-    : `${serviceLabel} Service`
-),  React.createElement(
-    "select",
-    {
-      className: "input",
-      value: form.serviceType,
-     onChange: (e) => {
+        React.createElement(
+          "div",
+          { className: "card" },
+          React.createElement(
+            "h3",
+            null,
+            serviceLabel === "Equipment"
+              ? "Service Type"
+              : `${serviceLabel} Service`
+          ), React.createElement(
+            "select",
+            {
+              className: "input",
+              value: form.serviceType,
+              onChange: (e) => {
   const val = e.target.value;
 
   setForm((f) => ({
     ...f,
     serviceType: val,
-    nursing: {
-      ...f.nursing,
-      staffType:
-        val === "caretaker"
-          ? "caretaker"
-          : val === "nursing"
-          ? "nurse"
-          : f.nursing.staffType,
-    },
+    nursing:
+      val === "nursing" || val === "caretaker"
+        ? [
+            emptyService(
+              val,
+              f.expectedStartDate,
+              f.expectedEndDate
+            ),
+          ]
+        : [],
   }));
 },
-    },
-React.createElement("option", { value: "rental" }, "Equipment Rental"),
-React.createElement("option", { value: "nursing" }, "Nursing"),
-React.createElement("option", { value: "caretaker" }, "Caretaker")  )
-),
-(form.serviceType === "nursing" || form.serviceType === "caretaker") &&
+            },
+            React.createElement("option", { value: "rental" }, "Equipment Rental"),
+            React.createElement("option", { value: "nursing" }, "Nursing"),
+            React.createElement("option", { value: "caretaker" }, "Caretaker"))
+        ),
+        (form.serviceType === "nursing" || form.serviceType === "caretaker") &&
 React.createElement(
   "div",
   { className: "card", style: { gridColumn: "1 / -1" } },
-React.createElement(
-  "h3",
-  null,
-form.serviceType === "caretaker"
-  ? "Caretaker Details"
-  : "Nursing Details"
-),
-  // Staff Type
-  React.createElement(
-  "label",
-  null,
- form.serviceType === "caretaker"
-  ? "Caretaker Type"
-  : "Nurse Type"
-),
-  React.createElement(
-    "select",
-    {
-      className: "input",
-      value: form.nursing.staffType,
-      onChange: (e) =>
-        setForm((f) => ({
-          ...f,
-          nursing: { ...f.nursing, staffType: e.target.value },
-        })),
-    },
-    React.createElement("option", { value: "nurse" }, "Nurse"),
-    React.createElement("option", { value: "caretaker" }, "Caretaker")
-  ),
 
-  // Count
-  React.createElement("label", null, "Number of Staff"),
-  React.createElement("input", {
-    className: "input",
-    type: "number",
-    min: 1,
-    value: form.nursing.count,
-    onChange: (e) =>
-      setForm((f) => ({
-        ...f,
-        nursing: {
-          ...f.nursing,
-          count: Number(e.target.value || 1),
+  React.createElement(
+    "h3",
+    { style: { display: "flex", justifyContent: "space-between" } },
+    "Services",
+    React.createElement(
+      "button",
+      { className: "btn", onClick: addService },
+      "+ Add Service"
+    )
+  ),
+  React.createElement(
+  "div",
+  { className: "services-header" },
+  React.createElement("div", null, "Staff"),
+  React.createElement("div", null, "Count"),
+  React.createElement("div", null, "Shift"),
+  React.createElement("div", null, "Start Date"),
+  React.createElement("div", null, "End Date"),
+  React.createElement("div", null, "")
+),
+
+  form.nursing.map((srv, i) =>
+    React.createElement(
+      "div",
+      { key: i, className: "services-row" },
+
+      React.createElement(
+        "select",
+        {
+          className: "input",
+          value: srv.staffType,
+          onChange: (e) => setService(i, { staffType: e.target.value }),
         },
-      })),
-  }),
+        React.createElement("option", { value: "nurse" }, "Nurse"),
+        React.createElement("option", { value: "caretaker" }, "Caretaker")
+      ),
 
-  // Shift
-  React.createElement("label", null, "Shift"),
-  React.createElement(
-    "select",
-    {
-      className: "input",
-      value: form.nursing.shift,
-      onChange: (e) =>
-        setForm((f) => ({
-          ...f,
-          nursing: { ...f.nursing, shift: e.target.value },
-        })),
-    },
-    React.createElement("option", { value: "day" }, "Day"),
-    React.createElement("option", { value: "night" }, "Night"),
-    React.createElement("option", { value: "full_day" }, "24 × 7")
-  ),
+      React.createElement("input", {
+        className: "input",
+        type: "number",
+        min: 1,
+        value: srv.count,
+        onChange: (e) =>
+          setService(i, { count: Number(e.target.value || 1) }),
+      }),
 
-  // Notes
-  React.createElement("label", null, "Care Notes"),
-  React.createElement("textarea", {
-    className: "input textarea",
-    placeholder: "Patient condition, special care, etc.",
-    value: form.nursing.notes,
-    onChange: (e) =>
-      setForm((f) => ({
-        ...f,
-        nursing: { ...f.nursing, notes: e.target.value },
-      })),
-  })
+      React.createElement(
+        "select",
+        {
+          className: "input",
+          value: srv.shift,
+          onChange: (e) => setService(i, { shift: e.target.value }),
+        },
+        React.createElement("option", { value: "day" }, "Day"),
+        React.createElement("option", { value: "night" }, "Night"),
+        React.createElement("option", { value: "full_day" }, "24x7")
+      ),
+
+      React.createElement("input", {
+        className: "input",
+        type: "date",
+        value: srv.startDate,
+        onChange: (e) =>
+          setService(i, { startDate: e.target.value }),
+      }),
+
+      React.createElement("input", {
+        className: "input",
+        type: "date",
+        value: srv.endDate,
+        onChange: (e) =>
+          setService(i, { endDate: e.target.value }),
+      }),
+
+      React.createElement(
+        "button",
+        { className: "btn icon", onClick: () => removeService(i) },
+        "✕"
+      )
+    )
+  )
 ),
 
 
@@ -701,72 +784,72 @@ form.serviceType === "caretaker"
                 // linked indicator
                 line.productId
                   ? React.createElement(
-                      "div",
-                      { className: "caps", style: { position: "absolute", right: 8, top: -14, color: "#16a34a" } },
-                      "linked"
-                    )
+                    "div",
+                    { className: "caps", style: { position: "absolute", right: 8, top: -14, color: "#16a34a" } },
+                    "linked"
+                  )
                   : null,
 
                 // Suggestion dropdown
                 suggestFor === i && findSuggestions(line.name).length
                   ? React.createElement(
-                      "div",
-                      {
-                        className: "suggest-pop",
-                        style: {
-                          position: "absolute",
-                          zIndex: 9999,
-                          left: 0,
-                          right: 0,
-                          top: "calc(100% + 4px)",
-                          background: "#fff",
-                          border: "1px solid rgba(15,23,42,0.08)",
-                          borderRadius: 8,
-                          boxShadow: "0 10px 24px rgba(15,23,42,0.08)",
-                          maxHeight: 260,
-                          overflowY: "auto",
-                          overflowX: "hidden",
-                        },
-                        onMouseDown: (e) => {
-                          // keep focus so click doesn't blur/close first
-                          e.preventDefault();
-                          e.stopPropagation();
-                        },
+                    "div",
+                    {
+                      className: "suggest-pop",
+                      style: {
+                        position: "absolute",
+                        zIndex: 9999,
+                        left: 0,
+                        right: 0,
+                        top: "calc(100% + 4px)",
+                        background: "#fff",
+                        border: "1px solid rgba(15,23,42,0.08)",
+                        borderRadius: 8,
+                        boxShadow: "0 10px 24px rgba(15,23,42,0.08)",
+                        maxHeight: 260,
+                        overflowY: "auto",
+                        overflowX: "hidden",
                       },
-                      ...findSuggestions(line.name).map((p) =>
-                        React.createElement(
-                          "button",
-                          {
-                            key: p.id,
-                            type: "button",
-                            className: "suggest-item",
-                            onClick: () => {
-                              setLine(i, { name: p.name || "", productId: p.id });
-                              setSuggestFor(null);
-                            },
-                            style: {
-                              display: "flex",
-                              width: "100%",
-                              textAlign: "left",
-                              gap: 8,
-                              padding: "10px 12px",
-                              border: "none",
-                              background: "white",
-                              cursor: "pointer",
-                              alignItems: "center",
-                              borderBottom: "1px solid rgba(15,23,42,0.04)",
-                              color: "#111827",
-                            },
+                      onMouseDown: (e) => {
+                        // keep focus so click doesn't blur/close first
+                        e.preventDefault();
+                        e.stopPropagation();
+                      },
+                    },
+                    ...findSuggestions(line.name).map((p) =>
+                      React.createElement(
+                        "button",
+                        {
+                          key: p.id,
+                          type: "button",
+                          className: "suggest-item",
+                          onClick: () => {
+                            setLine(i, { name: p.name || "", productId: p.id });
+                            setSuggestFor(null);
                           },
-                          React.createElement("div", { style: { fontWeight: 700 } }, p.name || "Unnamed"),
-                          React.createElement(
-                            "div",
-                            { className: "muted", style: { marginLeft: "auto", fontSize: 12, color: "#6b7280" } },
-                            p.sku ? `SKU: ${p.sku}` : ""
-                          )
+                          style: {
+                            display: "flex",
+                            width: "100%",
+                            textAlign: "left",
+                            gap: 8,
+                            padding: "10px 12px",
+                            border: "none",
+                            background: "white",
+                            cursor: "pointer",
+                            alignItems: "center",
+                            borderBottom: "1px solid rgba(15,23,42,0.04)",
+                            color: "#111827",
+                          },
+                        },
+                        React.createElement("div", { style: { fontWeight: 700 } }, p.name || "Unnamed"),
+                        React.createElement(
+                          "div",
+                          { className: "muted", style: { marginLeft: "auto", fontSize: 12, color: "#6b7280" } },
+                          p.sku ? `SKU: ${p.sku}` : ""
                         )
                       )
                     )
+                  )
                   : null
               ),
 
@@ -820,7 +903,7 @@ form.serviceType === "caretaker"
           "div",
           { className: "req-left" },
           lastSaved &&
-            React.createElement("div", { className: "req-saved" }, "Last saved: ", lastSaved.toLocaleString())
+          React.createElement("div", { className: "req-saved" }, "Last saved: ", lastSaved.toLocaleString())
         ),
         React.createElement(
           "div",

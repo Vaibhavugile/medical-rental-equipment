@@ -1313,7 +1313,7 @@ if (duplicate) {
                               setOpenReq(true);
                             }}
                           >
-                            Add Req
+                            + Another Req
                           </button>
                         ) : canCreateReq ? (
                           <button
@@ -1340,12 +1340,21 @@ if (duplicate) {
 
                         {/* Next */}
                       
+  {["new", "valid", "interested", "followup"].includes(normStatus(l.status)) ? (
   <button
     className="row-btn next"
     onClick={() => handleNext(l)}
   >
     Next
   </button>
+) : (
+  <button
+    className="row-btn edit"
+    onClick={() => handleNext(l)}
+  >
+    Edit
+  </button>
+)}
 
                         <button
                           title="WhatsApp"

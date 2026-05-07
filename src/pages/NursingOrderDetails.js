@@ -2624,10 +2624,7 @@ if (payAmount > allowedBalance) {
   };
   const handleStopFullService = async (stopDate, preview) => {
 
-    if (order?.lastStoppedAt) {
-      alert("Service already stopped");
-      return;
-    }
+    
 
     if (!stopDate) {
       alert("Select stop date");
@@ -2638,7 +2635,10 @@ if (payAmount > allowedBalance) {
       alert("Preview missing");
       return;
     }
-
+if (isServiceStopped(stopFullModal.serviceIndex)) {
+  alert("This service is already stopped");
+  return;
+}
     const confirmStop = window.confirm(
       "Are you sure you want to stop full service?"
     );

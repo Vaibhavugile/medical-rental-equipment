@@ -192,6 +192,37 @@
   max-width: 80% !important;
   min-width: 0 !important;
 }
+.equip-row {
+  display: grid;
+  grid-template-columns: 160px 70px 110px 150px 150px 40px;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.services-row {
+  display: grid;
+  grid-template-columns: 180px 70px 120px 160px 160px 40px;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.services-row .input {
+  width: 100%;
+}
+
+.services-row input[type="date"] {
+  width: 100%;
+}
+
+.services-header {
+  display: grid;
+  grid-template-columns: 180px 70px 120px 160px 160px 40px;
+  gap: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #555;
+}
 /* Hover */
 .req-drawer .btn:hover {
   background: #f1f5f9 !important;

@@ -26,7 +26,7 @@ export default function OrderDrawer({
   detailedStatus,
   detailedStatusColor,
   createReturnDelivery,
-
+unassignDriverFromOrder,
   // 🔹 ADD THESE
   assetCompanyFilter,
   setAssetCompanyFilter,
@@ -1666,12 +1666,12 @@ await syncDeliveryAssets({
                       flexWrap: "wrap",
                     }}
                   >
-                    <button
+                    {/* <button
                       className="cp-btn ghost"
                       onClick={() => navigate("/drivers")}
                     >
                       Manage drivers
-                    </button>
+                    </button> */}
                   </div>
 
                   {/* ASSIGNED DRIVERS */}
@@ -1710,6 +1710,24 @@ await syncDeliveryAssets({
                               ? "Return"
                               : "Pickup"}
                           </span>
+                          <button
+      className="cp-btn ghost"
+      style={{ fontSize: 12 ,maxWidth:"65px"}}
+      disabled={
+        liveDelivery?.status === "in_transit" ||
+        liveDelivery?.status === "delivered" ||
+      activeDelivery?.assignedDrivers?.length === 1      }
+      onClick={() => {
+        const ok = window.confirm(
+          `Remove ${d.name || "driver"} from this delivery?`
+        );
+        if (!ok) return;
+
+        unassignDriverFromOrder?.(d.id);
+      }}
+    >
+      Remove
+    </button>
                         </div>
                       ))}
                     </div>
@@ -1745,7 +1763,7 @@ await syncDeliveryAssets({
                   </div>
                 </div>
                 {/* Return Delivery CTA */}
-                <button
+                {/* <button
                   className="cp-btn"
                   style={{ marginTop: 8 }}
                   onClick={async () => {
@@ -1758,7 +1776,7 @@ await syncDeliveryAssets({
                   }}
                 >
                   Create Return Delivery
-                </button>
+                </button> */}
 
 
 

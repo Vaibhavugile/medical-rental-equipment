@@ -1408,7 +1408,80 @@ const assignDriversToOrder = async (driverIds = []) => {
     setSaving(false);
   }
 };
+const unassignDriverFromOrder = async (driverId) => {
+  if (!selectedOrder) return;
 
+  setSaving(true);
+  setError("");
+
+  try {
+    const deliveryType = selectedOrder.deliveryType || "pickup";
+
+    const deliveryId =
+      deliveryType === "pickup"
+        ? selectedOrder.pickupDeliveryId
+        : selectedOrder.returnDeliveryId;
+
+    if (!deliveryId) {
+      throw new Error("No delivery found");
+    }
+
+    const deliveryRef = doc(db, "deliveries", deliveryId);
+
+    // 🔹 get delivery
+    const snap = await getDoc(deliveryRef);
+    if (!snap.exists()) throw new Error("Delivery not found");
+
+    const data = snap.data();
+
+    // 🔒 safety check
+    if (["in_transit", "delivered"].includes(data.status)) {
+      throw new Error("Cannot remove driver after delivery started");
+    }
+
+    const existingDrivers = data.assignedDrivers || [];
+
+    // ✅ remove driver
+    const updatedDrivers = existingDrivers.filter(
+      (d) => d.id !== driverId
+    );
+    if (updatedDrivers.length === 0) {
+  throw new Error("At least one driver must remain assigned");
+}
+
+    const updatedDriverIds = updatedDrivers.map((d) => d.id);
+
+    // 🔹 update delivery
+    await updateDoc(deliveryRef, {
+      assignedDrivers: updatedDrivers,
+      assignedDriverIds: updatedDriverIds,
+      updatedAt: serverTimestamp(),
+    });
+
+    // 🔹 update order
+    const driversKey =
+      deliveryType === "return"
+        ? "returnAssignedDrivers"
+        : "pickupAssignedDrivers";
+
+    await updateDoc(doc(db, "orders", selectedOrder.id), {
+      [driversKey]: updatedDrivers,
+      updatedAt: serverTimestamp(),
+    });
+
+    // 🔹 update UI
+    setSelectedOrder((s) => ({
+      ...s,
+      [driversKey]: updatedDrivers,
+    }));
+
+  } catch (err) {
+    console.error("❌ unassign error:", err);
+    setError(err.message || "Failed to unassign driver");
+  } finally {
+    setSaving(false);
+  }
+};
 
 async function updateOrderPaymentSummary(orderId) {
   const paymentsCol = collection(db, "orders", orderId, "payments");
@@ -2403,6 +2476,7 @@ const badgeText = getDeliveryBadgeText(o, deliveriesByOrder);
             unassignAsset={unassignAsset}
             checkinAssignedAsset={checkinAssignedAsset}
             assignDriverToOrder={(driverId) => assignDriversToOrder([driverId])}
+            unassignDriverFromOrder={unassignDriverFromOrder} 
             driverAcceptDelivery={driverAcceptDelivery}
             markPickedUp={markPickedUp}
             markInTransit={markInTransit}

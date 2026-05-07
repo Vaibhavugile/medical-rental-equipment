@@ -26,6 +26,7 @@ import SupportingPatients from "../frontend/SupportingPatients";
 import Meet from "../frontend/Meet";
 import "./LandingPage.module.css";
 import SupportingSlider from "../frontend/SupportingSlider";
+import  HomeHealthcareSection from "../components/HomeHealthcareSection";
 
 
 export default function LandingPage() {
@@ -107,6 +108,7 @@ export default function LandingPage() {
 <ExperienceTrust /> 
 
       <ReviewsSection  autoplay={true} autoplayDelay={3500} />
+      <HomeHealthcareSection />
 
       <Footer />
       <FloatingContact />

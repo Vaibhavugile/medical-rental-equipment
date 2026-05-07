@@ -211,30 +211,41 @@ const openCreateQuotation = async (req) => {
   let items = [];
 
   if (isNursingReq(req)) {
-    // 🩺 NURSING / CARETAKER (FINAL FIXED LOGIC)
 
-    const days = Number(req.expectedDurationDays) || 1;
-    const count = Number(req.nursing?.count || 1);
+  const services = Array.isArray(req.nursing) ? req.nursing : [];
+
+  items = services.map((srv, idx) => {
+
+    const days =
+      srv.startDate && srv.endDate
+        ? Math.floor(
+            (new Date(srv.endDate) - new Date(srv.startDate)) /
+              (1000 * 60 * 60 * 24)
+          ) + 1
+        : Number(req.expectedDurationDays) || 1;
+
+    const count = Number(srv.count || 1);
     const rate = Number(req.dailyRate || 0);
 
-    const staffType = req.nursing?.staffType || "Care Staff";
-    const shift = req.nursing?.shift || "day";
+    const staffType = srv.staffType || "Care Staff";
+    const shift = srv.shift || "day";
 
-    items = [
-      {
-        id: Date.now() + "-nursing",
-        name: `${staffType} (${shift})`,
-        qty: count,                    // ✅ STAFF COUNT (FIXED)
-        rate: rate,                    // per staff per day
-        amount: count * days * rate,   // ✅ correct total
-        notes: req.nursing?.notes || "",
-        days: days,                    // ✅ duration shown separately
-        expectedStartDate: req.expectedStartDate || "",
-        expectedEndDate: req.expectedEndDate || "",
-        productId: "",                 // ❌ no product for nursing
-      },
-    ];
-  } else {
+    return {
+      id: Date.now() + "-nursing-" + idx,
+      name: `${staffType} (${shift})`,
+      qty: count,
+      rate: rate,
+      amount: count * days * rate,
+      notes: srv.notes || "",
+      days: days,
+      expectedStartDate: srv.startDate || req.expectedStartDate || "",
+      expectedEndDate: srv.endDate || req.expectedEndDate || "",
+      productId: "",
+    };
+
+  });
+
+}else {
     // 📦 RENTAL (UNCHANGED)
 
     const sourceItems =
