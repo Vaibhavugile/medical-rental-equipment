@@ -616,3 +616,151 @@ background:white;
 font-size:13px;
 cursor:pointer;
 }
+/* =========================
+   CREATOR FILTER
+========================= */
+
+.creatorFilter {
+  position: relative;
+  width: 240px;
+}
+
+.creatorFilter .search-input {
+  width: 100%;
+}
+
+/* DROPDOWN */
+.creatorDropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+
+  background: #ffffff;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+
+  overflow: hidden;
+
+  max-height: 260px;
+  overflow-y: auto;
+
+  z-index: 100;
+
+  box-shadow:
+    0 10px 30px rgba(15, 23, 42, 0.08),
+    0 4px 12px rgba(15, 23, 42, 0.05);
+
+  animation: creatorDropdownIn 0.18s ease;
+}
+
+/* ITEM */
+.creatorItem {
+  padding: 12px 14px;
+
+  font-size: 14px;
+  font-weight: 500;
+
+  color: #1e293b;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.creatorItem:last-child {
+  border-bottom: none;
+}
+
+.creatorItem:hover {
+  background: #f8fafc;
+  color: #4f46e5;
+}
+
+/* ACTIVE SELECTED */
+.creatorItem.active {
+  background: #eef2ff;
+  color: #4338ca;
+  font-weight: 600;
+}
+
+/* EMPTY */
+.creatorEmpty {
+  padding: 14px;
+
+  font-size: 13px;
+  color: #64748b;
+
+  text-align: center;
+}
+
+/* SCROLLBAR */
+.creatorDropdown::-webkit-scrollbar {
+  width: 8px;
+}
+
+.creatorDropdown::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 999px;
+}
+
+.creatorDropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ANIMATION */
+@keyframes creatorDropdownIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .creatorFilter {
+    width: 100%;
+  }
+
+  .creatorDropdown {
+    max-height: 220px;
+  }
+}
+.dateFilterWrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.customDateInputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.customDateInputs input {
+  height: 38px;
+  padding: 0 12px;
+
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+
+  background: #fff;
+
+  font-size: 14px;
+}
+
+.customDateInputs span {
+  font-size: 13px;
+  color: #64748b;
+}

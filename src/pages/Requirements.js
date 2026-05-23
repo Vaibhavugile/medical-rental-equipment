@@ -12,6 +12,10 @@ import {
   serverTimestamp,
   updateDoc,
   increment,
+  getDocs,
+limit,
+startAfter,
+where,
 } from "firebase/firestore";
 import { updateAccountReport } from "../utils/accountReport";
 import { db, auth } from "../firebase";
@@ -149,30 +153,206 @@ const [editRequirement, setEditRequirement] = useState(null);
   const [openQuotation, setOpenQuotation] = useState(false);
   const [quotation, setQuotation] = useState(defaultQuotation);
   const [confirmDelete, setConfirmDelete] = useState(null);
+  const PAGE_SIZE = 50;
+  const [lastDoc, setLastDoc] = useState(null);
+
+const [hasMore, setHasMore] = useState(true);
+
+const [loadingMore, setLoadingMore] =
+  useState(false);
 const [typeFilter, setTypeFilter] = useState("all");
 const [search, setSearch] = useState("");
   // Track last focused item index for "+ Add Item below current"
   const [activeItemIdx, setActiveItemIdx] = useState(null);
 const isNursingReq = (r) =>
   r?.serviceType === "nursing" || r?.serviceType === "caretaker";
-  useEffect(() => {
+  const loadInitialRequirements = async () => {
+
+  try {
+
     setLoading(true);
-    const q = query(collection(db, "requirements"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
-        setRequirements(docs);
-        setLoading(false);
-      },
-      (err) => {
-        console.error("requirements onSnapshot", err);
-        setError(err.message || "Failed to load requirements");
-        setLoading(false);
-      }
+
+    const base = collection(
+      db,
+      "requirements"
     );
-    return () => unsub();
-  }, []);
+
+    const constraints = [];
+
+    // TYPE FILTER
+    if (typeFilter !== "all") {
+
+      constraints.push(
+        where(
+          "serviceType",
+          "==",
+          typeFilter
+        )
+      );
+
+    }
+
+    // STATUS FILTER
+    if (
+      statusFilter !== "all" &&
+      statusFilter !== "others"
+    ) {
+
+      constraints.push(
+        where(
+          "status",
+          "==",
+          statusFilter
+        )
+      );
+
+    }
+
+    constraints.push(
+      orderBy("createdAt", "desc")
+    );
+
+    constraints.push(
+      limit(PAGE_SIZE)
+    );
+
+    const qy = query(
+      base,
+      ...constraints
+    );
+
+    const snap = await getDocs(qy);
+
+    const docs = snap.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() || {}),
+    }));
+
+    setRequirements(docs);
+
+    setLastDoc(
+      snap.docs[
+        snap.docs.length - 1
+      ] || null
+    );
+
+    setHasMore(
+      snap.docs.length === PAGE_SIZE
+    );
+
+  } catch (err) {
+
+    console.error(err);
+
+    setError(
+      err.message ||
+      "Failed to load requirements"
+    );
+
+  } finally {
+
+    setLoading(false);
+
+  }
+
+};
+useEffect(() => {
+  loadInitialRequirements();
+}, [typeFilter, statusFilter]);
+const loadMoreRequirements = async () => {
+
+  if (!lastDoc || loadingMore) return;
+
+  try {
+
+    setLoadingMore(true);
+
+    const base = collection(
+      db,
+      "requirements"
+    );
+
+    const constraints = [];
+
+    // TYPE FILTER
+    if (typeFilter !== "all") {
+
+      constraints.push(
+        where(
+          "serviceType",
+          "==",
+          typeFilter
+        )
+      );
+
+    }
+
+    // STATUS FILTER
+    if (
+      statusFilter !== "all" &&
+      statusFilter !== "others"
+    ) {
+
+      constraints.push(
+        where(
+          "status",
+          "==",
+          statusFilter
+        )
+      );
+
+    }
+
+    constraints.push(
+      orderBy("createdAt", "desc")
+    );
+
+    constraints.push(
+      startAfter(lastDoc)
+    );
+
+    constraints.push(
+      limit(PAGE_SIZE)
+    );
+
+    const qy = query(
+      base,
+      ...constraints
+    );
+
+    const snap = await getDocs(qy);
+
+    const docs = snap.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() || {}),
+    }));
+
+    setRequirements((prev) => [
+      ...prev,
+      ...docs,
+    ]);
+
+    setLastDoc(
+      snap.docs[
+        snap.docs.length - 1
+      ] || null
+    );
+
+    setHasMore(
+      snap.docs.length === PAGE_SIZE
+    );
+
+  } catch (err) {
+
+    console.error(err);
+
+  } finally {
+
+    setLoadingMore(false);
+
+  }
+
+};
 
   const openDetails = (r) => setDetailsReq(r);
   const closeDetails = () => setDetailsReq(null);
@@ -194,14 +374,68 @@ const openCreateQuotation = async (req) => {
         note: "Assigned when opening quotation",
       });
 
-      updateDoc(reqDoc, {
-        assignedTo: user.uid,
-        assignedToName: user.displayName || user.email || user.uid || "",
-        updatedAt: serverTimestamp(),
-        updatedBy: user.uid || "",
-        updatedByName: user.displayName || user.email || user.uid || "",
-        history: arrayUnion(entry),
-      }).catch(() => {});
+     updateDoc(reqDoc, {
+  assignedTo: user.uid,
+
+  assignedToName:
+    user.displayName ||
+    user.email ||
+    user.uid ||
+    "",
+
+  updatedAt: serverTimestamp(),
+
+  updatedBy: user.uid || "",
+
+  updatedByName:
+    user.displayName ||
+    user.email ||
+    user.uid ||
+    "",
+
+  history: arrayUnion(entry),
+
+})
+.then(() => {
+
+  setRequirements((prev) =>
+    prev.map((r) =>
+      r.id === req.id
+        ? {
+            ...r,
+
+            assignedTo: user.uid,
+
+            assignedToName:
+              user.displayName ||
+              user.email ||
+              user.uid ||
+              "",
+
+            updatedAt: {
+              toDate: () => new Date(),
+              toMillis: () => Date.now(),
+            },
+
+            updatedBy: user.uid || "",
+
+            updatedByName:
+              user.displayName ||
+              user.email ||
+              user.uid ||
+              "",
+
+            history: [
+              ...(r.history || []),
+              entry,
+            ],
+          }
+        : r
+    )
+  );
+
+})
+.catch(() => {});
     } catch {}
   }
 
@@ -481,6 +715,35 @@ useEffect(() => {
             user.displayName || user.email || user.uid || "",
           history: arrayUnion(entry),
         });
+        setRequirements((prev) =>
+  prev.map((r) =>
+    r.id === quotation.requirementId
+      ? {
+          ...r,
+
+          status: "quotation shared",
+
+          updatedAt: {
+            toDate: () => new Date(),
+            toMillis: () => Date.now(),
+          },
+
+          updatedBy: user.uid || "",
+
+          updatedByName:
+            user.displayName ||
+            user.email ||
+            user.uid ||
+            "",
+
+          history: [
+            ...(r.history || []),
+            entry,
+          ],
+        }
+      : r
+  )
+);
 
         propagateToLead(
           quotation.requirementId,
@@ -502,6 +765,9 @@ useEffect(() => {
   const handleDelete = async (req) => {
     try {
       await deleteDoc(doc(db, "requirements", req.id));
+      setRequirements((prev) =>
+  prev.filter((r) => r.id !== req.id)
+);
       setConfirmDelete(null);
     } catch (err) {
       console.error("delete requirement", err);
@@ -526,6 +792,35 @@ useEffect(() => {
         updatedByName: user.displayName || user.email || user.uid || "",
         history: arrayUnion(entry),
       });
+      setRequirements((prev) =>
+  prev.map((r) =>
+    r.id === req.id
+      ? {
+          ...r,
+
+          status: newStatus,
+
+          updatedAt: {
+            toDate: () => new Date(),
+            toMillis: () => Date.now(),
+          },
+
+          updatedBy: user.uid || "",
+
+          updatedByName:
+            user.displayName ||
+            user.email ||
+            user.uid ||
+            "",
+
+          history: [
+            ...(r.history || []),
+            entry,
+          ],
+        }
+      : r
+  )
+);
       propagateToLead(
         req.id,
         "requirement",
@@ -563,6 +858,41 @@ useEffect(() => {
         updatedByName: user.displayName || user.email || user.uid || "",
         history: arrayUnion(entry),
       });
+      setRequirements((prev) =>
+  prev.map((r) =>
+    r.id === req.id
+      ? {
+          ...r,
+
+          assignedTo: user.uid,
+
+          assignedToName:
+            user.displayName ||
+            user.email ||
+            user.uid ||
+            "",
+
+          updatedAt: {
+            toDate: () => new Date(),
+            toMillis: () => Date.now(),
+          },
+
+          updatedBy: user.uid || "",
+
+          updatedByName:
+            user.displayName ||
+            user.email ||
+            user.uid ||
+            "",
+
+          history: [
+            ...(r.history || []),
+            entry,
+          ],
+        }
+      : r
+  )
+);
     } catch (err) {
       console.error("assignToMe", err);
       setError(err.message || "Failed to assign");
@@ -731,115 +1061,156 @@ const exportRequirements = () => {
 
   <div className="filter-left">
 
-    {/* TYPE FILTER */}
-    <div className="segmented type-segment">
-      <button
-        className={`seg-btn ${typeFilter === "all" ? "active" : ""}`}
-        onClick={() => {
-          setTypeFilter("all");
-          setStatusFilter("all");
-        }}
-      >
-        All
-      </button>
+  {/* TYPE FILTER */}
+  <div className="segmented type-segment">
 
-      <button
-        className={`seg-btn equipment ${
-          typeFilter === "rental" ? "active" : ""
-        }`}
-        onClick={() => {
-          setTypeFilter("rental");
-          setStatusFilter("all");
-        }}
-      >
-        📦 Rental
-      </button>
+    <button
+      className={`seg-btn ${typeFilter === "all" ? "active" : ""}`}
+      onClick={() => {
+        setTypeFilter("all");
+        setStatusFilter("all");
+      }}
+    >
+      All
+    </button>
 
-      <button
-        className={`seg-btn nursing ${
-          typeFilter === "nursing" ? "active" : ""
-        }`}
-        onClick={() => {
-          setTypeFilter("nursing");
-          setStatusFilter("all");
-        }}
-      >
-        🩺 Nursing
-      </button>
-      <button
-  className={`seg-btn caretaker ${
-    typeFilter === "caretaker" ? "active" : ""
-  }`}
-  onClick={() => {
-    setTypeFilter("caretaker");
-    setStatusFilter("all");
-  }}
->
-  🧑‍⚕️ Caretaker
-</button>
-    </div>
+    <button
+      className={`seg-btn equipment ${
+        typeFilter === "rental" ? "active" : ""
+      }`}
+      onClick={() => {
+        setTypeFilter("rental");
+        setStatusFilter("all");
+      }}
+    >
+      📦 Rental
+    </button>
 
-    {/* STATUS FILTER */}
-  <div className="segmented status-segment">
+    <button
+      className={`seg-btn nursing ${
+        typeFilter === "nursing" ? "active" : ""
+      }`}
+      onClick={() => {
+        setTypeFilter("nursing");
+        setStatusFilter("all");
+      }}
+    >
+      🩺 Nursing
+    </button>
 
-  <button
-    className={`seg-btn ${statusFilter === "all" ? "active" : ""}`}
-    onClick={() => setStatusFilter("all")}
-  >
-    All <span className="badge">{statusCounts.all}</span>
-  </button>
-
-  <button
-    className={`seg-btn ${
-      statusFilter === "ready_for_quotation" ? "active" : ""
-    }`}
-    onClick={() => setStatusFilter("ready_for_quotation")}
-  >
-    Ready
-    <span className="badge">
-      {statusCounts.ready_for_quotation}
-    </span>
-  </button>
-
-  <button
-    className={`seg-btn ${
-      statusFilter === "quotation shared" ? "active" : ""
-    }`}
-    onClick={() => setStatusFilter("quotation shared")}
-  >
-    Shared
-    <span className="badge">
-      {statusCounts["quotation shared"]}
-    </span>
-  </button>
-
-  <button
-    className={`seg-btn ${
-      statusFilter === "order_created" ? "active" : ""
-    }`}
-    onClick={() => setStatusFilter("order_created")}
-  >
-    Order Created
-    <span className="badge">
-      {statusCounts.order_created}
-    </span>
-  </button>
-  <button
-  className={`seg-btn ${statusFilter === "others" ? "active" : ""}`}
-  onClick={() => setStatusFilter("others")}
->
-  Others
-  <span className="badge">
-    {statusCounts.others}
-  </span>
-  
-</button>
-
-
-</div>
-
+    <button
+      className={`seg-btn caretaker ${
+        typeFilter === "caretaker" ? "active" : ""
+      }`}
+      onClick={() => {
+        setTypeFilter("caretaker");
+        setStatusFilter("all");
+      }}
+    >
+      🧑‍⚕️ Caretaker
+    </button>
 
   </div>
+
+  {/* STATUS FILTER */}
+  <div className="segmented status-segment">
+
+    <button
+      className={`seg-btn ${statusFilter === "all" ? "active" : ""}`}
+      onClick={() => setStatusFilter("all")}
+    >
+      All
+
+      {statusFilter === "all" && (
+        <span className="badge">
+          {filtered.length}
+        </span>
+      )}
+    </button>
+
+    <button
+      className={`seg-btn ${
+        statusFilter === "ready_for_quotation"
+          ? "active"
+          : ""
+      }`}
+      onClick={() =>
+        setStatusFilter("ready_for_quotation")
+      }
+    >
+      Ready
+
+      {statusFilter ===
+        "ready_for_quotation" && (
+        <span className="badge">
+          {filtered.length}
+        </span>
+      )}
+    </button>
+
+    <button
+      className={`seg-btn ${
+        statusFilter === "quotation shared"
+          ? "active"
+          : ""
+      }`}
+      onClick={() =>
+        setStatusFilter("quotation shared")
+      }
+    >
+      Shared
+
+      {statusFilter ===
+        "quotation shared" && (
+        <span className="badge">
+          {filtered.length}
+        </span>
+      )}
+    </button>
+
+    <button
+      className={`seg-btn ${
+        statusFilter === "order_created"
+          ? "active"
+          : ""
+      }`}
+      onClick={() =>
+        setStatusFilter("order_created")
+      }
+    >
+      Order Created
+
+      {statusFilter ===
+        "order_created" && (
+        <span className="badge">
+          {filtered.length}
+        </span>
+      )}
+    </button>
+
+    <button
+      className={`seg-btn ${
+        statusFilter === "others"
+          ? "active"
+          : ""
+      }`}
+      onClick={() =>
+        setStatusFilter("others")
+      }
+    >
+      Others
+
+      {statusFilter === "others" && (
+        <span className="badge">
+          {filtered.length}
+        </span>
+      )}
+
+    </button>
+
+  </div>
+
+</div>
 
   {/* SEARCH */}
   <div className="filter-search">
@@ -973,6 +1344,25 @@ const exportRequirements = () => {
           </table>
         </div>
       </section>
+      {hasMore && (
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "center",
+      marginTop: 16,
+    }}
+  >
+    <button
+      className="cp-btn"
+      onClick={loadMoreRequirements}
+      disabled={loadingMore}
+    >
+      {loadingMore
+        ? "Loading..."
+        : "Load More"}
+    </button>
+  </div>
+)}
 
       {/* Details drawer */}
       {detailsReq && (
@@ -1671,7 +2061,22 @@ Delete requirement “{confirmDelete.requirementNumber || confirmDelete.customer
   <RequirementForm
     lead={null}
     requirement={editRequirement}
-    onSaved={() => setEditRequirement(null)}
+    onSaved={(updatedReq) => {
+
+  setRequirements((prev) =>
+    prev.map((r) =>
+      r.id === updatedReq.id
+        ? {
+            ...r,
+            ...updatedReq,
+          }
+        : r
+    )
+  );
+
+  setEditRequirement(null);
+
+}}
     onCancel={() => setEditRequirement(null)}
   />
 )}

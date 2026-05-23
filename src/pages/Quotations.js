@@ -13,6 +13,10 @@ import {
   getDoc, // ✅ added
   increment,
     deleteDoc  ,
+    getDocs,
+limit,
+startAfter,
+where,
 } from "firebase/firestore";
 import { updateAccountReport } from "../utils/accountReport";
 import { db, auth } from "../firebase";
@@ -108,6 +112,16 @@ const [userRole, setUserRole] = useState(null);
   const [waPhone, setWaPhone] = useState("");
   const [sendingWa, setSendingWa] = useState(false);
 const [typeFilter, setTypeFilter] = useState("all");
+const PAGE_SIZE = 50;
+
+const [lastDoc, setLastDoc] =
+  useState(null);
+
+const [hasMore, setHasMore] =
+  useState(true);
+
+const [loadingMore, setLoadingMore] =
+  useState(false);
   const [orderModalQuote, setOrderModalQuote] = useState(null);
   const navigate = useNavigate();
   const isNursingQuote = (q) =>
@@ -116,24 +130,188 @@ const [typeFilter, setTypeFilter] = useState("all");
   q?.serviceType === "nursing" ||
   q?.serviceType === "caretaker";
 
-  useEffect(() => {
+  const loadInitialQuotations = async () => {
+
+  try {
+
     setLoading(true);
-    const q = query(collection(db, "quotations"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const docs = snap.docs.map((d) => ({ id: d.id, ...(d.data() || {}) }));
-        setQuotations(docs);
-        setLoading(false);
-      },
-      (err) => {
-        console.error("quotations snapshot", err);
-        setError(err.message || "Failed to load quotations");
-        setLoading(false);
-      }
+
+    const base = collection(
+      db,
+      "quotations"
     );
-    return () => unsub();
-  }, []);
+
+    const constraints = [];
+
+    // TYPE FILTER
+    if (typeFilter !== "all") {
+
+      constraints.push(
+        where(
+          "serviceType",
+          "==",
+          typeFilter
+        )
+      );
+
+    }
+
+    // STATUS FILTER
+    if (statusFilter !== "all") {
+
+      constraints.push(
+        where(
+          "status",
+          "==",
+          statusFilter
+        )
+      );
+
+    }
+
+    constraints.push(
+      orderBy("createdAt", "desc")
+    );
+
+    constraints.push(
+      limit(PAGE_SIZE)
+    );
+
+    const qy = query(
+      base,
+      ...constraints
+    );
+
+    const snap = await getDocs(qy);
+
+    const docs = snap.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() || {}),
+    }));
+
+    setQuotations(docs);
+
+    setLastDoc(
+      snap.docs[
+        snap.docs.length - 1
+      ] || null
+    );
+
+    setHasMore(
+      snap.docs.length === PAGE_SIZE
+    );
+
+  } catch (err) {
+
+    console.error(err);
+
+    setError(
+      err.message ||
+      "Failed to load quotations"
+    );
+
+  } finally {
+
+    setLoading(false);
+
+  }
+
+};
+useEffect(() => {
+  loadInitialQuotations();
+}, [typeFilter, statusFilter]);
+const loadMoreQuotations = async () => {
+
+  if (!lastDoc || loadingMore)
+    return;
+
+  try {
+
+    setLoadingMore(true);
+
+    const base = collection(
+      db,
+      "quotations"
+    );
+
+    const constraints = [];
+
+    // TYPE FILTER
+    if (typeFilter !== "all") {
+
+      constraints.push(
+        where(
+          "serviceType",
+          "==",
+          typeFilter
+        )
+      );
+
+    }
+
+    // STATUS FILTER
+    if (statusFilter !== "all") {
+
+      constraints.push(
+        where(
+          "status",
+          "==",
+          statusFilter
+        )
+      );
+
+    }
+
+    constraints.push(
+      orderBy("createdAt", "desc")
+    );
+
+    constraints.push(
+      startAfter(lastDoc)
+    );
+
+    constraints.push(
+      limit(PAGE_SIZE)
+    );
+
+    const qy = query(
+      base,
+      ...constraints
+    );
+
+    const snap = await getDocs(qy);
+
+    const docs = snap.docs.map((d) => ({
+      id: d.id,
+      ...(d.data() || {}),
+    }));
+
+    setQuotations((prev) => [
+      ...prev,
+      ...docs,
+    ]);
+
+    setLastDoc(
+      snap.docs[
+        snap.docs.length - 1
+      ] || null
+    );
+
+    setHasMore(
+      snap.docs.length === PAGE_SIZE
+    );
+
+  } catch (err) {
+
+    console.error(err);
+
+  } finally {
+
+    setLoadingMore(false);
+
+  }
+
+};
 
   const statusCounts = useMemo(() => {
     const m = { all: quotations.length };
@@ -225,6 +403,9 @@ useEffect(() => {
 
   try {
     await deleteDoc(doc(db, "quotations", quote.id));
+    setQuotations((prev) =>
+  prev.filter((q) => q.id !== quote.id)
+);
     closeDetails();
   } catch (err) {
     console.error("deleteQuotation", err);
@@ -482,6 +663,16 @@ useEffect(() => {
       };
 
       await updateDoc(qRef, toUpdate);
+      setQuotations((prev) =>
+  prev.map((q) =>
+    q.id === details.id
+      ? {
+          ...q,
+          ...toUpdate,
+        }
+      : q
+  )
+);
 
       if (details.requirementId) {
         const reqRef = doc(db, "requirements", details.requirementId);
@@ -557,6 +748,16 @@ useEffect(() => {
       };
 
       await updateDoc(qRef, payload);
+      setQuotations((prev) =>
+  prev.map((q) =>
+    q.id === details.id
+      ? {
+          ...q,
+          ...payload,
+        }
+      : q
+  )
+);
 
       if (details.requirementId) {
         const reqRef = doc(db, "requirements", details.requirementId);
@@ -602,6 +803,26 @@ useEffect(() => {
         updatedBy: user.uid || "",
         updatedByName: user.displayName || user.email || "",
       });
+      setQuotations((prev) =>
+  prev.map((q) =>
+    q.id === quote.id
+      ? {
+          ...q,
+
+          status: newStatus,
+
+         updatedAt: new Date(),
+
+          updatedBy: user.uid || "",
+
+          updatedByName:
+            user.displayName ||
+            user.email ||
+            "",
+        }
+      : q
+  )
+);
       // 📊 Update account report counters
 if (newStatus === "accepted") {
   await updateAccountReport({
@@ -905,98 +1126,194 @@ const exportQuotations = async () => {
        <div className="filter-bar">
 
   <div className="filter-left">
-{/* SERVICE TYPE FILTER */}
-<div className="segmented type-segment">
 
-  <button
-    className={`seg-btn ${typeFilter === "all" ? "active" : ""}`}
-    onClick={() => {
-      setTypeFilter("all");
-      setStatusFilter("all");
-    }}
-  >
-    All
-  </button>
+  {/* SERVICE TYPE FILTER */}
+  <div className="segmented type-segment">
 
-  <button
-    className={`seg-btn equipment ${typeFilter === "rental" ? "active" : ""}`}
-    onClick={() => {
-      setTypeFilter("rental");
-      setStatusFilter("all");
-    }}
-  >
-    📦 Equipment
-  </button>
+    <button
+      className={`seg-btn ${
+        typeFilter === "all"
+          ? "active"
+          : ""
+      }`}
+      onClick={() => {
+        setTypeFilter("all");
+        setStatusFilter("all");
+      }}
+    >
+      All
+    </button>
 
-  <button
-    className={`seg-btn nursing ${typeFilter === "nursing" ? "active" : ""}`}
-    onClick={() => {
-      setTypeFilter("nursing");
-      setStatusFilter("all");
-    }}
-  >
-    🩺 Nursing
-  </button>
+    <button
+      className={`seg-btn equipment ${
+        typeFilter === "rental"
+          ? "active"
+          : ""
+      }`}
+      onClick={() => {
+        setTypeFilter("rental");
+        setStatusFilter("all");
+      }}
+    >
+      📦 Equipment
+    </button>
 
-  <button
-    className={`seg-btn caretaker ${typeFilter === "caretaker" ? "active" : ""}`}
-    onClick={() => {
-      setTypeFilter("caretaker");
-      setStatusFilter("all");
-    }}
-  >
-    🧑‍⚕️ Caretaker
-  </button>
+    <button
+      className={`seg-btn nursing ${
+        typeFilter === "nursing"
+          ? "active"
+          : ""
+      }`}
+      onClick={() => {
+        setTypeFilter("nursing");
+        setStatusFilter("all");
+      }}
+    >
+      🩺 Nursing
+    </button>
 
-</div>
-    {/* STATUS SEGMENT */}
-    <div className="segmented status-segment">
-
-      <button
-        className={`seg-btn ${statusFilter === "all" ? "active" : ""}`}
-        onClick={() => setStatusFilter("all")}
-      >
-        All <span className="badge">{statusCounts.all || 0}</span>
-      </button>
-
-      <button
-        className={`seg-btn draft ${statusFilter === "draft" ? "active" : ""}`}
-        onClick={() => setStatusFilter("draft")}
-      >
-        Draft <span className="badge">{statusCounts.draft || 0}</span>
-      </button>
-
-      <button
-        className={`seg-btn sent ${statusFilter === "sent" ? "active" : ""}`}
-        onClick={() => setStatusFilter("sent")}
-      >
-        Sent <span className="badge">{statusCounts.sent || 0}</span>
-      </button>
-
-      <button
-        className={`seg-btn accepted ${statusFilter === "accepted" ? "active" : ""}`}
-        onClick={() => setStatusFilter("accepted")}
-      >
-        Accepted <span className="badge">{statusCounts.accepted || 0}</span>
-      </button>
-
-      <button
-        className={`seg-btn rejected ${statusFilter === "rejected" ? "active" : ""}`}
-        onClick={() => setStatusFilter("rejected")}
-      >
-        Rejected <span className="badge">{statusCounts.rejected || 0}</span>
-      </button>
-
-      <button
-        className={`seg-btn order ${statusFilter === "order_created" ? "active" : ""}`}
-        onClick={() => setStatusFilter("order_created")}
-      >
-        Order Created <span className="badge">{statusCounts.order_created || 0}</span>
-      </button>
-
-    </div>
+    <button
+      className={`seg-btn caretaker ${
+        typeFilter === "caretaker"
+          ? "active"
+          : ""
+      }`}
+      onClick={() => {
+        setTypeFilter("caretaker");
+        setStatusFilter("all");
+      }}
+    >
+      🧑‍⚕️ Caretaker
+    </button>
 
   </div>
+
+  {/* STATUS SEGMENT */}
+  <div className="segmented status-segment">
+
+    <button
+      className={`seg-btn ${
+        statusFilter === "all"
+          ? "active"
+          : ""
+      }`}
+      onClick={() =>
+        setStatusFilter("all")
+      }
+    >
+      All
+
+      {statusFilter === "all" && (
+        <span className="badge">
+          {filtered.length}
+        </span>
+      )}
+    </button>
+
+    <button
+      className={`seg-btn draft ${
+        statusFilter === "draft"
+          ? "active"
+          : ""
+      }`}
+      onClick={() =>
+        setStatusFilter("draft")
+      }
+    >
+      Draft
+
+      {statusFilter === "draft" && (
+        <span className="badge">
+          {filtered.length}
+        </span>
+      )}
+    </button>
+
+    <button
+      className={`seg-btn sent ${
+        statusFilter === "sent"
+          ? "active"
+          : ""
+      }`}
+      onClick={() =>
+        setStatusFilter("sent")
+      }
+    >
+      Sent
+
+      {statusFilter === "sent" && (
+        <span className="badge">
+          {filtered.length}
+        </span>
+      )}
+    </button>
+
+    <button
+      className={`seg-btn accepted ${
+        statusFilter === "accepted"
+          ? "active"
+          : ""
+      }`}
+      onClick={() =>
+        setStatusFilter("accepted")
+      }
+    >
+      Accepted
+
+      {statusFilter ===
+        "accepted" && (
+        <span className="badge">
+          {filtered.length}
+        </span>
+      )}
+    </button>
+
+    <button
+      className={`seg-btn rejected ${
+        statusFilter === "rejected"
+          ? "active"
+          : ""
+      }`}
+      onClick={() =>
+        setStatusFilter("rejected")
+      }
+    >
+      Rejected
+
+      {statusFilter ===
+        "rejected" && (
+        <span className="badge">
+          {filtered.length}
+        </span>
+      )}
+    </button>
+
+    <button
+      className={`seg-btn order ${
+        statusFilter ===
+        "order_created"
+          ? "active"
+          : ""
+      }`}
+      onClick={() =>
+        setStatusFilter(
+          "order_created"
+        )
+      }
+    >
+      Order Created
+
+      {statusFilter ===
+        "order_created" && (
+        <span className="badge">
+          {filtered.length}
+        </span>
+      )}
+    </button>
+
+  </div>
+
+</div>
 
   {/* SEARCH */}
   <div className="filter-search">
@@ -1135,6 +1452,25 @@ const exportQuotations = async () => {
           </tbody>
         </table>
       </div>
+      {hasMore && (
+  <div
+    style={{
+      display: "flex",
+      justifyContent: "center",
+      marginTop: 16,
+    }}
+  >
+    <button
+      className="cp-btn"
+      onClick={loadMoreQuotations}
+      disabled={loadingMore}
+    >
+      {loadingMore
+        ? "Loading..."
+        : "Load More"}
+    </button>
+  </div>
+)}
 
       {/* Details drawer */}
       {details && (
@@ -1577,16 +1913,38 @@ const exportQuotations = async () => {
     open
     quotation={orderModalQuote}
     onClose={() => setOrderModalQuote(null)}
-    onCreated={(orderId) => {
-      if (details && details.id === orderModalQuote.id) {
-        setDetails((d) => ({
-          ...d,
-          orderId,
-          status: "order_created",
-        }));
-      }
-      setOrderModalQuote(null);
-    }}
+   onCreated={(orderId) => {
+
+  // Update details drawer if open
+  if (
+    details &&
+    details.id === orderModalQuote.id
+  ) {
+
+    setDetails((d) => ({
+      ...d,
+      orderId,
+      status: "order_created",
+    }));
+
+  }
+
+  // ALWAYS update quotations list
+  setQuotations((prev) =>
+    prev.map((q) =>
+      q.id === orderModalQuote.id
+        ? {
+            ...q,
+            orderId,
+            status: "order_created",
+          }
+        : q
+    )
+  );
+
+  setOrderModalQuote(null);
+
+}}
   />
 )}
 
@@ -1598,15 +1956,37 @@ const exportQuotations = async () => {
      serviceType={orderModalQuote.serviceType}
     onClose={() => setOrderModalQuote(null)}
     onCreated={(orderId) => {
-      if (details && details.id === orderModalQuote.id) {
-        setDetails((d) => ({
-          ...d,
-          orderId,
-          status: "order_created",
-        }));
-      }
-      setOrderModalQuote(null);
-    }}
+
+  // Update details drawer if open
+  if (
+    details &&
+    details.id === orderModalQuote.id
+  ) {
+
+    setDetails((d) => ({
+      ...d,
+      orderId,
+      status: "order_created",
+    }));
+
+  }
+
+  // ALWAYS update quotations list
+  setQuotations((prev) =>
+    prev.map((q) =>
+      q.id === orderModalQuote.id
+        ? {
+            ...q,
+            orderId,
+            status: "order_created",
+          }
+        : q
+    )
+  );
+
+  setOrderModalQuote(null);
+
+}}
   />
 )}
 

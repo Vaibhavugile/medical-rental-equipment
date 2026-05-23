@@ -1,9 +1,24 @@
 import React, { useEffect, useRef, useState } from "react";
 import "./HeroWithForm.css";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { db } from "../firebase"; // adjust path if needed
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+  limit,
+} from "firebase/firestore";import { db } from "../firebase"; // adjust path if needed
 
+function normalizePhone(phone = "") {
+  let cleaned = phone.replace(/\D/g, "");
 
+  if (cleaned.startsWith("91") && cleaned.length > 10) {
+    cleaned = cleaned.slice(2);
+  }
+
+  return cleaned;
+}
 export default function HeroWithForm({ imgSrc = "/banner.jpg" }) {
   const rootRef = useRef(null);
   const bgRef = useRef(null);
@@ -84,6 +99,17 @@ async function handleSubmit(e) {
   try {
     setLoading(true);
     showToast("info", "Submitting request...");
+    const normalizedPhone = normalizePhone(form.phone);
+
+const duplicateQuery = query(
+  collection(db, "leads"),
+  where("normalizedPhone", "==", normalizedPhone),
+  limit(1)
+);
+
+const duplicateSnap = await getDocs(duplicateQuery);
+
+const isDuplicate = !duplicateSnap.empty;
 
     const nowIso = new Date().toISOString();
 
@@ -96,6 +122,8 @@ async function handleSubmit(e) {
       notes: form.requirements || "",
       status: "new",
       leadSource: "website",
+      normalizedPhone,
+isDuplicate,
 
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),

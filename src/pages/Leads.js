@@ -13,6 +13,10 @@ import {
   updateDoc,
   where,
   increment,
+  limit,
+startAfter,
+getDocs,
+documentId,
 } from "firebase/firestore";
 import { updateAccountReport } from "../utils/accountReport";
 import { db, auth } from "../firebase";
@@ -102,12 +106,22 @@ export default function Leads() {
   const [form, setForm] = useState(defaultForm);
   const [followupFilter, setFollowupFilter] = useState("all");
   const [sortBy, setSortBy] = useState("created");
+  const [lastDoc, setLastDoc] = useState(null);
+const [hasMore, setHasMore] = useState(true);
+const [creatorSearch, setCreatorSearch] = useState("");
+const PAGE_SIZE = 50;
+const [dateFilter, setDateFilter] = useState("all");
   // Delete confirm
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [notInterestedFilter, setNotInterestedFilter] = useState("all");
+  const [selectedCreatorName, setSelectedCreatorName] = useState("");
   const [statusBranch, setStatusBranch] = useState(null);
   const [statusLevel1, setStatusLevel1] = useState(null)
   const [statusLevel2, setStatusLevel2] = useState(null)
+  const [createdByFilter, setCreatedByFilter] = useState("all");
+  const [customStartDate, setCustomStartDate] = useState("");
+const [customEndDate, setCustomEndDate] = useState("");
+const [users, setUsers] = useState([]);
   // Status modal (next stage + note)
   const [statusModal, setStatusModal] = useState({
     open: false,
@@ -158,91 +172,274 @@ export default function Leads() {
 
     return () => unsub();
   }, []);
+  const mapLead = (d) => {
+  const data = d.data() || {};
+
+  return {
+    id: d.id,
+    customerName: data.customerName || "",
+    contactPerson: data.contactPerson || "",
+    phone: data.phone || "",
+    email: data.email || "",
+    address: data.address || "",
+    leadSource: data.leadSource || "",
+    notes: data.notes || "",
+    status: data.status || "new",
+    type: data.type || "equipment",
+    createdAt: data.createdAt || null,
+    createdBy: data.createdBy || "",
+    createdByName: data.createdByName || "",
+    updatedAt: data.updatedAt || null,
+    updatedBy: data.updatedBy || "",
+    updatedByName: data.updatedByName || "",
+    normalizedPhone:
+  data.normalizedPhone ||
+  normalizePhone(data.phone || ""),
+  isDuplicate: data.isDuplicate || false,
+    history: Array.isArray(data.history)
+      ? data.history
+      : [],
+    followupDate: data.followupDate || null,
+  };
+};
+const serverStatuses = [
+  "new",
+  "invalid",
+  "followup",
+  "req shared",
+];
   // ---------- Realtime leads (TYPE-DRIVEN QUERY) ----------
-  useEffect(() => {
+ useEffect(() => {
+  loadInitialLeads();
+}, [  typeFilter,
+  statusFilter,
+  createdByFilter,
+  dateFilter,
+  customStartDate,
+  customEndDate
+]);
+useEffect(() => {
+  const loadUsers = async () => {
+    try {
+      const snap = await getDocs(collection(db, "users"));
+
+      const arr = snap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+
+      setUsers(arr);
+    } catch (err) {
+      console.error("load users error", err);
+    }
+  };
+
+  loadUsers();
+}, []);
+const creatorOptions = useMemo(() => {
+  const unique = new Map();
+
+  leads.forEach((l) => {
+    if (!l.createdBy) return;
+
+    if (!unique.has(l.createdBy)) {
+      unique.set(l.createdBy, {
+        id: l.createdBy,
+        name:
+          l.createdByName ||
+          l.createdBy ||
+          "Unknown",
+      });
+    }
+  });
+
+  return Array.from(unique.values());
+}, [leads]);
+const getDateRange = () => {
+  const now = new Date();
+
+  // TODAY
+  if (dateFilter === "today") {
+    const start = new Date();
+
+    start.setHours(0, 0, 0, 0);
+
+    return { start };
+  }
+
+  // WEEK
+  if (dateFilter === "week") {
+    const start = new Date();
+
+    const day = start.getDay();
+
+    start.setDate(start.getDate() - day);
+
+    start.setHours(0, 0, 0, 0);
+
+    return { start };
+  }
+
+  // MONTH
+  if (dateFilter === "month") {
+    const start = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      1
+    );
+
+    start.setHours(0, 0, 0, 0);
+
+    return { start };
+  }
+
+  // CUSTOM RANGE
+  if (
+    dateFilter === "custom" &&
+    customStartDate &&
+    customEndDate
+  ) {
+
+    const start = new Date(customStartDate);
+
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(customEndDate);
+
+    end.setHours(23, 59, 59, 999);
+
+    return { start, end };
+  }
+
+  return null;
+};
+const loadInitialLeads = async () => {
+  try {
     setLoading(true);
-    setError("");
 
     const base = collection(db, "leads");
-    const qy =
-      typeFilter === "all"
-        ? query(base, orderBy("createdAt", "desc"))
-        : query(base, where("type", "==", typeFilter), orderBy("createdAt", "desc"));
 
-    const unsub = onSnapshot(
-      qy,
-      (snap) => {
-        const docs = snap.docs.map((d) => {
-          const data = d.data() || {};
-          return {
-            id: d.id,
-            customerName: data.customerName || "",
-            contactPerson: data.contactPerson || "",
-            phone: data.phone || "",
-            email: data.email || "",
-            address: data.address || "",
-            leadSource: data.leadSource || "",
-            notes: data.notes || "",
-            status: data.status || "new",
-            // NEW
-            type: data.type || "equipment",
-            createdAt: data.createdAt || null,
-            createdBy: data.createdBy || "",
-            createdByName: data.createdByName || "",
-            updatedAt: data.updatedAt || null,
-            updatedBy: data.updatedBy || "",
-            updatedByName: data.updatedByName || "",
-            history: Array.isArray(data.history) ? data.history : [],
-            followupDate: data.followupDate || null,
-          };
-        });
-        setLeads(docs);
+   const constraints = [];
 
-        /* mark leads as seen */
-        const batch = writeBatch(db);
+if (typeFilter !== "all") {
+  constraints.push(
+    where("type", "==", typeFilter)
+  );
+}
 
-        snap.docs.forEach((d) => {
-          const data = d.data();
+if (serverStatuses.includes(statusFilter)) {
+  constraints.push(
+    where("status", "==", statusFilter)
+  );
+}
+if (createdByFilter !== "all") {
+  constraints.push(
+    where("createdBy", "==", createdByFilter)
+  );
+}
 
-          if (!data.seen) {
-            batch.update(doc(db, "leads", d.id), {
-              seen: true
-            });
-          }
-        });
 
-        batch.commit();
+if (statusFilter === "duplicate") {
+  constraints.push(
+    where("isDuplicate", "==", true)
+  );
+}
+const range = getDateRange();
 
-        setLoading(false);
-      },
-      (err) => {
-        console.error("leads onSnapshot error", err);
-        setError(err.message || "Failed to load leads.");
-        setLoading(false);
-      }
-    );
-    return () => unsub();
-  }, [typeFilter]);
+if (range?.start) {
+  constraints.push(
+    where("createdAt", ">=", range.start)
+  );
+}
+
+if (range?.end) {
+  constraints.push(
+    where("createdAt", "<=", range.end)
+  );
+}
+constraints.push(
+  orderBy("createdAt", "desc")
+);
+
+constraints.push(limit(PAGE_SIZE));
+
+const qy = query(base, ...constraints);
+    const snap = await getDocs(qy);
+
+    const docs = snap.docs.map(mapLead);
+
+    setLeads(docs);
+
+    setLastDoc(snap.docs[snap.docs.length - 1] || null);
+
+    setHasMore(snap.docs.length === PAGE_SIZE);
+
+  } catch (err) {
+    console.error(err);
+    setError("Failed to load leads");
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ---------- Realtime requirements → latest per leadId ----------
   useEffect(() => {
-    const qy = query(collection(db, "requirements"), orderBy("createdAt", "desc"));
-    const unsub = onSnapshot(
-      qy,
-      (snap) => {
-        const map = {};
-        snap.docs.forEach((d) => {
-          const r = { id: d.id, ...(d.data() || {}) };
-          const leadId = r.leadId || r.lead?.id || "";
-          if (!leadId) return;
-          if (!map[leadId]) map[leadId] = r; // first seen is latest (desc)
-        });
-        setReqByLead(map);
-      },
-      (err) => console.error("requirements onSnapshot error", err)
-    );
-    return () => unsub();
-  }, []);
+  if (!leads.length) {
+    setReqByLead({});
+    return;
+  }
+
+  loadRequirementsForVisibleLeads();
+}, [leads]);
+
+const loadRequirementsForVisibleLeads = async () => {
+  try {
+
+    const leadIds = leads.map((l) => l.id);
+
+    if (!leadIds.length) return;
+
+    const chunks = [];
+
+    for (let i = 0; i < leadIds.length; i += 10) {
+      chunks.push(leadIds.slice(i, i + 10));
+    }
+
+    const map = {};
+
+    for (const chunk of chunks) {
+
+      const qy = query(
+        collection(db, "requirements"),
+        where("leadId", "in", chunk)
+      );
+
+      const snap = await getDocs(qy);
+
+      snap.docs.forEach((d) => {
+
+        const data = d.data();
+
+        const leadId = data.leadId;
+
+        if (!map[leadId]) {
+          map[leadId] = {
+            id: d.id,
+            ...data,
+          };
+        }
+
+      });
+
+    }
+
+    setReqByLead(map);
+
+  } catch (err) {
+    console.error("load requirements error", err);
+  }
+};
+
 
   // ---------- Counts for STATUS chips (within current TYPE selection) ----------
   const statusCounts = useMemo(() => {
@@ -328,26 +525,7 @@ export default function Leads() {
     return map;
 
   }, [leads]);
-  const duplicateInfo = useMemo(() => {
-  const map = {};
-  const duplicates = new Set();
-
-  leads.forEach((l) => {
-    const key = `${l.phone}-${l.type}`;
-
-    if (map[key]) {
-      duplicates.add(l.id);
-      duplicates.add(map[key]);
-    } else {
-      map[key] = l.id;
-    }
-  });
-
-  return {
-    ids: duplicates,
-    count: duplicates.size,
-  };
-}, [leads]);
+ 
   // ---------- Search + STATUS filter (TYPE already applied by Firestore) ----------
   const filtered = useMemo(() => {
 
@@ -373,6 +551,13 @@ export default function Leads() {
         "urgent visit"
       ];
       list = list.filter((l) => {
+        const alreadyServerFiltered =
+  serverStatuses.includes(statusFilter) ||
+  statusFilter === "duplicate";
+
+if (alreadyServerFiltered) {
+  return true;
+}
 
         const s = normStatus(l.status);
 
@@ -439,7 +624,7 @@ export default function Leads() {
 
 }
 if (statusFilter === "duplicate") {
-  return duplicateInfo.ids.has(l.id);
+  return l.isDuplicate;
 }
 
         return s === statusFilter;
@@ -496,48 +681,7 @@ if (statusFilter === "duplicate") {
     return list;
 
 }, [leads, search, statusFilter, followupFilter, notInterestedFilter, sortBy]);
-const duplicateMap = useMemo(() => {
 
-  const map = {};
-  const result = {};
-
-  leads.forEach((l) => {
-
-    const key = `${normalizePhone(l.phone)}-${l.type}`;
-
-    if (!map[key]) {
-      map[key] = [];
-    }
-
-    map[key].push(l);
-
-  });
-
-  Object.keys(map).forEach((key) => {
-
-    const list = map[key];
-
-    if (list.length > 1) {
-
-      list
-        .sort((a, b) => {
-          if (!a.createdAt || !b.createdAt) return 0;
-          return a.createdAt.toMillis() - b.createdAt.toMillis();
-        })
-        .forEach((lead, index) => {
-
-          result[lead.id] =
-            index === 0 ? "original" : "duplicate";
-
-        });
-
-    }
-
-  });
-
-  return result;
-
-}, [leads]);
 
   // ---------- Drawer helpers ----------
   const openDrawer = (initial = defaultForm) => {
@@ -582,12 +726,19 @@ const duplicateMap = useMemo(() => {
     }
  const currentPhone = normalizePhone(form.phone);
 
-const duplicate = leads.find(
-  (l) =>
-    normalizePhone(l.phone) === currentPhone &&
-    l.type === form.type &&
-    l.id !== form.id
+const duplicateQuery = query(
+  collection(db, "leads"),
+  where("normalizedPhone", "==", currentPhone),
+  where("type", "==", form.type),
+  limit(1)
 );
+
+const duplicateSnap = await getDocs(duplicateQuery);
+
+const duplicate = duplicateSnap.docs.find(
+  (d) => d.id !== form.id
+);
+const isDuplicate = !!duplicate;
 
 if (duplicate) {
   const confirmDuplicate = window.confirm(
@@ -604,6 +755,8 @@ if (duplicate) {
         customerName: form.customerName.trim(),
         contactPerson: form.contactPerson.trim(),
         phone: form.phone.trim(),
+        normalizedPhone: normalizePhone(form.phone),
+        isDuplicate,
         email: form.email?.trim() || "",
         address: form.address?.trim() || "",
         leadSource: form.leadSource?.trim() || "",
@@ -680,28 +833,73 @@ if (duplicate) {
           note: "Lead created",
         });
 
-        await addDoc(collection(db, "leads"), {
-          ...payloadFields,
-          createdAt: serverTimestamp(),
-          createdBy: userForCreate.uid || "",
-          createdByName:
-            userForCreate.displayName ||
-            userForCreate.email ||
-            userForCreate.uid ||
-            "",
-          updatedAt: serverTimestamp(),
-          updatedBy: userForCreate.uid || "",
-          updatedByName:
-            userForCreate.displayName ||
-            userForCreate.email ||
-            userForCreate.uid ||
-            "",
-          history: [createEntry],
-        });
-        await updateAccountReport({
-          leadsAdded: increment(1)
-        });
+const docRef = await addDoc(collection(db, "leads"), {
+  ...payloadFields,
+
+  createdAt: serverTimestamp(),
+
+  createdBy: userForCreate.uid || "",
+
+  createdByName:
+    userForCreate.displayName ||
+    userForCreate.email ||
+    userForCreate.uid ||
+    "",
+
+  updatedAt: serverTimestamp(),
+
+  updatedBy: userForCreate.uid || "",
+
+  updatedByName:
+    userForCreate.displayName ||
+    userForCreate.email ||
+    userForCreate.uid ||
+    "",
+
+  history: [createEntry],
+});
+
+const newLead = {
+  id: docRef.id,
+
+  ...payloadFields,
+
+  createdAt: {
+    toDate: () => new Date(),
+    toMillis: () => Date.now(),
+  },
+
+  createdBy: userForCreate.uid || "",
+
+  createdByName:
+    userForCreate.displayName ||
+    userForCreate.email ||
+    userForCreate.uid ||
+    "",
+
+  updatedAt: {
+    toDate: () => new Date(),
+    toMillis: () => Date.now(),
+  },
+
+  updatedBy: userForCreate.uid || "",
+
+  updatedByName:
+    userForCreate.displayName ||
+    userForCreate.email ||
+    userForCreate.uid ||
+    "",
+
+  history: [createEntry],
+};
+
+setLeads((prev) => [newLead, ...prev]);
+
+await updateAccountReport({
+  leadsAdded: increment(1)
+});
       }
+      
 
       closeDrawer();
     } catch (err) {
@@ -806,6 +1004,38 @@ if (duplicate) {
         history: arrayUnion(entry),
 
       });
+      setLeads((prev) =>
+  prev.map((l) =>
+    l.id === lead.id
+      ? {
+          ...l,
+
+          status: nextStatus,
+
+          followupDate:
+            statusModal.followupDate || null,
+
+          updatedAt: {
+            toDate: () => new Date(),
+            toMillis: () => Date.now(),
+          },
+
+          updatedBy: user.uid || "",
+
+          updatedByName:
+            user.displayName ||
+            user.email ||
+            user.uid ||
+            "",
+
+          history: [
+            ...(l.history || []),
+            entry,
+          ],
+        }
+      : l
+  )
+);
       if (nextStatus === "contacted") {
         await updateAccountReport({
           leadsContacted: increment(1)
@@ -847,6 +1077,9 @@ if (duplicate) {
   const handleDelete = async (l) => {
     try {
       await deleteDoc(doc(db, "leads", l.id));
+      setLeads((prev) =>
+  prev.filter((x) => x.id !== l.id)
+);
       setConfirmDelete(null);
     } catch (err) {
       console.error("delete error", err);
@@ -893,6 +1126,73 @@ if (duplicate) {
   link.click();
 
   URL.revokeObjectURL(url);
+};
+const loadMoreLeads = async () => {
+  if (!lastDoc) return;
+
+  try {
+    const base = collection(db, "leads");
+
+    const constraints = [];
+
+if (typeFilter !== "all") {
+  constraints.push(
+    where("type", "==", typeFilter)
+  );
+}
+
+if (serverStatuses.includes(statusFilter)) {
+  constraints.push(
+    where("status", "==", statusFilter)
+  );
+}
+if (createdByFilter !== "all") {
+  constraints.push(
+    where("createdBy", "==", createdByFilter)
+  );
+}
+
+if (statusFilter === "duplicate") {
+  constraints.push(
+    where("isDuplicate", "==", true)
+  );
+}
+const range = getDateRange();
+
+if (range?.start) {
+  constraints.push(
+    where("createdAt", ">=", range.start)
+  );
+}
+
+if (range?.end) {
+  constraints.push(
+    where("createdAt", "<=", range.end)
+  );
+}
+
+constraints.push(
+  orderBy("createdAt", "desc")
+);
+
+constraints.push(startAfter(lastDoc));
+
+constraints.push(limit(PAGE_SIZE));
+
+const qy = query(base, ...constraints);
+    const snap = await getDocs(qy);
+
+    const docs = snap.docs.map(mapLead);
+
+    setLeads((prev) => [...prev, ...docs]);
+
+    setLastDoc(snap.docs[snap.docs.length - 1] || null);
+
+    setHasMore(snap.docs.length === PAGE_SIZE);
+
+  } catch (err) {
+    console.error(err);
+  }
 };
 
   // lock body scroll when drawer/modal open
@@ -1026,13 +1326,17 @@ if (duplicate) {
     className={`seg-btn ${statusFilter === "all" ? "active" : ""}`}
     onClick={() => setStatusFilter("all")}
   >
-    All ({statusCounts.all})
+    All   {statusFilter === "all"
+    ? ` (${filtered.length})`
+    : ""}
   </button>
     <button
     className={`seg-btn ${statusFilter === "new" ? "active" : ""}`}
     onClick={() => setStatusFilter("new")}
   >
-    New ({statusCounts.new})
+    New  {statusFilter === "new"
+    ? ` (${filtered.length})`
+    : ""}
   </button>
 
 
@@ -1041,7 +1345,9 @@ if (duplicate) {
     className={`seg-btn ${statusFilter === "req shared" ? "active" : ""}`}
     onClick={() => setStatusFilter("req shared")}
   >
-    Req Shared ({statusCounts["req shared"]})
+    Req Shared  {statusFilter === "req shared"
+    ? ` (${filtered.length})`
+    : ""}
   </button>
 
   {/* FOLLOWUP */}
@@ -1052,7 +1358,9 @@ if (duplicate) {
       setFollowupFilter("all");
     }}
   >
-    Followup ({statusCounts.followup})
+    Followup {statusFilter === "followup"
+    ? ` (${filtered.length})`
+    : ""}
   </button>
 
   {/* NOT INTERESTED */}
@@ -1063,7 +1371,9 @@ if (duplicate) {
     setNotInterestedFilter("all");
   }}
 >
-  Not Interested ({statusCounts["not interested"]})
+  Not Interested {statusFilter === "not interested"
+    ? ` (${filtered.length})`
+    : ""}
 </button>
 
   {/* INVALID */}
@@ -1071,13 +1381,18 @@ if (duplicate) {
     className={`seg-btn ${statusFilter === "invalid" ? "active" : ""}`}
     onClick={() => setStatusFilter("invalid")}
   >
-    Invalid ({statusCounts.invalid})
+    Invalid {statusFilter === "invalid"
+    ? ` (${filtered.length})`
+    : ""}
   </button>
   <button
   className={`seg-btn ${statusFilter === "duplicate" ? "active" : ""}`}
   onClick={() => setStatusFilter("duplicate")}
 >
-  🔴 Duplicate ({duplicateInfo.count})
+  🔴 Duplicate
+{statusFilter === "duplicate"
+  ? ` (${filtered.length})`
+  : ""}
 </button>
 
   {/* OTHERS */}
@@ -1085,7 +1400,9 @@ if (duplicate) {
     className={`seg-btn ${statusFilter === "others" ? "active" : ""}`}
     onClick={() => setStatusFilter("others")}
   >
-    Others ({statusCounts.others})
+    Others {statusFilter === "others"
+    ? ` (${filtered.length})`
+    : ""}
   </button>
 
 </div>
@@ -1184,6 +1501,156 @@ if (duplicate) {
           <option value="followup">Sort: Followup Date</option>
 
         </select>
+      <div className="creatorFilter">
+
+  <input
+    type="text"
+    placeholder="Search creator..."
+    value={creatorSearch || selectedCreatorName}
+    onChange={(e) => {
+
+      const value = e.target.value;
+
+      setCreatorSearch(value);
+
+      // if user starts typing again
+      // clear selected creator filter
+      if (selectedCreatorName) {
+        setSelectedCreatorName("");
+        setCreatedByFilter("all");
+      }
+
+      // reset all
+      if (!value) {
+        setCreatedByFilter("all");
+        setSelectedCreatorName("");
+      }
+    }}
+    className="search-input"
+  />
+
+  {creatorSearch && (
+    <div className="creatorDropdown">
+
+      {/* RESET */}
+      <div
+        className="creatorItem"
+        onClick={() => {
+          setCreatedByFilter("all");
+          setCreatorSearch("");
+          setSelectedCreatorName("");
+        }}
+      >
+        All Creators
+      </div>
+
+      {/* USERS */}
+      {creatorOptions
+        .filter((u) =>
+          u.name
+            .toLowerCase()
+            .includes(
+              creatorSearch.toLowerCase()
+            )
+        )
+        .map((u) => (
+
+          <div
+            key={u.id}
+            className={`creatorItem ${
+              createdByFilter === u.id
+                ? "active"
+                : ""
+            }`}
+            onClick={() => {
+
+              // APPLY FILTER
+              setCreatedByFilter(u.id);
+
+              // SHOW SELECTED NAME
+              setSelectedCreatorName(u.name);
+
+              // CLOSE DROPDOWN
+              setCreatorSearch("");
+            }}
+          >
+            {u.name}
+          </div>
+
+        ))}
+
+      {/* EMPTY */}
+      {!creatorOptions.filter((u) =>
+        u.name
+          .toLowerCase()
+          .includes(
+            creatorSearch.toLowerCase()
+          )
+      ).length && (
+        <div className="creatorEmpty">
+          No creator found
+        </div>
+      )}
+
+    </div>
+  )}
+
+</div>
+<div className="dateFilterWrap">
+
+  <select
+    className="sort-select"
+    value={dateFilter}
+    onChange={(e) =>
+      setDateFilter(e.target.value)
+    }
+  >
+    <option value="all">
+      All Time
+    </option>
+
+    <option value="today">
+      Today
+    </option>
+
+    <option value="week">
+      This Week
+    </option>
+
+    <option value="month">
+      This Month
+    </option>
+
+    <option value="custom">
+      Custom Range
+    </option>
+  </select>
+
+  {dateFilter === "custom" && (
+    <div className="customDateInputs">
+
+      <input
+        type="date"
+        value={customStartDate}
+        onChange={(e) =>
+          setCustomStartDate(e.target.value)
+        }
+      />
+
+      <span>to</span>
+
+      <input
+        type="date"
+        value={customEndDate}
+        onChange={(e) =>
+          setCustomEndDate(e.target.value)
+        }
+      />
+
+    </div>
+  )}
+
+</div>
 
         {/* SUMMARY */}
         <div className="filter-summary">
@@ -1232,17 +1699,18 @@ if (duplicate) {
                    <td>
   {l.phone}
 
-  {duplicateMap[l.id] === "original" && (
-    <span style={{ color: "#16a34a", marginLeft: 6, fontSize: 12 }}>
-      🟢 Original
-    </span>
-  )}
-
-  {duplicateMap[l.id] === "duplicate" && (
-    <span style={{ color: "red", marginLeft: 6, fontSize: 12 }}>
-      🔴 Duplicate
-    </span>
-  )}
+ {l.isDuplicate && (
+  <span
+    style={{
+      color: "red",
+      marginLeft: 6,
+      fontSize: 12,
+      fontWeight: 600,
+    }}
+  >
+    🔴 Duplicate
+  </span>
+)}
 </td>
 
                     <td className="cell-muted">
@@ -1379,6 +1847,7 @@ if (duplicate) {
                   </tr>
                 );
               })}
+     
 
               {!filtered.length && (
                 <tr>
@@ -1394,6 +1863,30 @@ if (duplicate) {
           </table>
         </div>
       </section>
+      {hasMore && (
+  <div
+    style={{
+      padding: 20,
+      display: "flex",
+      justifyContent: "center",
+    }}
+  >
+    <button
+      className="cp-btn"
+      onClick={loadMoreLeads}
+      style={{
+        padding: "10px 18px",
+        borderRadius: 10,
+        border: "1px solid #e2e8f0",
+        background: "#fff",
+        cursor: "pointer",
+        fontWeight: 600,
+      }}
+    >
+      Load More
+    </button>
+  </div>
+)}
 
       {/* Edit drawer */}
       {showForm && (
@@ -2111,13 +2604,59 @@ if (duplicate) {
                 newValue: "req shared",
                 note: "Requirement created and shared",
               });
-              updateDoc(doc(db, "leads", leadToUse.id), {
-                status: "req shared",
-                updatedAt: serverTimestamp(),
-                updatedBy: user.uid || "",
-                updatedByName: user.displayName || user.email || "",
-                history: arrayUnion(entry),
-              }).catch((e) => console.error("set req shared status error", e));
+           updateDoc(doc(db, "leads", leadToUse.id), {
+  status: "req shared",
+
+  updatedAt: serverTimestamp(),
+
+  updatedBy: user.uid || "",
+
+  updatedByName:
+    user.displayName ||
+    user.email ||
+    "",
+
+  history: arrayUnion(entry),
+
+})
+  .then(() => {
+
+    setLeads((prev) =>
+      prev.map((l) =>
+        l.id === leadToUse.id
+          ? {
+              ...l,
+
+              status: "req shared",
+
+              updatedAt: {
+                toDate: () => new Date(),
+                toMillis: () => Date.now(),
+              },
+
+              updatedBy: user.uid || "",
+
+              updatedByName:
+                user.displayName ||
+                user.email ||
+                "",
+
+              history: [
+                ...(l.history || []),
+                entry,
+              ],
+            }
+          : l
+      )
+    );
+
+  })
+  .catch((e) =>
+    console.error(
+      "set req shared status error",
+      e
+    )
+  );
             }
           }}
         />

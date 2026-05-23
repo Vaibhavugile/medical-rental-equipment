@@ -1,5 +1,13 @@
 import React, { useState } from "react";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+  limit,
+} from "firebase/firestore";
 import { db } from "../firebase";
 import "./EnquiryForm.css";
 
@@ -20,7 +28,15 @@ export default function EnquiryForm({ onSuccess }) {
   };
 
   const validatePhone = (p) => p.replace(/\D/g, "").length === 10;
+const normalizePhone = (phone = "") => {
+  let cleaned = phone.replace(/\D/g, "");
 
+  if (cleaned.startsWith("91") && cleaned.length > 10) {
+    cleaned = cleaned.slice(2);
+  }
+
+  return cleaned;
+};
   const handleSubmit = async (e) => {
     e.preventDefault();
     setStatus(null);
@@ -39,11 +55,24 @@ export default function EnquiryForm({ onSuccess }) {
 
     try {
       setStatus({ type: "sending", message: "Sending..." });
+      const normalizedPhone = normalizePhone(form.phone);
+
+const duplicateQuery = query(
+  collection(db, "leads"),
+  where("normalizedPhone", "==", normalizedPhone),
+  limit(1)
+);
+
+const duplicateSnap = await getDocs(duplicateQuery);
+
+const isDuplicate = !duplicateSnap.empty;
 
       await addDoc(collection(db, "leads"), {
         customerName: form.name.trim(),
         contactPerson: form.name.trim(),
         phone: form.phone.replace(/\D/g, ""),
+        normalizedPhone,
+isDuplicate,
         email: "",
         city: form.city,
         type: form.service,
