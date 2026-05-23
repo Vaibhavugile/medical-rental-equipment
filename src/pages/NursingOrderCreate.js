@@ -239,8 +239,9 @@ export default function NursingOrderCreate({
      const customerName =
   freshQuotation?.deliveryContact?.name ||
   freshQuotation?.customerName ||
-  requirement?.deliveryContact?.name ||
   requirement?.leadSnapshot?.customerName ||
+  requirement?.deliveryContact?.name ||
+  
   lead?.customerName ||
   "";
 
