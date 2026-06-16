@@ -13,9 +13,18 @@ import Footer from "../frontend/Footer";
 
 
 export default function SurgeryPage() {
-  useEffect(() => {
-    document.title = "Post Surgery Care at Home | BookMyMedicare";
-  }, []);
+    useEffect(() => {
+  document.title = "Post Surgery Care at Home | Home Health Nursing Care | Book My Medicare";
+
+  const description = document.querySelector('meta[name="description"]');
+
+  if (description) {
+    description.setAttribute(
+      "content",
+      "Post surgery care at home with home health nursing, wound care, physiotherapy support and recovery-focused health care at home services."
+    );
+  }
+}, []);
 
   const section1 = {
     eyebrow: "HOME HEALTHCARE SERVICES",

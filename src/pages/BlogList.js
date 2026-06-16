@@ -16,28 +16,23 @@ import Footer from "../frontend/Footer";
 import "./BlogList.css";
 
 /* ================= SEO ================= */
-function setMeta() {
-  document.title = "Healthcare Blogs | BookMyMedicare";
-
-  let meta = document.querySelector("meta[name='description']");
-  if (!meta) {
-    meta = document.createElement("meta");
-    meta.setAttribute("name", "description");
-    document.head.appendChild(meta);
-  }
-
-  meta.setAttribute(
-    "content",
-    "Read expert healthcare blogs by BookMyMedicare on home nursing, ICU care at home, elderly care, physiotherapy, and recovery services."
-  );
-}
 
 export default function BlogList() {
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
+useEffect(() => {
+  document.title = "Blogs | Home Health Care Services in Mumbai | Book My Medicare";
 
+  const description = document.querySelector('meta[name="description"]');
+
+  if (description) {
+    description.setAttribute(
+      "content",
+      "Explore blogs on home health care services, nursing services, ICU at home, medical equipment on rent and expert health care at home guidance for families."
+    );
+  }
+}, []);
   useEffect(() => {
-    setMeta();
 
     const fetchBlogs = async () => {
       try {
