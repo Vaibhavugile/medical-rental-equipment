@@ -1,12 +1,23 @@
-import React from "react";
+import React, { useEffect } from "react";
 import "./TermsAndConditions.css";
 import Header from "../frontend/Header";
 import TopBar from "../frontend/TopBar";
 import Footer from "../frontend/Footer";
+import SEO from "../components/SEO";
 
 
 export default function TermsAndConditions() {
+	
+
   return (
+    <>
+  <SEO
+        title="Terms & Conditions | Home Care Nursing | Book My Medicare"
+        description="Read the Terms & Conditions of Book My Medicare for home care nursing services. Know service policies, responsibilities & guidelines for safe care at home."
+        keywords="home nursing care, ICU setup at home, ambulance service, physiotherapy at home, medical equipment rental"
+        canonical="https://bookmymedicare.com/terms-&-condition"
+      />
+	  
     <div className="terms-page">
         <TopBar />
                               <Header />
@@ -166,5 +177,6 @@ export default function TermsAndConditions() {
       </div>
       <Footer />
     </div>
+    </>
   );
 }

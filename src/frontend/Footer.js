@@ -27,10 +27,10 @@ export default function Footer() {
         {/* Links */}
         <div className="bmm-footer-links">
           <a href="/">Home</a>
-          <a href="/icu">ICU at Home</a>
+          <a href="/icu-setup-at-home">ICU at Home</a>
           <a href="/nursing">Nursing Care</a>
-          <a href="/physiotherapy">Physiotherapy</a>
-          <a href="/ambulance">Ambulance</a>
+          <a href="/physiotherapy-at-home">Physiotherapy</a>
+          <a href="/ambulance-services">Ambulance</a>
           <a href="/our-team">Our Team</a>
         </div>
 
@@ -40,9 +40,9 @@ export default function Footer() {
             © {new Date().getFullYear()} BookMyMedicCare. All rights reserved.
           </span>
           <div className="bmm-legal">
-            <a href="/privacy">Privacy</a>
+            <a href="/privacy-policy">Privacy</a>
             <span>•</span>
-            <a href="/terms">Terms</a>
+            <a href="/terms-&-condition">Terms</a>
           </div>
            <div className="bmm-powered">
     Powered by{" "}

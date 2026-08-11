@@ -179,12 +179,12 @@ isDuplicate,
           <div className="hp-fixed-left-inner">
             <div className="hp-fixed-eyebrow">HOME HEALTHCARE SERVICES</div>
 
-            <h1 id="hp-title-fixed" className="hp-fixed-title" aria-label="From Our Family To Your">
+            <h2 id="hp-title-fixed" className="hp-fixed-title" aria-label="From Our Family To Your">
               <span className="hp-fixed-line hp-line-a">From Our</span>
               <span className="hp-fixed-line hp-line-b">Family</span>
               <span className="hp-fixed-line hp-line-c">To</span>
               <span className="hp-fixed-line hp-line-d">Your</span>
-            </h1>
+            </h2>
 
             <p className="hp-fixed-sub">
               We understand your need and we deliver our best.

@@ -12,20 +12,33 @@ import "./ServicesSection.css";
  */
 
 export default function ServicesSection() {
+	useEffect(() => {
+  document.title = "Services | Nursing Care at Home in Mumbai | Book My Medicare";
+
+  const description = document.querySelector('meta[name="description"]');
+
+  if (description) {
+    description.setAttribute(
+      "content",
+      "Explore nursing services at home offering skilled home health nursing, 24 hour nursing care and compassionate health care at home solutions."
+    );
+  }
+}, []);
+
   const rootRef = useRef(null);
 
   // Add `link` to each object to make it navigable
   const services = [
-    { key: "equip", title: "Medical Equipment", subtitle: "on Rental / Purchase", icon: "equip", link: "/equipment" },
-    { key: "icu", title: "ICU Setup", subtitle: "critical bed & monitoring", icon: "icu", link: "/icu" },
-    { key: "post", title: "Post Surgery Care", subtitle: "recovery at home", icon: "post", link: "/post-surgery-care" },
-    { key: "pall", title: "Palliative Care", subtitle: "elderly & comfort care", icon: "pall", link: "/palliative-care" },
-    { key: "ambulance", title: "Ambulance Services", subtitle: "24/7 transport", icon: "ambulance", link: "/ambulance" },
-    { key: "lab", title: "Lab Services", subtitle: "home sample collection", icon: "lab", link: "/lab-services" },
-    { key: "pharmacy", title: "Pharmacy Delivery", subtitle: "medicines at doorstep", icon: "pharmacy", link: "/pharmacy-delivery" },
-    { key: "nursing", title: "Nursing Care", subtitle: "trained medical staff", icon: "nursing", link: "/nursing-care" },
-    { key: "physio", title: "Physiotherapy Support", subtitle: "rehab & exercises", icon: "physio", link: "/physiotherapy" },
-    { key: "resp", title: "Respiratory Care", subtitle: "oxygen & ventilator support", icon: "resp", link: "/respiratory-care" },
+    { key: "equip", title: "Medical Equipment", subtitle: "on Rental / Purchase", icon: "equip", link: "/medical-equipment-on-rent" },
+    { key: "icu", title: "ICU Setup", subtitle: "critical bed & monitoring", icon: "icu", link: "/icu-setup-at-home" },
+    { key: "post", title: "Post Surgery Care", subtitle: "recovery at home", icon: "post", link: "/post-surgery-care-at-home" },
+    { key: "pall", title: "Palliative Care", subtitle: "elderly & comfort care", icon: "pall", link: "/palliative-care-at-home" },
+    { key: "ambulance", title: "Ambulance Services", subtitle: "24/7 transport", icon: "ambulance", link: "/ambulance-services" },
+    { key: "lab", title: "Lab Services", subtitle: "home sample collection", icon: "lab", link: "/lab-services-at-home" },
+    { key: "pharmacy", title: "Pharmacy Delivery", subtitle: "medicines at doorstep", icon: "pharmacy", link: "/pharmacy-delivery-at-home" },
+    { key: "nursing", title: "Nursing Care", subtitle: "trained medical staff", icon: "nursing", link: "/nursing-care-at-home" },
+    { key: "physio", title: "Physiotherapy Support", subtitle: "rehab & exercises", icon: "physio", link: "/physiotherapy-at-home" },
+    { key: "resp", title: "Respiratory Care", subtitle: "oxygen & ventilator support", icon: "resp", link: "/respiratory-care-at-home" },
   ];
 
   useEffect(() => {

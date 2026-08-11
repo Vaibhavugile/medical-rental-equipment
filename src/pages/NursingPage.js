@@ -9,13 +9,11 @@ import WhyChooseUsUnique from "../frontend/WhyChooseUsUnique";
 import HeroWithForm from "../frontend/HeroWithForm";
 import ReviewsSection from "../frontend/ReviewsSection";
 import Footer from "../frontend/Footer";
-
+import SEO from "../components/SEO";
 
 
 export default function NursingPage() {
-  useEffect(() => {
-    document.title = "Nursing Care at Home | BookMyMedicare";
-  }, []);
+   
 
   const section1 = {
     eyebrow: "HOME HEALTHCARE SERVICES",
@@ -78,6 +76,14 @@ export default function NursingPage() {
   };
 
   return (
+    <>
+  <SEO
+        title="Nursing Care at Home | 24 Hour Nursing Care Services | Book My Medicare"
+        description="Book My Medicare offers nursing care at home with 24 hour nursing care services for elderly and patients. Trusted and reliable home care support. Book Now"
+        keywords="home nursing care, ICU setup at home, ambulance service, physiotherapy at home, medical equipment rental"
+        canonical="https://bookmymedicare.com/nursing-care-at-home"
+      />
+	  
     <div>
       <TopBar />
       <Header />
@@ -95,5 +101,6 @@ export default function NursingPage() {
            <Footer />
       
     </div>
+    </>
   );
 }

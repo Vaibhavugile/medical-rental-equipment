@@ -14,8 +14,17 @@ import SEO from "../components/SEO";
 
 export default function ICUPage() {
   useEffect(() => {
-    document.title = "ICU Setup at Home | BookMyMedicare";
-  }, []);
+  document.title = "ICU Setup at Home | ICU at Home Mumbai | Book My Medicare";
+
+  const description = document.querySelector('meta[name="description"]');
+
+  if (description) {
+    description.setAttribute(
+      "content",
+      "Book My Medicare provides ICU at home Mumbai services with complete ICU setup at home, expert doctors & 24/7 emergency support. Trusted care at home."
+    );
+  }
+}, []);
 
   const section1 = {
     eyebrow: "HOME HEALTHCARE SERVICES",
@@ -91,7 +100,7 @@ export default function ICUPage() {
         title="ICU Setup at Home | 24x7 Critical Care by Experts | BookMyMedicCare"
         description="Get ICU setup at home with ventilator, oxygen, cardiac monitors and trained ICU nurses. Trusted home ICU care service by BookMyMedicCare."
         keywords="ICU setup at home, home ICU care, ventilator at home, critical care at home"
-        canonical="https://www.bookmymediccare.com/icu"
+        canonical="https://www.bookmymediccare.com/icu-setup-at-home"
       />
       <TopBar />
       <Header />

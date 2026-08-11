@@ -16,7 +16,7 @@ const BASE_NAV_ITEMS = [
   { id: "services", label: "Services", dropdown: true },
   { id: "blogs", label: "Blogs", route: "/blogs" },
   { id: "providers", label: "Providers", route: "/our-team" },
-  { id: "contact", label: "Contact" ,route:"/#contact"},
+  { id: "contact", label: "Contact" ,route:"/#contact-us"},
 ];
 
 const LANDING_ONLY_ITEMS = [
@@ -51,16 +51,16 @@ function CloseIcon({ size = 22 }) {
   );
 }
 const SERVICES_LIST = [
-  { label: "Medical Equipment", link: "/equipment" },
-  { label: "ICU Setup", link: "/icu" },
-  { label: "Post Surgery Care", link: "/post-surgery-care" },
-  { label: "Palliative Care", link: "/palliative-care" },
-  { label: "Ambulance Services", link: "/ambulance" },
-  { label: "Lab Services", link: "/lab-services" },
-  { label: "Pharmacy Delivery", link: "/pharmacy-delivery" },
-  { label: "Nursing Care", link: "/nursing-care" },
-  { label: "Physiotherapy", link: "/physiotherapy" },
-  { label: "Respiratory Care", link: "/respiratory-care" },
+  { label: "Medical Equipment", link: "/medical-equipment-on-rent" },
+  { label: "ICU Setup", link: "/icu-setup-at-home" },
+  { label: "Post Surgery Care", link: "/post-surgery-care-at-home" },
+  { label: "Palliative Care", link: "/palliative-care-at-home" },
+  { label: "Ambulance Services", link: "/ambulance-services" },
+  { label: "Lab Services", link: "/lab-services-at-home" },
+  { label: "Pharmacy Delivery", link: "/pharmacy-delivery-at-home" },
+  { label: "Nursing Care", link: "/nursing-care-at-home" },
+  { label: "Physiotherapy", link: "/physiotherapy-at-home" },
+  { label: "Respiratory Care", link: "/respiratory-care-at-home" },
 ];
 
 

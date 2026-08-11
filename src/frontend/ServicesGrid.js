@@ -21,7 +21,7 @@ const services = [
     title: "Medical Equipment",
     subtitle: "Hospital-grade equipment at home",
     icon: "equip",
-    link: "/equipment",
+    link: "/medical-equipment-on-rent",
     enquire: true
   },
   {
@@ -29,7 +29,7 @@ const services = [
     title: "ICU Setup",
     subtitle: "Advanced critical care at home",
     icon: "icu",
-    link: "/icu",
+    link: "/icu-setup-at-home",
     enquire: true
   },
   {
@@ -37,7 +37,7 @@ const services = [
     title: "Post Surgery Care",
     subtitle: "Safe recovery after surgery",
     icon: "post",
-    link: "/post-surgery-care",
+    link: "/post-surgery-care-at-home",
     enquire: false
   },
   {
@@ -45,7 +45,7 @@ const services = [
     title: "Palliative Care",
     subtitle: "Comfort-focused compassionate care",
     icon: "pall",
-    link: "/palliative-care",
+    link: "/palliative-care-at-home",
     enquire: true
   },
   {
@@ -53,7 +53,7 @@ const services = [
     title: "Ambulance Services",
     subtitle: "24/7 emergency medical transport",
     icon: "ambulance",
-    link: "/ambulance",
+    link: "/ambulance-services",
     enquire: true
   },
   {
@@ -61,7 +61,7 @@ const services = [
     title: "Lab Services",
     subtitle: "Home sample collection & reports",
     icon: "lab",
-    link: "/lab-services",
+    link: "/lab-services-at-home",
     enquire: false
   },
   {
@@ -69,7 +69,7 @@ const services = [
     title: "Pharmacy Delivery",
     subtitle: "Medicines delivered at doorstep",
     icon: "pharmacy",
-    link: "/pharmacy-delivery",
+    link: "/pharmacy-delivery-at-home",
     enquire: true
   },
   {
@@ -77,7 +77,7 @@ const services = [
     title: "Nursing Care",
     subtitle: "Trained nurses for home care",
     icon: "nursing",
-    link: "/nursing-care",
+    link: "/nursing-care-at-home",
     enquire: true
   },
   {
@@ -85,7 +85,7 @@ const services = [
     title: "Physiotherapy Support",
     subtitle: "Rehabilitation & mobility therapy",
     icon: "physio",
-    link: "/physiotherapy",
+    link: "/physiotherapy-at-home",
     enquire: false
   },
   {
@@ -93,7 +93,7 @@ const services = [
     title: "Respiratory Care",
     subtitle: "Oxygen & ventilator support",
     icon: "resp",
-    link: "/respiratory-care",
+    link: "/respiratory-care-at-home",
     enquire: true
   }
 ];

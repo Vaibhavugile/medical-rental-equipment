@@ -9,13 +9,12 @@ import WhyChooseUsUnique from "../frontend/WhyChooseUsUnique";
 import HeroWithForm from "../frontend/HeroWithForm";
 import ReviewsSection from "../frontend/ReviewsSection";
 import Footer from "../frontend/Footer";
-
+import SEO from "../components/SEO";
 
 
 export default function PalliativePage() {
-  useEffect(() => {
-    document.title = "Palliative Care at Home | BookMyMedicare";
-  }, []);
+ 
+
 
   const section1 = {
     eyebrow: "HOME HEALTHCARE SERVICES",
@@ -78,6 +77,14 @@ export default function PalliativePage() {
   };
 
   return (
+    <>
+  <SEO
+        title="Palliative Care at Home | 24 Hour Nursing Care | Book My Medicare"
+        description="Need post surgery care at home? Book My Medicare provides skilled home health nursing care for faster recovery and personalized patient support at home."
+        keywords="home nursing care, ICU setup at home, ambulance service, physiotherapy at home, medical equipment rental"
+        canonical="https://bookmymedicare.com/palliative-care-at-home"
+      />
+	  
     <div>
       <TopBar />
       <Header />
@@ -95,5 +102,6 @@ export default function PalliativePage() {
            <Footer />
       
     </div>
+    </>
   );
 }

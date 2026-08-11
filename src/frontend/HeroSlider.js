@@ -166,9 +166,9 @@ const HeroSlider = () => {
               </p>
 
               {/* Title */}
-              <h2 className="hero-title animate animate-2">
+              <h1 className="hero-title animate animate-2">
                 {slide.title}
-              </h2>
+              </h1>
 
               {/* Description */}
               <p className="hero-desc animate animate-3">

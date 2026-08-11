@@ -91,10 +91,10 @@ function openWhatsApp(message) {
           </p>
 
           <div className="hero-actions stagger">
-            <a href="/#contact" className="btn-primary">
+            <a href="/#contact-us" className="btn-primary">
               {slide.primaryCta}
             </a>
-            <a href="/#contact" className="btn-outline">
+            <a href="/#contact-us" className="btn-outline">
               {slide.secondaryCta}
             </a>
           </div>

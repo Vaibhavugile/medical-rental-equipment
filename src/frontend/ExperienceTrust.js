@@ -114,7 +114,7 @@ export default function ExperienceTrust() {
 
         {/* CTA */}
         <div className="et-cta">
-          <a href="/#contact" className="et-btn">
+          <a href="/#contact-us" className="et-btn">
             Talk to Our Care Team
           </a>
         </div>

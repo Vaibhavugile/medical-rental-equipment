@@ -9,13 +9,11 @@ import WhyChooseUsUnique from "../frontend/WhyChooseUsUnique";
 import HeroWithForm from "../frontend/HeroWithForm";
 import ReviewsSection from "../frontend/ReviewsSection";
 import Footer from "../frontend/Footer";
-
+import SEO from "../components/SEO";
 
 
 export default function RespiratoryPage() {
-  useEffect(() => {
-    document.title = "Respiratory Care at Home | BookMyMedicare";
-  }, []);
+ 
 
   const section1 = {
     eyebrow: "HOME HEALTHCARE SERVICES",
@@ -78,6 +76,14 @@ export default function RespiratoryPage() {
   };
 
   return (
+    <>
+  <SEO
+        title="Respiratory Care at Home | Oxygen Concentrator on Rent | Book My Medicare"
+        description="Looking for respiratory care at home? Book My Medicare offers oxygen concentrator on rent with fast delivery and dependable medical support at home."
+        keywords="home nursing care, ICU setup at home, ambulance service, physiotherapy at home, medical equipment rental"
+        canonical="https://bookmymedicare.com/respiratory-care-at-home"
+      />
+	  
     <div>
       <TopBar />
       <Header />
@@ -95,5 +101,7 @@ export default function RespiratoryPage() {
            <Footer />
       
     </div>
+    </>
   );
+  
 }

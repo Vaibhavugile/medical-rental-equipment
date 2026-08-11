@@ -261,17 +261,17 @@ export default function App() {
         
 {/* <Route
   path="/palliative.php"
-  element={<Navigate to="/palliative-care" replace />}
+  element={<Navigate to="/palliative-care-at-home" replace />}
 />
 
 <Route
   path="/surgery.php"
-  element={<Navigate to="/post-surgery-care" replace />}
+  element={<Navigate to="/post-surgery-care-at-home" replace />}
 />
 
 <Route
-  path="/pharmacy-delivery.php"
-  element={<Navigate to="/pharmacy-delivery" replace />}
+  path="/pharmacy-delivery-at-home.php"
+  element={<Navigate to="/pharmacy-delivery-at-home" replace />}
 />
 
 <Route
@@ -281,27 +281,27 @@ export default function App() {
 
 <Route
   path="/contact.php"
-  element={<Navigate to="/#contact" replace />}
+  element={<Navigate to="/#contact-us" replace />}
 /> */}
         {/* ================= PUBLIC ================= */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/landing" element={<LandingNew />} />
-        <Route path="/icu" element={<ICUPage />} />
-        <Route path="/post-surgery-care" element={<SurgeryPage />} />
-        <Route path="/palliative-care" element={<PalliativePage />} />
-        <Route path="/ambulance" element={<AmbulancePage />} />
-        <Route path="/lab-services" element={<DiagnosticPage />} />
-        <Route path="/pharmacy-delivery" element={<PharmacyPage />} />
-        <Route path="/nursing-care" element={<NursingPage />} />
-        <Route path="/physiotherapy" element={<PhysiotherapyPage />} />
-        <Route path="/respiratory-care" element={<RespiratoryPage />} />
+        <Route path="/icu-setup-at-home" element={<ICUPage />} />
+        <Route path="/post-surgery-care-at-home" element={<SurgeryPage />} />
+        <Route path="/palliative-care-at-home" element={<PalliativePage />} />
+        <Route path="/ambulance-services" element={<AmbulancePage />} />
+        <Route path="/lab-services-at-home" element={<DiagnosticPage />} />
+        <Route path="/pharmacy-delivery-at-home" element={<PharmacyPage />} />
+        <Route path="/nursing-care-at-home" element={<NursingPage />} />
+        <Route path="/physiotherapy-at-home" element={<PhysiotherapyPage />} />
+        <Route path="/respiratory-care-at-home" element={<RespiratoryPage />} />
         <Route path="/doctors" element={<Doctors />} />
         <Route path="/appsupport" element={<Support />} />
                 <Route path="/appprivacy" element={<PrivacyPolicys />} />
                 <Route path="/resmed-lumis-ventilator-brochure" element={<BrochurePage/>} />
 
-        <Route path="/equipment" element={<EquipmentList />} />
-        <Route path="/equipment/:slug" element={<EquipmentDetail />} />
+        <Route path="/medical-equipment-on-rent" element={<EquipmentList />} />
+        <Route path="/medical-equipment-on-rent/:slug" element={<EquipmentDetail />} />
 
         <Route path="/our-team" element={<TeamPage />} />
         <Route path="/blogs" element={<BlogList />} />
@@ -309,8 +309,8 @@ export default function App() {
        <Route path="/addblog" element={<AddBlog />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
-        <Route path="/privacy" element={<PrivacyPolicy />} />
-        <Route path="/terms" element={<TermsAndConditions />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-&-condition" element={<TermsAndConditions />} />
          <Route path="/videos" element={<VideosPage />} />
         <Route path="/community" element={<CommunitySupport />} />
 

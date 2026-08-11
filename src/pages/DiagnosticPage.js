@@ -13,9 +13,18 @@ import Footer from "../frontend/Footer";
 
 
 export default function DiagnosticPage() {
-  useEffect(() => {
-    document.title = "Diagnostic services at home | BookMyMedicare";
-  }, []);
+useEffect(() => {
+  document.title = "Lab Services at Home | Home Health Care Services | Book My Medicare";
+
+  const description = document.querySelector('meta[name="description"]');
+
+  if (description) {
+    description.setAttribute(
+      "content",
+      "Get lab services at home with Book My Medicare. Trusted home health care services for sample collection, accurate reports and doorstep testing today."
+    );
+  }
+}, []);
 
   const section1 = {
     eyebrow: "HOME HEALTHCARE SERVICES",

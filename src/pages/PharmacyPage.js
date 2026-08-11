@@ -9,14 +9,11 @@ import WhyChooseUsUnique from "../frontend/WhyChooseUsUnique";
 import HeroWithForm from "../frontend/HeroWithForm";
 import ReviewsSection from "../frontend/ReviewsSection";
 import Footer from "../frontend/Footer";
-
+import SEO from "../components/SEO";
 
 
 export default function PharmacyPage() {
-  useEffect(() => {
-    document.title = "Pharmacy Home Delivery | BookMyMedicare";
-  }, []);
-
+ 
   const section1 = {
     eyebrow: "Pharmacy Home Delivery",
     title: "Pharmacy Home Delivery",
@@ -78,6 +75,14 @@ export default function PharmacyPage() {
   };
 
   return (
+    <>
+  <SEO
+        title="Pharmacy Delivery at Home | Health Care at Home | Book My Medicare"
+        description="Choose Book My Medicare for pharmacy delivery at home with expert health care at home services and fast delivery of genuine medicines. Enquire now!"
+        keywords="home nursing care, ICU setup at home, ambulance service, physiotherapy at home, medical equipment rental"
+        canonical="https://bookmymedicare.com/pharmacy-delivery-at-home"
+      />
+	  
     <div>
       <TopBar />
       <Header />
@@ -95,5 +100,6 @@ export default function PharmacyPage() {
            <Footer />
       
     </div>
+    </>
   );
 }

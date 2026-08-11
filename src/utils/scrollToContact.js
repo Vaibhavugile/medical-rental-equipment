@@ -17,5 +17,5 @@ export function scrollToContact(e) {
   }
 
   // Otherwise → go to landing page contact
-  window.location.href = "/#contact";
+  window.location.href = "/#contact-us";
 }

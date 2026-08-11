@@ -9,13 +9,12 @@ import WhyChooseUsUnique from "../frontend/WhyChooseUsUnique";
 import HeroWithForm from "../frontend/HeroWithForm";
 import ReviewsSection from "../frontend/ReviewsSection";
 import Footer from "../frontend/Footer";
+import SEO from "../components/SEO";
 
 
 
 export default function PhysiotherapyPage() {
-  useEffect(() => {
-    document.title = "Physiotherapy at Home| BookMyMedicare";
-  }, []);
+
 
   const section1 = {
     eyebrow: "HOME HEALTHCARE SERVICES",
@@ -78,6 +77,13 @@ export default function PhysiotherapyPage() {
   };
 
   return (
+    <>
+   <SEO
+        title="Physiotherapy at Home | Home Health Nursing Services | Book My Medicare"
+        description="Need physiotherapy at home? Book My Medicare provides professional home health nursing services for elderly care and post-treatment recovery. Call now!"
+        keywords="home nursing care, ICU setup at home, ambulance service, physiotherapy at home, medical equipment rental"
+        canonical="https://bookmymedicare.com/physiotherapy-at-home"
+      />
     <div>
       <TopBar />
       <Header />
@@ -95,5 +101,6 @@ export default function PhysiotherapyPage() {
            <Footer />
       
     </div>
+    </>
   );
 }

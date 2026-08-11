@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import "./TeamPage.css";
 import Header from "../frontend/Header";
 import TopBar from "../frontend/TopBar";
@@ -6,6 +6,7 @@ import WhyChooseUsUnique from "../frontend/WhyChooseUsUnique";
 import HeroWithForm from "../frontend/HeroWithForm";
 import ReviewsSection from "../frontend/ReviewsSection";
 import Footer from "../frontend/Footer";
+import SEO from "../components/SEO";
 
 const executiveTeam = [
   {
@@ -60,7 +61,7 @@ function TeamSection({ title, subtitle, members }) {
         {members.map((m, i) => (
           <div key={i} className="team-card">
             <div className="avatar">
-              <img src={m.image} alt={m.name} />
+              <img src={m.image} alt="Our Team" />
             </div>
             <h3>{m.name}</h3>
             <p>{m.role}</p>
@@ -72,7 +73,16 @@ function TeamSection({ title, subtitle, members }) {
 }
 
 export default function TeamPage() {
+	
+
   return (
+  <>
+  <SEO
+        title="Our Team | Health Care at Home Experts | Book My Medicare"
+        description="Meet our experienced home health agency team delivering trusted health care at home, nursing services, ICU at home solutions and quality patient support."
+        keywords="home nursing care, ICU setup at home, ambulance service, physiotherapy at home, medical equipment rental"
+        canonical="https://bookmymedicare.com/our-team"
+      />
     <main className="team-page">
             <TopBar />
             <Header />
@@ -96,5 +106,6 @@ export default function TeamPage() {
                  <Footer />
       
     </main>
+    </>
   );
 }

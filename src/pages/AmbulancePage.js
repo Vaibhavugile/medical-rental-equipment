@@ -9,13 +9,12 @@ import WhyChooseUsUnique from "../frontend/WhyChooseUsUnique";
 import HeroWithForm from "../frontend/HeroWithForm";
 import ReviewsSection from "../frontend/ReviewsSection";
 import Footer from "../frontend/Footer";
+import SEO from "../components/SEO";
 
 
 
 export default function AmbulancePage() {
-  useEffect(() => {
-    document.title = " Ambulance Services | BookMyMedicare";
-  }, []);
+ 
 
   const section1 = {
     eyebrow: "HOME HEALTHCARE SERVICES",
@@ -79,6 +78,13 @@ export default function AmbulancePage() {
   };
 
   return (
+    <>
+  <SEO
+        title="Ambulance Services | Emergency Health Care at Home | BookMyMedicare"
+        description="Get fast ambulance services and emergency health care at home with Book My Medicare. Quick response, trained staff & 24/7 medical support. Call now for help!"
+        keywords="home nursing care, ICU setup at home, ambulance service, physiotherapy at home, medical equipment rental"
+        canonical="https://bookmymedicare.com/ambulance-services"
+      />
     <div>
       <TopBar />
       <Header />
@@ -96,5 +102,7 @@ export default function AmbulancePage() {
            <Footer />
       
     </div>
+    </>
   );
 }
+

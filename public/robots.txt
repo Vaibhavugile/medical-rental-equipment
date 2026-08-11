@@ -1,3 +1,7 @@
-# https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Disallow: /wp-admin/
+Allow: /wp-admin/admin-ajax.php
+
+Disallow: /cgi-bin/
+
+Sitemap: https://bookmymedicare.com/sitemap.xml

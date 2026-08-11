@@ -36,17 +36,17 @@
     "redirects": [
       {
         "source": "/palliative.php",
-        "destination": "/palliative-care",
+        "destination": "/palliative-care-at-home",
         "type": 301
       },
       {
         "source": "/surgery.php",
-        "destination": "/post-surgery-care",
+        "destination": "/post-surgery-care-at-home",
         "type": 301
       },
       {
-        "source": "/pharmacy-delivery.php",
-        "destination": "/pharmacy-delivery",
+        "source": "/pharmacy-delivery-at-home.php",
+        "destination": "/pharmacy-delivery-at-home",
         "type": 301
       },
       {
@@ -56,7 +56,7 @@
       },
       {
         "source": "/contact.php",
-        "destination": "/#contact",
+        "destination": "/#contact-us",
         "type": 301
       }
     ],

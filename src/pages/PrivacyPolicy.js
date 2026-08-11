@@ -1,11 +1,22 @@
-import React from "react";
+import React, { useEffect } from "react";
 import "./PrivacyPolicy.css";
 import Header from "../frontend/Header";
 import TopBar from "../frontend/TopBar";
 import Footer from "../frontend/Footer";
+import SEO from "../components/SEO";
 
 export default function PrivacyPolicy() {
+	
+
   return (
+    <>
+  <SEO
+        title="Privacy Policy | 24-Hour Nursing Care at Home | Book My Medicare"
+        description="Learn about Book My Medicare Privacy Policy covering 24-hour nursing care at home. We safeguard your data while delivering trusted medical support at home."
+        keywords="home nursing care, ICU setup at home, ambulance service, physiotherapy at home, medical equipment rental"
+        canonical="https://bookmymedicare.com/privacy-policy"
+      />
+	  
     <div className="privacy-page">
         <TopBar />
                       <Header />
@@ -174,6 +185,6 @@ export default function PrivacyPolicy() {
       </div>
       <Footer />
     </div>
-    
+    </>
   );
 }

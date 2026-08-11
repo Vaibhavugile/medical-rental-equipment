@@ -9,22 +9,11 @@ import WhyChooseUsUnique from "../frontend/WhyChooseUsUnique";
 import HeroWithForm from "../frontend/HeroWithForm";
 import ReviewsSection from "../frontend/ReviewsSection";
 import Footer from "../frontend/Footer";
-
+import SEO from "../components/SEO";
 
 
 export default function SurgeryPage() {
-    useEffect(() => {
-  document.title = "Post Surgery Care at Home | Home Health Nursing Care | Book My Medicare";
-
-  const description = document.querySelector('meta[name="description"]');
-
-  if (description) {
-    description.setAttribute(
-      "content",
-      "Post surgery care at home with home health nursing, wound care, physiotherapy support and recovery-focused health care at home services."
-    );
-  }
-}, []);
+   
 
   const section1 = {
     eyebrow: "HOME HEALTHCARE SERVICES",
@@ -87,6 +76,14 @@ export default function SurgeryPage() {
   };
 
   return (
+    <>
+  <SEO
+        title="Post Surgery Care at Home | Home Health Nursing Care | Book My Medicare"
+        description="Post surgery care at home with home health nursing, wound care, physiotherapy support and recovery-focused health care at home services."
+        keywords="home nursing care, ICU setup at home, ambulance service, physiotherapy at home, medical equipment rental"
+        canonical="https://bookmymedicare.com/post-surgery-care-at-home"
+      />
+	  
     <div>
       <TopBar />
       <Header />
@@ -104,5 +101,6 @@ export default function SurgeryPage() {
            <Footer />
       
     </div>
+    </>
   );
 }
