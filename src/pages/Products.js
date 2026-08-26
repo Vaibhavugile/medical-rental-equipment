@@ -429,15 +429,19 @@ const toggleSelectCompany = (companyAssets) => {
 
     (assetsForProduct || []).forEach((a) => {
       if (!a.assetId || typeof a.assetId !== "string") return;
-      if (!a.assetId.startsWith(prefix)) return;
+const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-      const m = a.assetId.match(/(\d+)$/);
-      if (m) {
-        const n = Number(m[1]);
-        if (!Number.isNaN(n) && n > maxSeq) {
-          maxSeq = n;
-        }
-      }
+const match = a.assetId.match(
+  new RegExp(`^${escapedPrefix}(\\d{3})$`)
+);
+
+if (!match) return;
+
+const n = Number(match[1]);
+
+if (!Number.isNaN(n) && n > maxSeq) {
+  maxSeq = n;
+}
     });
 
     const nextSeq = maxSeq + 1;

@@ -124,13 +124,19 @@ export async function createAssetsForProduct(
   let maxSeq = 0;
   snap.docs.forEach((d) => {
     const aid = d.data()?.assetId || "";
-    if (!aid.startsWith(prefix)) return;
+    const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    const m = aid.match(/(\d+)$/);
-    if (m) {
-      const n = Number(m[1]);
-      if (!Number.isNaN(n) && n > maxSeq) maxSeq = n;
-    }
+const match = aid.match(
+  new RegExp(`^${escapedPrefix}(\\d{3})$`)
+);
+
+if (!match) return;
+
+const n = Number(match[1]);
+
+if (!Number.isNaN(n) && n > maxSeq) {
+  maxSeq = n;
+}
   });
 
   const lastSeqIfAllCreated = maxSeq + Number(quantity || 0);

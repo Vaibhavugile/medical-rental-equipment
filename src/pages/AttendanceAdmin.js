@@ -26,6 +26,7 @@ export default function AttendanceAdmin() {
   const navigate = useNavigate();
 const [manualPerson, setManualPerson] = useState("");
 const [manualDate, setManualDate] = useState(isoOf(new Date()));
+const [manualCheckoutDate, setManualCheckoutDate] = useState(isoOf(new Date()));
 const [manualCheckIn, setManualCheckIn] = useState("");
 const [manualCheckOut, setManualCheckOut] = useState("");
 const [manualNotes, setManualNotes] = useState("");
@@ -356,9 +357,16 @@ if (type === "absent") prev.absent++;
     const dayId = manualDate;
 
     const checkInDate = new Date(`${manualDate}T${manualCheckIn}`);
-    const checkOutDate = manualCheckOut
-      ? new Date(`${manualDate}T${manualCheckOut}`)
-      : null;
+
+const checkOutDate = manualCheckOut
+  ? new Date(`${manualCheckoutDate}T${manualCheckOut}`)
+  : null;
+
+if (checkOutDate && checkOutDate <= checkInDate) {
+  alert("Checkout date/time must be after check-in date/time");
+  setSavingManual(false);
+  return;
+}
 
     const ref = doc(db, base, manualPerson, "attendance", dayId);
 
@@ -379,6 +387,7 @@ if (type === "absent") prev.absent++;
 
     setManualCheckIn("");
     setManualCheckOut("");
+    setManualCheckoutDate(manualDate);
     setManualNotes("");
   } catch (e) {
     console.error(e);
@@ -456,7 +465,11 @@ if (type === "absent") prev.absent++;
     value={manualCheckIn}
     onChange={(e) => setManualCheckIn(e.target.value)}
   />
-
+<input
+  type="date"
+  value={manualCheckoutDate}
+  onChange={(e) => setManualCheckoutDate(e.target.value)}
+/>
   <input
     type="time"
     value={manualCheckOut}
