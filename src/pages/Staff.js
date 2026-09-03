@@ -28,6 +28,7 @@ const servicesRef = useRef(null);
 const [servicesOpen, setServicesOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState(defaultType);
+  const [statusFilter, setStatusFilter] = useState("all");
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [careTypes, setCareTypes] = useState([]);
@@ -397,23 +398,34 @@ const [servicesOpen, setServicesOpen] = useState(false);
 
   /* ================= FILTER ================= */
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    return rows.filter((r) => {
-      const text = [
-        r.name,
-        r.loginEmail,
-        r.phone,
-        r.staffType,
-        ...(r.servicesOffered || []),
-      ]
-        .join(" ")
-        .toLowerCase();
+  const q = search.toLowerCase();
 
-      const qOk = !q || text.includes(q);
-      const tOk = typeFilter === "all" ? true : r.staffType === typeFilter;
-      return qOk && tOk;
-    });
-  }, [rows, search, typeFilter]);
+  return rows.filter((r) => {
+    const text = [
+      r.name,
+      r.loginEmail,
+      r.phone,
+      r.staffType,
+      ...(r.servicesOffered || []),
+    ]
+      .join(" ")
+      .toLowerCase();
+
+    const qOk = !q || text.includes(q);
+
+    const tOk =
+      typeFilter === "all"
+        ? true
+        : r.staffType === typeFilter;
+
+    const sOk =
+      statusFilter === "all"
+        ? true
+        : String(r.currentStatus || "").toLowerCase() === "on duty";
+
+    return qOk && tOk && sOk;
+  });
+}, [rows, search, typeFilter, statusFilter]);
   const exportStaff = () => {
 
   const rows = filtered.map((r, i) => ({
@@ -489,6 +501,13 @@ const [servicesOpen, setServicesOpen] = useState(false);
           <option value="nurse">Nurse</option>
           <option value="caretaker">Caretaker</option>
         </select>
+        <select
+  value={statusFilter}
+  onChange={(e) => setStatusFilter(e.target.value)}
+>
+  <option value="all">All Status</option>
+  <option value="on-duty">On Duty</option>
+</select>
         <div className="leads-header-actions">
         <button
           className="cp-btn ghost"
@@ -813,13 +832,13 @@ const [servicesOpen, setServicesOpen] = useState(false);
                       )}
 
                       <button
-                        className="st-btn attendance"
-                        onClick={() =>
-                          navigate(`/crm/attendance?role=staff&userId=${r.id}`)
-                        }
-                      >
-                        Attendance
-                      </button>
+  className="st-btn attendance"
+  onClick={() =>
+    navigate(`/crm/attendance?role=staff&driverId=${r.id}`)
+  }
+>
+  Attendance
+</button>
 
                     </div>
                   </td>

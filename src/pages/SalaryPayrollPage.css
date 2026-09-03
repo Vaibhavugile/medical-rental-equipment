@@ -5,6 +5,20 @@ padding:28px;
 background:#f6f8fb;
 min-height:100vh;
 }
+.btn-upload-slip {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-upload-slip input {
+  display: none;
+}
+
+.btn-upload-slip:hover {
+  opacity: 0.9;
+}
 
 /* HEADER */
 

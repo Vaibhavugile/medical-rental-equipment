@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+
 import {
   collection,
   getDocs,
@@ -8,20 +9,31 @@ import {
   Timestamp,
   collectionGroup,
 } from "firebase/firestore";
+
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
+
 import { db } from "../firebase";
 import jsPDF from "jspdf";
 import "./SalaryPayrollPage.css";
 import autoTable from "jspdf-autotable";
+const storage = getStorage();
 export default function SalaryPayrollPage() {
 
   const [role, setRole] = useState("drivers")
   const [people, setPeople] = useState([])
   const [records, setRecords] = useState([])
   const [payStatus, setPayStatus] = useState({})
+  
   const [loading, setLoading] = useState(true)
 const navigate = useNavigate()
   const [dateFrom, setDateFrom] = useState(firstDay())
   const [dateTo, setDateTo] = useState(today())
+const [uploadingSlip, setUploadingSlip] = useState(null)
 
 useEffect(() => {
 
@@ -198,6 +210,70 @@ if (role === "users") {
     alert("Salary marked paid")
 
   }
+  async function uploadSalarySlip(userId, file) {
+  try {
+    if (!file) return;
+
+    // Only PDF allowed
+    if (file.type !== "application/pdf") {
+      alert("Please upload a PDF file only.");
+      return;
+    }
+
+    const month = dateFrom.slice(0, 7);
+
+    setUploadingSlip(`${userId}_${month}`);
+
+    const storagePath =
+      `salary-slips/${role}/${userId}/${month}.pdf`;
+
+    const storageRef = ref(storage, storagePath);
+
+    // Upload PDF
+    // If one already exists for this employee/month,
+    // this replaces the old PDF.
+    await uploadBytes(storageRef, file, {
+      contentType: "application/pdf",
+    });
+
+    // Get public/download URL
+    const downloadUrl = await getDownloadURL(storageRef);
+
+    // Save salary slip information in Firestore
+    await setDoc(
+      doc(db, "payrollStatus", `${userId}_${month}`),
+      {
+        userId,
+        month,
+        salarySlipUrl: downloadUrl,
+        salarySlipPath: storagePath,
+        salarySlipName: file.name,
+        salarySlipUploadedAt: Timestamp.now(),
+        salarySlipUploadedBy: "admin",
+      },
+      { merge: true }
+    );
+
+    // Update UI immediately
+    setPayStatus(prev => ({
+      ...prev,
+      [`${userId}_${month}`]: {
+        ...(prev[`${userId}_${month}`] || {}),
+        salarySlipUrl: downloadUrl,
+        salarySlipPath: storagePath,
+        salarySlipName: file.name,
+      },
+    }));
+
+    alert("Salary slip uploaded successfully.");
+
+  } catch (error) {
+    console.error("Salary slip upload error:", error);
+    alert("Failed to upload salary slip.");
+  } finally {
+    setUploadingSlip(null);
+  }
+}
 
   async function markUnpaid(userId) {
 
@@ -342,7 +418,7 @@ if (role === "users") {
 
     const key = `${id}_${dateFrom.slice(0, 7)}`;
     const paid = payStatus[key]?.paid ? "Paid" : "Unpaid";
-
+const salarySlipUrl = payStatus[key]?.salarySlipUrl;
     rows.push({
       Name: person?.name || "",
       Role: role,
@@ -455,6 +531,8 @@ if (role === "users") {
 
           const key = `${id}_${dateFrom.slice(0, 7)}`
           const paid = payStatus[key]?.paid
+          
+const salarySlipUrl = payStatus[key]?.salarySlipUrl
 
           return (
 
@@ -532,6 +610,42 @@ View Attendance
                 >
                   Download PDF
                 </button>
+                {salarySlipUrl ? (
+
+  <button
+    className="btn btn-upload-slip"
+    onClick={() => window.open(salarySlipUrl, "_blank")}
+  >
+    View Salary Slip
+  </button>
+
+) : (
+
+  <label className="btn btn-upload-slip">
+    {uploadingSlip === `${id}_${dateFrom.slice(0, 7)}`
+      ? "Uploading..."
+      : "Upload Salary Slip"}
+
+    <input
+      type="file"
+      accept="application/pdf,.pdf"
+      hidden
+      disabled={
+        uploadingSlip === `${id}_${dateFrom.slice(0, 7)}`
+      }
+      onChange={(e) => {
+        const file = e.target.files?.[0];
+
+        if (file) {
+          uploadSalarySlip(id, file);
+        }
+
+        e.target.value = "";
+      }}
+    />
+  </label>
+
+)}
 
               </div>
 

@@ -1,5 +1,5 @@
 // src/pages/AttendanceAdmin.js
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import {
   collection,
   getDocs,
@@ -10,6 +10,7 @@ import {
   Timestamp,
   getCountFromServer,
   setDoc,
+  deleteField,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -31,7 +32,11 @@ const [manualCheckIn, setManualCheckIn] = useState("");
 const [manualCheckOut, setManualCheckOut] = useState("");
 const [manualNotes, setManualNotes] = useState("");
 const [savingManual, setSavingManual] = useState(false);
+const [manualPersonSearch, setManualPersonSearch] = useState("");
+const [manualPersonOpen, setManualPersonOpen] = useState(false);
 
+const [personSearch, setPersonSearch] = useState("");
+const [personDropdownOpen, setPersonDropdownOpen] = useState(false);
   // role = "drivers" | "marketing" (default drivers)
   const [role, setRole] = useState(() => (searchParams.get("role") || "drivers").toLowerCase());
 
@@ -51,7 +56,32 @@ const [savingManual, setSavingManual] = useState(false);
   const [perUser, setPerUser] = useState([]);
   const [perUserLoading, setPerUserLoading] = useState(false);
   const [perUserError, setPerUserError] = useState("");
+const personDropdownRef = useRef(null);
+const manualPersonDropdownRef = useRef(null);
 
+useEffect(() => {
+  const handleOutsideClick = (event) => {
+    if (
+      personDropdownRef.current &&
+      !personDropdownRef.current.contains(event.target)
+    ) {
+      setPersonDropdownOpen(false);
+    }
+
+    if (
+      manualPersonDropdownRef.current &&
+      !manualPersonDropdownRef.current.contains(event.target)
+    ) {
+      setManualPersonOpen(false);
+    }
+  };
+
+  document.addEventListener("mousedown", handleOutsideClick);
+
+  return () => {
+    document.removeEventListener("mousedown", handleOutsideClick);
+  };
+}, []);
   // Keep URL in sync
   useEffect(() => {
     const params = {};
@@ -258,7 +288,31 @@ useEffect(() => {
 
   
   const peopleById = useMemo(() => Object.fromEntries(people.map(p => [p.id, p])), [people]);
+const filteredPeople = useMemo(() => {
+  const search = personSearch.trim().toLowerCase();
 
+  if (!search) return people;
+
+  return people.filter((p) => {
+    const name = (p.name || "").toLowerCase();
+    const email = (p.loginEmail || p.email || "").toLowerCase();
+
+    return name.includes(search) || email.includes(search);
+  });
+}, [people, personSearch]);
+
+const filteredManualPeople = useMemo(() => {
+  const search = manualPersonSearch.trim().toLowerCase();
+
+  if (!search) return people;
+
+  return people.filter((p) => {
+    const name = (p.name || "").toLowerCase();
+    const email = (p.loginEmail || p.email || "").toLowerCase();
+
+    return name.includes(search) || email.includes(search);
+  });
+}, [people, manualPersonSearch]);
   // Aggregation per person (existing attendance summary)
  const totals = useMemo(() => {
 
@@ -396,6 +450,74 @@ if (checkOutDate && checkOutDate <= checkInDate) {
     setSavingManual(false);
   }
 }
+async function saveManualAbsent() {
+  try {
+    if (!manualPerson) {
+      alert("Select person");
+      return;
+    }
+
+    if (!manualDate) {
+      alert("Select date");
+      return;
+    }
+
+    const base =
+      role === "marketing"
+        ? "marketing"
+        : role === "staff"
+        ? "staff"
+        : role === "users"
+        ? "users"
+        : "drivers";
+
+    const dayId = manualDate;
+
+    const ref = doc(
+      db,
+      base,
+      manualPerson,
+      "attendance",
+      dayId
+    );
+
+    await setDoc(
+      ref,
+      {
+        date: manualDate,
+
+        // Remove existing check-in/check-out completely
+        checkInServer: deleteField(),
+        checkOutServer: deleteField(),
+
+        // Also remove possible old millisecond fields
+        checkInMs: deleteField(),
+        checkOutMs: deleteField(),
+
+        status: "absent",
+
+        notes: manualNotes || "Manual absent by admin",
+
+        createdBy: "admin",
+      },
+      { merge: true }
+    );
+
+    alert("Attendance marked absent");
+
+    setManualCheckIn("");
+    setManualCheckOut("");
+    setManualCheckoutDate(manualDate);
+    setManualNotes("");
+
+    // Reload attendance data
+    setRecords((prev) => [...prev]);
+
+  } catch (e) {
+    console.error("saveManualAbsent:", e);
+    alert("Failed to mark absent");
+  }
+}
 
   return (
     <div className="attendance-page">
@@ -419,20 +541,93 @@ if (checkOutDate && checkOutDate <= checkInDate) {
   <option value="users">Users</option>   
 </select>
 
-        <select value={personId} onChange={e => setPersonId(e.target.value)}>
-          <option value="all">
-  {role === "marketing"
-    ? "All marketing"
-    : role === "staff"
-    ? "All staff"
-    : role === "users"
-    ? "All users"
-    : "All drivers"}
-</option>
-          {people.map(p => (
-            <option key={p.id} value={p.id}>{p.name || p.loginEmail || p.email || p.id}</option>
-          ))}
-        </select>
+        <div className="person-search-dropdown"
+        ref={personDropdownRef}>
+  <button
+    type="button"
+    className="person-dropdown-button"
+    onClick={() => setPersonDropdownOpen((v) => !v)}
+  >
+    {personId === "all"
+      ? role === "marketing"
+        ? "All marketing"
+        : role === "staff"
+        ? "All staff"
+        : role === "users"
+        ? "All users"
+        : "All drivers"
+      : (
+        peopleById[personId]?.name ||
+        peopleById[personId]?.loginEmail ||
+        peopleById[personId]?.email ||
+        "Select Person"
+      )}
+
+    <span>▾</span>
+  </button>
+
+  {personDropdownOpen && (
+    <div className="person-dropdown-menu">
+
+      <input
+        type="text"
+        className="person-search-input"
+        placeholder="Search person..."
+        value={personSearch}
+        onChange={(e) => setPersonSearch(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        autoFocus
+      />
+
+      <div
+        className="person-dropdown-option"
+        onClick={() => {
+          setPersonId("all");
+          setPersonDropdownOpen(false);
+          setPersonSearch("");
+        }}
+      >
+        {role === "marketing"
+          ? "All marketing"
+          : role === "staff"
+          ? "All staff"
+          : role === "users"
+          ? "All users"
+          : "All drivers"}
+      </div>
+
+      {filteredPeople.map((p) => (
+        <div
+          key={p.id}
+          className={`person-dropdown-option ${
+            personId === p.id ? "selected" : ""
+          }`}
+          onClick={() => {
+            setPersonId(p.id);
+            setPersonDropdownOpen(false);
+            setPersonSearch("");
+          }}
+        >
+          <div>
+            <strong>
+              {p.name || p.loginEmail || p.email || p.id}
+            </strong>
+          </div>
+
+          {(p.loginEmail || p.email) && (
+            <small>{p.loginEmail || p.email}</small>
+          )}
+        </div>
+      ))}
+
+      {!filteredPeople.length && (
+        <div className="person-dropdown-empty">
+          No person found
+        </div>
+      )}
+    </div>
+  )}
+</div>
 
         <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
         <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
@@ -445,14 +640,70 @@ if (checkOutDate && checkOutDate <= checkInDate) {
       <div className="manual-attendance">
   <h3>Manual Attendance</h3>
 
-  <select value={manualPerson} onChange={(e) => setManualPerson(e.target.value)}>
-    <option value="">Select Person</option>
-    {people.map((p) => (
-      <option key={p.id} value={p.id}>
-        {p.name || p.loginEmail || p.email}
-      </option>
-    ))}
-  </select>
+ <div className="person-search-dropdown manual-person-dropdown"
+  ref={manualPersonDropdownRef}>
+  <button
+    type="button"
+    className="person-dropdown-button"
+    onClick={() => setManualPersonOpen((v) => !v)}
+  >
+    {manualPerson
+      ? (
+          peopleById[manualPerson]?.name ||
+          peopleById[manualPerson]?.loginEmail ||
+          peopleById[manualPerson]?.email ||
+          "Select Person"
+        )
+      : "Select Person"}
+
+    <span>▾</span>
+  </button>
+
+  {manualPersonOpen && (
+    <div className="person-dropdown-menu">
+
+      <input
+        type="text"
+        className="person-search-input"
+        placeholder="Search person..."
+        value={manualPersonSearch}
+        onChange={(e) => setManualPersonSearch(e.target.value)}
+        onClick={(e) => e.stopPropagation()}
+        autoFocus
+      />
+
+      {filteredManualPeople.map((p) => (
+        <div
+          key={p.id}
+          className={`person-dropdown-option ${
+            manualPerson === p.id ? "selected" : ""
+          }`}
+          onClick={() => {
+            setManualPerson(p.id);
+            setManualPersonOpen(false);
+            setManualPersonSearch("");
+          }}
+        >
+          <div>
+            <strong>
+              {p.name || p.loginEmail || p.email || p.id}
+            </strong>
+          </div>
+
+          {(p.loginEmail || p.email) && (
+            <small>{p.loginEmail || p.email}</small>
+          )}
+        </div>
+      ))}
+
+      {!filteredManualPeople.length && (
+        <div className="person-dropdown-empty">
+          No person found
+        </div>
+      )}
+    </div>
+  )}
+</div>
 
   <input
     type="date"
@@ -482,9 +733,23 @@ if (checkOutDate && checkOutDate <= checkInDate) {
     onChange={(e) => setManualNotes(e.target.value)}
   />
 
-  <button className="cp-btn" onClick={saveManualAttendance} disabled={savingManual}>
-    {savingManual ? "Saving..." : "Save Attendance"}
-  </button>
+  
+  <button
+  className="cp-btn"
+  onClick={saveManualAttendance}
+  disabled={savingManual}
+>
+  {savingManual ? "Saving..." : "Save Attendance"}
+</button>
+
+<button
+  type="button"
+  className="cp-btn ghost"
+  onClick={saveManualAbsent}
+  disabled={savingManual}
+>
+  Mark Absent
+</button>
 </div>
 
       {error && <p className="error">{error}</p>}
@@ -524,16 +789,21 @@ if (checkOutDate && checkOutDate <= checkInDate) {
           </thead>
 
           <tbody>
-            {records.map((r) => {
-              const attendance = getAttendanceType(
-                r.durationMinutes,
-                r.personId,
-                r.dayId,
-                graceStateForTable
-              );
+           {records.map((r) => {
+  const attendance = getAttendanceType(
+    r.durationMinutes,
+    r.personId,
+    r.dayId,
+    graceStateForTable
+  );
 
-              return (
-                <tr key={r.id}>
+  const sunday = isSunday(r.dayId);
+
+  return (
+    <tr
+      key={r.id}
+      className={sunday ? "sunday-row" : ""}
+    >
                   <td style={{ minWidth: 220 }}>
                     <div className="dname">
                       {peopleById[r.personId]?.name || "(unknown)"}
@@ -727,6 +997,14 @@ function isoOf(d) {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+function isSunday(dateString) {
+  const [year, month, day] = dateString.split("-").map(Number);
+
+  // JavaScript months are 0-based
+  const date = new Date(year, month - 1, day);
+
+  return date.getDay() === 0;
 }
 function daysBetween(fromIso, toIso) {
   const res = [];
