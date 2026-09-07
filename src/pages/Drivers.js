@@ -34,6 +34,7 @@ export default function Drivers() {
     loginEmail: "",
     status: "available",
     salary: "",
+    active: true,
     salaryPeriod: "monthly",
     joinDate: "",
     licenseNumber: "",
@@ -137,6 +138,27 @@ useEffect(() => {
     !marketingSnap.empty ||
     !usersSnap.empty
   );
+};
+const makeAllDriversActive = async () => {
+  try {
+    const snap = await getDocs(collection(db, "drivers"));
+
+    for (const driverDoc of snap.docs) {
+      const data = driverDoc.data();
+
+      // Only add active if the field doesn't already exist
+      if (data.active === undefined) {
+        await updateDoc(driverDoc.ref, {
+          active: true,
+        });
+      }
+    }
+
+    alert("All previous drivers are now active.");
+  } catch (error) {
+    console.error("Migration failed:", error);
+    alert("Failed to update drivers.");
+  }
 };
 const handleEnter = (e) => {
   if (e.key === "Enter") {
@@ -453,6 +475,13 @@ const exportDrivers = () => {
       >
         +
       </button>
+      <button
+  className="cp-btn ghost"
+  type="button"
+  onClick={makeAllDriversActive}
+>
+  Make Previous Drivers Active
+</button>
 
       {/* Drawer & Overlay */}
       {showForm && <div className="drawer-overlay" onClick={() => setShowForm(false)} />}
@@ -496,6 +525,21 @@ const exportDrivers = () => {
             <input type="text" placeholder="Emergency Contact Name" value={newDriver.emergencyContactName} onChange={(e) => setNewDriver({ ...newDriver, emergencyContactName: e.target.value })} />
             <input type="text" placeholder="Emergency Contact Phone" value={newDriver.emergencyContactPhone} onChange={(e) => setNewDriver({ ...newDriver, emergencyContactPhone: e.target.value })} />
             <input type="text" placeholder="Notes" value={newDriver.notes} onChange={(e) => setNewDriver({ ...newDriver, notes: e.target.value })} />
+            <div className="active-checkbox">
+  <label>
+    <input
+      type="checkbox"
+      checked={!!newDriver.active}
+      onChange={(e) =>
+        setNewDriver({
+          ...newDriver,
+          active: e.target.checked,
+        })
+      }
+    />
+    <span>Active</span>
+  </label>
+</div>
           </div>
 
           <div className="actions-row">

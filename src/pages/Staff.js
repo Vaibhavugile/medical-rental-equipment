@@ -740,7 +740,21 @@ const [servicesOpen, setServicesOpen] = useState(false);
               setForm({ ...form, upiId: e.target.value })
             }
           />
-
+<div className="active-checkbox">
+  <label>
+    <input
+      type="checkbox"
+      checked={!!form.active}
+      onChange={(e) =>
+        setForm({
+          ...form,
+          active: e.target.checked,
+        })
+      }
+    />
+    <span>Active</span>
+  </label>
+</div>
           <div className="actions-row">
             <button className="cp-btn">
               {editingId
