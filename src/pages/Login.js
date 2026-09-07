@@ -17,11 +17,20 @@ function Login() {
 
   /* 🔁 AUTO REDIRECT IF ALREADY LOGGED IN */
   useEffect(() => {
-    if (user && userProfile) {
-      const redirectTo = getRedirectPath(userProfile);
-      navigate(redirectTo, { replace: true });
+  if (user && userProfile) {
+
+    // Check whether account is disabled
+    if (userProfile.active === false) {
+      navigate("/account-disabled", { replace: true });
+      return;
     }
-  }, [user, userProfile, navigate]);
+
+    // Existing redirect logic
+    const redirectTo = getRedirectPath(userProfile);
+
+    navigate(redirectTo, { replace: true });
+  }
+}, [user, userProfile, navigate]);
 
   const handleLogin = async (e) => {
     e.preventDefault();

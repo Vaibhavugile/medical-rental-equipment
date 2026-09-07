@@ -91,6 +91,7 @@ import OrdersRecycleBin from "./pages/OrdersRecycleBin";
 import NursingOrdersRecycleBin from "./pages/NursingOrdersRecycleBin";
 import BrochurePage from "./pages/BrochurePage";
 import LeadsAnalytics from "./pages/LeadsAnalytics";
+import AccountDisabled from "./pages/AccountDisabled";
 /* ============================================================
    PRIVATE ROUTE (AUTH ONLY, SILENT)
 ============================================================ */
@@ -302,7 +303,10 @@ export default function App() {
 
         <Route path="/medical-equipment-on-rent" element={<EquipmentList />} />
         <Route path="/medical-equipment-on-rent/:slug" element={<EquipmentDetail />} />
-
+<Route
+  path="/account-disabled"
+  element={<AccountDisabled />}
+/>
         <Route path="/our-team" element={<TeamPage />} />
         <Route path="/blogs" element={<BlogList />} />
         <Route path="/blogs/:slug" element={<BlogDetail />} />

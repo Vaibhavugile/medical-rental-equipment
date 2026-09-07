@@ -6,6 +6,7 @@ import { auth, db } from "../firebase"; // adjust the import path if your projec
 import {
   createUserWithEmailAndPassword,
   updateProfile,
+   signOut,
 } from "firebase/auth";
 
 import {
@@ -80,11 +81,12 @@ export default function Signup() {
       const role = isDriver ? "driver" : isMarketing ? "marketing" : "sales";
 
       await setDoc(doc(db, "users", cred.user.uid), {
-        name: trimmedName,
-        email: trimmedEmail,
-        role,
-        createdAt: serverTimestamp(),
-      });
+  name: trimmedName,
+  email: trimmedEmail,
+  role,
+  active: false,
+  createdAt: serverTimestamp(),
+});
 
       // 5) Backfill authUid into the matched domain document (drivers/marketing)
       if (isDriver) {
@@ -110,9 +112,9 @@ export default function Signup() {
           { merge: true }
         );
       }
-
+await signOut(auth);
+navigate("/login", { replace: true });
       // 6) Send them to Login; your auth-based redirect can route to /marketing for marketing users
-      navigate("/login", { replace: true });
     } catch (err) {
       console.error(err);
       let message = "Something went wrong. Please try again.";

@@ -1103,10 +1103,16 @@ function mapDayDoc({ id, personId, dayId, raw }) {
       shift1Data?.checkOutLocation || null,
 
     checkInPhotoUrl:
-      shift1Data?.checkInPhotoUrl || "",
+  shift1Data?.checkInPhotoUrl ||
+  raw["check-inPhotoUrl"] ||
+  raw.checkInPhotoUrl ||
+  "",
 
-    checkOutPhotoUrl:
-      shift1Data?.checkOutPhotoUrl || "",
+checkOutPhotoUrl:
+  shift1Data?.checkOutPhotoUrl ||
+  raw["check-outPhotoUrl"] ||
+  raw.checkOutPhotoUrl ||
+  "",
 
     checkInPhotoStoragePath:
       shift1Data?.checkInPhotoStoragePath || "",
@@ -1164,10 +1170,16 @@ function mapDayDoc({ id, personId, dayId, raw }) {
         shift2Data.checkOutLocation || null,
 
       checkInPhotoUrl:
-        shift2Data.checkInPhotoUrl || "",
+  shift2Data.checkInPhotoUrl ||
+  raw["check-inPhotoUrl"] ||
+  raw.checkInPhotoUrl ||
+  "",
 
-      checkOutPhotoUrl:
-        shift2Data.checkOutPhotoUrl || "",
+checkOutPhotoUrl:
+  shift2Data.checkOutPhotoUrl ||
+  raw["check-outPhotoUrl"] ||
+  raw.checkOutPhotoUrl ||
+  "",
 
       checkInPhotoStoragePath:
         shift2Data.checkInPhotoStoragePath || "",
