@@ -93,41 +93,112 @@ if (role === "users") {
 
     // ================= BUILD RECORDS =================
 
-    const allRecords = []
+    // ================= BUILD RECORDS =================
 
-    const days = getDaysBetween(dateFrom, dateTo)
+const allRecords = [];
 
-    users.forEach(p => {
+const days = getDaysBetween(dateFrom, dateTo);
 
-      days.forEach(dayId => {
+users.forEach(p => {
 
-        const raw = attendanceMap[`${p.id}_${dayId}`]
+  days.forEach(dayId => {
 
-        if (!raw) {
+    const raw = attendanceMap[`${p.id}_${dayId}`];
 
-          allRecords.push({
-            id: `${p.id}_${dayId}`,
-            personId: p.id,
-            dayId,
-            durationMinutes: 0
-          })
 
-          return
-        }
+    // ==========================================
+    // NO ATTENDANCE DOCUMENT
+    // ==========================================
+    if (!raw) {
 
-        const checkIn = raw.checkInServer ?? raw.checkInMs ?? null
-        const checkOut = raw.checkOutServer ?? raw.checkOutMs ?? null
+      allRecords.push({
+        id: `${p.id}_${dayId}`,
+        personId: p.id,
+        dayId,
+        shift: 1,
+        durationMinutes: 0
+      });
 
-        allRecords.push({
-          id: `${p.id}_${dayId}`,
-          personId: p.id,
-          dayId,
-          durationMinutes: durationInMinutes(checkIn, checkOut)
-        })
+      return;
+    }
 
-      })
 
-    })
+    // ==========================================
+    // SHIFT 1
+    // ==========================================
+
+    const shift1 = raw.shifts?.["1"] || null;
+
+    const shift1CheckIn =
+      shift1?.checkInServer ??
+      shift1?.checkInMs ??
+      raw.checkInServer ??
+      raw.checkInMs ??
+      null;
+
+    const shift1CheckOut =
+      shift1?.checkOutServer ??
+      shift1?.checkOutMs ??
+      raw.checkOutServer ??
+      raw.checkOutMs ??
+      null;
+
+
+    allRecords.push({
+      id: `${p.id}_${dayId}_shift1`,
+      personId: p.id,
+      dayId,
+      shift: 1,
+
+      checkInAt: shift1CheckIn,
+      checkOutAt: shift1CheckOut,
+
+      durationMinutes: durationInMinutes(
+        shift1CheckIn,
+        shift1CheckOut
+      )
+    });
+
+
+    // ==========================================
+    // SHIFT 2
+    // ==========================================
+
+    const shift2 = raw.shifts?.["2"] || null;
+
+    if (shift2) {
+
+      const shift2CheckIn =
+        shift2.checkInServer ??
+        shift2.checkInMs ??
+        null;
+
+      const shift2CheckOut =
+        shift2.checkOutServer ??
+        shift2.checkOutMs ??
+        null;
+
+
+      allRecords.push({
+        id: `${p.id}_${dayId}_shift2`,
+        personId: p.id,
+        dayId,
+        shift: 2,
+
+        checkInAt: shift2CheckIn,
+        checkOutAt: shift2CheckOut,
+
+        durationMinutes: durationInMinutes(
+          shift2CheckIn,
+          shift2CheckOut
+        )
+      });
+
+    }
+
+  });
+
+});
 
     setRecords(allRecords)
 

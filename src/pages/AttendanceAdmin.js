@@ -182,9 +182,16 @@ const base =
   });
   continue;
 }
-          const raw = snap.data() || {};
-          const rec = mapDayDoc({ id: `${p.id}_${dayId}`, personId: p.id, dayId, raw });
-          out.push(rec);
+        const raw = snap.data() || {};
+
+const mappedRows = mapDayDoc({
+  id: `${p.id}_${dayId}`,
+  personId: p.id,
+  dayId,
+  raw
+});
+
+out.push(...mappedRows);
         }
         if (!mounted) return;
         out.sort((a,b)=> a.dayId.localeCompare(b.dayId));
@@ -778,6 +785,7 @@ async function saveManualAbsent() {
 </th>
 
               <th>Date</th>
+              <th>Shift</th>
               <th>Check-in</th>
               <th>Check-out</th>
               <th>Duration</th>
@@ -816,6 +824,11 @@ async function saveManualAbsent() {
                   </td>
 
                   <td className="mono">{r.dayId}</td>
+<td>
+  <strong>
+    Shift {r.shift || 1}
+  </strong>
+</td>
 
                   <td>{fmtDT(r.checkInAt)}</td>
 
@@ -1056,38 +1069,130 @@ function durationInMinutes(checkInAt, checkOutAt) {
   return Math.round(diffMs / 60000);
 }
 function mapDayDoc({ id, personId, dayId, raw }) {
-  const checkInAt = raw.checkInServer ?? raw.checkInMs ?? null;
-  const checkOutAt = raw.checkOutServer ?? raw.checkOutMs ?? null;
-  const rec = {
-    id,
+  const rows = [];
+
+  // =========================================================
+  // SHIFT 1
+  // ONLY USE SHIFT 1 TIME DATA
+  // =========================================================
+  const shift1Data = raw.shifts?.["1"] || null;
+
+  const shift1CheckIn =
+    shift1Data?.checkInServer ??
+    shift1Data?.checkInMs ??
+    null;
+
+  const shift1CheckOut =
+    shift1Data?.checkOutServer ??
+    shift1Data?.checkOutMs ??
+    null;
+
+  const shift1 = {
+    id: `${id}_shift1`,
     personId,
     dayId: raw.date || dayId,
+    shift: 1,
 
-    checkInAt,
-    checkOutAt,
+    checkInAt: shift1CheckIn,
+    checkOutAt: shift1CheckOut,
 
-    checkInLocation: raw.checkInLocation || null,
-    checkOutLocation: raw.checkOutLocation || null,
+    checkInLocation:
+      shift1Data?.checkInLocation || null,
 
-    // ✅ PHOTOS
-    checkInPhotoUrl: raw["check-inPhotoUrl"] || raw.checkInPhotoUrl || "",
-    checkOutPhotoUrl: raw["check-outPhotoUrl"] || raw.checkOutPhotoUrl || "",
+    checkOutLocation:
+      shift1Data?.checkOutLocation || null,
+
+    checkInPhotoUrl:
+      shift1Data?.checkInPhotoUrl || "",
+
+    checkOutPhotoUrl:
+      shift1Data?.checkOutPhotoUrl || "",
 
     checkInPhotoStoragePath:
-      raw["check-inPhotoStoragePath"] || raw.checkInPhotoStoragePath || "",
-    checkOutPhotoStoragePath:
-      raw["check-outPhotoStoragePath"] || raw.checkOutPhotoStoragePath || "",
+      shift1Data?.checkInPhotoStoragePath || "",
 
-    notes: raw.note || raw.notes || "",
-    status: raw.status || (checkOutAt ? "present" : "open"),
+    checkOutPhotoStoragePath:
+      shift1Data?.checkOutPhotoStoragePath || "",
+
+    notes:
+      shift1Data?.note || "",
+
+    status:
+      shift1Data?.status ||
+      (shift1CheckOut ? "present" : "open"),
   };
 
+  // Duration ONLY for Shift 1
+  shift1.durationMinutes = durationInMinutes(
+    shift1.checkInAt,
+    shift1.checkOutAt
+  );
 
-rec.durationMinutes = durationInMinutes(rec.checkInAt, rec.checkOutAt);
-
-return rec;
+  rows.push(shift1);
 
 
+  // =========================================================
+  // SHIFT 2
+  // ONLY USE SHIFT 2 TIME DATA
+  // =========================================================
+  const shift2Data = raw.shifts?.["2"] || null;
+
+  if (shift2Data) {
+    const shift2CheckIn =
+      shift2Data.checkInServer ??
+      shift2Data.checkInMs ??
+      null;
+
+    const shift2CheckOut =
+      shift2Data.checkOutServer ??
+      shift2Data.checkOutMs ??
+      null;
+
+    const shift2 = {
+      id: `${id}_shift2`,
+      personId,
+      dayId: raw.date || dayId,
+      shift: 2,
+
+      checkInAt: shift2CheckIn,
+      checkOutAt: shift2CheckOut,
+
+      checkInLocation:
+        shift2Data.checkInLocation || null,
+
+      checkOutLocation:
+        shift2Data.checkOutLocation || null,
+
+      checkInPhotoUrl:
+        shift2Data.checkInPhotoUrl || "",
+
+      checkOutPhotoUrl:
+        shift2Data.checkOutPhotoUrl || "",
+
+      checkInPhotoStoragePath:
+        shift2Data.checkInPhotoStoragePath || "",
+
+      checkOutPhotoStoragePath:
+        shift2Data.checkOutPhotoStoragePath || "",
+
+      notes:
+        shift2Data.note || "",
+
+      status:
+        shift2Data.status ||
+        (shift2CheckOut ? "present" : "open"),
+    };
+
+    // Duration ONLY for Shift 2
+    shift2.durationMinutes = durationInMinutes(
+      shift2.checkInAt,
+      shift2.checkOutAt
+    );
+
+    rows.push(shift2);
+  }
+
+  return rows;
 }
 
 // ---- NEW: time range + counting helpers ----
