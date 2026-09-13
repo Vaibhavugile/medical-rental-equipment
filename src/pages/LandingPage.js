@@ -27,8 +27,7 @@ import Meet from "../frontend/Meet";
 import "./LandingPage.module.css";
 import SupportingSlider from "../frontend/SupportingSlider";
 import  HomeHealthcareSection from "../components/HomeHealthcareSection";
-
-
+import FaqNew from "../frontend/faqnew";
 export default function LandingPage() {
   useEffect(() => {
   if (!window.location.hash) return;
@@ -107,8 +106,11 @@ export default function LandingPage() {
             <TrustPremium />
 <ExperienceTrust /> 
 
+<FaqNew />
       <ReviewsSection  autoplay={true} autoplayDelay={3500} />
+      
       <HomeHealthcareSection />
+
 
       <Footer />
       <FloatingContact />

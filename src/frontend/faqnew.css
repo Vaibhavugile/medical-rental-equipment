@@ -1,0 +1,149 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Georgia, "Times New Roman", serif;
+  background: #f3f3f3;
+  color: #111;
+}
+
+.app {
+  width: 100%;
+  min-height: 100vh;
+  padding: 30px 0;
+}
+
+.document {
+  width: 900px;
+  max-width: calc(100% - 40px);
+  min-height: 1200px;
+  margin: 0 auto;
+  padding: 45px 70px 35px;
+  background: #ffffff;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
+}
+
+/* Header */
+
+.document-header {
+  text-align: center;
+}
+
+.document-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 15px;
+}
+
+.heading-line {
+  width: 100%;
+  height: 1px;
+  background: #222;
+  margin-bottom: 30px;
+}
+
+/* FAQ Content */
+
+.faq-content {
+  width: 100%;
+}
+
+.faq-item {
+  margin-bottom: 24px;
+}
+
+.faq-item h2 {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.45;
+  margin-bottom: 13px;
+}
+
+.faq-item p {
+  font-size: 15.5px;
+  line-height: 1.55;
+  text-align: justify;
+  margin: 0;
+}
+
+/* Footer */
+
+.document-footer {
+  margin-top: 35px;
+  padding-top: 12px;
+  border-top: 1px solid #ccc;
+
+  display: flex;
+  justify-content: space-between;
+
+  font-size: 12px;
+  color: #555;
+}
+
+/* Mobile */
+
+@media (max-width: 768px) {
+  .app {
+    padding: 0;
+    background: #fff;
+  }
+
+  .document {
+    width: 100%;
+    max-width: 100%;
+    min-height: 100vh;
+    margin: 0;
+    padding: 30px 25px;
+    box-shadow: none;
+  }
+
+  .document-header h1 {
+    font-size: 24px;
+  }
+
+  .faq-item {
+    margin-bottom: 22px;
+  }
+
+  .faq-item h2 {
+    font-size: 16px;
+  }
+
+  .faq-item p {
+    font-size: 15px;
+    text-align: left;
+  }
+}
+
+/* Print / PDF */
+
+@media print {
+  body {
+    background: #fff;
+  }
+
+  .app {
+    padding: 0;
+  }
+
+  .document {
+    width: 100%;
+    max-width: 100%;
+    min-height: auto;
+    margin: 0;
+    padding: 30px 50px;
+    box-shadow: none;
+  }
+
+  .faq-item {
+    break-inside: avoid;
+  }
+
+  .document-footer {
+    break-inside: avoid;
+  }
+}

@@ -10,7 +10,7 @@ import HeroWithForm from "../frontend/HeroWithForm";
 import ReviewsSection from "../frontend/ReviewsSection";
 import Footer from "../frontend/Footer";
 import SEO from "../components/SEO";
-
+import Nursingreadmore from "../frontend/Nursingreadmore";
 
 export default function NursingPage() {
    
@@ -94,10 +94,13 @@ export default function NursingPage() {
       />
      <WhyChooseUsUnique />
          <section id="contact">
+
         <HeroWithForm />
+
       </section>
            
            <ReviewsSection  autoplay={true} autoplayDelay={3500} />
+           <Nursingreadmore />
            <Footer />
       
     </div>

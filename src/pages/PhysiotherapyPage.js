@@ -10,7 +10,7 @@ import HeroWithForm from "../frontend/HeroWithForm";
 import ReviewsSection from "../frontend/ReviewsSection";
 import Footer from "../frontend/Footer";
 import SEO from "../components/SEO";
-
+import Physioreadmore from "../frontend/Physioreadmore";
 
 
 export default function PhysiotherapyPage() {
@@ -96,6 +96,7 @@ export default function PhysiotherapyPage() {
          <section id="contact">
         <HeroWithForm />
       </section>
+      <Physioreadmore />
            
            <ReviewsSection  autoplay={true} autoplayDelay={3500} />
            <Footer />
