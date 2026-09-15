@@ -25,9 +25,12 @@ const [userRole, setUserRole] = useState(null);
   salaryMonthly: "",
   active: true,
   authUid: "",
-};
-  const [form, setForm] = useState(empty);
+  sourceLabels: [],
 
+};
+const [leadSourceSearch, setLeadSourceSearch] = useState("");
+  const [form, setForm] = useState(empty);
+const [leadSources, setLeadSources] = useState([]);
   // Load all marketing users
   const reload = async () => {
     setLoading(true);
@@ -65,6 +68,31 @@ useEffect(() => {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
+  useEffect(() => {
+  const loadLeadSources = async () => {
+    try {
+      const snap = await getDocs(collection(db, "leadSources"));
+
+      const arr = snap.docs
+        .map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }))
+        .filter((source) => source.active !== false)
+        .sort((a, b) =>
+          String(a.name || "").localeCompare(
+            String(b.name || "")
+          )
+        );
+
+      setLeadSources(arr);
+    } catch (err) {
+      console.error("load lead sources error", err);
+    }
+  };
+
+  loadLeadSources();
+}, []);
 const emailExists = async (email) => {
 
   const marketingQuery = query(
@@ -133,6 +161,9 @@ const emailExists = async (email) => {
   salaryMonthly: Number(p.salaryMonthly || 0),
   active: !!p.active,
   authUid: p.authUid.trim(),
+  sourceLabels: Array.isArray(p.sourceLabels)
+  ? p.sourceLabels
+  : [],
   role: "marketing",
   updatedAt: serverTimestamp(),
 });
@@ -211,6 +242,9 @@ const emailExists = async (email) => {
   phone: r.phone || "",
   branchId: r.branchId || "",
   salaryMonthly: r.salaryMonthly || "",
+  sourceLabels: Array.isArray(r.sourceLabels)
+  ? r.sourceLabels
+  : [],
   active: r.active !== false,
   authUid: r.uid || r.authUid || "",
 });
@@ -414,6 +448,296 @@ const exportMarketing = () => {
             type="text" placeholder="Branch ID"
             value={form.branchId} onChange={(e) => setForm({ ...form, branchId: e.target.value })}
           />
+          {/* LEAD SOURCES */}
+{/* LEAD SOURCES */}
+
+{/* LEAD SOURCES */}
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  }}
+>
+  <label
+    style={{
+      fontSize: 13,
+      fontWeight: 600,
+      color: "#334155",
+    }}
+  >
+    Lead Sources
+  </label>
+
+  <details
+    style={{
+      position: "relative",
+    }}
+  >
+    {/* DROPDOWN HEADER */}
+    <summary
+      style={{
+        height: 44,
+        padding: "0 14px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        border: "1px solid #e2e8f0",
+        borderRadius: 10,
+        background: "#f8fafc",
+        fontSize: 14,
+        color: form.sourceLabels?.length
+          ? "#0f172a"
+          : "#94a3b8",
+        cursor: "pointer",
+        listStyle: "none",
+        boxSizing: "border-box",
+      }}
+    >
+      <span>
+        {form.sourceLabels?.length
+          ? `${form.sourceLabels.length} source${
+              form.sourceLabels.length > 1 ? "s" : ""
+            } selected`
+          : "Select Lead Sources"}
+      </span>
+
+      <span
+        style={{
+          fontSize: 12,
+          color: "#64748b",
+        }}
+      >
+        ▼
+      </span>
+    </summary>
+
+    {/* DROPDOWN */}
+    <div
+      style={{
+        position: "absolute",
+        top: 50,
+        left: 0,
+        right: 0,
+        background: "#fff",
+        border: "1px solid #e2e8f0",
+        borderRadius: 10,
+        boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
+        zIndex: 100,
+        overflow: "hidden",
+      }}
+    >
+      {/* SEARCH INPUT */}
+      <div
+        style={{
+          padding: 8,
+          borderBottom: "1px solid #e2e8f0",
+          background: "#fff",
+        }}
+      >
+        <input
+          type="text"
+          placeholder="Search lead sources..."
+          value={leadSourceSearch}
+          onChange={(e) =>
+            setLeadSourceSearch(e.target.value)
+          }
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: "100%",
+            height: 40,
+            padding: "0 12px",
+            borderRadius: 8,
+            border: "1px solid #e2e8f0",
+            background: "#f8fafc",
+            fontSize: 13,
+            color: "#0f172a",
+            outline: "none",
+            boxSizing: "border-box",
+          }}
+        />
+      </div>
+
+      {/* SOURCE LIST */}
+      <div
+        style={{
+          maxHeight: 220,
+          overflowY: "auto",
+          padding: 6,
+        }}
+      >
+        {leadSources.length === 0 ? (
+          <div
+            style={{
+              padding: 12,
+              fontSize: 13,
+              color: "#94a3b8",
+            }}
+          >
+            No lead sources available
+          </div>
+        ) : (
+          (() => {
+            const searchText =
+              leadSourceSearch.trim().toLowerCase();
+
+            const filteredSources = leadSources.filter(
+              (source) =>
+                String(source.name || "")
+                  .toLowerCase()
+                  .includes(searchText)
+            );
+
+            if (filteredSources.length === 0) {
+              return (
+                <div
+                  style={{
+                    padding: 12,
+                    fontSize: 13,
+                    color: "#94a3b8",
+                  }}
+                >
+                  No matching lead sources
+                </div>
+              );
+            }
+
+            return filteredSources.map((source) => {
+              // IMPORTANT:
+              // sourceLabels now stores the Firestore document ID
+              const selected =
+                form.sourceLabels?.includes(source.id);
+
+              return (
+                <label
+                  key={source.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "10px 8px",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    background: selected
+                      ? "#eff6ff"
+                      : "transparent",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={(e) => {
+                      setForm((f) => ({
+                        ...f,
+
+                        sourceLabels: e.target.checked
+                          ? [
+                              ...(f.sourceLabels || []),
+                              source.id,
+                            ]
+                          : (f.sourceLabels || []).filter(
+                              (id) => id !== source.id
+                            ),
+                      }));
+                    }}
+                  />
+
+                  <span
+                    style={{
+                      fontSize: 14,
+                      color: "#0f172a",
+                      flex: 1,
+                    }}
+                  >
+                    {source.name}
+                  </span>
+
+                  {selected && (
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: "#2563eb",
+                        fontWeight: 600,
+                      }}
+                    >
+                      ✓
+                    </span>
+                  )}
+                </label>
+              );
+            });
+          })()
+        )}
+      </div>
+    </div>
+  </details>
+
+  {/* SELECTED SOURCES */}
+  {form.sourceLabels?.length > 0 && (
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 6,
+        marginTop: 2,
+      }}
+    >
+      {form.sourceLabels.map((sourceId) => {
+        // Find the actual source using its Firestore document ID
+        const source = leadSources.find(
+          (s) => s.id === sourceId
+        );
+
+        return (
+          <span
+            key={sourceId}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "5px 9px",
+              borderRadius: 999,
+              background: "#eff6ff",
+              color: "#2563eb",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            {/* Show name, not ID */}
+            {source?.name || sourceId}
+
+            <button
+              type="button"
+              onClick={() => {
+                setForm((f) => ({
+                  ...f,
+                  sourceLabels: (
+                    f.sourceLabels || []
+                  ).filter(
+                    (id) => id !== sourceId
+                  ),
+                }));
+              }}
+              style={{
+                border: "none",
+                background: "transparent",
+                color: "#2563eb",
+                cursor: "pointer",
+                padding: 0,
+                fontSize: 14,
+                lineHeight: 1,
+              }}
+            >
+              ×
+            </button>
+          </span>
+        );
+      })}
+    </div>
+  )}
+</div>
+
+
           <input
   type="number"
   placeholder="Monthly Salary (₹)"

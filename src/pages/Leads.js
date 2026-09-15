@@ -111,6 +111,8 @@ const [hasMore, setHasMore] = useState(true);
 const [creatorSearch, setCreatorSearch] = useState("");
 const PAGE_SIZE = 50;
 const [dateFilter, setDateFilter] = useState("all");
+const [leadSources, setLeadSources] = useState([]);
+const [showLeadSourceDropdown, setShowLeadSourceDropdown] = useState(false);
   // Delete confirm
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [notInterestedFilter, setNotInterestedFilter] = useState("all");
@@ -255,6 +257,31 @@ const creatorOptions = useMemo(() => {
 
   return Array.from(unique.values());
 }, [leads]);
+useEffect(() => {
+  const loadLeadSources = async () => {
+    try {
+      const snap = await getDocs(collection(db, "leadSources"));
+
+      const arr = snap.docs
+        .map((d) => ({
+          id: d.id,
+          ...d.data(),
+        }))
+        .filter((source) => source.active !== false)
+        .sort((a, b) =>
+          String(a.name || "").localeCompare(
+            String(b.name || "")
+          )
+        );
+
+      setLeadSources(arr);
+    } catch (err) {
+      console.error("load lead sources error", err);
+    }
+  };
+
+  loadLeadSources();
+}, []);
 const getDateRange = () => {
   const now = new Date();
 
@@ -1976,7 +2003,6 @@ const qy = query(base, ...constraints);
                 { label: "Phone", key: "phone", required: true },
                 { label: "Email", key: "email" },
                 { label: "Address / City", key: "address" },
-                { label: "Lead Source", key: "leadSource" },
               ].map((field) => (
                 <div key={field.key} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   <label style={{ fontSize: 13, fontWeight: 600, color: "#334155" }}>
@@ -1999,6 +2025,201 @@ const qy = query(base, ...constraints);
                   />
                 </div>
               ))}
+              {/* LEAD SOURCE */}
+<div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+  <label
+    style={{
+      fontSize: 13,
+      fontWeight: 600,
+      color: "#334155",
+    }}
+  >
+    Lead Source
+  </label>
+
+  <div style={{ position: "relative" }}>
+    <input
+      type="text"
+      value={form.leadSource}
+      placeholder="Type or select lead source"
+      onFocus={() => {
+        setShowLeadSourceDropdown(true);
+      }}
+      onChange={(e) => {
+        setForm((f) => ({
+          ...f,
+          leadSource: e.target.value,
+        }));
+
+        setShowLeadSourceDropdown(true);
+      }}
+      style={{
+        width: "100%",
+        height: 44,
+        padding: "0 14px",
+        borderRadius: 10,
+        border: "1px solid #e2e8f0",
+        background: "#f8fafc",
+        fontSize: 14,
+        color: "#0f172a",
+        outline: "none",
+        boxSizing: "border-box",
+      }}
+    />
+
+    {showLeadSourceDropdown && form.leadSource.trim() && (
+      <div
+        style={{
+          position: "absolute",
+          top: 48,
+          left: 0,
+          right: 0,
+          background: "#fff",
+          border: "1px solid #e2e8f0",
+          borderRadius: 10,
+          boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
+          zIndex: 100,
+          overflow: "hidden",
+        }}
+      >
+        {/* EXISTING SOURCES */}
+        {leadSources
+          .filter((source) =>
+            String(source.name || "")
+              .toLowerCase()
+              .includes(form.leadSource.trim().toLowerCase())
+          )
+          .map((source) => (
+            <div
+              key={source.id}
+              onClick={() => {
+                setForm((f) => ({
+                  ...f,
+                  leadSource: source.name,
+                }));
+
+                // CLOSE DROPDOWN
+                setShowLeadSourceDropdown(false);
+              }}
+              style={{
+                padding: "12px 14px",
+                cursor: "pointer",
+                fontSize: 14,
+                color: "#0f172a",
+                borderBottom: "1px solid #f1f5f9",
+                background: "#fff",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "#f8fafc";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "#fff";
+              }}
+            >
+              {source.name}
+            </div>
+          ))}
+
+        {/* ADD NEW SOURCE */}
+        {!leadSources.some(
+          (source) =>
+            String(source.name || "")
+              .trim()
+              .toLowerCase() ===
+            form.leadSource.trim().toLowerCase()
+        ) && (
+          <div
+            onClick={async () => {
+              const newSource = form.leadSource.trim();
+
+              if (!newSource) return;
+
+              try {
+                // CHECK AGAINST EXISTING SOURCES
+                const existing = leadSources.find(
+                  (source) =>
+                    String(source.name || "")
+                      .trim()
+                      .toLowerCase() === newSource.toLowerCase()
+                );
+
+                // IF ALREADY EXISTS
+                if (existing) {
+                  setForm((f) => ({
+                    ...f,
+                    leadSource: existing.name,
+                  }));
+
+                  // CLOSE DROPDOWN
+                  setShowLeadSourceDropdown(false);
+
+                  return;
+                }
+
+                // ADD NEW SOURCE TO FIREBASE
+                const ref = await addDoc(
+                  collection(db, "leadSources"),
+                  {
+                    name: newSource,
+                    active: true,
+                    createdAt: serverTimestamp(),
+                  }
+                );
+
+                // UPDATE LOCAL SOURCE LIST
+                setLeadSources((prev) =>
+                  [
+                    ...prev,
+                    {
+                      id: ref.id,
+                      name: newSource,
+                      active: true,
+                    },
+                  ].sort((a, b) =>
+                    String(a.name || "").localeCompare(
+                      String(b.name || "")
+                    )
+                  )
+                );
+
+                // SELECT NEW SOURCE
+                setForm((f) => ({
+                  ...f,
+                  leadSource: newSource,
+                }));
+
+                // CLOSE DROPDOWN
+                setShowLeadSourceDropdown(false);
+              } catch (err) {
+                console.error(
+                  "add lead source error",
+                  err
+                );
+              }
+            }}
+            style={{
+              padding: "12px 14px",
+              cursor: "pointer",
+              fontSize: 14,
+              fontWeight: 600,
+              color: "#2563eb",
+              background: "#f8fafc",
+              borderTop: "1px solid #e2e8f0",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "#eff6ff";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "#f8fafc";
+            }}
+          >
+            + Add "{form.leadSource.trim()}"
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+</div>
 
               {/* TYPE */}
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
