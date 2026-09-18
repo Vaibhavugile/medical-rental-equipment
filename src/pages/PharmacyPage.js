@@ -13,6 +13,18 @@ import SEO from "../components/SEO";
 
 
 export default function PharmacyPage() {
+  useEffect(() => {
+   document.title = "ICU Setup at Home | ICU at Home Mumbai | Book My Medicare";
+ 
+   const description = document.querySelector('meta[name="description"]');
+ 
+   if (description) {
+     description.setAttribute(
+       "content",
+       "Book My Medicare provides ICU at home Mumbai services with complete ICU setup at home, expert doctors & 24/7 emergency support. Trusted care at home."
+     );
+   }
+ }, []);
  
   const section1 = {
     eyebrow: "Pharmacy Home Delivery",

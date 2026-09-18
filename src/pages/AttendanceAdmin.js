@@ -789,6 +789,7 @@ async function saveManualAbsent() {
               <th>Check-in</th>
               <th>Check-out</th>
               <th>Duration</th>
+              <th>OT</th>
               <th>Status</th>
               <th>Notes</th>
               <th>Track</th>
@@ -839,7 +840,21 @@ async function saveManualAbsent() {
                   </td>
 
                   <td>{minsToHhmm(r.durationMinutes || 0)}</td>
+<td>
+  {(() => {
+    const otMinutes = overtimeMinutes(r.durationMinutes || 0);
 
+    return (
+      <span
+        className={`ot-value ${
+          otMinutes > 60 ? "ot-high" : ""
+        }`}
+      >
+        {minsToHhmm(otMinutes)}
+      </span>
+    );
+  })()}
+</td>
                   <td>
   {attendance === "grace" ? (
     <span className="chip grace">Grace</span>
@@ -1047,6 +1062,10 @@ function minsToHhmm(mins) {
   const h = Math.floor(m / 60);
   const mm = String(m % 60).padStart(2, "0");
   return `${h}:${mm}`;
+}
+function overtimeMinutes(durationMinutes) {
+  const duration = Math.max(0, Math.round(durationMinutes || 0));
+  return Math.max(0, duration - 540); // 8 hours = 480 minutes
 }
 function csvEscape(x) {
   const s = String(x ?? "");

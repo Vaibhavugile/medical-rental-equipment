@@ -56,7 +56,7 @@ export default function LandingPage() {
       {/* ✅ SEO — LANDING PAGE */}
       <SEO
         title="Home Care Services in Mumbai | Home Nursing | Book My Medicare"
-        description="Get trusted Home Care Services in Mumbai with Book My Medicare. Expert home nursing, elderly care & patient support at home. Book reliable care today!"
+        description="Get trusted Home Care"
         keywords="home nursing care, ICU setup at home, ambulance service, physiotherapy at home, medical equipment rental"
         canonical="https://www.bookmymediccare.com/"
       />

@@ -604,3 +604,22 @@
     flex: 1 1 160px;
   }
 }
+.ot-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.ot-high {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  box-shadow: 0 0 0 1px rgba(220, 38, 38, 0.05);
+}

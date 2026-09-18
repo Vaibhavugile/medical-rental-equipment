@@ -142,13 +142,13 @@ Loading report...
 <>
 
 {/* KPI SECTION */}
-<KpiSection report={report}/>
+{/* <KpiSection report={report}/> */}
 
 {/* FUNNEL */}
-<FunnelChart report={report}/>
+{/* <FunnelChart report={report}/> */}
 
 {/* CHARTS */}
-<ChartsGrid report={report}/>
+{/* <ChartsGrid report={report}/> */}
 
 {/* TABLES */}
 {/* <TablesSection report={report}/> */}
