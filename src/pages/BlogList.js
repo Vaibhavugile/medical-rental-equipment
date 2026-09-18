@@ -22,6 +22,18 @@ import "./BlogList.css";
 export default function BlogList() {
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  useEffect(() => {
+  document.title = "Blogs | Home Health Care Services in Mumbai | Book My Medicare";
+
+  const description = document.querySelector('meta[name="description"]');
+
+  if (description) {
+    description.setAttribute(
+      "content",
+      "Explore blogs on home health care services, nursing services, ICU at home, medical equipment on rent and expert health care at home guidance for families."
+    );
+  }
+}, []);
 
   useEffect(() => {
 

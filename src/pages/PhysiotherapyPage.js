@@ -14,10 +14,22 @@ import Physioreadmore from "../frontend/Physioreadmore";
 
 
 export default function PhysiotherapyPage() {
+   useEffect(() => {
+  document.title = "Physiotherapy at Home | Home Health Nursing Services | Book My Medicare";
+
+  const description = document.querySelector('meta[name="description"]');
+
+  if (description) {
+    description.setAttribute(
+      "content",
+      "Need physiotherapy at home? Book My Medicare provides professional home health nursing services for elderly care and post-treatment recovery. Call now!",
+    );
+  }
+}, []);
 
 
   const section1 = {
-    eyebrow: "HOME HEALTHCARE SERVICES",
+    eyebrow: "Physiotherapy at HomeS",
     title: "Physiotherapy at Home",
     lead:
     "Physiotherapy at home is a personalized rehabilitation service where a licensed physiotherapist visits the patient's home to provide therapeutic exercises, pain relief techniques, mobility training, and recovery support.",

@@ -9,11 +9,21 @@ import WhyChooseUsUnique from "../../frontend/WhyChooseUsUnique";
 import HeroWithForm from "../../frontend/HeroWithForm";
 import ReviewsSection from "../../frontend/ReviewsSection";
 import Footer from "../../frontend/Footer";
-import SEO from "../components/SEO";
-
 export default function EquipmentList() {
 	
-	
+	useEffect(() => {
+  document.title = "Medical Equipment on Rent";
+
+  const description = document.querySelector('meta[name="description"]');
+
+  if (description) {
+    description.setAttribute(
+      "content",
+      "Book My Medicare offers hospital bed on rent and medical equipment on rent in Mumbai. Affordable, reliable and delivered to your home. Enquire now!"
+    );
+  }
+}, []);
+
 	
   const navigate = useNavigate();
 const WHATSAPP_LINK =
@@ -31,14 +41,6 @@ const WHATSAPP_LINK =
   );
 
   return (
-    <>
-  <SEO
-        title="Medical Equipment on Rent | Hospital Bed on Rent | Book My Medicare"
-        description="Book My Medicare offers hospital bed on rent and medical equipment on rent in Mumbai. Affordable, reliable and delivered to your home. Enquire now!"
-        keywords="home nursing care, ICU setup at home, ambulance service, physiotherapy at home, medical equipment rental"
-        canonical="https://bookmymedicare.com/medical-equipment-on-rent"
-      />
-	  
     <div className="me-page">
        <TopBar />
         <Header />
@@ -51,7 +53,7 @@ const WHATSAPP_LINK =
           <div className="me-hero-alt-img">
             <img
               src="/medical.jpg"
-              alt="Medical Equipment on Rental and Purchase"
+              alt="Medical Equipment on Rental"
             />
           </div>
 
@@ -135,6 +137,5 @@ const WHATSAPP_LINK =
       <ReviewsSection  autoplay={true} autoplayDelay={3500} />
       <Footer />
     </div>
-    </>
   );
 }

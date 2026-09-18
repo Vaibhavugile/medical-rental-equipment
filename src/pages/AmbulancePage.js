@@ -15,9 +15,20 @@ import SEO from "../components/SEO";
 
 export default function AmbulancePage() {
  
+useEffect(() => {
+  document.title = "Ambulance Services | Emergency Health Care at Home | BookMyMedicare";
 
+  const description = document.querySelector('meta[name="description"]');
+
+  if (description) {
+    description.setAttribute(
+      "content",
+      "Get fast ambulance services and emergency health care at home with Book My Medicare. Quick response, trained staff & 24/7 medical support. Call now for help!"
+    );
+  }
+}, [])
   const section1 = {
-    eyebrow: "HOME HEALTHCARE SERVICES",
+    eyebrow: "Ambulance Services",
     title: "Ambulance Services",
     lead:
     "An ambulance service provides emergency and non-emergency medical transportation for patients who require urgent or medically supervised transfer. Ambulances are equipped with life-saving equipment and trained personnel to ensure safe, timely care while en route to hospitals or between medical facilities."

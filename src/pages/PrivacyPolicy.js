@@ -6,7 +6,18 @@ import Footer from "../frontend/Footer";
 import SEO from "../components/SEO";
 
 export default function PrivacyPolicy() {
-	
+	useEffect(() => {
+  // document.title = "Lab Services at Home | Home Health Care Services | Book My Medicare";
+
+  const description = document.querySelector('meta[name="description"]');
+
+  if (description) {
+    description.setAttribute(
+      "content",
+      "Learn about Book My Medicare Privacy Policy covering 24-hour nursing care at home. We safeguard your data while delivering trusted medical support at home."
+    );
+  }
+}, []);
 
   return (
     <>

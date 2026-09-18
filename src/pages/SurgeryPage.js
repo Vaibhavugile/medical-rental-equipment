@@ -13,6 +13,18 @@ import SEO from "../components/SEO";
 
 
 export default function SurgeryPage() {
+  useEffect(() => {
+    // document.title = "Lab Services at Home | Home Health Care Services | Book My Medicare";
+  
+    const description = document.querySelector('meta[name="description"]');
+  
+    if (description) {
+      description.setAttribute(
+        "content",
+        "Post surgery care at home with home health nursing, wound care, physiotherapy support and recovery-focused health care at home services."
+      );
+    }
+  }, []);
    
 
   const section1 = {

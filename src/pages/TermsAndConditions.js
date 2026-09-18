@@ -7,7 +7,18 @@ import SEO from "../components/SEO";
 
 
 export default function TermsAndConditions() {
-	
+	useEffect(() => {
+    // document.title = "Lab Services at Home | Home Health Care Services | Book My Medicare";
+  
+    const description = document.querySelector('meta[name="description"]');
+  
+    if (description) {
+      description.setAttribute(
+        "content",
+        "Read the Terms & Conditions of Book My Medicare for home care nursing services. Know service policies, responsibilities & guidelines for safe care at home."
+      );
+    }
+  }, []);
 
   return (
     <>
@@ -22,7 +33,7 @@ export default function TermsAndConditions() {
         <TopBar />
                               <Header />
       <div className="terms-container">
-        <h1 className="terms-title">Terms & Conditions</h1>
+        <h1 className="terms-title">Terms and Conditions</h1>
         <p className="terms-updated">Last updated: January 2026</p>
 
         <section>

@@ -14,7 +14,18 @@ import SEO from "../components/SEO";
 
 export default function PalliativePage() {
  
-
+useEffect(() => {
+    // document.title = "Lab Services at Home | Home Health Care Services | Book My Medicare";
+  
+    const description = document.querySelector('meta[name="description"]');
+  
+    if (description) {
+      description.setAttribute(
+        "content",
+        "Need post surgery care at home? Book My Medicare provides skilled home health nursing care for faster recovery and personalized patient support at home."
+      );
+    }
+  }, []);
 
   const section1 = {
     eyebrow: "HOME HEALTHCARE SERVICES",
