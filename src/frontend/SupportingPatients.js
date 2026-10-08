@@ -58,9 +58,9 @@ export default function SupportingPatients() {
 
       {/* ===== HEADER ===== */}
       <div className="supportHeader">
-        <h2>
-          Supporting <span>Patients</span>
-        </h2>
+        <h3>
+          Supporting Patients
+        </h3>
 
         <p>
           We work closely with esteemed hospitals to ensure

@@ -27,6 +27,7 @@ export default function Employees() {
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [showDrawer, setShowDrawer] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [userRole, setUserRole] = useState(null);
@@ -247,38 +248,40 @@ export default function Employees() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
 
-    if (!q) return rows;
-
     return rows.filter((r) => {
+      // ACTIVE / INACTIVE FILTER
+      const isActive = r.active !== false;
+
+      if (statusFilter === "active" && !isActive) {
+        return false;
+      }
+
+      if (statusFilter === "inactive" && isActive) {
+        return false;
+      }
+
+      // SEARCH FILTER
+      if (!q) return true;
+
       const text = [
         r.employeeId,
-
         r.name,
         r.email,
         r.phone,
         r.alternatePhone,
-
         r.dob,
         r.fatherName,
-
         r.gender,
         r.bloodGroup,
-
         r.aadharNumber,
         r.panNumber,
-
         r.designation,
         r.workType,
-
         r.joiningDate,
         r.employeeStatus,
-
         r.address,
-
         r.branchId,
-
         r.salaryMonthly,
-
         r.role,
       ]
         .filter(
@@ -292,7 +295,7 @@ export default function Employees() {
 
       return text.includes(q);
     });
-  }, [rows, search]);
+  }, [rows, search, statusFilter]);
 
 
   /* =========================================================
@@ -1122,6 +1125,24 @@ const printEmployeeProfileUrls = () => {
       setSearch(e.target.value)
     }
   />
+
+  <select
+    value={statusFilter}
+    onChange={(e) => setStatusFilter(e.target.value)}
+    style={{
+      minWidth: "150px",
+      padding: "10px 12px",
+      borderRadius: "10px",
+      border: "1px solid #d9dee7",
+      background: "#fff",
+      fontSize: "14px",
+      cursor: "pointer",
+    }}
+  >
+    <option value="all">All Employees</option>
+    <option value="active">Active</option>
+    <option value="inactive">Inactive</option>
+  </select>
 
   <button
     className="cp-btn ghost"

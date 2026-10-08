@@ -157,7 +157,7 @@ export default function AdminSupportingPatients() {
   return (
     <div className="adminSupporting">
 
-      <h1>Supporting Patients Manager</h1>
+      <h2>Supporting Patients Manager</h2>
 
       {/* ===== UPLOAD ===== */}
       <div className="uploadBox">

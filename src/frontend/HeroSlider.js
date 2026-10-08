@@ -119,7 +119,18 @@ const HeroSlider = () => {
 
     return () => clearInterval(interval);
   }, []);
+useEffect(() => {
+  document.title = "Lab Services at Home | Home Health Care Services | Book My Medicare";
 
+  const description = document.querySelector('meta[name="description"]');
+
+  if (description) {
+    description.setAttribute(
+      "content",
+      "Get lab services at home with Book My Medicare. Trusted home health care services for sample collection, accurate reports and doorstep testing today."
+    );
+  }
+}, []);
   /* =========================
      NAVIGATION
   ========================= */
@@ -166,9 +177,9 @@ const HeroSlider = () => {
               </p>
 
               {/* Title */}
-              <h1 className="hero-title animate animate-2">
+              <h2 className="hero-title animate animate-2">
                 {slide.title}
-              </h1>
+              </h2>
 
               {/* Description */}
               <p className="hero-desc animate animate-3">

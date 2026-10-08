@@ -58,7 +58,7 @@ function FaqNew() {
     <div className="app">
       <div className="document">
         <header className="document-header">
-          <h1>Book My Medicare GEO FAQs</h1>
+          <h2>Book My Medicare GEO FAQs</h2>
         </header>
 
         <div className="heading-line"></div>

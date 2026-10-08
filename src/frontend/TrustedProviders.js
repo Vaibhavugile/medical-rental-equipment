@@ -84,9 +84,9 @@ const TrustedProviders = () => {
   return (
     <section className="providers-wrapper">
       <header className="providers-title-area">
-        <h1 className="providers-main-title">
+        <h2 className="providers-main-title">
           Our <span>Trusted</span> Providers
-        </h1>
+        </h2>
       </header>
 
       <div className="providers-layout">

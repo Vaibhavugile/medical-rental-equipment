@@ -80,11 +80,11 @@ function openWhatsApp(message) {
             {slide.eyebrow}
           </span>
 
-          <h1 className="hero-title stagger">
+          <h2 className="hero-title stagger">
             {slide.title.split("\n").map((line, i) => (
               <span key={i}>{line}</span>
             ))}
-          </h1>
+          </h2>
 
           <p className="hero-desc stagger">
             {slide.desc}

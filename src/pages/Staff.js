@@ -95,6 +95,8 @@ export default function Staff({ defaultType = "all" }) {
 
     employeeStatus: "Active",
 
+    currentStatus: "On Duty",
+
     staffType:
       defaultType === "all"
         ? "nurse"
@@ -700,6 +702,9 @@ export default function Staff({ defaultType = "all" }) {
     employeeStatus:
       p.employeeStatus || "Active",
 
+    currentStatus:
+      p.currentStatus || "On Duty",
+
     staffType:
       p.staffType,
 
@@ -1087,6 +1092,10 @@ export default function Staff({ defaultType = "all" }) {
         r.employeeStatus ||
         "Active",
 
+      currentStatus:
+        r.currentStatus ||
+        "On Duty",
+
       profilePhotoUrl:
         r.profilePhotoUrl || "",
 
@@ -1188,6 +1197,7 @@ export default function Staff({ defaultType = "all" }) {
         r.designation,
         r.workType,
         r.employeeStatus,
+        r.currentStatus,
         r.staffType,
         r.qualifications,
         r.address,
@@ -1210,13 +1220,15 @@ export default function Staff({ defaultType = "all" }) {
       const sOk =
         statusFilter === "all"
           ? true
-          : String(
-              r.currentStatus ||
-              r.employeeStatus ||
-              ""
-            )
-              .toLowerCase() ===
-            "on duty";
+          : statusFilter === "on-duty"
+            ? String(r.currentStatus || "")
+                .trim()
+                .toLowerCase() === "on duty"
+            : statusFilter === "active"
+              ? r.active !== false
+              : statusFilter === "inactive"
+                ? r.active === false
+                : true;
 
       return (
         qOk &&
@@ -1522,6 +1534,9 @@ export default function Staff({ defaultType = "all" }) {
           "Employee Status":
             r.employeeStatus || "",
 
+          "Duty Status":
+            r.currentStatus || "",
+
           Address:
             r.address || "",
 
@@ -1771,6 +1786,14 @@ export default function Staff({ defaultType = "all" }) {
 
           <option value="on-duty">
             On Duty
+          </option>
+
+          <option value="active">
+            Active
+          </option>
+
+          <option value="inactive">
+            Inactive
           </option>
         </select>
 
@@ -2273,6 +2296,28 @@ export default function Staff({ defaultType = "all" }) {
 
             <option value="Terminated">
               Terminated
+            </option>
+          </select>
+
+          {/* CURRENT DUTY STATUS */}
+
+          <select
+            value={
+              form.currentStatus
+            }
+            onChange={(e) =>
+              updateField(
+                "currentStatus",
+                e.target.value
+              )
+            }
+          >
+            <option value="On Duty">
+              On Duty
+            </option>
+
+            <option value="Off Duty">
+              Off Duty
             </option>
           </select>
 

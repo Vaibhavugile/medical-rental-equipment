@@ -171,9 +171,9 @@ function SupportingSlider() {
     <div className="supporting">
 
       {/* HEADER */}
-      <h1>
+      <h2>
         <span>Supporting</span> Patients
-      </h1>
+      </h2>
 
       <p>
         We work closely with esteemed hospitals
