@@ -17,7 +17,7 @@ return(
 onClick={()=>onCardClick("orders")}
 />
 
-<Card title="Total Staff" value={data.staff} color="purple"
+<Card title="Total Nurses" value={data.staff} color="purple"
 onClick={()=>onCardClick("staff")}
 />
 
@@ -59,7 +59,7 @@ onClick={()=>onCardClick("refundPending")}
 
 {/* 💵 CASHFLOW */}
 <Card
-title="Cash Collected"
+title="Amountc Collected"
 value={`₹ ${formatCurrency(data.revenueCollected)}`}
 color="green"
 onClick={()=>onCardClick("revenueCollected")}

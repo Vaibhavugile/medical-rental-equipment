@@ -30,6 +30,7 @@ import { db, auth } from "../firebase";
 import { useNavigate } from "react-router-dom";
 import "./Staff.css";
 import jsPDF from "jspdf";
+import QRCode from "qrcode";
 export default function Staff({ defaultType = "all" }) {
   const navigate = useNavigate();
 
@@ -1255,230 +1256,236 @@ export default function Staff({ defaultType = "all" }) {
   ============================================================
   */
 
-  const printStaffProfileUrls = () => {
+ 
+const printStaffProfileUrls = async () => {
+  try {
+    setError("");
+
     if (!filtered.length) {
       setError("No staff records available to print.");
       return;
     }
 
-    const pdf = new jsPDF(
-      "p",
-      "mm",
-      "a4"
-    );
+    const staffForPrint = await Promise.all(
+      filtered.map(async (staff) => {
+        const uid = String(
+          staff.authUid || staff.uid || staff.id || ""
+        ).trim();
 
-    const pageWidth =
-      pdf.internal.pageSize.getWidth();
+        if (!uid) return null;
 
-    const pageHeight =
-      pdf.internal.pageSize.getHeight();
-
-    let y = 20;
-
-    /*
-    ------------------------------------------------------------
-    HEADER
-    ------------------------------------------------------------
-    */
-
-    pdf.setFont(
-      "helvetica",
-      "bold"
-    );
-
-    pdf.setFontSize(18);
-
-    pdf.text(
-      "BookMyMedicare",
-      pageWidth / 2,
-      y,
-      {
-        align: "center"
-      }
-    );
-
-    y += 8;
-
-    pdf.setFont(
-      "helvetica",
-      "normal"
-    );
-
-    pdf.setFontSize(11);
-
-    pdf.text(
-      defaultType === "caretaker"
-        ? "Caretaker Profile Directory"
-        : defaultType === "nurse"
-          ? "Nursing Staff Profile Directory"
-          : "Nursing & Caretaker Profile Directory",
-      pageWidth / 2,
-      y,
-      {
-        align: "center"
-      }
-    );
-
-    y += 16;
-
-    /*
-    ------------------------------------------------------------
-    STAFF LIST
-    ------------------------------------------------------------
-    */
-
-    filtered.forEach(
-      (staff, index) => {
-
-        const uid =
-          staff.authUid ||
-          staff.uid ||
-          staff.id;
-
-        /*
-        Skip records that have
-        absolutely no usable UID.
-        */
-        if (!uid) {
-          return;
-        }
-
-        const name =
-          String(
-            staff.name ||
-              "Staff Member"
-          ).trim();
+        const name = String(
+          staff.name || "Staff Member"
+        ).trim();
 
         const profileUrl =
-          `https://bookmymedicare.com/employeeprofiles/${encodeURIComponent(
-            uid
-          )}`;
+          `https://bookmymedicare.com/employeeprofiles/${encodeURIComponent(uid)}`;
 
-        /*
-        --------------------------------------------------------
-        PAGE BREAK
-        --------------------------------------------------------
-        */
+        const qrData = await QRCode.toDataURL(profileUrl, {
+          errorCorrectionLevel: "H",
+          margin: 2,
+          width: 400,
+          color: {
+            dark: "#0F172A",
+            light: "#FFFFFF",
+          },
+        });
 
-        if (
-          y >
-          pageHeight - 35
-        ) {
-          pdf.addPage();
-          y = 20;
-        }
-
-        /*
-        --------------------------------------------------------
-        NAME
-        --------------------------------------------------------
-        */
-
-        pdf.setFont(
-          "helvetica",
-          "bold"
-        );
-
-        pdf.setFontSize(11);
-
-        pdf.text(
-          `${index + 1}. ${name}`,
-          15,
-          y
-        );
-
-        y += 7;
-
-        /*
-        --------------------------------------------------------
-        PROFILE URL
-        --------------------------------------------------------
-        */
-
-        pdf.setFont(
-          "helvetica",
-          "normal"
-        );
-
-        pdf.setFontSize(9);
-
-        pdf.text(
-          profileUrl,
-          20,
-          y
-        );
-
-        y += 12;
-
-        /*
-        --------------------------------------------------------
-        SEPARATOR
-        --------------------------------------------------------
-        */
-
-        pdf.setDrawColor(
-          210,
-          210,
-          210
-        );
-
-        pdf.line(
-          15,
-          y - 5,
-          pageWidth - 15,
-          y - 5
-        );
-      }
+        return { name, profileUrl, qrData };
+      })
     );
 
-    /*
-    ------------------------------------------------------------
-    FOOTER ON ALL PAGES
-    ------------------------------------------------------------
-    */
+    const validStaff = staffForPrint.filter(Boolean);
 
-    const totalPages =
-      pdf.internal.getNumberOfPages();
+    if (!validStaff.length) {
+      setError("No valid staff IDs found for QR code generation.");
+      return;
+    }
 
-    for (
-      let page = 1;
-      page <= totalPages;
-      page++
-    ) {
-      pdf.setPage(page);
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+      compress: true,
+    });
 
-      pdf.setFont(
-        "helvetica",
-        "normal"
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const marginX = 12;
+    const marginTop = 28;
+    const gapX = 6;
+    const gapY = 7;
+    const columns = 2;
+    const rows = 4;
+    const cardsPerPage = columns * rows;
+    const cardWidth =
+      (pageWidth - marginX * 2 - gapX) / columns;
+    const cardHeight = 57;
+
+    const NAVY = [15, 23, 42];
+    const TEAL = [15, 118, 110];
+    const MUTED = [100, 116, 139];
+    const BORDER = [226, 232, 240];
+    const LIGHT_BG = [248, 250, 252];
+
+    const drawHeader = () => {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(17);
+      pdf.setTextColor(...TEAL);
+      pdf.text("BookMyMedicare", marginX, 13);
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+      pdf.setTextColor(...MUTED);
+
+      const heading =
+        defaultType === "caretaker"
+          ? "Caretaker Profile QR Codes"
+          : defaultType === "nurse"
+            ? "Nursing Staff Profile QR Codes"
+            : "Nursing & Caretaker Profile QR Codes";
+
+      pdf.text(heading, marginX, 19);
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.setTextColor(...NAVY);
+      pdf.text(
+        `${validStaff.length} Staff Member${validStaff.length === 1 ? "" : "s"}`,
+        pageWidth - marginX,
+        15,
+        { align: "right" }
       );
 
-      pdf.setFontSize(8);
+      pdf.setDrawColor(...BORDER);
+      pdf.line(marginX, 23, pageWidth - marginX, 23);
+    };
+
+    const drawStaff = (staff, x, y, number) => {
+      pdf.setFillColor(...LIGHT_BG);
+      pdf.setDrawColor(...BORDER);
+      pdf.roundedRect(
+        x, y, cardWidth, cardHeight, 3, 3, "FD"
+      );
+
+      pdf.setFillColor(...TEAL);
+      pdf.roundedRect(x, y, 2, cardHeight, 1, 1, "F");
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.setTextColor(...NAVY);
+
+      const nameLines = pdf.splitTextToSize(
+        `${number}. ${staff.name}`,
+        cardWidth - 12
+      );
+
+      pdf.text(nameLines.slice(0, 2), x + 6, y + 9);
+
+      const qrSize = 32;
+      const qrX = x + (cardWidth - qrSize) / 2;
+      const qrY = y + 12;
+
+      pdf.addImage(
+        staff.qrData,
+        "PNG",
+        qrX,
+        qrY,
+        qrSize,
+        qrSize
+      );
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(6);
+      pdf.setTextColor(...TEAL);
+      pdf.text(
+        "SCAN TO VIEW PROFILE",
+        x + cardWidth / 2,
+        y + 47,
+        { align: "center" }
+      );
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(4.5);
+      pdf.setTextColor(...MUTED);
+
+      const urlLines = pdf.splitTextToSize(
+        staff.profileUrl,
+        cardWidth - 10
+      );
 
       pdf.text(
-        "BookMyMedicare • Employee Management",
-        pageWidth / 2,
+        urlLines.slice(0, 2),
+        x + cardWidth / 2,
+        y + 52,
+        { align: "center" }
+      );
+    };
+
+    validStaff.forEach((staff, index) => {
+      const position = index % cardsPerPage;
+
+      if (position === 0) {
+        if (index > 0) pdf.addPage();
+        drawHeader();
+      }
+
+      const column = position % columns;
+      const row = Math.floor(position / columns);
+
+      const x = marginX + column * (cardWidth + gapX);
+      const y = marginTop + row * (cardHeight + gapY);
+
+      drawStaff(staff, x, y, index + 1);
+    });
+
+    const totalPages = pdf.getNumberOfPages();
+
+    for (let page = 1; page <= totalPages; page++) {
+      pdf.setPage(page);
+
+      pdf.setDrawColor(...BORDER);
+      pdf.line(
+        marginX,
         pageHeight - 10,
-        {
-          align: "center"
-        }
+        pageWidth - marginX,
+        pageHeight - 10
+      );
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(6);
+      pdf.setTextColor(...MUTED);
+
+      pdf.text(
+        "BookMyMedicare | Staff Management",
+        marginX,
+        pageHeight - 5
+      );
+
+      pdf.text(
+        `Page ${page} of ${totalPages}`,
+        pageWidth - marginX,
+        pageHeight - 5,
+        { align: "right" }
       );
     }
 
-    /*
-    ------------------------------------------------------------
-    DOWNLOAD
-    ------------------------------------------------------------
-    */
-
     const fileName =
       defaultType === "caretaker"
-        ? "bookmymedicare_caretaker_profile_urls.pdf"
+        ? "bookmymedicare_caretaker_qr_codes.pdf"
         : defaultType === "nurse"
-          ? "bookmymedicare_nurse_profile_urls.pdf"
-          : "bookmymedicare_staff_profile_urls.pdf";
+          ? "bookmymedicare_nurse_qr_codes.pdf"
+          : "bookmymedicare_staff_qr_codes.pdf";
 
     pdf.save(fileName);
-  };
+  } catch (err) {
+    console.error("Print staff QR codes:", err);
+    setError(
+      err?.message || "Failed to generate staff QR code PDF."
+    );
+  }
+};
+
   const exportStaff = () => {
     const exportRows =
       filtered.map(

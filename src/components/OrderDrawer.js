@@ -10,6 +10,7 @@ import { db } from "../firebase";
 import { updateAccountReport } from "../utils/accountReport";
 import AssetPickerModal from "./AssetPickerModal";
 import { assignAssetsWithLimit } from "../utils/assetAssignment";
+import { generateNursingInvoice } from "../pages/NursingOrderInvoice";
 export default function OrderDrawer({
   // state
   selectedOrder,
@@ -950,6 +951,18 @@ await syncDeliveryAssets({
             >
               Activate
             </button> */}
+            <button
+              className="cp-btn"
+              onClick={() =>
+                generateNursingInvoice({
+                  ...selectedOrder,
+                  invoiceKind: "rental",
+                })
+              }
+            >
+              Generate Invoice
+            </button>
+
             <button
               className="cp-btn ghost"
               onClick={() => confirmAndChangeStatus("completed")}

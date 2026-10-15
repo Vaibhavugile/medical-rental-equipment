@@ -42,8 +42,8 @@ return(
 
 <h1 className="nor-title">
 {serviceType==="caretaker"
-? "Caretaker Operations Intelligence"
-: "Nursing Operations Intelligence"}
+? "Caretaker Report"
+: "Nursing Report"}
 </h1>
 
 <ReportFilters

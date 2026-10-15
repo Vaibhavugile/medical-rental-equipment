@@ -29,7 +29,7 @@ import { db, auth } from "../firebase";
 import "./Drivers.css";
 import { useNavigate } from "react-router-dom";
 import jsPDF from "jspdf";
-
+import QRCode from "qrcode";
 /**
  * Drivers Management Module
  *
@@ -354,7 +354,8 @@ export default function Drivers() {
 
   }, []);
 
-const printDriverProfileUrls = () => {
+
+const printDriverProfileUrls = async () => {
   try {
     setError("");
 
@@ -363,53 +364,43 @@ const printDriverProfileUrls = () => {
       return;
     }
 
-    // ================================================================
-    // DRIVER PROFILE URL LIST
-    // ONLY NAME + URL
-    // NO QR CODE
-    // NO PHOTO
-    // NO EMPLOYEE ID
-    // NO DESIGNATION
-    // ================================================================
-
-    const driversForPrint = filtered
-      .map((driver) => {
+    // Generate a QR code for each driver's profile.
+    const driversForPrint = await Promise.all(
+      filtered.map(async (driver) => {
         const uid = String(
           driver?.uid ||
-            driver?.authUid ||
-            driver?.id ||
-            ""
+          driver?.authUid ||
+          driver?.id ||
+          ""
         ).trim();
 
         if (!uid) return null;
 
-        const name = String(
-          driver?.name || "Driver"
-        ).trim();
+        const name = String(driver?.name || "Driver").trim();
 
         const profileUrl =
-          `https://bookmymedicare.com/employeeprofiles/${encodeURIComponent(
-            uid
-          )}`;
+          `https://bookmymedicare.com/employeeprofiles/${encodeURIComponent(uid)}`;
 
-        return {
-          uid,
-          name,
-          profileUrl,
-        };
+        const qrData = await QRCode.toDataURL(profileUrl, {
+          errorCorrectionLevel: "H",
+          margin: 2,
+          width: 400,
+          color: {
+            dark: "#0F172A",
+            light: "#FFFFFF",
+          },
+        });
+
+        return { name, profileUrl, qrData };
       })
-      .filter(Boolean);
+    );
 
-    if (!driversForPrint.length) {
-      setError(
-        "No valid driver UID found for profile URL generation."
-      );
+    const validDrivers = driversForPrint.filter(Boolean);
+
+    if (!validDrivers.length) {
+      setError("No valid driver IDs found for QR code generation.");
       return;
     }
-
-    // ================================================================
-    // PDF SETTINGS
-    // ================================================================
 
     const pdf = new jsPDF({
       orientation: "portrait",
@@ -420,330 +411,135 @@ const printDriverProfileUrls = () => {
 
     const pageWidth = 210;
     const pageHeight = 297;
-
-    const marginX = 16;
-    const marginTop = 20;
-
-    const cardWidth =
-      pageWidth - marginX * 2;
-
-    const cardHeight = 31;
+    const marginX = 12;
+    const marginTop = 28;
+    const gapX = 6;
     const gapY = 7;
+    const columns = 2;
+    const rows = 4;
+    const cardsPerPage = columns * rows;
+    const cardWidth = (pageWidth - marginX * 2 - gapX) / columns;
+    const cardHeight = 57;
 
-    const cardsPerPage = 7;
-
-    // Premium colors
     const NAVY = [15, 23, 42];
     const TEAL = [15, 118, 110];
     const MUTED = [100, 116, 139];
     const BORDER = [226, 232, 240];
     const LIGHT_BG = [248, 250, 252];
-    const WHITE = [255, 255, 255];
-
-    // ================================================================
-    // HEADER
-    // ================================================================
 
     const drawHeader = () => {
-      pdf.setFont(
-        "helvetica",
-        "bold"
-      );
-
+      pdf.setFont("helvetica", "bold");
       pdf.setFontSize(17);
+      pdf.setTextColor(...TEAL);
+      pdf.text("BookMyMedicare", marginX, 13);
 
-      pdf.setTextColor(
-        ...TEAL
-      );
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(8);
+      pdf.setTextColor(...MUTED);
+      pdf.text("Driver Profile QR Codes", marginX, 19);
 
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.setTextColor(...NAVY);
       pdf.text(
-        "BookMyMedicare",
-        marginX,
-        12
-      );
-
-      pdf.setFont(
-        "helvetica",
-        "normal"
-      );
-
-      pdf.setFontSize(7);
-
-      pdf.setTextColor(
-        ...MUTED
-      );
-
-      pdf.text(
-        "Driver Profile Directory",
-        marginX,
-        17
-      );
-
-      pdf.setFont(
-        "helvetica",
-        "bold"
-      );
-
-      pdf.setFontSize(7);
-
-      pdf.setTextColor(
-        ...NAVY
-      );
-
-      pdf.text(
-        `${driversForPrint.length} Driver${
-          driversForPrint.length === 1
-            ? ""
-            : "s"
-        }`,
+        `${validDrivers.length} Driver${validDrivers.length === 1 ? "" : "s"}`,
         pageWidth - marginX,
-        14,
-        {
-          align: "right",
-        }
+        15,
+        { align: "right" }
       );
 
-      pdf.setDrawColor(
-        ...BORDER
-      );
-
-      pdf.setLineWidth(0.3);
-
-      pdf.line(
-        marginX,
-        22,
-        pageWidth - marginX,
-        22
-      );
+      pdf.setDrawColor(...BORDER);
+      pdf.line(marginX, 23, pageWidth - marginX, 23);
     };
 
-    // ================================================================
-    // DRAW DRIVER
-    // ================================================================
+    const drawDriver = (driver, x, y, number) => {
+      pdf.setFillColor(...LIGHT_BG);
+      pdf.setDrawColor(...BORDER);
+      pdf.roundedRect(x, y, cardWidth, cardHeight, 3, 3, "FD");
 
-    const drawDriver = (
-      driver,
-      x,
-      y,
-      number
-    ) => {
-      // Card
-      pdf.setFillColor(
-        ...LIGHT_BG
+      // Teal accent.
+      pdf.setFillColor(...TEAL);
+      pdf.roundedRect(x, y, 2, cardHeight, 1, 1, "F");
+
+      // Driver name.
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(9);
+      pdf.setTextColor(...NAVY);
+
+      const nameLines = pdf.splitTextToSize(
+        `${number}. ${driver.name}`,
+        cardWidth - 32
       );
 
-      pdf.setDrawColor(
-        ...BORDER
+      pdf.text(nameLines.slice(0, 2), x + 6, y + 9);
+
+      // QR code.
+      const qrSize = 32;
+      const qrX = x + (cardWidth - qrSize) / 2;
+      const qrY = y + 12;
+
+      pdf.addImage(
+        driver.qrData,
+        "PNG",
+        qrX,
+        qrY,
+        qrSize,
+        qrSize
       );
 
-      pdf.setLineWidth(0.35);
-
-      pdf.roundedRect(
-        x,
-        y,
-        cardWidth,
-        cardHeight,
-        3,
-        3,
-        "FD"
-      );
-
-      // Teal accent
-      pdf.setFillColor(
-        ...TEAL
-      );
-
-      pdf.roundedRect(
-        x,
-        y,
-        3,
-        cardHeight,
-        1.5,
-        1.5,
-        "F"
-      );
-
-      // Number
-      pdf.setFillColor(
-        ...TEAL
-      );
-
-      pdf.circle(
-        x + 10,
-        y + cardHeight / 2,
-        4,
-        "F"
-      );
-
-      pdf.setFont(
-        "helvetica",
-        "bold"
-      );
-
+      pdf.setFont("helvetica", "bold");
       pdf.setFontSize(6);
+      pdf.setTextColor(...TEAL);
+      pdf.text("SCAN TO VIEW PROFILE", x + cardWidth / 2, y + 47, {
+        align: "center",
+      });
 
-      pdf.setTextColor(
-        ...WHITE
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(4.5);
+      pdf.setTextColor(...MUTED);
+
+      const urlLines = pdf.splitTextToSize(
+        driver.profileUrl,
+        cardWidth - 10
       );
 
-      pdf.text(
-        String(number),
-        x + 10,
-        y + cardHeight / 2 + 2,
-        {
-          align: "center",
-        }
-      );
-
-      // ============================================================
-      // DRIVER NAME
-      // ============================================================
-
-      pdf.setFont(
-        "helvetica",
-        "bold"
-      );
-
-      pdf.setFontSize(10);
-
-      pdf.setTextColor(
-        ...NAVY
-      );
-
-      const nameLines =
-        pdf.splitTextToSize(
-          driver.name,
-          70
-        );
-
-      pdf.text(
-        nameLines.slice(0, 2),
-        x + 18,
-        y + 10
-      );
-
-      // ============================================================
-      // PROFILE URL
-      // ============================================================
-
-      pdf.setFont(
-        "helvetica",
-        "normal"
-      );
-
-      pdf.setFontSize(6.5);
-
-      pdf.setTextColor(
-        ...TEAL
-      );
-
-      const urlLines =
-        pdf.splitTextToSize(
-          driver.profileUrl,
-          cardWidth - 70
-        );
-
-      pdf.text(
-        urlLines.slice(0, 2),
-        x + 18,
-        y + 18
-      );
-
-      // Label
-      pdf.setFont(
-        "helvetica",
-        "bold"
-      );
-
-      pdf.setFontSize(4.8);
-
-      pdf.setTextColor(
-        ...MUTED
-      );
-
-      pdf.text(
-        "EMPLOYEE PROFILE URL",
-        x + 18,
-        y + 26
-      );
+      pdf.text(urlLines.slice(0, 2), x + cardWidth / 2, y + 52, {
+        align: "center",
+      });
     };
 
-    // ================================================================
-    // GENERATE PAGES
-    // ================================================================
-
-    for (
-      let i = 0;
-      i < driversForPrint.length;
-      i++
-    ) {
-      const position =
-        i % cardsPerPage;
+    validDrivers.forEach((driver, index) => {
+      const position = index % cardsPerPage;
 
       if (position === 0) {
-        if (i > 0) {
-          pdf.addPage();
-        }
-
+        if (index > 0) pdf.addPage();
         drawHeader();
       }
 
-      const x = marginX;
+      const column = position % columns;
+      const row = Math.floor(position / columns);
 
-      const y =
-        marginTop +
-        10 +
-        position *
-          (cardHeight + gapY);
+      const x = marginX + column * (cardWidth + gapX);
+      const y = marginTop + row * (cardHeight + gapY);
 
-      drawDriver(
-        driversForPrint[i],
-        x,
-        y,
-        i + 1
-      );
-    }
+      drawDriver(driver, x, y, index + 1);
+    });
 
-    // ================================================================
-    // FOOTER
-    // ================================================================
+    // Page footer.
+    const totalPages = pdf.getNumberOfPages();
 
-    const totalPages =
-      pdf.getNumberOfPages();
-
-    for (
-      let page = 1;
-      page <= totalPages;
-      page++
-    ) {
+    for (let page = 1; page <= totalPages; page++) {
       pdf.setPage(page);
 
-      pdf.setDrawColor(
-        ...BORDER
-      );
+      pdf.setDrawColor(...BORDER);
+      pdf.line(marginX, pageHeight - 10, pageWidth - marginX, pageHeight - 10);
 
-      pdf.setLineWidth(0.25);
-
-      pdf.line(
-        marginX,
-        pageHeight - 10,
-        pageWidth - marginX,
-        pageHeight - 10
-      );
-
-      pdf.setFont(
-        "helvetica",
-        "normal"
-      );
-
+      pdf.setFont("helvetica", "normal");
       pdf.setFontSize(6);
-
-      pdf.setTextColor(
-        ...MUTED
-      );
+      pdf.setTextColor(...MUTED);
 
       pdf.text(
-        "BookMyMedicare • Employee Management",
+        "BookMyMedicare | Driver Management",
         marginX,
         pageHeight - 5
       );
@@ -752,32 +548,17 @@ const printDriverProfileUrls = () => {
         `Page ${page} of ${totalPages}`,
         pageWidth - marginX,
         pageHeight - 5,
-        {
-          align: "right",
-        }
+        { align: "right" }
       );
     }
 
-    // ================================================================
-    // SAVE
-    // ================================================================
-
-    pdf.save(
-      "bookmymedicare_driver_profile_urls.pdf"
-    );
-
+    pdf.save("bookmymedicare_driver_qr_codes.pdf");
   } catch (err) {
-    console.error(
-      "print driver profile URLs",
-      err
-    );
-
-    setError(
-      err?.message ||
-        "Failed to generate driver profile URL PDF."
-    );
+    console.error("Print driver QR codes:", err);
+    setError(err?.message || "Failed to generate driver QR code PDF.");
   }
 };
+
   /* =========================================================
      CURRENCY
   ========================================================= */

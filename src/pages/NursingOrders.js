@@ -15,6 +15,7 @@ import { useNavigate } from "react-router-dom";
 import { db, auth } from "../firebase";
 import "./NursingOrders.css";
 import NursingOrderCreate from "./NursingOrderCreate";
+import { generateNursingInvoice } from "./NursingOrderInvoice";
 
 /* =========================
    Helpers
@@ -703,10 +704,10 @@ const exportNursingOrders = async () => {
                 }
 
                 const staffCount =
-                  o.items?.reduce(
-                    (s, it) => s + Number(it.qty || 0),
-                    0
-                  ) || 0;
+  o.items?.reduce(
+    (s, it) => s + Number(it.staffCount ?? it.qty ?? 0),
+    0
+  ) || 0;
 
                 const startDates =
                   o.items?.map((it) => toYmd(it.expectedStartDate)).filter(Boolean) || [];
@@ -771,6 +772,12 @@ const exportNursingOrders = async () => {
 
                   
                     <td className="actions">
+                      <button
+                        className="link"
+                        onClick={() => generateNursingInvoice(o)}
+                      >
+                        Invoice
+                      </button>
                       <button
                         className="link"
                         onClick={() =>

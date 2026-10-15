@@ -15,6 +15,7 @@ import { updateAccountReport } from "../utils/accountReport";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { db, auth } from "../firebase";
 import "./NursingOrderDetails.css";
+import { generateNursingInvoice } from "./NursingOrderInvoice";
 
 /* ======================
    Helpers
@@ -3041,12 +3042,20 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
         <h2>{order.serviceType === "caretaker"
           ? "Caretaker Order"
           : "Nursing Order"} — {order.orderNo}</h2>
-        <button
-          className="nod-btn nod-btn-secondary"
-          onClick={() => navigate(-1)}
-        >
-          Back
-        </button>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            className="nod-btn nod-btn-primary"
+            onClick={() => generateNursingInvoice(order)}
+          >
+            Generate Invoice
+          </button>
+          <button
+            className="nod-btn nod-btn-secondary"
+            onClick={() => navigate(-1)}
+          >
+            Back
+          </button>
+        </div>
       </div>
       
 

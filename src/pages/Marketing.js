@@ -839,7 +839,8 @@ export default function Marketing() {
    * Premium BookMyMedicare employee cards
    */
 
- const printMarketingQR = async () => {
+ 
+const printMarketingQR = async () => {
   try {
     setError("");
 
@@ -848,54 +849,42 @@ export default function Marketing() {
       return;
     }
 
-    // ================================================================
-    // EMPLOYEE PROFILE URL LIST
-    // ONLY NAME + URL
-    // NO QR CODE
-    // NO PHOTO
-    // NO EMPLOYEE ID
-    // NO DESIGNATION
-    // ================================================================
-
-    const employees = filtered
-      .map((r) => {
+    // Generate employee profile URLs and QR codes
+    const employees = await Promise.all(
+      filtered.map(async (r) => {
         const uid = String(
-          r?.uid ||
-            r?.authUid ||
-            r?.id ||
-            ""
+          r?.uid || r?.authUid || r?.id || ""
         ).trim();
 
         if (!uid) return null;
 
-        const name = String(
-          r?.name || "Employee"
-        ).trim();
+        const name = String(r?.name || "Employee").trim();
 
         const profileUrl =
-          `https://bookmymedicare.com/employeeprofiles/${encodeURIComponent(
-            uid
-          )}`;
+          `https://bookmymedicare.com/employeeprofiles/${encodeURIComponent(uid)}`;
 
-        return {
-          uid,
-          name,
-          profileUrl,
-        };
+        const qrData = await QRCode.toDataURL(profileUrl, {
+          errorCorrectionLevel: "H",
+          margin: 1,
+          width: 300,
+          color: {
+            dark: "#0F172A",
+            light: "#FFFFFF",
+          },
+        });
+
+        return { uid, name, profileUrl, qrData };
       })
-      .filter(Boolean);
+    );
 
-    if (!employees.length) {
-      setError(
-        "No valid employee UID found for profile URL generation."
-      );
+    const validEmployees = employees.filter(Boolean);
+
+    if (!validEmployees.length) {
+      setError("No valid employee UID found.");
       return;
     }
 
-    // ================================================================
-    // PDF
-    // ================================================================
-
+    // Create A4 PDF
     const pdf = new jsPDF({
       orientation: "portrait",
       unit: "mm",
@@ -910,15 +899,11 @@ export default function Marketing() {
     const marginTop = 20;
     const marginBottom = 18;
 
-    const cardWidth =
-      pageWidth - marginX * 2;
-
-    const cardHeight = 31;
-    const gapY = 7;
-
+    const cardWidth = pageWidth - marginX * 2;
+    const cardHeight = 34;
+    const gapY = 5;
     const cardsPerPage = 7;
 
-    // Premium colors
     const NAVY = [15, 23, 42];
     const TEAL = [15, 118, 110];
     const MUTED = [100, 116, 139];
@@ -926,295 +911,138 @@ export default function Marketing() {
     const LIGHT_BG = [248, 250, 252];
     const WHITE = [255, 255, 255];
 
-    // ================================================================
-    // PAGE HEADER
-    // ================================================================
-
+    // Page header
     const drawHeader = () => {
-      // Brand
-      pdf.setFont(
-        "helvetica",
-        "bold"
-      );
-
+      pdf.setFont("helvetica", "bold");
       pdf.setFontSize(17);
+      pdf.setTextColor(...TEAL);
+      pdf.text("BookMyMedicare", marginX, 12);
 
-      pdf.setTextColor(
-        ...TEAL
-      );
-
-      pdf.text(
-        "BookMyMedicare",
-        marginX,
-        12
-      );
-
-      // Subtitle
-      pdf.setFont(
-        "helvetica",
-        "normal"
-      );
-
+      pdf.setFont("helvetica", "normal");
       pdf.setFontSize(7);
+      pdf.setTextColor(...MUTED);
+      pdf.text("Employee Profile QR Directory", marginX, 17);
 
-      pdf.setTextColor(
-        ...MUTED
-      );
-
-      pdf.text(
-        "Employee Profile Directory",
-        marginX,
-        17
-      );
-
-      // Employee count
-      pdf.setFont(
-        "helvetica",
-        "bold"
-      );
-
+      pdf.setFont("helvetica", "bold");
       pdf.setFontSize(7);
-
-      pdf.setTextColor(
-        ...NAVY
-      );
-
+      pdf.setTextColor(...NAVY);
       pdf.text(
-        `${employees.length} Employee${
-          employees.length === 1
-            ? ""
-            : "s"
+        `${validEmployees.length} Employee${
+          validEmployees.length === 1 ? "" : "s"
         }`,
         pageWidth - marginX,
         14,
-        {
-          align: "right",
-        }
+        { align: "right" }
       );
 
-      // Divider
-      pdf.setDrawColor(
-        ...BORDER
-      );
-
+      pdf.setDrawColor(...BORDER);
       pdf.setLineWidth(0.3);
-
-      pdf.line(
-        marginX,
-        22,
-        pageWidth - marginX,
-        22
-      );
+      pdf.line(marginX, 22, pageWidth - marginX, 22);
     };
 
-    // ================================================================
-    // DRAW EMPLOYEE
-    // ================================================================
-
-    const drawEmployee = (
-      employee,
-      x,
-      y,
-      number
-    ) => {
+    // Draw employee card with QR code
+    const drawEmployee = (employee, x, y, number) => {
       // Card background
-      pdf.setFillColor(
-        ...LIGHT_BG
-      );
-
-      pdf.setDrawColor(
-        ...BORDER
-      );
-
+      pdf.setFillColor(...LIGHT_BG);
+      pdf.setDrawColor(...BORDER);
       pdf.setLineWidth(0.35);
 
       pdf.roundedRect(
-        x,
-        y,
-        cardWidth,
-        cardHeight,
-        3,
-        3,
-        "FD"
+        x, y, cardWidth, cardHeight, 3, 3, "FD"
       );
 
-      // Left teal accent
-      pdf.setFillColor(
-        ...TEAL
-      );
+      // Teal accent
+      pdf.setFillColor(...TEAL);
+      pdf.roundedRect(x, y, 3, cardHeight, 1.5, 1.5, "F");
 
-      pdf.roundedRect(
-        x,
-        y,
-        3,
-        cardHeight,
-        1.5,
-        1.5,
-        "F"
-      );
+      // Number badge
+      pdf.setFillColor(...TEAL);
+      pdf.circle(x + 10, y + cardHeight / 2, 4, "F");
 
-      // Number circle
-      pdf.setFillColor(
-        ...TEAL
-      );
-
-      pdf.circle(
-        x + 10,
-        y + cardHeight / 2,
-        4,
-        "F"
-      );
-
-      pdf.setFont(
-        "helvetica",
-        "bold"
-      );
-
+      pdf.setFont("helvetica", "bold");
       pdf.setFontSize(6);
-
-      pdf.setTextColor(
-        ...WHITE
-      );
-
+      pdf.setTextColor(...WHITE);
       pdf.text(
         String(number),
         x + 10,
         y + cardHeight / 2 + 2,
-        {
-          align: "center",
-        }
+        { align: "center" }
       );
 
-      // ============================================================
-      // NAME
-      // ============================================================
-
-      pdf.setFont(
-        "helvetica",
-        "bold"
-      );
-
+      // Employee name
+      pdf.setFont("helvetica", "bold");
       pdf.setFontSize(10);
+      pdf.setTextColor(...NAVY);
 
-      pdf.setTextColor(
-        ...NAVY
+      const nameLines = pdf.splitTextToSize(employee.name, 105);
+
+      pdf.text(nameLines.slice(0, 2), x + 18, y + 10);
+
+      // Profile URL
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(6);
+      pdf.setTextColor(...TEAL);
+
+      const urlLines = pdf.splitTextToSize(employee.profileUrl, 112);
+
+      pdf.text(urlLines.slice(0, 2), x + 18, y + 19);
+
+      // Scan instruction
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(5.5);
+      pdf.setTextColor(...MUTED);
+
+      pdf.text("SCAN TO OPEN EMPLOYEE PROFILE", x + 18, y + 28);
+
+      // Actual QR code image
+      const qrSize = 25;
+      const qrX = x + cardWidth - qrSize - 4;
+      const qrY = y + (cardHeight - qrSize) / 2;
+
+      pdf.setFillColor(...WHITE);
+      pdf.roundedRect(
+        qrX - 1,
+        qrY - 1,
+        qrSize + 2,
+        qrSize + 2,
+        1,
+        1,
+        "F"
       );
 
-      const nameLines =
-        pdf.splitTextToSize(
-          employee.name,
-          70
-        );
-
-      pdf.text(
-        nameLines.slice(0, 2),
-        x + 18,
-        y + 10
-      );
-
-      // ============================================================
-      // URL
-      // ============================================================
-
-      pdf.setFont(
-        "helvetica",
-        "normal"
-      );
-
-      pdf.setFontSize(6.5);
-
-      pdf.setTextColor(
-        ...TEAL
-      );
-
-      const urlLines =
-        pdf.splitTextToSize(
-          employee.profileUrl,
-          cardWidth - 70
-        );
-
-      pdf.text(
-        urlLines.slice(0, 2),
-        x + 18,
-        y + 18
-      );
-
-      // Small label
-      pdf.setFont(
-        "helvetica",
-        "bold"
-      );
-
-      pdf.setFontSize(4.8);
-
-      pdf.setTextColor(
-        ...MUTED
-      );
-
-      pdf.text(
-        "EMPLOYEE PROFILE URL",
-        x + 18,
-        y + 26
+      pdf.addImage(
+        employee.qrData,
+        "PNG",
+        qrX,
+        qrY,
+        qrSize,
+        qrSize
       );
     };
 
-    // ================================================================
-    // DRAW PAGES
-    // ================================================================
+    // Draw pages
+    for (let i = 0; i < validEmployees.length; i++) {
+      const position = i % cardsPerPage;
 
-    for (
-      let i = 0;
-      i < employees.length;
-      i++
-    ) {
-      const position =
-        i % cardsPerPage;
-
-      // New page
       if (position === 0) {
-        if (i > 0) {
-          pdf.addPage();
-        }
-
+        if (i > 0) pdf.addPage();
         drawHeader();
       }
 
       const x = marginX;
+      const y = marginTop + 10 + position * (cardHeight + gapY);
 
-      const y =
-        marginTop +
-        10 +
-        position *
-          (cardHeight + gapY);
-
-      drawEmployee(
-        employees[i],
-        x,
-        y,
-        i + 1
-      );
+      drawEmployee(validEmployees[i], x, y, i + 1);
     }
 
-    // ================================================================
-    // FOOTER
-    // ================================================================
+    // Footer
+    const totalPages = pdf.getNumberOfPages();
 
-    const totalPages =
-      pdf.getNumberOfPages();
-
-    for (
-      let page = 1;
-      page <= totalPages;
-      page++
-    ) {
+    for (let page = 1; page <= totalPages; page++) {
       pdf.setPage(page);
 
-      pdf.setDrawColor(
-        ...BORDER
-      );
-
+      pdf.setDrawColor(...BORDER);
       pdf.setLineWidth(0.25);
-
       pdf.line(
         marginX,
         pageHeight - 10,
@@ -1222,19 +1050,12 @@ export default function Marketing() {
         pageHeight - 10
       );
 
-      pdf.setFont(
-        "helvetica",
-        "normal"
-      );
-
+      pdf.setFont("helvetica", "normal");
       pdf.setFontSize(6);
-
-      pdf.setTextColor(
-        ...MUTED
-      );
+      pdf.setTextColor(...MUTED);
 
       pdf.text(
-        "BookMyMedicare • Employee Management",
+        "BookMyMedicare | Employee Management",
         marginX,
         pageHeight - 5
       );
@@ -1243,32 +1064,20 @@ export default function Marketing() {
         `Page ${page} of ${totalPages}`,
         pageWidth - marginX,
         pageHeight - 5,
-        {
-          align: "right",
-        }
+        { align: "right" }
       );
     }
 
-    // ================================================================
-    // SAVE PDF
-    // ================================================================
-
-    pdf.save(
-      "bookmymedicare_employee_profile_urls.pdf"
-    );
-
+    pdf.save("bookmymedicare_employee_qr_codes.pdf");
   } catch (err) {
-    console.error(
-      "print employee profile URLs",
-      err
-    );
+    console.error("Print employee QR codes", err);
 
     setError(
-      err?.message ||
-        "Failed to generate employee profile URL PDF."
+      err?.message || "Failed to generate employee QR code PDF."
     );
   }
 };
+
   const exportMarketing = () => {
     const rowsExport =
       filtered.map((r, i) => ({
