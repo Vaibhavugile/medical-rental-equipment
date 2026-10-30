@@ -1136,3 +1136,34 @@ cursor:pointer;
   .asset-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .asset-maintenance-history-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+
+/* Bulk purchase-rate editor */
+.asset-bulk-purchase {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  background: linear-gradient(120deg, #eef2ff, #f8fafc);
+}
+.asset-bulk-purchase strong {
+  color: #312e81;
+  font-size: 13px;
+  white-space: nowrap;
+}
+.asset-bulk-purchase .cp-input {
+  min-width: 190px;
+  max-width: 240px;
+}
+.asset-bulk-purchase button:disabled {
+  opacity: .6;
+  cursor: not-allowed;
+}
+@media (max-width: 640px) {
+  .asset-bulk-purchase { align-items: stretch; }
+  .asset-bulk-purchase .cp-input,
+  .asset-bulk-purchase button { width: 100%; max-width: none; }
+}

@@ -14,6 +14,7 @@ import {
   increment,
   writeBatch,
   getDocs,
+  Timestamp,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import {
@@ -91,6 +92,9 @@ export default function Products() {
   const [assetBranchFilter, setAssetBranchFilter] = useState("");
   const [assetPageSize, setAssetPageSize] = useState(24);
   const [selectedAssetIds, setSelectedAssetIds] = useState([]);
+  const [bulkPurchaseRate, setBulkPurchaseRate] = useState("");
+  const [bulkPurchaseBusy, setBulkPurchaseBusy] = useState(false);
+  const [bulkPurchaseDateBusy, setBulkPurchaseDateBusy] = useState(false);
 
 
   // new: options for asset id generation & preview
@@ -325,6 +329,106 @@ export default function Products() {
   };
 
 
+  // Set purchaseDate from each asset's own createdAt for the entire assets collection.
+  // This is intentionally global and does not depend on the currently selected product or filters.
+  const doSetPurchaseDateFromCreatedAtForAllAssets = async () => {
+    const ok = window.confirm(
+      "Update ALL assets in Firestore? Each asset with a createdAt value will get purchaseDate = createdAt. Existing purchase dates will be overwritten. Assets without createdAt will be skipped."
+    );
+    if (!ok) return;
+
+    setBulkPurchaseDateBusy(true);
+    try {
+      const snapshot = await getDocs(collection(db, "assets"));
+      const docsWithCreatedAt = snapshot.docs.filter((assetDoc) => {
+        const data = assetDoc.data() || {};
+        return data.createdAt !== undefined && data.createdAt !== null && data.createdAt !== "";
+      });
+
+      if (!docsWithCreatedAt.length) {
+        showToast("No assets with a createdAt value were found", "info");
+        return;
+      }
+
+      for (let offset = 0; offset < docsWithCreatedAt.length; offset += 450) {
+        const batch = writeBatch(db);
+        docsWithCreatedAt.slice(offset, offset + 450).forEach((assetDoc) => {
+          const data = assetDoc.data() || {};
+          batch.update(doc(db, "assets", assetDoc.id), {
+            purchaseDate: data.createdAt,
+            purchaseDateSyncedFromCreatedAtAt: serverTimestamp(),
+          });
+        });
+        await batch.commit();
+      }
+
+      const skipped = snapshot.size - docsWithCreatedAt.length;
+      showToast(
+        `Purchase date updated for ${docsWithCreatedAt.length} asset(s). ${skipped} skipped (missing createdAt).`,
+        "success"
+      );
+      await refreshAssets();
+    } catch (e) {
+      console.error("Global purchase date update failed", e);
+      setError(e.message || "Failed to update purchase dates for all assets");
+      showToast("Could not update all asset purchase dates", "error");
+    } finally {
+      setBulkPurchaseDateBusy(false);
+    }
+  };
+
+  const doBulkUpdatePurchaseRate = async () => {
+    const rate = Number(bulkPurchaseRate);
+    if (!selectedAssetIds.length) {
+      showToast("Select assets first", "error");
+      return;
+    }
+    if (bulkPurchaseRate === "" || !Number.isFinite(rate) || rate < 0) {
+      showToast("Enter a valid purchase rate", "error");
+      return;
+    }
+    const ok = window.confirm(
+      `Update purchase rate to ₹${fmt.money(rate)} for ${selectedAssetIds.length} selected asset(s)?`
+    );
+    if (!ok) return;
+
+    setBulkPurchaseBusy(true);
+    try {
+      const user = auth.currentUser || {};
+      for (let offset = 0; offset < selectedAssetIds.length; offset += 450) {
+        const batch = writeBatch(db);
+        selectedAssetIds.slice(offset, offset + 450).forEach((id) => {
+          batch.update(doc(db, "assets", id), {
+            purchasePrice: rate,
+            purchasePricePerUnit: rate,
+            purchaseRateUpdatedAt: serverTimestamp(),
+            purchaseRateUpdatedBy: user.uid || "",
+            purchaseRateUpdatedByName: user.displayName || user.email || "",
+            updatedAt: serverTimestamp(),
+            history: arrayUnion({
+              ts: new Date().toISOString(),
+              by: user.uid || "system",
+              byName: user.displayName || user.email || "system",
+              type: "purchase_rate_updated",
+              note: `Purchase rate updated to ${rate}`,
+              data: { purchasePricePerUnit: rate },
+            }),
+          });
+        });
+        await batch.commit();
+      }
+      setBulkPurchaseRate("");
+      setSelectedAssetIds([]);
+      await refreshAssets();
+      showToast(`Purchase rate updated for ${selectedAssetIds.length} asset(s)`, "success");
+    } catch (e) {
+      console.error("Bulk purchase rate update failed", e);
+      setError(e.message || "Failed to update purchase rates");
+    } finally {
+      setBulkPurchaseBusy(false);
+    }
+  };
+
 const allVisibleAssetIds = visibleAssets.map((a) => a.id);
 const allSelected =
   allVisibleAssetIds.length > 0 &&
@@ -501,6 +605,22 @@ if (!Number.isNaN(n) && n > maxSeq) {
           supplier: assetSupplier.trim() || "",
         }
       );
+
+      // Use the selected purchase date as the asset's created date as requested.
+      // Keep purchaseDate as the canonical purchase date field as well.
+      if (Array.isArray(created) && created.length) {
+        for (let offset = 0; offset < created.length; offset += 450) {
+          const batch = writeBatch(db);
+          created.slice(offset, offset + 450).forEach((asset) => {
+            if (!asset.id) return;
+            batch.update(doc(db, "assets", asset.id), {
+              createdAt: Timestamp.fromDate(new Date(`${assetPurchaseDate}T00:00:00`)),
+              purchaseDate: assetPurchaseDate,
+            });
+          });
+          await batch.commit();
+        }
+      }
 
       await refreshAssets();
       setAssetCompany("");
@@ -1188,10 +1308,17 @@ if (!Number.isNaN(n) && n > maxSeq) {
   <h3>Assets</h3>
 
   {/* 🔥 BULK DELETE BAR — THIS WAS MISSING */}
-  {visibleAssets.length > 0 && (
-  <div className="bulk-bar"
-  
-  >
+  <div className="bulk-bar">
+    <button
+      className="cp-btn"
+      onClick={doSetPurchaseDateFromCreatedAtForAllAssets}
+      disabled={bulkPurchaseDateBusy}
+      title="Applies to every asset in Firestore, not just the current product or filtered list"
+    >
+      {bulkPurchaseDateBusy ? "Updating all assets…" : "Set purchase date = created date (ALL assets)"}
+    </button>
+
+    {visibleAssets.length > 0 && <>
     <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
       <input
         type="checkbox"
@@ -1206,12 +1333,32 @@ if (!Number.isNaN(n) && n > maxSeq) {
     </label>
 
     {selectedAssetIds.length > 0 && (
-      <button className="cp-btn danger" onClick={doBulkDeleteAssets}>
-        Delete selected ({selectedAssetIds.length})
-      </button>
+      <div className="asset-bulk-purchase">
+        <strong>{selectedAssetIds.length} selected</strong>
+        <input
+          className="cp-input"
+          type="number"
+          min="0"
+          step="0.01"
+          value={bulkPurchaseRate}
+          onChange={(e) => setBulkPurchaseRate(e.target.value)}
+          placeholder="New purchase rate / asset"
+          aria-label="New purchase rate per asset"
+        />
+        <button
+          className="cp-btn"
+          onClick={doBulkUpdatePurchaseRate}
+          disabled={bulkPurchaseBusy}
+        >
+          {bulkPurchaseBusy ? "Updating…" : "Update purchase rate"}
+        </button>
+        <button className="cp-btn danger" onClick={doBulkDeleteAssets}>
+          Delete selected ({selectedAssetIds.length})
+        </button>
+      </div>
     )}
+    </>}
   </div>
-)}
 
 
   {/* Filters */}
@@ -1383,7 +1530,7 @@ if (!Number.isNaN(n) && n > maxSeq) {
                   </strong>
                 </div>
                 <div className="asset-purchase-extra">
-                  {a.purchaseDate && <span>Purchased: {a.purchaseDate}</span>}
+                  {a.purchaseDate && <span>Purchased: {fmt.date(a.purchaseDate)}</span>}
                   {a.purchaseSupplier && <span>Supplier: {a.purchaseSupplier}</span>}
                 </div>
               </div>
@@ -1699,7 +1846,7 @@ if (!Number.isNaN(n) && n > maxSeq) {
 
       <div className="asset-overview-grid">
         <div><span>Purchase price</span><strong>₹{fmt.money(assetDetails.purchasePricePerUnit ?? assetDetails.purchasePrice ?? 0)}</strong></div>
-        <div><span>Purchase date</span><strong>{assetDetails.purchaseDate || "—"}</strong></div>
+        <div><span>Purchase date</span><strong>{assetDetails.purchaseDate ? fmt.date(assetDetails.purchaseDate) : "—"}</strong></div>
         <div><span>Current status</span><strong>{String(assetDetails.status || "in_stock").replace(/_/g, " ")}</strong></div>
         <div><span>Lifetime maintenance</span><strong>₹{fmt.money(assetDetails.totalMaintenanceCost || 0)}</strong></div>
       </div>
@@ -1714,7 +1861,7 @@ if (!Number.isNaN(n) && n > maxSeq) {
           </strong>
         </div>
         <div className="asset-purchase-extra">
-          {assetDetails.purchaseDate && <span>Purchase date: {assetDetails.purchaseDate}</span>}
+          {assetDetails.purchaseDate && <span>Purchase date: {fmt.date(assetDetails.purchaseDate)}</span>}
           {assetDetails.purchaseSupplier && <span>Supplier: {assetDetails.purchaseSupplier}</span>}
           {assetDetails.purchaseBatchId && <span>Batch: {assetDetails.purchaseBatchId}</span>}
         </div>

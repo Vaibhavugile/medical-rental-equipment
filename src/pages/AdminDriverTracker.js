@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { GoogleMap, Marker, Polyline, InfoWindow, Circle } from "@react-google-maps/api";
 import { collection, doc, onSnapshot, orderBy, query } from "firebase/firestore";
+import "./AdminDriverTracker.css";
 
 /**
  * AdminDriverTracker (detailed report with reverse geocoded stop addresses) — ROLE AWARE
@@ -53,6 +54,9 @@ const base = collectionByRole(role);
   const [stopAddresses, setStopAddresses] = useState({}); // key => formatted address
 
   const mapRef = useRef(null);
+  const mapShellRef = useRef(null);
+  const [mapType, setMapType] = useState("roadmap");
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const playbackTimer = useRef(null);
   const liveUnsubRef = useRef(null);
   const dayUnsubRef = useRef(null);
@@ -289,228 +293,120 @@ const base = collectionByRole(role);
 
   const mapCenter = path[0] ?? { lat: 20.5937, lng: 78.9629 }; // India fallback
   const zoom = path.length ? 15 : 5;
+  const online = live ? isOnline(live) : false;
+  const activePoint = cursor || end;
+  const focusPoint = (point) => {
+    if (!point || !mapRef.current) return;
+    mapRef.current.panTo({ lat: point.lat, lng: point.lng });
+    mapRef.current.setZoom(17);
+    setSelectedPoint(point);
+  };
+  const fitRoute = () => {
+    if (!mapRef.current || !window.google?.maps) return;
+    const all = [...effectivePoints];
+    if (live && Number.isFinite(live.lat) && Number.isFinite(live.lng)) all.push(live);
+    if (all.length) fitToPath(mapRef.current, all);
+  };
+  const changeZoom = (delta) => {
+    if (!mapRef.current) return;
+    const current = mapRef.current.getZoom() || 14;
+    mapRef.current.setZoom(Math.max(3, Math.min(21, current + delta)));
+  };
+  const toggleFullscreen = async () => {
+    const node = mapShellRef.current;
+    if (!node) return;
+    try {
+      if (!document.fullscreenElement) await node.requestFullscreen();
+      else await document.exitFullscreen();
+    } catch (e) { console.warn("Fullscreen is not available", e); }
+  };
+  useEffect(() => {
+    const sync = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
 
   return (
-    <div className="w-full h-full flex flex-col gap-4">
-      {/* Controls */}
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm font-medium">Date</label>
-        <input
-          type="date"
-          className="border rounded px-2 py-1"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-        />
-
-        <div className="text-sm text-black/70 ml-4">
-          {attn
-            ? <>Status: <b>{attn.status}</b>{" "}
-               {attn.checkInMs ? `• In: ${toLocal(attn.checkInMs)}` : ""}{" "}
-               {attn.checkOutMs ? `• Out: ${toLocal(attn.checkOutMs)}` : ""}</>
-            : "No attendance record"}
+    <section className="adt-page">
+      <header className="adt-header">
+        <div>
+          <div className="adt-eyebrow"><span className="adt-eyebrow-dot" /> LIVE OPERATIONS</div>
+          <h2>Location & activity</h2>
+          <p>Review the route, stops and movement history for the selected day.</p>
         </div>
+        <div className="adt-header-status">
+          <span className={`adt-status-dot ${online ? "is-online" : "is-offline"}`} />
+          <span>{online ? "Live location active" : "Live location unavailable"}</span>
+        </div>
+      </header>
 
-        <div className="flex items-center gap-2 ml-auto">
-          <button
-            onClick={() => setPlaying((p) => !p)}
-            className="px-3 py-1 rounded bg-black/80 text-white"
-            disabled={!effectivePoints.length}
-          >
-            {playing ? "Pause" : "Play"}
+      <div className="adt-toolbar">
+        <label className="adt-date-field"><span>TRACKING DATE</span><input type="date" value={date} onChange={(e) => { setDate(e.target.value); setPlaying(false); setSelectedPoint(null); }} /></label>
+        <div className="adt-attendance">
+          <span className="adt-attendance-label">ATTENDANCE</span>
+          <strong className={`adt-attendance-state ${attn?.status === "checked_in" || attn?.status === "present" ? "good" : ""}`}>{attn?.status || "No record"}</strong>
+          <small>{attn?.checkInMs ? `In ${toLocal(attn.checkInMs)}` : "Not checked in"}{attn?.checkOutMs ? ` · Out ${toLocal(attn.checkOutMs)}` : ""}</small>
+        </div>
+        <div className="adt-playback">
+          <button className={`adt-button ${playing ? "adt-button-dark" : "adt-button-primary"}`} onClick={() => { if (cursorIdx >= effectivePoints.length - 1) setCursorIdx(0); setPlaying((v) => !v); }} disabled={effectivePoints.length < 2}>
+            <span>{playing ? "Ⅱ" : "▶"}</span>{playing ? "Pause replay" : "Replay route"}
           </button>
-          <input
-            type="range"
-            min={0}
-            max={Math.max(0, effectivePoints.length - 1)}
-            value={Math.min(cursorIdx, Math.max(0, effectivePoints.length - 1))}
-            onChange={(e) => setCursorIdx(Number(e.target.value))}
-            className="w-56"
-          />
-          <span className="text-xs tabular-nums">
-            {effectivePoints.length ? `${cursorIdx + 1}/${effectivePoints.length}` : "0/0"}
-          </span>
+          <div className="adt-range-wrap"><input aria-label="Route playback position" type="range" min={0} max={Math.max(0, effectivePoints.length - 1)} value={Math.min(cursorIdx, Math.max(0, effectivePoints.length - 1))} onChange={(e) => { setPlaying(false); setCursorIdx(Number(e.target.value)); }} disabled={!effectivePoints.length} /><span>{effectivePoints.length ? `${Math.min(cursorIdx + 1, effectivePoints.length)} / ${effectivePoints.length}` : "0 / 0"}</span></div>
         </div>
       </div>
 
-      {/* Map */}
-      <div className="w-full" style={{ height }}>
-        <GoogleMap
-          onLoad={onMapLoad}
-          mapContainerStyle={{ width: "100%", height: "100%" }}
-          center={mapCenter}
-          zoom={zoom}
-          options={{ streetViewControl: false, mapTypeControl: false }}
-        >
-          {/* Path with direction arrows */}
-          {path.length > 1 && (
-            <Polyline
-              path={path}
-              options={{
-                strokeOpacity: 1,
-                strokeWeight: 4,
-                icons: window.google?.maps ? [{
-                  icon: { path: window.google.maps.SymbolPath.FORWARD_OPEN_ARROW, scale: 2 },
-                  offset: "0",
-                  repeat: "60px",
-                }] : undefined,
-              }}
-            />
-          )}
-
-          {/* Start & End */}
-          {start && (
-            <Marker
-              position={{ lat: start.lat, lng: start.lng }}
-              label="S"
-              onClick={() => setSelectedPoint(start)}
-            />
-          )}
-          {end && (
-            <Marker
-              position={{ lat: end.lat, lng: end.lng }}
-              label="E"
-              onClick={() => setSelectedPoint(end)}
-            />
-          )}
-
-          {/* Playback cursor */}
-          {cursor && (
-            <Marker
-              position={{ lat: cursor.lat, lng: cursor.lng }}
-              onClick={() => setSelectedPoint(cursor)}
-            />
-          )}
-
-          {/* Live */}
-          {live && Number.isFinite(live.lat) && Number.isFinite(live.lng) && (
-            <Marker
-              position={{ lat: live.lat, lng: live.lng }}
-              label="LIVE"
-              onClick={() => {
-                const sel = { ...live, capturedAtMs: live.capturedAtMs ?? Date.now() };
-                setSelectedPoint(sel);
-              }}
-            />
-          )}
-
-          {/* Stops (circles + numbered markers) */}
-          {report.stops.map((s, i) => (
-            <React.Fragment key={`stop-${i}`}>
-              <Circle
-                center={{ lat: s.center.lat, lng: s.center.lng }}
-                radius={18}
-                options={{ strokeOpacity: 0.7, strokeWeight: 1, fillOpacity: 0.15 }}
-              />
-              <Marker
-                position={{ lat: s.center.lat, lng: s.center.lng }}
-                label={`${i + 1}`}
-                onClick={() => setSelectedPoint({
-                  lat: s.center.lat,
-                  lng: s.center.lng,
-                  capturedAtMs: s.startMs,
-                  _stop: s,
-                })}
-              />
-            </React.Fragment>
-          ))}
-
-          {/* InfoWindow (point or stop) */}
-          {selectedPoint && (
-            <InfoWindow
-              position={{ lat: selectedPoint.lat, lng: selectedPoint.lng }}
-              onCloseClick={() => setSelectedPoint(null)}
-            >
-              <div className="text-xs space-y-1" style={{ maxWidth: 260 }}>
-                {selectedPoint._stop ? (
-                  <>
-                    <div><b>Stop</b> #{report.stops.findIndex(s => s === selectedPoint._stop) + 1}</div>
-                    <div><b>Start:</b> {toLocal(selectedPoint._stop.startMs)}</div>
-                    <div><b>End:</b> {toLocal(selectedPoint._stop.endMs)}</div>
-                    <div><b>Duration:</b> {fmtDuration(selectedPoint._stop.durationMs)}</div>
-                    <div>
-                      <b>Location:</b>{" "}
-                      {stopAddresses[stopKey(selectedPoint.lat, selectedPoint.lng)] ?? "Loading..."}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div><b>Time:</b> {selectedPoint.capturedAtMs ? toLocal(selectedPoint.capturedAtMs) : "—"}</div>
-                    <div><b>Lat/Lng:</b> {selectedPoint.lat.toFixed(6)}, {selectedPoint.lng.toFixed(6)}</div>
-                    {Number.isFinite(selectedPoint.speed) && (
-                      <div><b>Speed:</b> {mpsToKmph(selectedPoint.speed).toFixed(1)} km/h</div>
-                    )}
-                    {Number.isFinite(selectedPoint.accuracy) && (
-                      <div><b>Accuracy:</b> ±{Math.round(selectedPoint.accuracy)} m</div>
-                    )}
-                  </>
-                )}
-              </div>
-            </InfoWindow>
-          )}
-        </GoogleMap>
+      <div className="adt-kpis">
+        <div className="adt-kpi"><span className="adt-kpi-icon purple">↗</span><div><small>DISTANCE COVERED</small><strong>{(report.distanceM / 1000).toFixed(2)} <em>km</em></strong></div></div>
+        <div className="adt-kpi"><span className="adt-kpi-icon green">◷</span><div><small>MOVING TIME</small><strong>{fmtDuration(report.movingMs)}</strong></div></div>
+        <div className="adt-kpi"><span className="adt-kpi-icon amber">Ⅱ</span><div><small>IDLE TIME</small><strong>{fmtDuration(report.idleMs)}</strong></div></div>
+        <div className="adt-kpi"><span className="adt-kpi-icon blue">⌖</span><div><small>STOPS DETECTED</small><strong>{report.stops.length}</strong></div></div>
       </div>
 
-      {/* Summary / Detailed report */}
-      <div className="grid gap-3" style={{ gridTemplateColumns: "1.2fr 1fr" }}>
-        <div className="text-sm p-3 border rounded">
-          <div className="font-medium mb-2">Day Summary</div>
-          <div>Points: {points.length} raw → {cleanPoints.length} clean</div>
-          <div>
-            Distance: {(report.distanceM / 1000).toFixed(2)} km •{" "}
-            Moving: {fmtDuration(report.movingMs)} •{" "}
-            Idle: {fmtDuration(report.idleMs)}
+      <div className="adt-main-grid">
+        <section className="adt-map-card">
+          <div className="adt-map-heading"><div><h3>Route map</h3><p>{effectivePoints.length ? `${effectivePoints.length.toLocaleString()} recorded location points` : "No route points for this date"}</p></div><div className="adt-map-legend"><span><i className="legend-start" /> Start</span><span><i className="legend-stop" /> Stop</span><span><i className="legend-live" /> Live</span></div></div>
+          <div className="adt-map-shell" ref={mapShellRef}>
+            <GoogleMap onLoad={onMapLoad} mapContainerStyle={{ width: "100%", height: "100%" }} center={mapCenter} zoom={zoom} options={{
+              streetViewControl: false, mapTypeControl: false, fullscreenControl: false, zoomControl: false,
+              clickableIcons: false, gestureHandling: "greedy", mapTypeId: mapType,
+              keyboardShortcuts: true, disableDoubleClickZoom: false,
+              styles: mapType === "roadmap" ? [
+                { featureType: "poi", elementType: "labels", stylers: [{ visibility: "simplified" }] },
+                { featureType: "transit", elementType: "labels", stylers: [{ visibility: "on" }] }
+              ] : undefined
+            }}>
+              {path.length > 1 && <Polyline path={path} options={{ strokeColor: "#5267e8", strokeOpacity: 0.95, strokeWeight: 5, geodesic: true, zIndex: 2, icons: window.google?.maps ? [{ icon: { path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW, scale: 2, fillColor: "#ffffff", fillOpacity: 1, strokeColor: "#5267e8", strokeWeight: 1 }, offset: "50%", repeat: "120px" }] : undefined }} />}
+              {start && <Marker position={{ lat: start.lat, lng: start.lng }} title="Route start" label={{ text: "S", color: "#fff", fontWeight: "700" }} icon={window.google?.maps ? { path: window.google.maps.SymbolPath.CIRCLE, scale: 13, fillColor: "#159b70", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 3 } : undefined} onClick={() => focusPoint(start)} />}
+              {end && effectivePoints.length > 1 && <Marker position={{ lat: end.lat, lng: end.lng }} title="Last recorded location" label={{ text: "E", color: "#fff", fontWeight: "700" }} icon={window.google?.maps ? { path: window.google.maps.SymbolPath.CIRCLE, scale: 13, fillColor: "#e05262", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 3 } : undefined} onClick={() => focusPoint(end)} />}
+              {cursor && <Marker position={{ lat: cursor.lat, lng: cursor.lng }} title="Playback position" zIndex={10} icon={window.google?.maps ? { path: window.google.maps.SymbolPath.CIRCLE, scale: 9, fillColor: "#5367e8", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 3 } : undefined} onClick={() => focusPoint(cursor)} />}
+              {live && Number.isFinite(live.lat) && Number.isFinite(live.lng) && <Marker position={{ lat: live.lat, lng: live.lng }} title={online ? "Live location" : "Last known location"} zIndex={20} icon={window.google?.maps ? { path: window.google.maps.SymbolPath.CIRCLE, scale: 11, fillColor: online ? "#16a36a" : "#8b95a7", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 4 } : undefined} onClick={() => focusPoint({ ...live, capturedAtMs: live.capturedAtMs ?? Date.now() })} />}
+              {report.stops.map((stop, i) => <React.Fragment key={`stop-${i}`}><Circle center={stop.center} radius={22} options={{ strokeColor: "#e39a32", strokeOpacity: 0.75, strokeWeight: 1.5, fillColor: "#f7b955", fillOpacity: 0.18, clickable: false }} /><Marker position={stop.center} title={`Stop ${i + 1} · ${fmtDuration(stop.durationMs)}`} label={{ text: String(i + 1), color: "#fff", fontWeight: "800", fontSize: "12px" }} icon={window.google?.maps ? { path: window.google.maps.SymbolPath.CIRCLE, scale: 13, fillColor: "#e59a35", fillOpacity: 1, strokeColor: "#fff", strokeWeight: 3 } : undefined} onClick={() => focusPoint({ lat: stop.center.lat, lng: stop.center.lng, capturedAtMs: stop.startMs, _stop: stop })} /></React.Fragment>)}
+              {selectedPoint && <InfoWindow position={{ lat: selectedPoint.lat, lng: selectedPoint.lng }} onCloseClick={() => setSelectedPoint(null)}><div className="adt-infowindow">{selectedPoint._stop ? <><b>Stop {report.stops.findIndex((s) => s === selectedPoint._stop) + 1}</b><span>{fmtDuration(selectedPoint._stop.durationMs)} stopped</span><small>{toLocal(selectedPoint._stop.startMs)} – {toLocal(selectedPoint._stop.endMs)}</small><small>{stopAddresses[stopKey(selectedPoint.lat, selectedPoint.lng)] || "Resolving address…"}</small></> : <><b>{selectedPoint === live ? "Live location" : "Recorded location"}</b><span>{selectedPoint.capturedAtMs ? toLocal(selectedPoint.capturedAtMs) : "Time unavailable"}</span><small>{selectedPoint.lat.toFixed(6)}, {selectedPoint.lng.toFixed(6)}</small>{Number.isFinite(selectedPoint.speed) && <small>{mpsToKmph(selectedPoint.speed).toFixed(1)} km/h</small>}</>}</div></InfoWindow>}
+            </GoogleMap>
+            <div className="adt-map-controls"><button type="button" title="Zoom in" onClick={() => changeZoom(1)}>＋</button><button type="button" title="Zoom out" onClick={() => changeZoom(-1)}>−</button><i /><button type="button" title="Fit route" onClick={fitRoute}>⌗</button><button type="button" title={isFullscreen ? "Exit full screen" : "Full screen"} onClick={toggleFullscreen}>{isFullscreen ? "↙" : "⛶"}</button></div>
+            <div className="adt-map-type"><button className={mapType === "roadmap" ? "active" : ""} onClick={() => setMapType("roadmap")}>Map</button><button className={mapType === "satellite" ? "active" : ""} onClick={() => setMapType("satellite")}>Satellite</button></div>
+            {!effectivePoints.length && <div className="adt-map-empty"><span>⌖</span><b>No route recorded</b><small>Try another date or check whether location tracking was enabled.</small></div>}
           </div>
-          <div>
-            Offline (between check-in & check-out): {fmtDuration(report.offline.totalMs)}
-            {report.offline.gaps.length
-              ? ` • ${report.offline.gaps.length} gap${report.offline.gaps.length > 1 ? "s" : ""}`
-              : ""}
-          </div>
-          <div>
-            {live
-              ? `Live: ${isOnline(live) ? "online" : "offline"} (${live._source || "user"})`
-              : "Live unavailable"}
-          </div>
-        </div>
+          <div className="adt-map-footer"><span><b>{points.length}</b> raw points <i /> <b>{cleanPoints.length}</b> filtered points</span><button onClick={fitRoute} disabled={!effectivePoints.length}>Fit entire route <span>↗</span></button></div>
+        </section>
 
-        <div className="text-sm p-3 border rounded">
-          <div className="font-medium mb-2">
-            Stops ({report.stops.length})
+        <aside className="adt-side-card">
+          <div className="adt-side-heading"><div><h3>Journey timeline</h3><p>Stops and key moments</p></div><span className="adt-count-pill">{report.stops.length} stops</span></div>
+          <div className="adt-timeline">
+            {start && <button className="adt-timeline-item" onClick={() => focusPoint(start)}><span className="adt-timeline-marker start-marker">S</span><span className="adt-timeline-content"><b>Journey started</b><small>{start.capturedAtMs ? toLocal(start.capturedAtMs) : "Time unavailable"}</small></span><span className="adt-timeline-arrow">↗</span></button>}
+            {report.stops.map((stop, i) => <button className="adt-timeline-item" key={`timeline-${i}`} onClick={() => focusPoint({ lat: stop.center.lat, lng: stop.center.lng, capturedAtMs: stop.startMs, _stop: stop })}><span className="adt-timeline-marker stop-marker">{i + 1}</span><span className="adt-timeline-content"><b>Stop {i + 1}</b><small>{toLocal(stop.startMs)}</small><small className="adt-address">{stopAddresses[stopKey(stop.center.lat, stop.center.lng)] || "Finding address…"}</small><em>{fmtDuration(stop.durationMs)} stop duration</em></span><span className="adt-timeline-arrow">↗</span></button>)}
+            {end && effectivePoints.length > 1 && <button className="adt-timeline-item" onClick={() => focusPoint(end)}><span className="adt-timeline-marker end-marker">E</span><span className="adt-timeline-content"><b>Last recorded point</b><small>{end.capturedAtMs ? toLocal(end.capturedAtMs) : "Time unavailable"}</small></span><span className="adt-timeline-arrow">↗</span></button>}
+            {!start && <div className="adt-empty-state"><span>⌖</span><b>No journey activity</b><small>Location history will appear here when points are available.</small></div>}
           </div>
-          {report.stops.length === 0 ? (
-            <div className="text-black/70">No stops detected.</div>
-          ) : (
-            <div className="overflow-auto" style={{ maxHeight: 260 }}>
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-left">
-                    <th>#</th>
-                    <th>Start</th>
-                    <th>End</th>
-                    <th>Duration</th>
-                    <th>Location</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {report.stops.map((s, i) => {
-                    const key = stopKey(s.center.lat, s.center.lng);
-                    return (
-                      <tr key={`row-${i}`}>
-                        <td>{i + 1}</td>
-                        <td>{toLocal(s.startMs)}</td>
-                        <td>{toLocal(s.endMs)}</td>
-                        <td>{fmtDuration(s.durationMs)}</td>
-                        <td>{stopAddresses[key] ?? "Loading..."}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+          <div className="adt-side-bottom"><div><span>OFFLINE TIME</span><b>{fmtDuration(report.offline.totalMs)}</b><small>{report.offline.gaps.length} tracking gaps detected</small></div><div><span>LIVE STATUS</span><b className={online ? "text-online" : "text-offline"}>{online ? "Online" : "Unavailable"}</b><small>{live?.capturedAtMs ? `Updated ${toLocal(live.capturedAtMs)}` : "No live coordinates"}</small></div></div>
+        </aside>
       </div>
-    </div>
+
+      <section className="adt-detail-card"><div className="adt-detail-heading"><div><h3>Stop details</h3><p>Tap any stop to locate it on the map.</p></div><span className="adt-count-pill">{report.stops.length} locations</span></div>
+        {report.stops.length ? <div className="adt-stop-list">{report.stops.map((stop, i) => { const key = stopKey(stop.center.lat, stop.center.lng); return <button className="adt-stop-row" key={`detail-${i}`} onClick={() => focusPoint({ lat: stop.center.lat, lng: stop.center.lng, capturedAtMs: stop.startMs, _stop: stop })}><span className="adt-stop-number">{i + 1}</span><span className="adt-stop-main"><b>Stop {i + 1}</b><small>{stopAddresses[key] || "Address is being resolved…"}</small></span><span className="adt-stop-time"><b>{fmtDuration(stop.durationMs)}</b><small>{toLocal(stop.startMs)}</small></span><span className="adt-stop-chevron">↗</span></button>; })}</div> : <div className="adt-no-stops">No stops of 3 minutes or longer were detected for this day.</div>}
+      </section>
+      <div className="adt-footnote">Route and stop details are based on location points received by the device. Gaps may occur when GPS, network or background permissions are unavailable.</div>
+    </section>
   );
 }
 
