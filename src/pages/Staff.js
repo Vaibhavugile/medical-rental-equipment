@@ -364,9 +364,7 @@ export default function Staff({ defaultType = "all" }) {
     // EMPLOYEE ID
     // --------------------------------------------------------
 
-    if (!p.employeeId.trim()) {
-      return "Employee ID is required";
-    }
+
 
     // --------------------------------------------------------
     // NAME
