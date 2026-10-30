@@ -28,7 +28,7 @@ import NursingOrderCreate from "./NursingOrderCreate";
 // NEW: PDF generation + Firebase Storage upload
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable"; // ✅ correct v3 import
+import html2canvas from "html2canvas";
 
 const fmtCurrency = (v) => {
   try {
@@ -927,78 +927,295 @@ const convertToOrder = (quote) => {
   };
 
   const buildQuotationPdf = async (q) => {
-    const doc = new jsPDF();
-    const marginLeft = 14;
-    const pageWidth = doc.internal.pageSize.getWidth();
+    if (!q) throw new Error("Quotation details are not available.");
 
-    // Header
-    doc.setFontSize(18);
-    doc.text("Quotation", marginLeft, 20);
-    doc.setFontSize(11);
-    doc.text(`Quotation No: ${q.quoNo || q.quotationId || q.id}`, marginLeft, 28);
-    doc.text(`Status: ${q.status || "draft"}`, marginLeft, 34);
-    doc.text(`Created: ${parseDate(q.createdAt)}`, marginLeft, 40);
-    if (q.createdByName || q.createdBy) doc.text(`By: ${q.createdByName || q.createdBy}`, marginLeft, 46);
+    const COMPANY = {
+      name: "BOOKMYMEDICARE PRIVATE LIMITED",
+      address: "Shop No. 10, Sun and Moon CHS, Rajendra Nagar, Datta Pada Road, Borivali (East), Mumbai - 400068",
+      registration: "CDSCO-MFG/MD/2023/000462",
+      cin: "U74999MH2021PTC353543",
+      licences: "MH-MZ7-561792 | MH-MZ7-561793 | MH-MZ7-561794 | MH-MZ7-561795",
+      phone: "7777066885",
+      gstin: "27AAJCB5669E1ZF",
+      state: "Maharashtra",
+      stateCode: "27",
+      email: "bookmymedicare@gmail.com",
+      pan: "AAJCB5669E",
+      bankName: "Indian Overseas Bank (IOB) (0119)",
+      account: "020933000000119",
+      branchIfsc: "Andheri West & IOBA0000209",
+    };
 
-    // NEW: Customer lines
-    const custY = 52;
-    if (q.customerName) doc.text(`Customer: ${q.customerName}`, marginLeft, custY);
-    if (q.customerPhone) doc.text(`Mobile: ${q.customerPhone}`, marginLeft, custY + 6);
+    const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+    })[char]);
+    const money = (value) => Number(value || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2, maximumFractionDigits: 2,
+    });
+    const toDate = (value) => {
+      if (!value) return null;
+      if (typeof value?.toDate === "function") return value.toDate();
+      if (value?.seconds) return new Date(value.seconds * 1000);
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? null : date;
+    };
+    const dateText = (value) => {
+      const date = toDate(value);
+      return date ? date.toLocaleDateString("en-IN", {
+        day: "2-digit", month: "short", year: "2-digit",
+      }) : "—";
+    };
+    const numberWords = (number) => {
+      const n = Math.floor(Math.abs(Number(number) || 0));
+      if (!n) return "Zero";
+      const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+      const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+      const underThousand = (num) => {
+        let out = "";
+        if (num >= 100) out += `${ones[Math.floor(num / 100)]} Hundred `;
+        num %= 100;
+        if (num >= 20) {
+          out += `${tens[Math.floor(num / 10)]} `;
+          if (num % 10) out += `${ones[num % 10]} `;
+        } else if (num > 0) out += `${ones[num]} `;
+        return out.trim();
+      };
+      const units = [[10000000, "Crore"], [100000, "Lakh"], [1000, "Thousand"], [1, ""]];
+      let remaining = n;
+      const parts = [];
+      units.forEach(([size, label]) => {
+        const chunk = Math.floor(remaining / size);
+        if (chunk) {
+          parts.push(`${underThousand(chunk)}${label ? ` ${label}` : ""}`.trim());
+          remaining %= size;
+        }
+      });
+      return parts.join(" ").trim();
+    };
+    const amountInWords = (amount) => {
+      const value = Number(amount || 0);
+      const rupees = Math.floor(Math.abs(value));
+      const paise = Math.round((Math.abs(value) - rupees) * 100);
+      return `INR ${numberWords(rupees)}${paise ? ` and ${numberWords(paise)} Paise` : ""} Only`;
+    };
+    const durationLabel = (item) => {
+      const start = toDate(item.expectedStartDate || item.startDate);
+      const end = toDate(item.expectedEndDate || item.endDate);
+      if (!start || !end) return "";
+      const startDay = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+      const endDay = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+      const days = Math.max(1, Math.floor((endDay - startDay) / 86400000) + 1);
+      return `${dateText(start)} to ${dateText(end)} (${days} ${days === 1 ? "Day" : "Days"})`;
+    };
 
-    // Items table
-    const rows = (q.items || []).map((it, idx) => [
-      idx + 1,
-      it.name || it.itemName || it.productName || it.productId || "—",
-      String(it.qty ?? it.quantity ?? 0),
-      fmtCurrency(it.rate ?? 0),
-      fmtCurrency(it.amount ?? ((it.qty ?? it.quantity ?? 0) * (it.rate ?? 0)))
-    ]);
+    const items = Array.isArray(q.items) ? q.items : [];
+    const calculated = calcAmounts(items, q.discount || {}, q.taxes || []);
+    const totals = q.totals || {};
+    const subtotal = Number(totals.subtotal ?? calculated.subtotal);
+    const discount = Number(totals.discountAmount ?? calculated.discountAmount ?? 0);
+    const taxList = Array.isArray(totals.taxBreakdown) ? totals.taxBreakdown
+      : Array.isArray(totals.taxes) ? totals.taxes : calculated.taxBreakdown;
+    const totalTax = Number(totals.totalTax ?? taxList.reduce((sum, tax) => sum + Number(tax.amount || 0), 0));
+    const total = Number(totals.total ?? Math.max(0, subtotal - discount + totalTax));
 
-    // ✅ use autoTable(doc, {...}) for v3
-    autoTable(doc, {
-      head: [["#", "Item", "Qty", "Rate", "Amount"]],
-      body: rows,
-      startY: (q.customerName || q.customerPhone) ? (custY + 14) : 54, // push down if customer block present
-      styles: { fontSize: 10 },
-      headStyles: { fillColor: [240, 240, 240] },
-      theme: "grid",
-      columnStyles: {
-        0: { cellWidth: 10 },
-        2: { halign: "right", cellWidth: 18 },
-        3: { halign: "right", cellWidth: 24 },
-        4: { halign: "right", cellWidth: 28 }
+    const quotationNo = q.quoNo || q.quotationId || q.id || "—";
+    const quotationDate = dateText(q.createdAt || new Date());
+    const customerName = q.customerName || q.contactPerson || q.customer?.name || "—";
+    const address = q.customerAddress || q.deliveryAddress || q.address || q.customer?.address || "—";
+    const phone = q.customerPhone || q.phone || q.customer?.phone || "";
+    const email = q.customerEmail || q.email || q.customer?.email || "";
+    const requirementNo = q.requirementNumber || q.requirementId || "—";
+    const serviceLabel = q.serviceType === "nursing" ? "Nursing Service"
+      : q.serviceType === "caretaker" ? "Caretaker Service"
+      : q.serviceType === "rental" || !q.serviceType ? "Medical Equipment Rental"
+      : "Medical Equipment / Services";
+
+    const starts = items.map((item) => toDate(item.expectedStartDate || item.startDate)).filter(Boolean).sort((a, b) => a - b);
+    const ends = items.map((item) => toDate(item.expectedEndDate || item.endDate)).filter(Boolean).sort((a, b) => a - b);
+    const servicePeriod = starts.length && ends.length
+      ? `${dateText(starts[0])} to ${dateText(ends[ends.length - 1])}` : "—";
+
+    const itemRows = items.length ? items.map((item, index) => {
+      const qty = Number(item.qty ?? item.quantity ?? 1);
+      const amount = Number(item.amount ?? qty * Number(item.rate || 0));
+      const rate = Number(item.rate ?? (qty ? amount / qty : amount));
+      const description = item.name || item.itemName || item.productName || item.productId || "Quotation Item";
+      const detail = item.notes || item.description || item.unitNotes || "";
+      const duration = durationLabel(item);
+      return `<tr>
+        <td class="center">${index + 1}</td>
+        <td><strong>${escapeHtml(description)}</strong>
+          ${detail ? `<div class="subline">${escapeHtml(detail)}</div>` : ""}
+          ${duration ? `<div class="subline">Period: ${escapeHtml(duration)}</div>` : ""}
+        </td>
+        <td class="center">${escapeHtml(item.hsnSac || item.sac || "")}</td>
+        <td class="center">${qty}</td>
+        <td class="number">${money(rate)}</td>
+        <td class="center">Unit</td>
+        <td class="number">${money(amount)}</td>
+      </tr>`;
+    }).join("") : `<tr><td class="center">1</td><td>${escapeHtml(serviceLabel)}</td><td></td><td></td><td></td><td></td><td class="number">${money(total)}</td></tr>`;
+
+    const taxRows = taxList.map((tax) => `<tr class="tax-summary-row">
+      <td colspan="6" class="tax-label">${escapeHtml(tax.name || tax.label || tax.type || "Tax")}</td>
+      <td class="number">${money(tax.amount)}</td>
+    </tr>`).join("");
+
+    const buildPage = (copyLabel) => `
+      <section class="invoice-page">
+        <div class="invoice-title"><strong>Quotation</strong><em>(${escapeHtml(copyLabel)})</em></div>
+        <div class="top-grid">
+          <div class="company-block">
+            <strong class="company-name">${escapeHtml(COMPANY.name)}</strong>
+            <div>${escapeHtml(COMPANY.address)}</div>
+            <div>${escapeHtml(COMPANY.registration)}</div>
+            <div>CIN: ${escapeHtml(COMPANY.cin)}</div>
+            <div>DL LIC: ${escapeHtml(COMPANY.licences)}</div>
+            <div>CONTACT NO. ${escapeHtml(COMPANY.phone)}</div>
+            <div>GSTIN/UIN: ${escapeHtml(COMPANY.gstin)}</div>
+            <div>State Name: ${escapeHtml(COMPANY.state)}, Code: ${escapeHtml(COMPANY.stateCode)}</div>
+            <div>E-Mail: ${escapeHtml(COMPANY.email)}</div>
+          </div>
+          <div class="meta-grid">
+            <div><span>Quotation No.</span><strong>${escapeHtml(quotationNo)}</strong></div>
+            <div><span>Dated</span><strong>${escapeHtml(quotationDate)}</strong></div>
+            <div><span>Requirement No.</span><strong>${escapeHtml(requirementNo)}</strong></div>
+            <div><span>Validity / Terms</span><strong>${escapeHtml(q.validity || q.paymentTerms || "As per agreed terms")}</strong></div>
+            <div><span>Reference No. & Date</span><strong>${escapeHtml(requirementNo)}<br>${escapeHtml(quotationDate)}</strong></div>
+            <div><span>Service Type</span><strong>${escapeHtml(serviceLabel)}</strong></div>
+            <div><span>Prepared By</span><strong>${escapeHtml(q.createdByName || q.createdBy || "—")}</strong></div>
+            <div><span>Status</span><strong>${escapeHtml(q.status || "Draft")}</strong></div>
+          </div>
+        </div>
+        <div class="address-grid">
+          ${["Consignee (Service Location)", "Buyer (Bill to)"].map((label) => `
+            <div><b>${label}</b><strong>${escapeHtml(customerName)}</strong>
+              <div>${escapeHtml(address)}</div>
+              ${phone ? `<div>Phone: ${escapeHtml(phone)}</div>` : ""}
+              ${email ? `<div>Email: ${escapeHtml(email)}</div>` : ""}
+              <div>State Name: ${escapeHtml(q.customerState || COMPANY.state)}, Code: ${escapeHtml(q.customerStateCode || COMPANY.stateCode)}</div>
+            </div>`).join("")}
+        </div>
+        <div class="terms"><b>Terms of Delivery</b><strong>${escapeHtml(serviceLabel)}</strong>
+          <div>Period: ${escapeHtml(servicePeriod)}</div>
+          <div>${escapeHtml(q.notes || q.terms || "This quotation is subject to the terms agreed with the customer.")}</div>
+        </div>
+        <table class="items-table">
+          <thead><tr><th>Sl No.</th><th>Description of Goods / Services</th><th>HSN/SAC</th><th>Quantity</th><th>Rate</th><th>Per</th><th>Amount (₹)</th></tr></thead>
+          <tbody>${itemRows}</tbody>
+          <tfoot>
+            <tr><td colspan="6" class="summary-label">Subtotal</td><td class="number">${money(subtotal)}</td></tr>
+            ${discount ? `<tr><td colspan="6" class="summary-label">Discount</td><td class="number">-${money(discount)}</td></tr>` : ""}
+            ${taxRows}
+            <tr><td colspan="6" class="summary-label">Total</td><td class="number">₹ ${money(total)}</td></tr>
+          </tfoot>
+        </table>
+        <div class="amount-words"><b>Amount Chargeable (in words)</b><strong>${escapeHtml(amountInWords(total))}</strong><em>E. & O.E.</em></div>
+        <div class="bottom-grid">
+          <div class="declaration"><b>Company's PAN: ${escapeHtml(COMPANY.pan)}</b><h4>Declaration</h4>
+            <p>We hereby certify that the particulars given above are true and correct and that the amount indicated represents the charges for the items and services described in this quotation.</p>
+            <p>This is a computer-generated quotation and is subject to acceptance.</p>
+          </div>
+          <div class="bank"><h4>Company's Bank Details</h4>
+            <div>Bank Name: <strong>${escapeHtml(COMPANY.bankName)}</strong></div>
+            <div>A/c No.: <strong>${escapeHtml(COMPANY.account)}</strong></div>
+            <div>Branch & IFSC Code: <strong>${escapeHtml(COMPANY.branchIfsc)}</strong></div>
+            <div class="signatory">for ${escapeHtml(COMPANY.name)}<br><br><br>Authorised Signatory</div>
+          </div>
+        </div>
+        <div class="footer-note">${escapeHtml(COMPANY.name)} · This is a computer-generated quotation</div>
+      </section>`;
+
+    const style = `
+      * { box-sizing: border-box; }
+      body { margin: 0; font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 9px; }
+      .invoice-page {
+        width: 718px; height: 1040px; min-height: 1040px;
+        display: flex; flex-direction: column; gap: 0;
+        page-break-after: always; border: 1px solid #555;
+        padding: 14px; background: #fff; overflow: hidden;
       }
-    });
+      .invoice-title { flex: 0 0 auto; display: flex; justify-content: space-between; border-bottom: 1px solid #444; padding: 0 0 7px; font-size: 14px; }
+      .invoice-title em { font-size: 10px; }
+      .top-grid { flex: 0 0 auto; display: grid; grid-template-columns: 1.08fr 1fr; border-bottom: 1px solid #555; min-width: 0; }
+      .company-block { min-width: 0; padding: 7px 6px; border-right: 1px solid #555; line-height: 1.45; overflow-wrap: anywhere; font-size: 8.5px; }
+      .company-name { display: block; font-size: 11px; margin-bottom: 3px; }
+      .meta-grid { min-width: 0; display: grid; grid-template-columns: 1fr 1fr; }
+      .meta-grid > div { min-width: 0; min-height: 30px; padding: 4px 5px; border-bottom: 1px solid #bbb; border-left: 1px solid #bbb; overflow-wrap: anywhere; }
+      .meta-grid span { display: block; color: #444; margin-bottom: 2px; font-size: 8px; }
+      .meta-grid strong { display: block; font-size: 8.5px; overflow-wrap: anywhere; }
+      .address-grid { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #555; }
+      .address-grid > div { min-width: 0; padding: 7px; line-height: 1.4; min-height: 72px; overflow-wrap: anywhere; }
+      .address-grid > div + div { border-left: 1px solid #555; }
+      .address-grid b, .address-grid strong { display: block; }
+      .address-grid strong { margin-top: 4px; }
+      .terms { flex: 0 0 auto; padding: 6px 7px; border-bottom: 1px solid #555; line-height: 1.4; overflow-wrap: anywhere; }
+      .terms b, .terms strong { display: block; }
+      table { width: 100%; border-collapse: collapse; }
+      .items-table { width: 100%; table-layout: fixed; flex: 0 0 auto; min-height: 0; margin: 0; }\n      .items-table tbody { height: auto !important; }\n      .items-table tfoot { display: table-row-group; }\n      .items-table tfoot tr { page-break-inside: avoid; break-inside: avoid; }
+      .items-table th, .items-table td { border: 1px solid #555; padding: 4px 3px; vertical-align: top; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
+      .items-table th { text-align: center; font-weight: bold; background: #f4f4f4; font-size: 8px; }
+      .items-table td { font-size: 8px; }
+      .items-table th:nth-child(1), .items-table td:nth-child(1) { width: 5%; }
+      .items-table th:nth-child(2), .items-table td:nth-child(2) { width: 43%; }
+      .items-table th:nth-child(3), .items-table td:nth-child(3) { width: 10%; }
+      .items-table th:nth-child(4), .items-table td:nth-child(4) { width: 8%; }
+      .items-table th:nth-child(5), .items-table td:nth-child(5) { width: 12%; }
+      .items-table th:nth-child(6), .items-table td:nth-child(6) { width: 8%; }
+      .items-table th:nth-child(7), .items-table td:nth-child(7) { width: 14%; }
+      .items-table .number { text-align: right; white-space: normal; overflow-wrap: anywhere; }
+      .center { text-align: center; }
+      .subline { margin-top: 3px; font-size: 7.5px; color: #333; overflow-wrap: anywhere; }
+      .summary-label { text-align: right; font-weight: bold; white-space: normal !important; overflow-wrap: anywhere !important; word-break: break-word !important; line-height: 1.25; }
+      .items-table td.tax-label {
+        text-align: left !important;
+        padding-left: 8px !important;
+        font-weight: 600;
+        white-space: normal !important;
+        overflow-wrap: anywhere !important;
+        word-break: break-word !important;
+        line-height: 1.25;
+      }
+      .items-table tr.tax-summary-row td {
+        vertical-align: middle;
+      }\n      .items-table tfoot td { padding-top: 5px; padding-bottom: 5px; }\n      .items-table tfoot .number { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+      .amount-words { flex: 0 0 auto; padding: 7px; border-bottom: 1px solid #555; position: relative; min-height: 46px; overflow-wrap: anywhere; }
+      .amount-words b, .amount-words strong { display: block; margin-bottom: 4px; }
+      .amount-words em { position: absolute; right: 7px; bottom: 6px; }
+      .bottom-grid { flex: 0 0 auto; display: grid; grid-template-columns: 1fr 1fr; min-height: 132px; }
+      .declaration, .bank { min-width: 0; padding: 8px; line-height: 1.4; overflow-wrap: anywhere; font-size: 8px; }
+      .declaration { border-right: 1px solid #555; }
+      .declaration h4, .bank h4 { margin: 5px 0; font-size: 9px; }
+      .declaration p { margin: 4px 0; }
+      .signatory { text-align: right; border-top: 1px solid #aaa; margin-top: 8px; padding-top: 5px; font-weight: bold; line-height: 1.35; }
+      .footer-note { flex: 0 0 auto; text-align: center; margin-top: auto; padding-top: 6px; font-size: 7.5px; }
+    `;
 
-    // Totals
-    const y = doc.lastAutoTable ? doc.lastAutoTable.finalY + 8 : 64;
-    const totalLines = [
-      ["Subtotal", fmtCurrency(q.totals?.subtotal || 0)],
-      ["Discount", fmtCurrency(q.totals?.discountAmount || 0)],
-      ["Tax", fmtCurrency(q.totals?.totalTax || 0)],
-      ["Total", fmtCurrency(q.totals?.total || 0)]
-    ];
-    let lineY = y;
-    totalLines.forEach(([label, val], idx) => {
-      const isStrong = idx === totalLines.length - 1;
-      if (isStrong) doc.setFont(undefined, "bold");
-      doc.text(label, pageWidth - 80, lineY);
-      doc.text(val, pageWidth - 30, lineY, { align: "right" });
-      if (isStrong) doc.setFont(undefined, "normal");
-      lineY += 6;
-    });
+    // Render fixed 718 x 1040 page artwork and fit it inside the A4 printable area.
+    const host = document.createElement("div");
+    host.style.cssText = "position:fixed;left:-10000px;top:0;z-index:-1;width:718px;background:#fff;overflow:hidden;";
+    host.innerHTML = `<style>${style}</style>${buildPage("ORIGINAL FOR CUSTOMER")}${buildPage("DUPLICATE FOR OFFICE")}`;
+    document.body.appendChild(host);
 
-    // Notes
-    const notes = q.notes ? String(q.notes) : "";
-    if (notes) {
-      doc.setFontSize(11);
-      doc.text("Notes:", marginLeft, lineY + 8);
-      doc.setFontSize(10);
-      doc.text(doc.splitTextToSize(notes, pageWidth - marginLeft * 2), marginLeft, lineY + 14);
+    try {
+      const pages = Array.from(host.querySelectorAll(".invoice-page"));
+      if (!pages.length) throw new Error("Could not prepare the quotation PDF pages.");
+      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
+      for (let index = 0; index < pages.length; index += 1) {
+        const canvas = await html2canvas(pages[index], {
+          scale: 2, useCORS: true, backgroundColor: "#ffffff",
+          width: 718, height: 1040, windowWidth: 718, windowHeight: 1040,
+          scrollX: 0, scrollY: 0, logging: false,
+        });
+        if (index > 0) pdf.addPage("a4", "portrait");
+        pdf.addImage(canvas.toDataURL("image/jpeg", 0.96), "JPEG", 10, 10, 190, 275, undefined, "FAST");
+        canvas.width = 1;
+        canvas.height = 1;
+      }
+      return pdf.output("blob");
+    } finally {
+      host.remove();
     }
-
-    // Return Blob so we can upload
-    return doc.output("blob");
   };
 
   const sendWhatsappPdf = async () => {
