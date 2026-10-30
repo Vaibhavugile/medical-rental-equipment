@@ -15,6 +15,7 @@ import { updateAccountReport } from "../utils/accountReport";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { db, auth } from "../firebase";
 import "./NursingOrderDetails.css";
+import "./NursingOrderDetails.notes.css";
 import { generateNursingInvoice } from "./NursingOrderInvoice";
 
 /* ======================
@@ -69,7 +70,8 @@ export default function NursingOrderDetails() {
   const [stopFullModal, setStopFullModal] = useState({
     open: false,
     stopDate: "",
-    serviceIndex: null
+    serviceIndex: null,
+    note: ""
   });
   const [isEditingCustomer, setIsEditingCustomer] = useState(false);
   const [customerDraft, setCustomerDraft] = useState(null);
@@ -410,7 +412,8 @@ export default function NursingOrderDetails() {
   const [stopServiceModal, setStopServiceModal] = useState({
     open: false,
     assignment: null,
-    endDate: ""
+    endDate: "",
+    note: ""
   });
 
   const [assignDates, setAssignDates] = useState({
@@ -612,6 +615,8 @@ export default function NursingOrderDetails() {
     status: "completed",
     reference: "",
     note: "",
+    periodFrom: "",
+    periodTo: "",
   };
 
   // payments
@@ -625,6 +630,8 @@ export default function NursingOrderDetails() {
       status: "completed",
       reference: "",
       note: "",
+      periodFrom: "",
+      periodTo: "",
     },
     saving: false,
   });
@@ -1832,6 +1839,13 @@ if (payAmount > allowedBalance) {
   setPaymentModal(p => ({ ...p, saving: false }));
   return;
 }
+      const periodFrom = paymentModal.form.periodFrom || "";
+      const periodTo = paymentModal.form.periodTo || "";
+      if (periodFrom && periodTo && periodTo < periodFrom) {
+        alert("Payment period end date cannot be earlier than the start date.");
+        setPaymentModal(p => ({ ...p, saving: false }));
+        return;
+      }
       const user = auth.currentUser;
       const selectedDate = new Date(paymentModal.form.date).toISOString();
 
@@ -1842,6 +1856,8 @@ if (payAmount > allowedBalance) {
         status: paymentModal.form.status,
         reference: paymentModal.form.reference || "",
         note: paymentModal.form.note || "",
+        periodFrom,
+        periodTo,
 
         // ✅ CREATED BY (from login)
         createdByUid: user?.uid || "",
@@ -1902,6 +1918,10 @@ if (payAmount > allowedBalance) {
 
           method: newPayment.method,
 
+          note: newPayment.note || "",
+          periodFrom: newPayment.periodFrom || "",
+          periodTo: newPayment.periodTo || "",
+
           date: new Date().toISOString()
 
         })
@@ -1925,7 +1945,7 @@ if (payAmount > allowedBalance) {
     }
   };
 
-  const stopAllActiveStaff = async (stopDate) => {
+  const stopAllActiveStaff = async (stopDate, stopNote = "") => {
 
     try {
 
@@ -1997,6 +2017,8 @@ if (payAmount > allowedBalance) {
             status: "completed",
 
             stoppedAt: serverTimestamp(),
+            stopNote: (stopNote || "").trim(),
+            stoppedBy: auth.currentUser?.uid || "",
             updatedAt: serverTimestamp()
           }
         );
@@ -2017,6 +2039,7 @@ if (payAmount > allowedBalance) {
 
     const assignment = stopServiceModal.assignment;
     const stopDate = stopServiceModal.endDate;
+    const stopNote = (stopServiceModal.note || "").trim();
 
     if (!assignment || !stopDate) return;
 
@@ -2065,7 +2088,8 @@ if (payAmount > allowedBalance) {
         status: "completed",
 
         stoppedAt: serverTimestamp(),
-        stoppedBy: auth.currentUser?.uid || ""
+        stoppedBy: auth.currentUser?.uid || "",
+        stopNote
 
       });
 
@@ -2082,7 +2106,8 @@ if (payAmount > allowedBalance) {
       setStopServiceModal({
         open: false,
         assignment: null,
-        endDate: ""
+        endDate: "",
+        note: ""
       });
 
     } catch (err) {
@@ -2098,7 +2123,8 @@ if (payAmount > allowedBalance) {
     setStopServiceModal({
       open: true,
       assignment,
-      endDate: formatDateTimeLocal(assignment.endDate || new Date())
+      endDate: formatDateTimeLocal(assignment.endDate || new Date()),
+      note: ""
     });
 
   };
@@ -2271,7 +2297,7 @@ if (payAmount > allowedBalance) {
     }
 
   };
-  const stopOrderServicesOnly = async (stopDate, overrideSubtotal = null) => {
+  const stopOrderServicesOnly = async (stopDate, overrideSubtotal = null, stopNote = "") => {
     if (!stopDate) {
       alert("Select stop date");
       return;
@@ -2425,6 +2451,7 @@ if (payAmount > allowedBalance) {
               auth.currentUser?.email ||
               "Admin",
             editedAt: new Date().toISOString(),
+            note: (stopNote || "").trim(),
           });
 
           stopHistory.push({
@@ -2440,6 +2467,7 @@ if (payAmount > allowedBalance) {
               auth.currentUser?.email ||
               "Admin",
             stoppedAt: new Date().toISOString(),
+            note: (stopNote || "").trim(),
           });
 
         }
@@ -2450,16 +2478,18 @@ if (payAmount > allowedBalance) {
          7️⃣ SAVE TO FIRESTORE
       ========================= */
 
+      const updatedStopHistory = [
+        ...(order.stopHistory || []),
+        ...stopHistory,
+      ];
+
       await updateDoc(doc(db, "nursingOrders", id), {
 
         items: updatedItems,
 
         totals: newTotals,
 
-        stopHistory: [
-          ...(order.stopHistory || []),
-          ...stopHistory,
-        ],
+        stopHistory: updatedStopHistory,
 
         activityLog:
           logs.length > 0
@@ -2480,6 +2510,7 @@ if (payAmount > allowedBalance) {
         ...o,
         items: updatedItems,
         totals: newTotals,
+        stopHistory: updatedStopHistory,
       }));
 
       alert("Service updated successfully");
@@ -2623,7 +2654,7 @@ if (payAmount > allowedBalance) {
       alert("Refund handling failed");
     }
   };
-  const handleStopFullService = async (stopDate, preview) => {
+  const handleStopFullService = async (stopDate, preview, stopNote = "") => {
 
     
 
@@ -2653,7 +2684,8 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
       ========================= */
       await stopOrderServicesOnly(
         stopDate,
-        preview.finalSubtotal // ✅ VERY IMPORTANT
+        preview.finalSubtotal,
+        stopNote
       );
 
       /* =========================
@@ -2668,7 +2700,7 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
       /* =========================
          3️⃣ STOP STAFF
       ========================= */
-      await stopAllActiveStaff(stopDate);
+      await stopAllActiveStaff(stopDate, stopNote);
 
       /* =========================
          4️⃣ FINAL TOTAL (FROM PREVIEW)
@@ -2689,7 +2721,7 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
       /* =========================
          6️⃣ RESET UI
       ========================= */
-      setStopFullModal({ open: false, stopDate: "" });
+      setStopFullModal({ open: false, stopDate: "", serviceIndex: null, note: "" });
       setStopPreviewOverride({ newSubtotal: "" });
 
       alert("Service stopped successfully");
@@ -3416,6 +3448,18 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
               </div>
 
 
+              {isServiceStopped(i) && (() => {
+                const stoppedRecord = (order.stopHistory || [])
+                  .filter((entry) => entry.serviceIndex === i)
+                  .slice(-1)[0];
+                return stoppedRecord?.note ? (
+                  <div className="nod-stop-note nod-stop-note-service">
+                    <span className="nod-stop-note-label">Service stop reason</span>
+                    <span>{stoppedRecord.note}</span>
+                  </div>
+                ) : null;
+              })()}
+
               {/* RIGHT SIDE ACTIONS */}
               <div className="nod-right">
 
@@ -3450,7 +3494,8 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
                       setStopFullModal({
                         open: true,
                         serviceIndex: i,
-                        stopDate: editableItems[i]?.expectedEndDate
+                        stopDate: editableItems[i]?.expectedEndDate,
+                        note: ""
                       })
                     }
                   >
@@ -3672,6 +3717,16 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
                   Ref: {p.reference}
                 </div>
               )}
+
+              {(p.note || p.periodFrom || p.periodTo) && (
+                <div className="nod-payment-note">
+                  <span className="nod-payment-note-label">Payment details</span>
+                  {(p.periodFrom || p.periodTo) && (
+                    <span><strong>Period:</strong> {p.periodFrom || "—"} to {p.periodTo || "—"}</span>
+                  )}
+                  {p.note && <span>{p.note}</span>}
+                </div>
+              )}
             </div>
 
             {/* RIGHT */}
@@ -3685,6 +3740,9 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
                     form: {
                       ...p,
                       date: p.date,
+                      periodFrom: p.periodFrom || "",
+                      periodTo: p.periodTo || "",
+                      note: p.note || "",
                     },
                   })
                 }
@@ -3857,6 +3915,13 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
                       >
                         Paid ₹{fmtCurrency(a.paidAmount || 0)} / ₹{fmtCurrency(a.amount)}
                       </div>
+
+                      {a.status === "completed" && a.stopNote && (
+                        <div className="nod-stop-note">
+                          <span className="nod-stop-note-label">Stop reason</span>
+                          <span>{a.stopNote}</span>
+                        </div>
+                      )}
 
                       {/* Attendance */}
                       <button
@@ -4599,9 +4664,37 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
               <option value="bank">Bank</option>
             </select>
 
+            <div className="nod-payment-period-fields">
+              <label>
+                <span>Payment period from <em>(Optional)</em></span>
+                <input
+                  type="date"
+                  className="nod-input"
+                  value={paymentModal.form.periodFrom || ""}
+                  onChange={(e) => setPaymentModal((p) => ({
+                    ...p,
+                    form: { ...p.form, periodFrom: e.target.value },
+                  }))}
+                />
+              </label>
+              <label>
+                <span>Payment period to <em>(Optional)</em></span>
+                <input
+                  type="date"
+                  className="nod-input"
+                  min={paymentModal.form.periodFrom || undefined}
+                  value={paymentModal.form.periodTo || ""}
+                  onChange={(e) => setPaymentModal((p) => ({
+                    ...p,
+                    form: { ...p.form, periodTo: e.target.value },
+                  }))}
+                />
+              </label>
+            </div>
+
             <textarea
-              className="nod-input"
-              placeholder="Note"
+              className="nod-input nod-note-textarea"
+              placeholder="Optional additional note"
               value={paymentModal.form.note}
               onChange={(e) =>
                 setPaymentModal((p) => ({
@@ -4767,6 +4860,17 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
               }
             />
 
+            <label>Reason for stopping <span className="nod-optional-label">Optional</span></label>
+            <textarea
+              className="nod-input nod-note-textarea"
+              rows={3}
+              placeholder="Add why this nurse / staff service is stopping..."
+              value={stopServiceModal.note || ""}
+              onChange={(e) =>
+                setStopServiceModal(p => ({ ...p, note: e.target.value }))
+              }
+            />
+
             <div className="nod-row">
 
               <button
@@ -4775,7 +4879,8 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
                   setStopServiceModal({
                     open: false,
                     assignment: null,
-                    endDate: ""
+                    endDate: "",
+                    note: ""
                   })
                 }
               >
@@ -5005,6 +5110,17 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
               }}
             />
 
+            <label>Reason for stopping <span className="nod-optional-label">Optional</span></label>
+            <textarea
+              className="nod-input nod-note-textarea"
+              rows={3}
+              placeholder="Add why this full service is stopping..."
+              value={stopFullModal.note || ""}
+              onChange={(e) =>
+                setStopFullModal(p => ({ ...p, note: e.target.value }))
+              }
+            />
+
             {/* 🔥 PREVIEW */}
             {stopPreview && (
               <div className="nod-preview-box">
@@ -5106,7 +5222,7 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
               <button
                 className="nod-btn nod-btn-secondary"
                 onClick={() => {
-                  setStopFullModal({ open: false, stopDate: "" });
+                  setStopFullModal({ open: false, stopDate: "", serviceIndex: null, note: "" });
                   setStopPreviewOverride({ newSubtotal: "" });
                 }}
               >
@@ -5125,10 +5241,14 @@ if (isServiceStopped(stopFullModal.serviceIndex)) {
                     stopPreview.discount +
                     stopPreview.taxTotal;
 
-                  handleStopFullService(stopFullModal.stopDate, {
-                    finalSubtotal: overrideSubtotal,
-                    finalTotal,
-                  });
+                  handleStopFullService(
+                    stopFullModal.stopDate,
+                    {
+                      finalSubtotal: overrideSubtotal,
+                      finalTotal,
+                    },
+                    stopFullModal.note || ""
+                  );
                 }}
               >
                 Confirm Stop
