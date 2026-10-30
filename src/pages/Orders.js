@@ -1072,6 +1072,56 @@ const groupedAssets = useMemo(() => {
     }
   };
 
+  // Change the physical movement of one asset without removing it from this order.
+  const toggleOrderAssetMovement = async (assetId, itemIndex) => {
+    if (!selectedOrder || saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      const order = selectedOrder;
+      if (!(order.items?.[itemIndex]?.assignedAssets || []).includes(assetId)) {
+        throw new Error("This asset is no longer assigned to the order.");
+      }
+      const ref = doc(db, "assets", assetId);
+      const before = await getDoc(ref);
+      if (!before.exists()) throw new Error("Asset no longer exists.");
+      const asset = before.data();
+      const status = String(asset.status || "").toLowerCase();
+      const orderId = order.id;
+      const owner = asset.rentalId || asset.orderId || asset.currentRentalId || asset.reservationId;
+      if (owner && owner !== orderId) {
+        throw new Error("Asset belongs to a different order or reservation.");
+      }
+      if (status === "out_for_rental") {
+        if (!window.confirm(`Check IN asset ${asset.assetId || assetId} for this order?`)) return;
+        await checkinAsset(assetId, {
+          note: `Manually checked IN for order ${order.orderNo || orderId}`,
+        });
+      } else if (["in_stock", "reserved"].includes(status)) {
+        if (!window.confirm(`Check OUT asset ${asset.assetId || assetId} for this order?`)) return;
+        await checkoutAsset(assetId, {
+          rentalId: orderId,
+          orderNo: order.orderNo || "",
+          customer: order.customerName || "",
+          expectedReturn: order.items?.[itemIndex]?.expectedEndDate || null,
+          until: order.items?.[itemIndex]?.expectedEndDate || null,
+          note: `Manually checked OUT for order ${order.orderNo || orderId}`,
+        });
+      } else {
+        throw new Error(`Cannot change an asset with status ${status || "unknown"}.`);
+      }
+      const after = await getDoc(ref);
+      if (after.exists()) {
+        setAssetsById(prev => ({ ...prev, [assetId]: { id: after.id, ...after.data() } }));
+      }
+    } catch (err) {
+      console.error("toggleOrderAssetMovement", err);
+      setError(err.message || "Failed to update asset movement");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const changeOrderStatus = async (newStatus) => {
     if (!selectedOrder) return;
     setSaving(true);
@@ -2388,6 +2438,7 @@ const badgeText = getDeliveryBadgeText(o, deliveriesByOrder);
             createReturnDelivery={createReturnDelivery}
             drivers={drivers}
             assetsById={assetsById}
+            toggleOrderAssetMovement={toggleOrderAssetMovement}
             assetPicker={assetPicker}
             paymentModal={paymentModal}
             error={error}

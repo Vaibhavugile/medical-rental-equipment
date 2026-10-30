@@ -20,6 +20,7 @@ export default function OrderDrawer({
   productsList,
   drivers,
   assetsById,
+  toggleOrderAssetMovement,
   assetPicker,
   paymentModal,
   error,
@@ -1479,6 +1480,19 @@ await syncDeliveryAssets({
                                           alignItems: "center",
                                         }}
                                       >
+                                        <span className={`order-asset-movement ${meta?.status === "out_for_rental" ? "is-out" : meta?.status === "in_stock" ? "is-in" : "is-other"}`}>
+                                          {meta?.status === "out_for_rental" ? "Checked OUT" : meta?.status === "in_stock" ? "Checked IN" : meta?.status === "reserved" ? "Reserved / IN" : meta?.status ? meta.status.replace(/_/g, " ") : "Loading status"}
+                                        </span>
+                                        {meta && ["out_for_rental", "in_stock", "reserved"].includes(meta.status) && (
+                                          <button
+                                            type="button"
+                                            className={`cp-btn order-asset-toggle ${meta.status === "out_for_rental" ? "to-in" : "to-out"}`}
+                                            disabled={saving || selectedOrder.status === "cancelled"}
+                                            onClick={() => toggleOrderAssetMovement(aid, idx)}
+                                          >
+                                            {meta.status === "out_for_rental" ? "Check IN" : "Check OUT"}
+                                          </button>
+                                        )}
                                         <button
                                           className="cp-btn ghost"
                                           onClick={() => {

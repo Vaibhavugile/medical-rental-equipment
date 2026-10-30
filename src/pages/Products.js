@@ -1,7 +1,9 @@
 // src/pages/Products.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   collection,
+  arrayUnion,
   onSnapshot,
   query,
   orderBy,
@@ -78,6 +80,9 @@ export default function Products() {
 
   // drawer – create assets & filters
   const [assetQty, setAssetQty] = useState(1);
+  const [assetPurchasePrice, setAssetPurchasePrice] = useState("");
+  const [assetPurchaseDate, setAssetPurchaseDate] = useState(new Date().toISOString().slice(0, 10));
+  const [assetSupplier, setAssetSupplier] = useState("");
   const [assetBranch, setAssetBranch] = useState("");
   const [assetSearch, setAssetSearch] = useState("");
   const [assetCompany, setAssetCompany] = useState("");
@@ -102,8 +107,25 @@ export default function Products() {
   // maintenance modal
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [maintenanceAsset, setMaintenanceAsset] = useState(null);
-  const [maintenanceTechnician, setMaintenanceTechnician] = useState("");
-  const [maintenanceNote, setMaintenanceNote] = useState("");
+  const [maintenanceForm, setMaintenanceForm] = useState({
+    category: "general",
+    priority: "normal",
+    issue: "",
+    technician: "",
+    vendor: "",
+    expectedCompletionDate: "",
+    estimatedCost: "",
+    initialCondition: "fair",
+    startNotes: "",
+    completionDate: new Date().toISOString().slice(0, 10),
+    workPerformed: "",
+    partsReplaced: "",
+    laborCost: "",
+    partsCost: "",
+    finalCondition: "good",
+    nextServiceDate: "",
+    completionNotes: "",
+  });
   const [maintenanceBusy, setMaintenanceBusy] = useState(false);
   const [assetCompanyFilter, setAssetCompanyFilter] = useState("");
 
@@ -456,27 +478,37 @@ if (!Number.isNaN(n) && n > maxSeq) {
     if (!selectedProduct) return setError("Select a product first.");
 
     const qty = Number(assetQty || 0);
-    if (!qty || qty < 1) return setError("Quantity must be at least 1");
+    const purchasePrice = Number(assetPurchasePrice);
+    if (!Number.isInteger(qty) || qty < 1) return setError("Quantity must be a whole number greater than 0");
+    if (assetPurchasePrice === "" || !Number.isFinite(purchasePrice) || purchasePrice < 0) {
+      return setError("Enter a valid purchase price per unit");
+    }
+    if (!assetPurchaseDate) return setError("Purchase date is required");
 
     try {
       const created = await createAssetsForProduct(
         selectedProduct.id,
         assetBranch || null,
         qty,
-        assetCompany.trim() || null, // 🔥 COMPANY
+        assetCompany.trim() || null,
         "in_stock",
         {
           companyPrefix,
           batch: batchOverride || undefined,
           shortCode: shortCodeOverride || undefined,
+          purchasePricePerUnit: purchasePrice,
+          purchaseDate: assetPurchaseDate,
+          supplier: assetSupplier.trim() || "",
         }
       );
 
       await refreshAssets();
-      setAssetCompany(""); // reset input
+      setAssetCompany("");
+      setAssetPurchasePrice("");
+      setAssetSupplier("");
 
       showToast(
-        `Created ${Array.isArray(created) ? created.length : qty} asset(s)`,
+        `Created ${Array.isArray(created) ? created.length : qty} asset(s). Purchase total: ${fmt.money(purchasePrice * qty)}`,
         "success"
       );
     } catch (err) {
@@ -503,35 +535,215 @@ if (!Number.isNaN(n) && n > maxSeq) {
   };
   const doMove = async (id, to) => { if (!to) return; try { await moveAssetToBranch(id, to, `Moved via UI to ${to}`); await refreshAssets(); } catch (e) { setError(e.message || "Move failed"); } };
 
-  /* ── maintenance ── */
-  const openMaintenance = (a) => { setMaintenanceAsset(a); setMaintenanceTechnician(""); setMaintenanceNote(""); setMaintenanceOpen(true); };
+  /* ── maintenance lifecycle ── */
+  const updateMaintenanceForm = (key, value) => {
+    setMaintenanceForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const openMaintenance = (asset) => {
+    const current = asset.maintenance || {};
+    const isActive = asset.status === "maintenance" && current.code;
+
+    setMaintenanceAsset(asset);
+    setMaintenanceForm({
+      category: current.category || "general",
+      priority: current.priority || "normal",
+      issue: current.issue || "",
+      technician: current.technician || auth.currentUser?.displayName || "",
+      vendor: current.vendor || "",
+      expectedCompletionDate: current.expectedCompletionDate || "",
+      estimatedCost: current.estimatedCost ?? "",
+      initialCondition: current.initialCondition || "fair",
+      startNotes: current.startNotes || "",
+      completionDate: new Date().toISOString().slice(0, 10),
+      workPerformed: "",
+      partsReplaced: "",
+      laborCost: "",
+      partsCost: "",
+      finalCondition: "good",
+      nextServiceDate: "",
+      completionNotes: "",
+    });
+
+    setMaintenanceOpen(true);
+  };
+
+  const makeMaintenanceCode = () => {
+    const date = new Date();
+    const ymd = [
+      date.getFullYear(),
+      String(date.getMonth() + 1).padStart(2, "0"),
+      String(date.getDate()).padStart(2, "0"),
+    ].join("");
+    return `MNT-${ymd}-${Date.now().toString().slice(-5)}`;
+  };
+
   const startMaintenance = async () => {
     if (!maintenanceAsset) return;
+
+    const form = maintenanceForm;
+    if (!form.issue.trim()) {
+      showToast("Describe the maintenance issue first", "error");
+      return;
+    }
+    if (!form.technician.trim()) {
+      showToast("Enter the technician or responsible person", "error");
+      return;
+    }
+    if (maintenanceAsset.status === "out_for_rental" || maintenanceAsset.status === "reserved") {
+      showToast("This asset must be checked in or released before maintenance", "error");
+      return;
+    }
+
     setMaintenanceBusy(true);
     try {
-      const tech = maintenanceTechnician?.trim() || (auth.currentUser && (auth.currentUser.displayName || auth.currentUser.email)) || "unknown";
-      const note = `Maintenance started by ${tech}${maintenanceNote ? ` — ${maintenanceNote}` : ""}`;
-      await changeAssetStatus(maintenanceAsset.id, "maintenance", note, { technician: tech, phase: "start" });
+      const now = new Date().toISOString();
+      const code = makeMaintenanceCode();
+      const user = auth.currentUser || {};
+      const record = {
+        code,
+        status: "in_progress",
+        category: form.category,
+        priority: form.priority,
+        issue: form.issue.trim(),
+        technician: form.technician.trim(),
+        vendor: form.vendor.trim() || null,
+        expectedCompletionDate: form.expectedCompletionDate || null,
+        estimatedCost: Number(form.estimatedCost || 0),
+        initialCondition: form.initialCondition,
+        startNotes: form.startNotes.trim() || null,
+        reportedAt: now,
+        startedAt: now,
+        startedBy: user.uid || "",
+        startedByName: user.displayName || user.email || "Unknown",
+      };
+
+      const startEntry = {
+        ts: now,
+        by: user.uid || "system",
+        byName: user.displayName || user.email || "system",
+        type: "maintenance_start",
+        note: `Maintenance started · ${code} · ${record.issue}`,
+        data: { phase: "start", maintenanceCode: code, ...record },
+      };
+
+      // Save status, active work order and history together.
+      await updateDoc(doc(db, "assets", maintenanceAsset.id), {
+        status: "maintenance",
+        maintenance: record,
+        maintenanceUpdatedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid || "",
+        updatedByName: user.displayName || user.email || "",
+        history: arrayUnion(startEntry),
+      });
+
       await refreshAssets();
       setMaintenanceOpen(false);
-      showToast("Maintenance started", "success");
+      showToast(`Maintenance ${code} started`, "success");
     } catch (e) {
+      console.error("Start maintenance failed", e);
       setError(e.message || "Failed to start maintenance");
-    } finally { setMaintenanceBusy(false); }
+    } finally {
+      setMaintenanceBusy(false);
+    }
   };
+
   const completeMaintenance = async () => {
     if (!maintenanceAsset) return;
+
+    const active = maintenanceAsset.maintenance || {};
+    if (!active.code) {
+      showToast("Maintenance record is missing. Refresh the asset and try again.", "error");
+      return;
+    }
+    if (!maintenanceForm.workPerformed.trim()) {
+      showToast("Enter the work performed before completing maintenance", "error");
+      return;
+    }
+
+    const laborCost = Number(maintenanceForm.laborCost || 0);
+    const partsCost = Number(maintenanceForm.partsCost || 0);
+    if (!Number.isFinite(laborCost) || laborCost < 0 || !Number.isFinite(partsCost) || partsCost < 0) {
+      showToast("Enter valid maintenance costs", "error");
+      return;
+    }
+
     setMaintenanceBusy(true);
     try {
-      const tech = maintenanceTechnician?.trim() || (auth.currentUser && (auth.currentUser.displayName || auth.currentUser.email)) || "unknown";
-      const note = `Maintenance completed by ${tech}${maintenanceNote ? ` — ${maintenanceNote}` : ""}`;
-      await changeAssetStatus(maintenanceAsset.id, "in_stock", note, { technician: tech, phase: "complete", condition: "ok" });
+      const now = new Date().toISOString();
+      const user = auth.currentUser || {};
+      const totalCost = laborCost + partsCost;
+      const completedRecord = {
+        ...active,
+        status: "completed",
+        completedAt: now,
+        completionDate: maintenanceForm.completionDate || now.slice(0, 10),
+        workPerformed: maintenanceForm.workPerformed.trim(),
+        partsReplaced: maintenanceForm.partsReplaced.trim() || null,
+        laborCost,
+        partsCost,
+        totalCost,
+        finalCondition: maintenanceForm.finalCondition,
+        nextServiceDate: maintenanceForm.nextServiceDate || null,
+        completionNotes: maintenanceForm.completionNotes.trim() || null,
+        completedBy: user.uid || "",
+        completedByName: user.displayName || user.email || "Unknown",
+      };
+
+      if (["poor", "damaged"].includes(maintenanceForm.finalCondition)) {
+        showToast("This asset is not ready for stock. Select Good, Fair or Excellent only after it is safe to use.", "error");
+        setMaintenanceBusy(false);
+        return;
+      }
+
+      const completionEntry = {
+        ts: now,
+        by: user.uid || "system",
+        byName: user.displayName || user.email || "system",
+        type: "maintenance_complete",
+        note: `Maintenance completed · ${active.code} · Total cost ₹${fmt.money(totalCost)}`,
+        data: {
+          phase: "complete",
+          maintenanceCode: active.code,
+          technician: active.technician || "",
+          category: active.category || "",
+          issue: active.issue || "",
+          workPerformed: completedRecord.workPerformed,
+          partsReplaced: completedRecord.partsReplaced,
+          laborCost,
+          partsCost,
+          totalCost,
+          finalCondition: completedRecord.finalCondition,
+          nextServiceDate: completedRecord.nextServiceDate,
+          completionNotes: completedRecord.completionNotes,
+        },
+      };
+
+      // Complete the work order, return the asset to stock and log the event atomically.
+      await updateDoc(doc(db, "assets", maintenanceAsset.id), {
+        status: "in_stock",
+        maintenance: completedRecord,
+        maintenanceUpdatedAt: serverTimestamp(),
+        maintenanceHistory: arrayUnion(completedRecord),
+        lastMaintenanceAt: now,
+        nextServiceDate: completedRecord.nextServiceDate,
+        totalMaintenanceCost: increment(totalCost),
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid || "",
+        updatedByName: user.displayName || user.email || "",
+        history: arrayUnion(completionEntry),
+      });
+
       await refreshAssets();
       setMaintenanceOpen(false);
-      showToast("Maintenance completed", "success");
+      showToast(`Maintenance ${active.code} completed · ₹${fmt.money(totalCost)}`, "success");
     } catch (e) {
+      console.error("Complete maintenance failed", e);
       setError(e.message || "Failed to complete maintenance");
-    } finally { setMaintenanceBusy(false); }
+    } finally {
+      setMaintenanceBusy(false);
+    }
   };
 
   /* ── PRINT / EXPORT HELPERS ---------- */
@@ -899,14 +1111,21 @@ if (!Number.isNaN(n) && n > maxSeq) {
                     <input className="cp-input" value={batchOverride} onChange={(e) => setBatchOverride(e.target.value)} style={{ width: 90 }} placeholder="Batch e.g. 25" />
                     <input className="cp-input" value={shortCodeOverride} onChange={(e) => setShortCodeOverride(e.target.value)} style={{ width: 120 }} placeholder="Short code (optional)" />
 
-                    <input className="cp-input" type="number" min="1" value={assetQty} onChange={(e) => setAssetQty(Number(e.target.value || 0))} style={{ width: 90 }} />
+                    <input className="cp-input" type="number" min="1" step="1" value={assetQty} onChange={(e) => setAssetQty(Number(e.target.value || 0))} style={{ width: 100 }} placeholder="Quantity" />
+                    <input className="cp-input" type="number" min="0" step="0.01" value={assetPurchasePrice} onChange={(e) => setAssetPurchasePrice(e.target.value)} style={{ width: 160 }} placeholder="Purchase price / unit" />
+                    <input className="cp-input" type="date" value={assetPurchaseDate} onChange={(e) => setAssetPurchaseDate(e.target.value)} style={{ width: 160 }} />
+                    <input className="cp-input" value={assetSupplier} onChange={(e) => setAssetSupplier(e.target.value)} placeholder="Supplier (optional)" style={{ minWidth: 180 }} />
                     <select className="cp-input" value={assetBranch} onChange={(e) => setAssetBranch(e.target.value)} style={{ minWidth: 160 }}>
                       <option value="">Default branch</option>
                       {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                     </select>
                     <input className="cp-input" value={assetCompany} onChange={(e) => setAssetCompany(e.target.value)} placeholder="Company name (e.g. Company A)" style={{ minWidth: 200 }} />
 
-                    <button className="cp-btn" onClick={onCreateAssets}>Create</button>
+                    <div style={{ flexBasis: "100%", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "10px 12px", borderRadius: 10, background: "rgba(99,102,241,.08)" }}>
+                      <span className="muted">Total purchase cost</span>
+                      <strong style={{ fontSize: 18 }}>{fmt.money((Number(assetQty) || 0) * (Number(assetPurchasePrice) || 0))}</strong>
+                    </div>
+                    <button className="cp-btn" onClick={onCreateAssets}>Add Inventory</button>
                   </div>
                   <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>
                     Tip: add arbitrary metadata (JSON) to tag assets (e.g., serial, size, color). You can override prefix/batch/short code — preview below is best-effort.
@@ -1154,12 +1373,27 @@ if (!Number.isNaN(n) && n > maxSeq) {
                 </div>
               </div>
 
+              <div className="asset-purchase-info">
+                <div className="asset-purchase-price">
+                  <span>Purchase price</span>
+                  <strong>
+                    {a.purchasePricePerUnit != null || a.purchasePrice != null
+                      ? `₹${fmt.money(a.purchasePricePerUnit ?? a.purchasePrice)}`
+                      : "Not recorded"}
+                  </strong>
+                </div>
+                <div className="asset-purchase-extra">
+                  {a.purchaseDate && <span>Purchased: {a.purchaseDate}</span>}
+                  {a.purchaseSupplier && <span>Supplier: {a.purchaseSupplier}</span>}
+                </div>
+              </div>
+
               <div className="asset-meta muted">
                 {a.rental?.customer && (
                   <div>Rented to: {a.rental.customer}</div>
                 )}
                 <div>
-                  Created: {fmt.date(a.createdAt)} · {a.createdByName}
+                  Created: {fmt.date(a.createdAt)} · {a.createdByName || "—"}
                 </div>
               </div>
 
@@ -1195,8 +1429,11 @@ if (!Number.isNaN(n) && n > maxSeq) {
                   )
                 )}
 
-                <button className="btn ghost" onClick={() => openMaintenance(a)}>
-                  Maintenance
+                <button
+                  className={`btn ${a.status === "maintenance" ? "maintenance-active-btn" : "ghost"}`}
+                  onClick={() => openMaintenance(a)}
+                >
+                  {a.status === "maintenance" ? "Complete Maintenance" : "Start Maintenance"}
                 </button>
 
                 <select
@@ -1260,28 +1497,182 @@ if (!Number.isNaN(n) && n > maxSeq) {
         </div>
       )}
 
-      {/* Maintenance modal */}
-      {maintenanceOpen && maintenanceAsset && (
-        <div className="cp-modal" onClick={() => setMaintenanceOpen(false)}>
-          <div className="cp-modal-card" onClick={(e) => e.stopPropagation()}>
-            <h3>Maintenance — {maintenanceAsset.assetId}</h3>
-            <div className="muted" style={{ marginTop: 8 }}>
-              Current status: <strong style={{ textTransform: "capitalize" }}>{maintenanceAsset.status}</strong>
-            </div>
+      {/* Premium maintenance workflow */}
+      {maintenanceOpen && maintenanceAsset && createPortal(
+        <div
+          className="cp-modal cp-maintenance-modal"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => !maintenanceBusy && setMaintenanceOpen(false)}
+        >
+          <div className="maintenance-workspace" onClick={(e) => e.stopPropagation()}>
+            {(() => {
+              const activeMaintenance = maintenanceAsset.maintenance || {};
+              const isCompleting = maintenanceAsset.status === "maintenance" && !!activeMaintenance.code;
+              const field = (label, key, type = "text", placeholder = "", extra = {}) => (
+                <label className="maintenance-field">
+                  <span>{label}</span>
+                  <input
+                    type={type}
+                    value={maintenanceForm[key]}
+                    onChange={(e) => updateMaintenanceForm(key, e.target.value)}
+                    placeholder={placeholder}
+                    {...extra}
+                  />
+                </label>
+              );
+              const selectField = (label, key, options) => (
+                <label className="maintenance-field">
+                  <span>{label}</span>
+                  <select
+                    value={maintenanceForm[key]}
+                    onChange={(e) => updateMaintenanceForm(key, e.target.value)}
+                  >
+                    {options.map(([value, text]) => <option key={value} value={value}>{text}</option>)}
+                  </select>
+                </label>
+              );
+              const areaField = (label, key, placeholder) => (
+                <label className="maintenance-field maintenance-field-wide">
+                  <span>{label}</span>
+                  <textarea
+                    rows={3}
+                    value={maintenanceForm[key]}
+                    onChange={(e) => updateMaintenanceForm(key, e.target.value)}
+                    placeholder={placeholder}
+                  />
+                </label>
+              );
 
-            <label className="label" style={{ marginTop: 12 }}>Technician / Responsible</label>
-            <input value={maintenanceTechnician} onChange={(e) => setMaintenanceTechnician(e.target.value)} placeholder="Technician name or team" className="cp-input" />
+              return (
+                <>
+                  <div className="maintenance-head">
+                    <div>
+                      <div className="maintenance-eyebrow">ASSET SERVICE CENTER</div>
+                      <h2>{isCompleting ? "Complete maintenance" : "Start maintenance"}</h2>
+                      <p>{isCompleting
+                        ? "Record the repair work, costs and final condition before returning this asset to stock."
+                        : "Create a traceable service record and move this asset into maintenance."}</p>
+                    </div>
+                    <button className="maintenance-close" onClick={() => setMaintenanceOpen(false)} disabled={maintenanceBusy}>×</button>
+                  </div>
 
-            <label className="label" style={{ marginTop: 8 }}>Note</label>
-            <textarea rows={3} value={maintenanceNote} onChange={(e) => setMaintenanceNote(e.target.value)} className="cp-input" placeholder="Describe issue, parts replaced, expected return date..." />
+                  <div className="maintenance-asset-strip">
+                    <div className="maintenance-asset-icon">🔧</div>
+                    <div className="maintenance-asset-main">
+                      <strong>{maintenanceAsset.assetId}</strong>
+                      <span>{selectedProduct?.name || "Inventory asset"} · {maintenanceAsset.company || "No company"}</span>
+                    </div>
+                    <span className={`maintenance-state-pill ${isCompleting ? "is-active" : "is-new"}`}>
+                      {isCompleting ? "IN MAINTENANCE" : String(maintenanceAsset.status || "in_stock").replace(/_/g, " ").toUpperCase()}
+                    </span>
+                  </div>
 
-            <div className="cp-form-actions" style={{ marginTop: 12 }}>
-              <button className="cp-btn ghost" onClick={() => setMaintenanceOpen(false)}>Cancel</button>
-              <button className="cp-btn" onClick={startMaintenance} disabled={maintenanceBusy}>{maintenanceBusy ? "Working…" : "Start Maintenance"}</button>
-              <button className="cp-btn" onClick={completeMaintenance} disabled={maintenanceBusy}>{maintenanceBusy ? "Working…" : "Complete (In stock)"}</button>
-            </div>
+                  {isCompleting && (
+                    <div className="maintenance-code-banner">
+                      <div>
+                        <span>MAINTENANCE REFERENCE</span>
+                        <strong>{activeMaintenance.code}</strong>
+                      </div>
+                      <div className="maintenance-code-meta">
+                        <span>Started {activeMaintenance.startedAt ? new Date(activeMaintenance.startedAt).toLocaleString() : "—"}</span>
+                        <span>Technician: {activeMaintenance.technician || "—"}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="maintenance-scroll">
+                    {!isCompleting ? (
+                      <>
+                        <div className="maintenance-section-heading">
+                          <span>01</span>
+                          <div><strong>Issue & service details</strong><small>What happened to this asset?</small></div>
+                        </div>
+                        <div className="maintenance-form-grid">
+                          {selectField("Issue category", "category", [
+                            ["general", "General repair"], ["electrical", "Electrical"], ["mechanical", "Mechanical"],
+                            ["damage", "Physical damage"], ["cleaning", "Cleaning / servicing"],
+                            ["inspection", "Inspection"], ["preventive", "Preventive maintenance"], ["other", "Other"],
+                          ])}
+                          {selectField("Priority", "priority", [
+                            ["low", "Low"], ["normal", "Normal"], ["high", "High"], ["urgent", "Urgent"],
+                          ])}
+                          {field("Technician / responsible person *", "technician", "text", "Technician name")}
+                          {field("Service center / vendor", "vendor", "text", "Internal team or vendor")}
+                          {field("Expected completion", "expectedCompletionDate", "date")}
+                          {field("Estimated cost (₹)", "estimatedCost", "number", "0", { min: "0", step: "0.01" })}
+                          {selectField("Asset condition before repair", "initialCondition", [
+                            ["excellent", "Excellent"], ["good", "Good"], ["fair", "Fair"], ["poor", "Poor"], ["damaged", "Damaged"],
+                          ])}
+                          {areaField("Problem description *", "issue", "Describe the fault, damage, symptoms or reason for servicing...")}
+                          {areaField("Initial notes / handover details", "startNotes", "Accessories received, visible damage, customer notes, etc.")}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="maintenance-section-heading">
+                          <span>02</span>
+                          <div><strong>Repair completion report</strong><small>Capture exactly what was done to the asset.</small></div>
+                        </div>
+                        <div className="maintenance-form-grid">
+                          {field("Completion date *", "completionDate", "date")}
+                          {selectField("Final asset condition", "finalCondition", [
+                            ["excellent", "Excellent — like new"], ["good", "Good — ready to use"],
+                            ["fair", "Fair — usable with caution"], ["poor", "Poor — needs follow-up"],
+                            ["damaged", "Damaged — do not release"],
+                          ])}
+                          {field("Labour cost (₹)", "laborCost", "number", "0", { min: "0", step: "0.01" })}
+                          {field("Parts / materials cost (₹)", "partsCost", "number", "0", { min: "0", step: "0.01" })}
+                          {field("Next service due", "nextServiceDate", "date")}
+                          {field("Service vendor", "vendor", "text", "Vendor / workshop")}
+                          {areaField("Work performed *", "workPerformed", "Describe repairs, checks, servicing and tests completed...")}
+                          {areaField("Parts replaced", "partsReplaced", "Part name, quantity, part number or write None")}
+                          {areaField("Completion notes", "completionNotes", "Warranty details, test results, recommendations or follow-up...")}
+                        </div>
+                        <div className="maintenance-cost-summary">
+                          <div><span>Labour</span><strong>₹{fmt.money(maintenanceForm.laborCost || 0)}</strong></div>
+                          <div><span>Parts</span><strong>₹{fmt.money(maintenanceForm.partsCost || 0)}</strong></div>
+                          <div className="maintenance-cost-total"><span>Total maintenance cost</span><strong>₹{fmt.money(Number(maintenanceForm.laborCost || 0) + Number(maintenanceForm.partsCost || 0))}</strong></div>
+                        </div>
+                        {maintenanceForm.finalCondition === "poor" || maintenanceForm.finalCondition === "damaged" ? (
+                          <div className="maintenance-warning">
+                            <strong>Asset not ready for normal use</strong>
+                            <span>Choose a safe final condition before completing. This action currently returns the asset to In Stock, so do not complete it while it remains unsafe.</span>
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+                  </div>
+
+                  <div className="maintenance-footer">
+                    <div className="maintenance-footer-hint">
+                      {isCompleting
+                        ? "Completing will close this service record and return the asset to In Stock."
+                        : "Starting maintenance will block this asset from rental availability."}
+                    </div>
+                    <div className="maintenance-footer-actions">
+                      <button className="maintenance-secondary-btn" onClick={() => setMaintenanceOpen(false)} disabled={maintenanceBusy}>Cancel</button>
+                      {!isCompleting ? (
+                        <button className="maintenance-primary-btn" onClick={startMaintenance} disabled={maintenanceBusy}>
+                          {maintenanceBusy ? "Starting…" : "Start Maintenance"}
+                        </button>
+                      ) : (
+                        <button
+                          className="maintenance-primary-btn"
+                          onClick={completeMaintenance}
+                          disabled={maintenanceBusy || ["poor", "damaged"].includes(maintenanceForm.finalCondition)}
+                        >
+                          {maintenanceBusy ? "Saving report…" : "Complete Maintenance"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Asset details modal */}
@@ -1289,17 +1680,131 @@ if (!Number.isNaN(n) && n > maxSeq) {
   <div className="asset-modal-overlay" onClick={() => setAssetDetailsOpen(false)}>
     <div className="asset-modal-card" onClick={(e) => e.stopPropagation()}>
 
-      <h3 className="asset-modal-title">
-        Asset Details — {assetDetails.assetId}
-      </h3>
-
-      <div className="asset-modal-subtitle">
-        Product: {assetDetails.productId} · Branch: {
-          (branches.find(b => b.id === assetDetails.branchId) || {}).name
-          || assetDetails.branchId || "—"
-        }
+      <div className="asset-details-hero">
+        <div className="asset-details-avatar">▦</div>
+        <div className="asset-details-identity">
+          <div className="asset-details-kicker">INVENTORY ASSET PROFILE</div>
+          <h3 className="asset-modal-title">{assetDetails.assetId}</h3>
+          <div className="asset-modal-subtitle">
+            {selectedProduct?.name || assetDetails.productId}
+            {assetDetails.company ? ` · ${assetDetails.company}` : ""}
+            {" · "}
+            {(branches.find(b => b.id === assetDetails.branchId) || {}).name || assetDetails.branchId || "Default branch"}
+          </div>
+        </div>
+        <span className={`asset-details-status status ${assetDetails.status || "in_stock"}`}>
+          {String(assetDetails.status || "in_stock").replace(/_/g, " ")}
+        </span>
       </div>
 
+      <div className="asset-overview-grid">
+        <div><span>Purchase price</span><strong>₹{fmt.money(assetDetails.purchasePricePerUnit ?? assetDetails.purchasePrice ?? 0)}</strong></div>
+        <div><span>Purchase date</span><strong>{assetDetails.purchaseDate || "—"}</strong></div>
+        <div><span>Current status</span><strong>{String(assetDetails.status || "in_stock").replace(/_/g, " ")}</strong></div>
+        <div><span>Lifetime maintenance</span><strong>₹{fmt.money(assetDetails.totalMaintenanceCost || 0)}</strong></div>
+      </div>
+
+      <div className="asset-purchase-info asset-details-purchase">
+        <div className="asset-purchase-price">
+          <span>Purchase price per unit</span>
+          <strong>
+            {assetDetails.purchasePricePerUnit != null || assetDetails.purchasePrice != null
+              ? `₹${fmt.money(assetDetails.purchasePricePerUnit ?? assetDetails.purchasePrice)}`
+              : "Not recorded"}
+          </strong>
+        </div>
+        <div className="asset-purchase-extra">
+          {assetDetails.purchaseDate && <span>Purchase date: {assetDetails.purchaseDate}</span>}
+          {assetDetails.purchaseSupplier && <span>Supplier: {assetDetails.purchaseSupplier}</span>}
+          {assetDetails.purchaseBatchId && <span>Batch: {assetDetails.purchaseBatchId}</span>}
+        </div>
+      </div>
+
+
+      {/* MAINTENANCE OVERVIEW */}
+      <div className="asset-section asset-maintenance-details">
+        <div className="asset-details-section-head">
+          <div>
+            <h4 className="asset-section-title">Maintenance overview</h4>
+            <p className="asset-muted">Service status, latest work order and lifetime maintenance cost</p>
+          </div>
+          <span className={`maintenance-state-pill ${assetDetails.status === "maintenance" ? "is-active" : "is-new"}`}>
+            {assetDetails.status === "maintenance" ? "IN MAINTENANCE" : "NOT IN MAINTENANCE"}
+          </span>
+        </div>
+
+        {assetDetails.maintenance?.code ? (
+          <>
+            <div className="asset-maintenance-grid">
+              <div><span>Maintenance code</span><strong>{assetDetails.maintenance.code}</strong></div>
+              <div><span>Category</span><strong>{String(assetDetails.maintenance.category || "—").replace(/_/g, " ")}</strong></div>
+              <div><span>Priority</span><strong>{assetDetails.maintenance.priority || "—"}</strong></div>
+              <div><span>Technician</span><strong>{assetDetails.maintenance.technician || "—"}</strong></div>
+              <div><span>Started</span><strong>{fmt.date(assetDetails.maintenance.startedAt)}</strong></div>
+              <div><span>Expected completion</span><strong>{assetDetails.maintenance.expectedCompletionDate || "—"}</strong></div>
+              <div><span>Estimated cost</span><strong>₹{fmt.money(assetDetails.maintenance.estimatedCost || 0)}</strong></div>
+              <div><span>Last maintenance cost</span><strong>₹{fmt.money(assetDetails.maintenance.totalCost || 0)}</strong></div>
+            </div>
+            <div className="asset-maintenance-description">
+              <span>Reported issue</span>
+              <p>{assetDetails.maintenance.issue || "—"}</p>
+              {assetDetails.maintenance.workPerformed && <>
+                <span>Work performed</span>
+                <p>{assetDetails.maintenance.workPerformed}</p>
+              </>}
+              {assetDetails.maintenance.partsReplaced && <>
+                <span>Parts replaced</span>
+                <p>{assetDetails.maintenance.partsReplaced}</p>
+              </>}
+            </div>
+            {assetDetails.maintenance.nextServiceDate && (
+              <div className="asset-next-service">Next service due: <strong>{assetDetails.maintenance.nextServiceDate}</strong></div>
+            )}
+          </>
+        ) : (
+          <div className="asset-muted">No maintenance records have been added for this asset yet.</div>
+        )}
+
+        <div className="asset-maintenance-total">
+          <span>Lifetime maintenance spend</span>
+          <strong>₹{fmt.money(assetDetails.totalMaintenanceCost || 0)}</strong>
+        </div>
+      </div>
+
+      {/* MAINTENANCE WORK ORDER HISTORY */}
+      <div className="asset-section asset-maintenance-history-section">
+        <h4 className="asset-section-title">Maintenance work orders</h4>
+        {Array.isArray(assetDetails.maintenanceHistory) && assetDetails.maintenanceHistory.length > 0 ? (
+          <div className="asset-maintenance-history-list">
+            {assetDetails.maintenanceHistory
+              .slice()
+              .sort((a, b) => Date.parse(b.completedAt || b.startedAt || 0) - Date.parse(a.completedAt || a.startedAt || 0))
+              .map((record, index) => (
+                <div className="asset-maintenance-history-card" key={record.code || index}>
+                  <div className="asset-maintenance-history-top">
+                    <div>
+                      <strong>{record.code || "Maintenance record"}</strong>
+                      <span>{record.category || "General"} · {record.priority || "Normal"} priority</span>
+                    </div>
+                    <span className="maintenance-state-pill is-new">{record.status || "completed"}</span>
+                  </div>
+                  <div className="asset-maintenance-history-grid">
+                    <div><span>Started</span><strong>{fmt.date(record.startedAt)}</strong></div>
+                    <div><span>Completed</span><strong>{record.completionDate || fmt.date(record.completedAt)}</strong></div>
+                    <div><span>Technician</span><strong>{record.technician || "—"}</strong></div>
+                    <div><span>Total cost</span><strong>₹{fmt.money(record.totalCost || 0)}</strong></div>
+                  </div>
+                  {record.issue && <p><b>Issue:</b> {record.issue}</p>}
+                  {record.workPerformed && <p><b>Work:</b> {record.workPerformed}</p>}
+                  {record.partsReplaced && <p><b>Parts:</b> {record.partsReplaced}</p>}
+                  {record.nextServiceDate && <div className="asset-next-service">Next service: <strong>{record.nextServiceDate}</strong></div>}
+                </div>
+              ))}
+          </div>
+        ) : (
+          <div className="asset-muted">No completed maintenance work orders yet.</div>
+        )}
+      </div>
 
       {/* METADATA */}
       <div className="asset-section">
@@ -1444,7 +1949,15 @@ if (!Number.isNaN(n) && n > maxSeq) {
 
                         
                         <td>
-                          {h.note || "—"}
+                          <div>{h.note || "—"}</div>
+                          {data.maintenanceCode && (
+                            <div className="asset-history-maintenance">
+                              <strong>{data.maintenanceCode}</strong>
+                              {data.technician && <span> · {data.technician}</span>}
+                              {data.totalCost != null && <span> · ₹{fmt.money(data.totalCost)}</span>}
+                              {data.workPerformed && <p>{data.workPerformed}</p>}
+                            </div>
+                          )}
                         </td>
 
                       </tr>
